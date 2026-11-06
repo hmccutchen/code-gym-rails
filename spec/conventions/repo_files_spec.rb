@@ -54,6 +54,13 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(referenced_paths(doc.path).map(&:first)).to eq([ "spec/rails_helper.rb" ])
   end
 
+  it "uploads failure screenshots from the folder Capybara saves them to" do
+    steps = YAML.load_file(Rails.root.join(".github/workflows/ci.yml")).dig("jobs", "system_test", "steps")
+    upload = steps.find { |step| step["name"] == "Upload failure screenshots" }
+
+    expect(Rails.root.join(upload.dig("with", "path"))).to eq(Pathname(Capybara.save_path))
+  end
+
   it "pins every CI job to ubuntu-24.04 rather than a moving label" do
     runners = YAML.load_file(Rails.root.join(".github/workflows/ci.yml")).fetch("jobs").transform_values { |job| job["runs-on"] }
 
