@@ -8,9 +8,9 @@ A team Rails app for daily personalized coding exercises. Each engineer logs in 
 
 All changes are made on a feature/dev branch, never directly on `main`. Create (or switch to) a branch before touching any files, and open a PR into `main` when the work is ready for review.
 
-A push runs the unit suite through the pre-push hook (`lefthook.yml`), so give
-`git push` a timeout of at least five minutes, and don't push while another
-spec run on this machine is using the test database.
+A push runs static checks through `lefthook.yml`, not RSpec.
+`docs/code-notes/lefthook.md` lists the checks. Separate local spec runs
+must still avoid sharing the test database concurrently.
 
 **Every PR gets two reviews once the implementation is done, each run by a
 separate agent.** After the suites pass and before the PR is marked ready,
@@ -38,6 +38,9 @@ PR comment listing what was fixed, what was rejected and why, and which
 issues were opened. Reviewers can run specs, and two runs sharing the test
 database fail falsely, so don't run the suite while a review agent is
 working.
+
+Merge only after the full CI suites pass on the final PR commit and GitHub
+review findings are resolved.
 
 ## Code Style
 
@@ -261,9 +264,9 @@ exists, a table missing from `.claude/rules/models.md`, a CI job off
 CVE audit (`bundle-audit` is not installed) or any complexity check beyond
 length, and this
 repository has no branch protection — so no check gates a merge. The local
-hooks (`lefthook.yml`) run the same checks, except the system specs, before a
-push, but anyone can skip them. CI is
-advisory signal; it is not evidence that anything was verified.
+hooks (`lefthook.yml`) run static checks, not RSpec, before a push, but anyone
+can skip them. Neither hooks nor branch protection enforce the merge policy
+above; inspect actual final-commit CI results rather than assuming checks ran.
 
 ## Stack
 
@@ -334,7 +337,7 @@ bin/jobs              # optional: Solid Queue and the recurring schedule
 ```
 
 `bin/setup` also installs Prettier for `CodeFormat` and the git hooks in
-`lefthook.yml`, which run CI's checks before a commit and before a push.
+`lefthook.yml`, which run local static checks before a commit and before a push.
 `docs/code-notes/lefthook.md` says which run when and how to skip them.
 Prettier needs Node and npm. On an older checkout, run
 `npm --prefix vendor/prettier ci` and `bundle exec lefthook install` once.
@@ -354,12 +357,12 @@ development.
 ## Tests
 
 **What to run when.** During a TDD step, run the spec file you are changing.
-When a task is done, run the unit suite once
-(`bundle exec rspec --exclude-pattern "system/**/*_spec.rb"`). Before opening
-a PR, run `spec/system` once. CI runs everything on every PR. A diff that
-touches one of the shared authorities named in
-`.github/copilot-instructions.md` still runs the full unit suite, not just the
-changed file. After a failing run, `bundle exec rspec --only-failures` re-runs
+Run focused tests and relevant lint locally for each correction. Use the
+changed files and their consumers to choose the focused coverage; the shared
+authorities in `.github/copilot-instructions.md` need downstream coverage too.
+Let CI run the full unit and system suites on the final PR commit, and verify
+they pass before merging. Local hooks do not repeat those suites.
+After a failing run, `bundle exec rspec --only-failures` re-runs
 only what failed; RSpec records each example's result in `spec/examples.txt`
 (gitignored).
 
