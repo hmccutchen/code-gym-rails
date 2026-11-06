@@ -8,6 +8,8 @@ RSpec.describe "Conventions held over the repository's own files" do
 
   def relative(path) = Pathname(path).relative_path_from(Rails.root).to_s
 
+  def ci_workflow = YAML.load_file(Rails.root.join(".github/workflows/ci.yml"))
+
   def instruction_docs
     REFERENCE_DOCS.map { |path| Rails.root.join(path).to_s } + Dir[Rails.root.join(".claude/{rules,agents}/*.md")].sort
   end
@@ -55,14 +57,14 @@ RSpec.describe "Conventions held over the repository's own files" do
   end
 
   it "uploads failure screenshots from the folder Capybara saves them to" do
-    steps = YAML.load_file(Rails.root.join(".github/workflows/ci.yml")).dig("jobs", "system_test", "steps")
-    upload = steps.find { |step| step["name"] == "Upload failure screenshots" }
+    upload = ci_workflow.dig("jobs", "system_test", "steps").find { |step| step["name"] == "Upload failure screenshots" }
 
+    expect(upload).to be_present, "ci.yml's system_test job has no step named Upload failure screenshots"
     expect(Rails.root.join(upload.dig("with", "path"))).to eq(Pathname(Capybara.save_path))
   end
 
   it "pins every CI job to ubuntu-24.04 rather than a moving label" do
-    runners = YAML.load_file(Rails.root.join(".github/workflows/ci.yml")).fetch("jobs").transform_values { |job| job["runs-on"] }
+    runners = ci_workflow.fetch("jobs").transform_values { |job| job["runs-on"] }
 
     expect(runners.reject { |_job, runner| runner == "ubuntu-24.04" }).to be_empty
   end
