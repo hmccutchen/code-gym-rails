@@ -23,8 +23,9 @@ often**, not merely fill differently. `slot_staleness` is a `max` over the
 eligible pool, so a narrowed pool keeps the surviving kind scheduled — and
 therefore fresh — which lowers the slot's staleness and loses it ranking
 contests on days too short to fill every slot. Excluding two of the three
-fourth kinds takes that slot from roughly 81% of 3-section days to 50%, and
-from 36% of 2-section days to 14%. The exclusion copy says so outright rather
+fourth kinds takes that slot from roughly 81% of 4-section days to 50%, and
+from 37% of 3-section days to 14%, measured with the default daily pair; a
+2-section day has no optional slot. The exclusion copy says so outright rather
 than leaving it to be discovered. Ranking the slot over the *full* pool
 instead was considered and is worse: an excluded kind is never scheduled, so
 its staleness grows without bound and the slot would monopolize every scarce
