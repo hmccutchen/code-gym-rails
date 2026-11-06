@@ -1,6 +1,6 @@
 # Tracks
 
-a track is the person's overall level, and it is
+A track sets baseline difficulty, and it is
 `skill_level` itself; nothing stores it a second time. Every kind follows
 it unless that kind has a target of its own, earned through a level
 suggestion or set in the Exercise mix. The welcome page at `/welcome` asks
@@ -12,9 +12,71 @@ keys, a level on the ladder, and `User#first_run?` still true, or a 422 that
 saves nothing. `User#choose_track` sets `skill_level` and `track_chosen_at`.
 No preset targets are written: since 2026-10-15 the generation prompt
 states every kind's level whether or not it has a target, so a target equal
-to the skill level would change nothing. **Senior is the highest track
-graduation reaches; principal engineer is set by hand in Setup**, and both
+to the skill level would change nothing. **Senior is the highest level
+suggestions reach; principal engineer is set by hand in Setup**, and both
 pages say so.
+
+## Track and exercise mix
+
+The decision in #709, agreed on 2026-11-05, is to keep track out of
+kind frequency. Track supplies neither an initial exercise-mix preset nor
+an ongoing rotation bias. Changing track does not rewrite exercise weights
+or exclusions. The same kinds remain available across tracks, subject to
+the user's explicit settings; the existing principal-engineer and
+difficulty-lock restrictions remain unchanged. A junior can practise
+architecture through a simpler problem, and a senior can still benefit
+from a code-ordering exercise.
+
+Today, `SectionRotation` selects optional kinds using history, weights and
+exclusions; `DailyPlan` does not use track or per-kind difficulty to bias
+the mix. `KindDifficulty#rung_for` resolves each kind's target or baseline,
+and `GenerationPrompt::DifficultyGuidance` expresses those levels.
+Sharing kinds across tracks does not establish that every kind's prompts
+adequately distinguish levels: #718 owns that difficulty-definition work.
+Demonstrated practice needs and explicit preferences guide frequency under
+the protected-practice and variety direction in #714, whose implementation
+is separate from this decision.
+
+## Graduation direction — not yet implemented
+
+The direction agreed in #709 on 2026-11-05 keeps two layers of progression:
+
+- **Per-kind advancement:** success at a kind's current difficulty can earn
+  an opportunity to attempt harder work. Code review can move to mid-level
+  while design comparison stays junior. Today's `LevelSuggestion` already
+  offers per-kind changes that require an explicit Apply and leave the
+  overall track alone (`level-suggestions.md`).
+- **Overall graduation:** broad, sustained performance at the next level
+  can justify offering an overall track change. This is a future offer,
+  never a silent promotion. Success at the current level earns the harder
+  opportunity; evidence from that harder work supports graduation.
+
+A future graduation offer and its application must preserve easier
+per-kind levels where more practice is needed. The weakest kind must not
+hold back every other kind, and success in one kind must not make all
+others harder. How to protect an untargeted kind that currently follows
+the baseline remains undecided. The manual target-preservation change in
+#720 is not implemented, and preserving explicit targets alone would not
+settle that untargeted-kind case. The current clearing behavior below must
+not be assumed to implement graduation's protection.
+
+Per-kind difficulty, overall graduation and Automatic daily workload size
+are separate decisions. The four-of-five rule approved in #715 concerns
+growing the workload from two sections to three; it is not a graduation
+threshold. Graduation recognizes ability demonstrated in the app's
+exercises, not professional seniority, which also involves delivery,
+collaboration and judgment in real projects. Senior remains the highest
+level graduation may offer; principal engineer remains a manual choice.
+
+Graduation's required breadth, evidence thresholds and time windows remain
+open, as do presentation, wording and confirmation. Eligibility still needs
+decisions about self-ratings, eased work, retention, and unavailable or
+user-excluded kinds. It must neither require every kind to advance nor
+treat missing evidence as demonstrated readiness. These questions and the
+preservation behavior need their own specification before implementation;
+this decision adds no graduation algorithm or UI.
+
+## Current behavior and history
 
 **`track_chosen_at` is a flag, not a clock.** `User#first_run?` is a saved
 account with no `track_chosen_at` and no exercise.
@@ -53,7 +115,7 @@ it. In specs, `create_user_with_key` and `create_fake_provider_user` stand
 for accounts that chose a track; a first-run spec passes
 `track_chosen: false`.
 
-**Every track change clears the targets the track now covers.**
+**Current track changes clear the targets the track now covers.**
 `TrackChange` is the one statement of the rule: an unlocked target equal to
 the old or the new level is cleared, so that kind follows the track again;
 every other target stays, including a locked one and, on a two-rung move,
@@ -69,8 +131,11 @@ reply carries the preference state the Exercise mix adopts in place (the
 that kept their own level. Once presets stop being written, a target equal to
 the old level can't be told apart from one chosen on purpose, so a deliberate
 target at the old level is cleared too and only a lock protects it; that was
-decided on 2026-10-15. Showing what a change will do before the select saves
-is a follow-up, and graduation's card will show it from the same `TrackChange`.
+decided on 2026-10-15. The approved direction in #720 supersedes that policy
+but is not yet implemented: manual changes will preserve explicit targets
+and locks, with an inline consequence preview and explicit Apply or Cancel.
+Until that work lands, Setup still autosaves and clears targets as described
+here. Graduation's preservation and interaction remain separately scoped.
 
 **Existing accounts were told apart by a backfill, not a date.**
 `AddLearningTrackToUsers` added the nullable string and
