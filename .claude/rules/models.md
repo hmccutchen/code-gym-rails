@@ -17,6 +17,12 @@ semantics, must preserve compatibility or deliberately migrate both durable
 receipt tokens and open suffix data/policy before rollout. Frozen decoding
 alone does not preserve replay semantics.
 
+`ConceptMastery.practice_requests` is reserved, inactive storage (non-null
+jsonb, default `{}`). The P-S schema release does not initialize practice
+state or implement #712, #714 or #716; no application code reads or writes
+the field. P-C readers must wait until web and worker have deployed P-S or a
+verified descendant; P-C compatibility and P-A activation are later releases.
+
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
