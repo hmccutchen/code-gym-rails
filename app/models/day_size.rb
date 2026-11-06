@@ -1,31 +1,20 @@
-# A fixed setting returns early so the rule can't reach it, clamped because a stored count may be out of range.
 class DaySize
-  Decision = Data.define(:count, :reason, :setting, :completion, :gate) do
+  Decision = Data.define(:count, :reason, :setting, :gate) do
     def automatic? = setting.nil?
 
-    # Read from the gate, so the brake blocks coverage even when completion alone would also give the floor.
-    def brake? = automatic? && gate.reason == :brake
+    # Coverage must not bypass either an isolated skip or workload recovery.
+    def brake? = automatic? && gate.safety_hold
 
     def diagnostics
-      { count: count, reason: reason, setting: setting || User::AUTOMATIC_SECTION_COUNT, completion: completion,
-        gate: { count: gate.count, reason: gate.reason, evidence: gate.evidence } }
+      { count: count, reason: reason, setting: setting || User::AUTOMATIC_SECTION_COUNT,
+        gate: gate&.to_h }
     end
   end
 
-  def self.for(setting:, completion:, gate:)
-    decision = Decision.new(count: setting&.clamp(User::DAILY_SECTION_COUNTS),
-                            reason: :setting, setting: setting, completion: completion, gate: gate)
-    return decision if setting
+  def self.for(setting:, gate: nil)
+    return Decision.new(count: setting.clamp(User::DAILY_SECTION_COUNTS), reason: :setting, setting: setting, gate: nil) if setting
 
-    decision.with(count: [ completion, gate.count ].min.clamp(SectionCount::FLOOR, ExerciseSection::MAX_SECTIONS),
-                  reason: automatic_reason(completion, gate))
+    reason = %i[brake completion].include?(gate.reason) ? gate.reason : :gate
+    Decision.new(count: gate.count, reason: reason, setting: nil, gate: gate)
   end
-
-  # Completion is named whenever it alone gives the same count; the gate and brake only when they lowered it.
-  def self.automatic_reason(completion, gate)
-    return :completion if completion <= gate.count
-
-    gate.reason == :brake ? :brake : :gate
-  end
-  private_class_method :automatic_reason
 end

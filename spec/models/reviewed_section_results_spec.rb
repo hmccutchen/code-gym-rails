@@ -79,6 +79,15 @@ RSpec.describe ReviewedSectionResults do
     expect(described_class.for(response({ "code_review" => { rung: "junior" } }, submitted: false))).to eq([])
   end
 
+  it "excludes supplementary bug hunts without excluding ordinary or multi-file reviews" do
+    row = response({ "code_review" => { rung: "junior" }, "pattern" => { rung: "junior" } })
+    row.daily_exercise.problem_set["code_review"]["purpose"] = "Find the trap"
+    expect(described_class.for(row, require_rubric: true).map(&:kind)).to eq([ "pattern" ])
+    row.daily_exercise.problem_set["code_review"].delete("purpose")
+    row.daily_exercise.problem_set["code_review"]["files"] = [ { "path" => "a.rb", "code" => "x" } ]
+    expect(described_class.for(row, require_rubric: true).map(&:kind)).to eq(%w[code_review pattern])
+  end
+
   describe "include_eased:" do
     let(:with_eased) do
       response({ "code_review" => { rung: "junior" }, "challenge" => { rung: "junior", eased: true, self: "too_hard" } })

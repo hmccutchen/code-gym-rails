@@ -300,9 +300,7 @@ en:
     shared_concept: "%{sections} today look at the same idea from different sides."
     size_change:
       larger: "Your recent answers qualify you for a larger set."
-      smaller:
-        one: "Your next automatic set will have one section because several recent sections felt too hard."
-        other: "Your next automatic set will have %{count} sections because several recent sections felt too hard."
+      smaller: "Your next automatic set will have %{count} sections to leave more room for practice."
     rating_group: "How hard was %{section} for you?"
     generating_label: "Generating…"
     generate_anyway: "Generate today's set anyway"

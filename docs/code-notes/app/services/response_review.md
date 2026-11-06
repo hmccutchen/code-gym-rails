@@ -39,10 +39,10 @@ then writes neither grades nor mastery, leaves the claim alone and reports
 `:busy`, because the review that now holds the claim will grade the same
 sections. Without the check both would record mastery for the same answers.
 
-Inside that lock, the writer compares assessed answers before and after the
-successful merge. Only the transition from none to at least one counts down
-paused concepts. A walkthrough-only or invalid first batch leaves the
-countdown for a later valid answer. Only newly successful assessed sections
+Inside that lock, the writer compares assessed core answers before and after
+the successful merge. Only the transition from none to at least one counts
+down paused concepts. A supplementary bug hunt, walkthrough-only or invalid
+first batch leaves the countdown for a later valid core answer. Only newly successful assessed sections
 move mastery; retries never replay prior successes. The response save,
 mastery changes and skipped-check deferral stay in the same transaction.
 The pre-existing same-concept retry-order gap is tracked separately in #726;

@@ -19,9 +19,9 @@ would add duplicate evaluations. The all-at-once least-favourable assertion
 remains intact; batch-dependent mastery is not the intended policy.
 
 A paused concept returns early. Cooldown advances only on a response's
-first assessed-answer transition, checked under the response lock by
+first assessed-core-answer transition, checked under the response lock by
 `ResponseReview`. The model additionally requires submission and an assessed
-successful section. Invalid grades and walkthrough-only successes cannot
+successful core section. Supplementary bug hunts, invalid grades and walkthrough-only successes cannot
 count a session or change mastery. Successful skipped retention deferral
 remains separate and still excludes a concept answered anywhere on the day.
 

@@ -30,6 +30,7 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
     travel_to(Time.utc(2026, 10, 14, 9)) { GenerateDailyExercisesJob.perform_now(user_id: user.id) }
 
     expect(user.daily_exercises.sole.plan_notes["daily_kinds"]).to eq(pair)
+    expect(user.daily_exercises.sole.plan_notes["kind_rungs"]).to eq(KindDifficulty.for(user).rungs(skill_level: user.skill_level))
   end
 
   it "records the user's pair on a weekend set" do
@@ -45,17 +46,20 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
     RegenerateExerciseJob.perform_now(user_id: user.id)
 
     expect(legacy.reload.plan_notes["daily_kinds"]).to eq(pair)
+    expect(legacy.plan_notes["kind_rungs"]).to eq(KindDifficulty.for(user).rungs(skill_level: user.skill_level))
   end
 
   it "keeps a carried-forward set's own pair, since moving a held set is not a new plan" do
     held = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: 1.day.ago, language: "ruby_rails",
                                  problem_set: { "code_review" => { "question" => "held" } },
-                                 plan_notes: { "daily_kinds" => %w[code_review design_comparison] })
+                                 plan_notes: { "daily_kinds" => %w[code_review design_comparison], "kind_rungs" => { "code_review" => "senior" } })
     user.update!(paused_generation_at: 2.days.ago)
+    user.update!(section_kind_levels: { "code_review" => "junior" })
 
     user.carry_held_set_forward!
 
-    expect(held.reload).to have_attributes(date: Date.current, plan_notes: { "daily_kinds" => %w[code_review design_comparison] })
+    expect(held.reload).to have_attributes(date: Date.current,
+      plan_notes: { "daily_kinds" => %w[code_review design_comparison], "kind_rungs" => { "code_review" => "senior" } })
   end
 
   it "records the seeded account's own pair on every preview day" do

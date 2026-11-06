@@ -8,8 +8,8 @@ section, the ingest checks and the key's optional fields.
 
 A `bug_hunt` section is a `code_review` section with a `purpose` field.
 Ingest deletes a provider's `purpose` on every other mode, so after ingest
-the field is a reliable marker, and `CodeReview.bug_hunt?` is the one
-reader of it. The mode itself is never stored on the section, the way
+the field is a reliable marker. `CodeReview.bug_hunt?` and the separate
+adaptation facet delegate to `BugHunt.section?`. The mode itself is never stored on the section, the way
 `code_review_mode` never is.
 
 ## `Checks`

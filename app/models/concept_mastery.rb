@@ -21,14 +21,14 @@ class ConceptMastery < ApplicationRecord
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: [ :user_id, :language ] }
 
-  # Count down only on the locked transition from no assessed answers to at least one.
+  # Count down only on the locked transition from no assessed core answers to at least one.
   def self.record_review!(response, sections:, apply_session_countdown:)
     return unless response.submitted?
 
     user = response.user
     assessed = sections & response.assessed_sections
 
-    count_down_paused_concepts!(user) if apply_session_countdown && assessed.any?
+    count_down_paused_concepts!(user) if apply_session_countdown && (assessed & response.assessed_adaptation_sections).any?
     return unless response.concept_tags.is_a?(Hash)
 
     defer_skipped_checks!(response, sections)

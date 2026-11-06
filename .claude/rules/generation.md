@@ -16,13 +16,13 @@ paths:
   - "script/{compare_models,model_comparison,forced_concept_drafts,solve_agreement,report_answer_positions,answer_position_balance,key_sheet_export,key_sample_drafts,draft_key_samples,bug_hunt_measure}.rb"
   - "spec/fixtures/judge/**"
   - "spec/**/*{ai_service,judged_generation,exercise_draft,section_judge_prompt,section_context,pseudocode_prompt,duck_prompt,problem_set_ingest,exercise_section,real_source,judge_verdict,code_format,concept_vocabulary,generate_daily_exercises,regenerate_exercise}*"
-  - "app/models/{daily_plan,section_rotation,section_count,day_hosts}.rb"
+  - "app/models/{daily_plan,section_rotation,day_hosts}.rb"
   - "app/models/exercise_history_entry.rb"
   - "app/views/responses/answers/_design_comparison.html.erb"
   - "app/views/responses/_answered_sections.html.erb"
   - "app/javascript/controllers/comparison_answer_controller.js"
   - "spec/**/exercise_section/**"
-  - "spec/**/*{design_comparison,generation_prompt,section_count,section_rotation}*"
+  - "spec/**/*{design_comparison,generation_prompt,section_rotation}*"
 ---
 
 # Generation, judging and section kinds
@@ -32,6 +32,10 @@ separate inputs and reuses both on retries. Pending answers and draft
 ratings reach neither performance nor its diagnostics; delivered concepts
 and scenarios are repetition-only context and contain no answer keys
 (`docs/decisions/personalization-loop.md`).
+Performance and its completion projection exclude supplementary bug hunts;
+delivered repetition history keeps them. One captured server `kind_rungs`
+map supplies ingest, retry ingest, the judge and the new plan-notes snapshot.
+Existing unstamped rating-driven easing is not reconstructed (#714).
 
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
@@ -63,8 +67,8 @@ read it before changing that area.
   or a `code_review` with files, is dropped);
   a day with every section dropped raises `AllSectionsRejectedError` and
   writes no row. A dropped kind still counts as
-  scheduled, and nothing in the rotation compensates, on purpose; a day's
-  credit never exceeds the sections it delivered. The judge sees one section
+  scheduled, and nothing in the rotation compensates, on purpose; drops
+  supply no workload completion credit. The judge sees one section
   with no concept history, answer keys, `SERVER_STAMPS` or the kind's
   `.judge_hidden_fields`, plus the kind's `.judge_attachment` (a multi-file
   code review's files, every line numbered).

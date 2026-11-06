@@ -26,6 +26,9 @@ table.
 
 Assessed performance and delivered-content history are each fetched once.
 The draft captures both whole projections and retries reuse them.
+It also captures every kind's effective rung once, before the call, using
+the captured difficulty. Ingest, retry ingest, retry ladders and the judge
+reuse that map; judged notes persist it as the period's input snapshot.
 Diagnostics log only assessed performance under `recent_performance`;
 delivered scenarios are not added to logs.
 

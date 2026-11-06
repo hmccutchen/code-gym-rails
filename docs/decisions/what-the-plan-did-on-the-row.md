@@ -6,9 +6,9 @@ default `{}`, null false) records `{"size" => count, "size_reason" =>
 [key, key]}` (the pair the plan used, `docs/decisions/daily-kinds.md`) on
 every plan, and
 `{"coverage" => kind_key, "coverage_reason" => "gap" | "due_check"}`,
-`{"shared_concept" => concept}` and `{"brake" => true}` (the gate's brake
-held, so coverage could add nothing; `size_reason` alone can't say so, since
-it names completion whenever completion gives the same count), each only when
+`{"shared_concept" => concept}` and `{"brake" => true}` (the gate's persistent
+safety hold blocks coverage during recovery or after an isolated skip;
+the most recent transition reason alone cannot say so), each only when
 it applied
 (`DailyPlan::Result#notes`). `brake` has no backfill: a set planned before
 it was recorded reads as unbraked, so the swap picker can show its weeks
@@ -24,3 +24,12 @@ it is on the row. No backfill: no earlier plan added a section or shared a
 concept, and a row from before sizes were recorded has no `size`, which
 the transition log and the dashboard's size lines read as nothing to
 compare against.
+
+New generated and regenerated sets also record `kind_rungs`, the all-kind
+effective-rung map captured by `ExerciseDraft` from the same difficulty input
+used by ingest. Retries reuse it, and `JudgedGeneration` passes it through
+`Result#notes(kind_rungs:)`; provider output cannot set it. Held rows retain
+their old map. The plan does not query difficulty or suggestion state.
+The workload reader validates registry keys and rungs. Absent legacy maps
+fall back to observed section rungs; old setting changes while a kind was
+absent cannot be inferred. No current setting relabels delivered work.

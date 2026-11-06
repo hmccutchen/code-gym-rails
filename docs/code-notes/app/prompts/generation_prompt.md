@@ -13,8 +13,9 @@ plan field is read here and nowhere else. No default queries the database:
 that constructing, rendering and building the schema issue no SQL and mutate
 no input.
 
-Reviewed evidence lists only assessed answers, even when no concept is
-known, and renders totals/skips only for qualified completion. Delivered
+Reviewed evidence lists only assessed core answers, even when no concept is
+known, and renders core totals/skips only for qualified completion. Bug hunts
+are removed at the performance reader, not by prompt branches. Delivered
 notes carry repetition context only. Empty assessment history does not mean
 this is the engineer's first delivered set.
 

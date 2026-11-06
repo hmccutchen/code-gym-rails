@@ -6,10 +6,11 @@ or a fixed count in `User::DAILY_SECTION_COUNTS`, which runs from
 radio group that autosaves through `PATCH /profile`. A fixed count is an
 override of the count only: `DaySize.for` returns it before completion or
 the gate is consulted, so no change to either can reach a user who chose
-one. Automatic takes the lower of the completion rule and the competency
-gate. `SectionRotation` still picks which optional kinds fill the day
-either way, since that is not sizing, and the gate still runs under a fixed
-count so the `[set_size]` line can log its evidence. Weights, exclusions, difficulty targets and locks are unaffected, and
+one. Automatic uses the unified competency gate's count, with core
+completion and recovery inside that fold. `SectionRotation` still picks
+which optional kinds fill the day either way. Fixed sizing performs no gate
+replay query; `[set_size]` reports nil for that unqueried gate.
+Weights, exclusions, difficulty targets and locks are unaffected, and
 the setting is not part of the Exercise mix, so it does not bump
 `section_kind_preferences_version`.
 

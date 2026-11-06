@@ -14,7 +14,8 @@ RSpec.describe GenerationDiagnostics do
   end
   let(:draft) do
     ExerciseDraft::Draft.new(user: user, language: "ruby_rails", problem_set: {}, plan: plan, kinds: kinds,
-                             difficulty: KindDifficulty.none, ladders: {}, history: [], delivered_history: [], suggested_concepts: [], unusable_sections: [])
+                             difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level),
+                             ladders: {}, history: [], delivered_history: [], suggested_concepts: [], unusable_sections: [])
   end
 
   # Every section carries every answer-key field any kind declares, so a new kind or a new field is covered unchanged.
@@ -78,6 +79,23 @@ RSpec.describe GenerationDiagnostics do
                           "code_review_files=single user=#{user.id}",
                           "[planted_key] answer_key=missing kind=plan_review language=javascript attempt=draft code_review_mode=test_file " \
                           "code_review_files=single user=#{user.id}" ])
+  end
+
+  it "keeps supplementary grades and ratings out of logged performance and completion" do
+    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+      problem_set: { "code_review" => { "purpose" => "Find the trap" }, "pattern" => { "question" => "q" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+      answers: { "code_review" => "answer", "pattern" => "answer" },
+      section_ratings: { "code_review" => "too_hard", "pattern" => "right_level" },
+      ai_review: { "code_review" => { "rating" => "developing" }, "pattern" => { "rating" => "solid" } })
+    captured = draft.with(history: user.recent_performance)
+    lines = logged_lines do
+      described_class.new(user).finished("ruby_rails", captured, problem_set, dropped_concepts: {}, judge: nil, unhosted: [])
+    end
+    payload = JSON.parse(lines.grep(/\A\[difficulty_diagnostics\]/).sole.delete_prefix("[difficulty_diagnostics] "))
+    performance = payload.fetch("requested").fetch("recent_performance").sole
+    expect(performance["sections"].map { |section| section["key"] }).to eq([ "pattern" ])
+    expect(performance["completion"]).to eq("answered" => 1, "total" => 1, "skipped_sections" => [])
   end
 
   it "marks a day that asked for several files as multi" do

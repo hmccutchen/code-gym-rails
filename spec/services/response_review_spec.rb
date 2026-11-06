@@ -23,6 +23,47 @@ RSpec.describe ResponseReview do
     described_class.new(subject_response, user: user, reviewer: reviewer).call
   end
 
+  [ %w[code_review pattern], %w[pattern code_review] ].each do |order|
+    it "counts only the first core assessment with batches #{order.inspect}" do
+      paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+      exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
+      allow(reviewer).to receive(:review_sections).and_return(
+        { order.first => review_result("solid"), order.last => failed_result },
+        { order.last => review_result("solid") }
+      )
+      review
+      expect(paused.reload.cooldown_remaining).to eq(order.first == "pattern" ? 1 : 2)
+      review
+      expect(paused.reload.cooldown_remaining).to eq(1)
+      review
+      expect(paused.reload.cooldown_remaining).to eq(1)
+    end
+
+    it "counts the first core batch once with a later pending core answer and a bug in the same batch" do
+      paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
+      exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" })
+        .merge("plan_review" => { "question" => "q" }))
+      response.update!(answers: response.answers.merge("plan_review" => "answer"))
+      allow(reviewer).to receive(:review_sections).and_return(
+        { "code_review" => review_result("solid"), "pattern" => review_result("solid"), "plan_review" => failed_result },
+        { "plan_review" => review_result("solid") })
+      review
+      expect(paused.reload.cooldown_remaining).to eq(1)
+      review
+      expect(paused.reload.cooldown_remaining).to eq(1)
+      review
+      expect(paused.reload.cooldown_remaining).to eq(1)
+    end
+
+    it "guards the mastery countdown boundary against a direct bug-only application" do
+      paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 1)
+      exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "purpose" => "Find the trap" }))
+      response.ai_review = { "code_review" => { "rating" => "strong" } }
+      ConceptMastery.record_review!(response, sections: [ "code_review" ], apply_session_countdown: true)
+      expect(paused.reload).to have_attributes(tier: "paused", cooldown_remaining: 1)
+    end
+  end
+
   [ nil, "invalid" ].each do |grade|
     it "counts the first assessed answer after an earlier #{grade.inspect} batch exactly once" do
       paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)

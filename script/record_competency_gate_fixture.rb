@@ -19,14 +19,17 @@ def generate(profile, seed)
   rng    = Random.new(seed)
   levels = Hash.new("mid_level")
   size   = 2
-  Array.new(DAYS) do
+  Array.new(DAYS) do |index|
     optional = OPTIONAL.sample(rng.rand(0..[ size - 2, 2 ].max), random: rng)
     complete = optional.empty? || rng.rand < profile[:optional_complete]
     answered = complete ? optional : optional.first(optional.size - 1)
     kinds    = (DEFAULT_PAIR + answered).sort_by { |kind| ExerciseSection.keys.index(kind) }
     results  = kinds.map { |kind| result_for(kind, profile, levels, rng) }
-    size     = (size + rng.rand(-1..1)).clamp(2, 4)
-    { "results" => results, "optional" => optional.empty? ? "none" : (complete ? "complete" : "incomplete") }
+    recorded = { "date" => (Date.new(2026, 1, 1) + index).to_s, "assigned" => size,
+      "delivered_core" => DEFAULT_PAIR + optional, "answered_core" => kinds,
+      "results" => results, "optional" => optional.empty? ? "none" : (complete ? "complete" : "incomplete") }
+    size = (size + rng.rand(-1..1)).clamp(2, 4)
+    recorded
   end
 end
 
@@ -39,10 +42,15 @@ def result_for(kind, profile, levels, rng)
 end
 
 def gate_day(day)
+  date = Date.iso8601(day.fetch("date"))
   results = day["results"].map do |kind, level, ai, self_rating, eased|
-    ReviewedSectionResults::Result.new(date: nil, kind: kind, level: level, ai_rating: ai, self_rating: self_rating, eased: eased)
+    ReviewedSectionResults::Result.new(date: date, kind: kind, level: level, ai_rating: ai, self_rating: self_rating, eased: eased)
   end
-  CompetencyGate::Day.new(results: results, optional: day["optional"].to_sym, daily: DEFAULT_PAIR)
+  completion = CompetencyGate::Completion.new(
+    state: (day["delivered_core"] - day["answered_core"]).empty? ? :complete : :incomplete,
+    assigned: day["assigned"], delivered: day["delivered_core"].size, answered: day["answered_core"].size,
+    too_hard: results.select(&:too_hard?).map(&:kind), ratings_known: true)
+  CompetencyGate::Day.new(date: date, results: results, completion: completion, rungs: {})
 end
 
 histories = PROFILES.flat_map do |name, profile|
@@ -54,7 +62,13 @@ histories = PROFILES.flat_map do |name, profile|
 end
 
 previous = FIXTURE.exist? ? JSON.parse(FIXTURE.read).fetch("histories").to_h { |history| [ history["name"], history["plans"] ] } : {}
-changed  = histories.sum { |history| history["plans"].zip(previous.fetch(history["name"], [])).count { |now, before| now != before } }
+histories.each do |history|
+  pairs = history["plans"].zip(previous.fetch(history["name"], []))
+  counts = pairs.count { |now, before| before && now["count"] != before["count"] }
+  up = pairs.count { |now, before| before && now["count"] > before["count"] }
+  reason = pairs.count { |now, before| before && now["count"] == before["count"] && now["reason"] != before["reason"] }
+  puts "#{history['name']}: count=#{counts} up=#{up} down=#{counts - up} reason_only=#{reason} schema_only=#{DAYS - counts - reason} final=#{pairs.last.last&.fetch('count')}->#{pairs.last.first['count']}"
+end
 
 File.write(FIXTURE, JSON.generate("histories" => histories))
-puts "Wrote #{histories.size} histories to #{FIXTURE.relative_path_from(Rails.root)}; #{changed} plans differ from the file it replaced"
+puts "Wrote #{histories.size} histories to #{FIXTURE.relative_path_from(Rails.root)}"

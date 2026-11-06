@@ -37,7 +37,7 @@ class JudgedGeneration
     dropped = outcomes.select { |_, outcome| outcome[:dropped] }.keys
     reject_empty_day!(set, dropped)
     finish(set, dropped, outcomes)
-    AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes,
+    AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes(kind_rungs: @draft.kind_rungs),
                              solves: @chains.flat_map { |key, chain| chain.solves(dropped: dropped.include?(key)) })
   end
 
@@ -243,7 +243,7 @@ class JudgedGeneration
   end
 
   def rung_for(kind)
-    @draft.difficulty.rung_for(kind, skill_level: @user.skill_level)
+    @draft.kind_rungs.fetch(kind.key)
   end
 
   def judge_with_fallback(kind, section)

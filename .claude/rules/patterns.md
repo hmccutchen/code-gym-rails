@@ -74,19 +74,20 @@ says what a deviation from one requires.
   provider is contacted; `ProblemSetIngest` normalizes provider output and
   writes nothing, returning a `Result` instead. `ProblemSetIngest` is pure, so
   its specs need no database; `DailyPlan` composes two pure collaborators of
-  its own — `SectionCount` (how many sections recent completion allows) and `SectionRotation` (which
+  its own — `CompetencyGate` (Automatic count, completion and recovery) and `SectionRotation` (which
   kind fills each) — whose specs need none, even though `DailyPlan` itself
   reads concept-mastery history to decide reinforcement and retention. The
-  same holds for `CompetencyGate` (how many sections reviewed work has
-  earned), `DaySize` (the day's planned count from the setting, completion
-  and the gate), `CoverageException` (whether a two-section day gains a
+  same holds for `DaySize` (the fixed setting or gate count),
+  `CoverageException` (whether a two-section day gains a
   section), `SharedConcept` (which concept both daily sections take) and
   `DayHosts` (which kinds can tag a concept today). Keep the collaborators
   that way.
 - **Single authority per fact** — `DailyExercise#active_section_keys` for how
   many sections a day has, `ConceptVocabulary` for the concept lists and which
   of them a kind may be asked for, `ConceptBucket` for which vocabulary a
-  concept records under. Derive from the authority; never recount.
+  concept records under. `DailyExercise#adaptation_section_keys` owns the
+  active subset through each kind's separate adaptation facet.
+  Derive from the authority; never recount.
 - **One prompt line per vocabulary group** — a concept group that needs a
   cross-section rule gets one `GenerationPrompt::ConceptGuidance#<group>_guidance`
   method naming the group from its constant and stated once for all sections,

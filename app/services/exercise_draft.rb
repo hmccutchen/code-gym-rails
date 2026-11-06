@@ -3,7 +3,7 @@ class ExerciseDraft
   # prompt(user, language, plan:, history:, delivered_history:, difficulty:, ladders:) builds a GenerationPrompt; generate(user, purpose, language, prompt, subject:, deadline:) returns the parsed reply; both raise. record_suggestion(suggestion) may raise.
   Provider = Data.define(:prompt, :generate, :record_suggestion)
 
-  Draft = Data.define(:user, :language, :problem_set, :plan, :kinds, :difficulty, :ladders, :history, :delivered_history,
+  Draft = Data.define(:user, :language, :problem_set, :plan, :kinds, :difficulty, :kind_rungs, :ladders, :history, :delivered_history,
                       :suggested_concepts, :unusable_sections)
 
   def self.call(user, language:, provider:, deadline: GenerationDeadline::NONE)
@@ -13,24 +13,25 @@ class ExerciseDraft
     history    = user.recent_performance
     delivered_history = user.recent_delivered_content
     difficulty = KindDifficulty.for(user)
+    kind_rungs = difficulty.rungs(skill_level: user.skill_level)
     kinds      = plan.kinds
-    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language, plan.code_review_mode,
+    ladders    = GenerationLadders.for(kinds.index_with { |kind| kind_rungs.fetch(kind.key) }, language, plan.code_review_mode,
                                        gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, delivered_history: delivered_history, difficulty: difficulty, ladders: ladders)
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
                                    subject: "problem set", deadline: deadline)
-    files = code_review_files(plan, difficulty, user)
+    files = code_review_files(plan, kind_rungs)
     ingested = ProblemSetIngest.call(
       reply, language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
-      code_review_files: files, code_review_mode: plan.code_review_mode, pitched_at: difficulty.rungs(skill_level: user.skill_level), eased_for: eased_concepts_for(plan, difficulty)
+      code_review_files: files, code_review_mode: plan.code_review_mode, pitched_at: kind_rungs, eased_for: eased_concepts_for(plan, difficulty)
     )
 
     diagnostics = GenerationDiagnostics.new(user)
     diagnostics.unusable_sections(ingested.unusable_sections)
     diagnostics.key_notes(ingested.key_notes, attempt: "draft", code_review_mode: plan.code_review_mode, code_review_files: files)
     Draft.new(user: user, language: language, problem_set: ingested.problem_set, plan: plan, kinds: kinds,
-              difficulty: difficulty, ladders: ladders, history: history, delivered_history: delivered_history,
+              difficulty: difficulty, kind_rungs: kind_rungs, ladders: ladders, history: history, delivered_history: delivered_history,
               suggested_concepts: ingested.suggested_concepts, unusable_sections: ingested.unusable_sections)
   end
 
@@ -42,13 +43,13 @@ class ExerciseDraft
                                    subject: "#{kind.key} retry",
                                    deadline: deadline.leaving(CallProfiles.worst_case_seconds_for("judge_section")))
 
-    files = code_review_files(draft.plan, draft.difficulty, user)
+    files = code_review_files(draft.plan, draft.kind_rungs)
     ingested = ProblemSetIngest.call(
       reply, language: language,
       expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
       code_review_source: draft.plan.code_review_source, code_review_files: files,
       code_review_mode: draft.plan.code_review_mode,
-      pitched_at: { kind.key => draft.difficulty.rung_for(kind, skill_level: user.skill_level) },
+      pitched_at: draft.kind_rungs.slice(kind.key),
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key)
     )
     GenerationDiagnostics.new(user).key_notes(ingested.key_notes, attempt: "retry", code_review_mode: draft.plan.code_review_mode,
@@ -70,13 +71,13 @@ class ExerciseDraft
   end
   private_class_method :featured_concept_name
 
-  def self.code_review_files(plan, difficulty, user)
-    ExerciseSection::CodeReview.day_file_range(plan: plan, difficulty: difficulty, skill_level: user.skill_level)
+  def self.code_review_files(plan, kind_rungs)
+    ExerciseSection::CodeReview.file_range(files: plan.code_review_files, rung: kind_rungs.fetch(ExerciseSection::CodeReview.key))
   end
   private_class_method :code_review_files
 
   def self.retry_ladders(draft, kind)
-    GenerationLadders.for(draft.difficulty.rungs_for([ kind ], skill_level: draft.user.skill_level), draft.language,
+    GenerationLadders.for({ kind => draft.kind_rungs.fetch(kind.key) }, draft.language,
                           draft.plan.code_review_mode, gotcha: draft.plan.code_review_gotcha, featured_concept: draft.plan.featured_concept)
   end
   private_class_method :retry_ladders

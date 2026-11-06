@@ -10,14 +10,13 @@ class SizeForecast
 
   # Ingest can keep an unrequested extra and the judge can drop one, so take the larger of planned and shown.
   def self.delivered_or_planned(exercise)
-    [ exercise.planned_size_with_coverage, exercise.active_section_keys.size ].max
+    [ exercise.planned_size, exercise.adaptation_section_keys.size ].max
   end
   private_class_method :delivered_or_planned
 
-  # Smaller only when the brake lowers it, since the brake is the reason the dashboard line gives.
   def self.change(today, tomorrow)
     return Change.new(direction: :larger, count: tomorrow.count) if tomorrow.count > today
 
-    Change.new(direction: :smaller, count: tomorrow.count) if tomorrow.reason == :brake && tomorrow.count < today
+    Change.new(direction: :smaller, count: tomorrow.count) if %i[brake completion].include?(tomorrow.reason) && tomorrow.count < today
   end
 end

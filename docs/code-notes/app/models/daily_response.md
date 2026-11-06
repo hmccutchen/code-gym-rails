@@ -152,3 +152,9 @@ answered. Skips need no grade or walkthrough, so this may be true while
 writer must see the before-merge and after-merge states on the same instance.
 Review rendering, replacement protection and missing-section retries keep
 their existing review-presence predicates.
+
+An explicit `sections:` argument intersects the selected active subset.
+Workload and generation pass the exercise-owned adaptation keys, so a
+pending or skipped supplementary bug cannot change core completion.
+`assessed_adaptation_sections` intersects that subset with basic assessment;
+the review writer uses it for the first-core-session transition.

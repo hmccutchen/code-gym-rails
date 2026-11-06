@@ -95,7 +95,7 @@ class GeminiCapacityProbe
     @captured   = 0
     @calls_made = 0
     @last_step_attempts = 0
-    @user.daily_section_count = SectionCount::FLOOR
+    @user.daily_section_count = CompetencyGate::FLOOR
   end
 
   def run

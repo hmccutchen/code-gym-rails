@@ -276,14 +276,17 @@ class User < ApplicationRecord
 
   def recent_performance(limit: PERFORMANCE_HISTORY_LIMIT)
     AdaptationHistory.recent(self, limit: limit) do |response|
-      sections = response.assessed_sections.map do |section|
+      core = response.adaptation_section_keys
+      assessed = response.assessed_adaptation_sections
+      next if assessed.empty?
+
+      sections = assessed.map do |section|
         concept = response.concept_tags[section] if response.concept_tags.is_a?(Hash)
         { key: section, concept: history_concept(concept, section, response.daily_exercise.language),
           self_rating: response.self_rating_for(section), ai_rating: response.ai_rating_for(section) }.compact
       end
-      completion = if response.completion_evidence?
-        { answered: response.answered_sections.size, total: response.section_keys.size,
-          skipped_sections: response.section_keys - response.answered_sections }
+      completion = if response.completion_evidence?(sections: core)
+        { answered: assessed.size, total: core.size, skipped_sections: core - assessed }
       end
       { date: response.date.to_s, sections: sections, completion: completion }
     end
@@ -321,16 +324,6 @@ class User < ApplicationRecord
           dropped:                exercise.dropped_sections.size
         )
       end
-  end
-
-  def recent_completion_history(limit: SectionCount::WINDOW, before: Date.current)
-    AdaptationHistory.recent(self, limit: limit, before: before) do |response|
-      exercise = response.daily_exercise
-      next unless response.completion_evidence? && exercise.dropped_sections.is_a?(Array)
-
-      ExerciseHistoryEntry::Completion.new(answered: response.answered_sections.size,
-        delivered_section_keys: exercise.active_section_keys, dropped: exercise.dropped_sections.size)
-    end
   end
 
   def concepts_needing_reinforcement(limit: 10, bucket: nil, exclude_buckets: [], hostable: nil)

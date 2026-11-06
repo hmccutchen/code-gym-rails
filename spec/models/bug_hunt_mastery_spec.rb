@@ -101,10 +101,11 @@ RSpec.describe "A bug_hunt section and concept mastery" do
       expect(ConceptExposureIndex.for(user).count("memoization", "ruby_rails", on_or_before: Date.current)).to eq(1)
     end
 
-    it "counts the section as code_review evidence for the competency gate and level suggestions" do
+    it "keeps graded feedback out of competency and level-suggestion evidence" do
       response = reviewed_day({ "code_review" => hunt("memoization") })
 
-      expect(ReviewedSectionResults.for(response).map(&:kind)).to eq(%w[code_review])
+      expect(response.assessed_sections).to eq(%w[code_review])
+      expect(ReviewedSectionResults.for(response)).to be_empty
     end
   end
 end

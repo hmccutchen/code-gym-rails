@@ -29,13 +29,13 @@ RSpec.describe ExerciseDraft do
 
   def draft_for(language: "ruby_rails", mode: :application_code)
     described_class::Draft.new(user: user, language: language, problem_set: {}, plan: Struct.new(:code_review_mode, :code_review_gotcha, :featured_concept).new(mode, nil, nil),
-                               kinds: [], difficulty: KindDifficulty.none, ladders: {}, history: [], delivered_history: [],
+                               kinds: [], difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level), ladders: {}, history: [], delivered_history: [],
                                suggested_concepts: [], unusable_sections: [])
   end
 
   it "keeps the draft to its user and language, the plan, the drafted inputs and the ingest results" do
     expect(described_class::Draft.members)
-      .to eq(%i[user language problem_set plan kinds difficulty ladders history delivered_history suggested_concepts unusable_sections])
+      .to eq(%i[user language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections])
   end
 
   it "asks for the week's featured concept and plans the day around it, so a hiding kind is never offered it" do
@@ -117,6 +117,43 @@ RSpec.describe ExerciseDraft do
     expect(inputs.size).to eq(2)
     expect(inputs.last[:history]).to equal(inputs.first[:history])
     expect(inputs.last[:delivered_history]).to equal(inputs.first[:delivered_history])
+  end
+
+  it "captures all server rungs before the call and reuses them when retrying" do
+    original = KindDifficulty.for(user).rungs(skill_level: user.skill_level)
+    reply["kind_rungs"] = { "code_review" => "principal_engineer" }
+    reply["code_review"]["pitched_at"] = "principal_engineer"
+    changing = provider.with(generate: ->(*, **) { user.skill_level = "junior"; reply })
+    draft = described_class.call(user, language: "ruby_rails", provider: changing)
+    expect(draft.kind_rungs).to eq(original)
+    expect(draft.problem_set["code_review"]["pitched_at"]).to eq("senior")
+    reply["code_review"]["pitched_at"] = "principal_engineer"
+    retried = described_class.retry_section(draft, ExerciseSection::CodeReview, "n_plus_one", provider: provider)
+    expect(retried["pitched_at"]).to eq("senior")
+    expect(draft.plan.notes(kind_rungs: draft.kind_rungs)["kind_rungs"]).to eq(original)
+  end
+
+  it "removes bug performance from initial and retry prompts while retaining repetition context" do
+    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+      problem_set: { "code_review" => { "purpose" => "Find the trap", "concept" => "memoization", "scenario" => "BUG-REPETITION" },
+        "pattern" => { "question" => "q", "concept" => "caching" } })
+    user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, submitted_at: Time.current,
+      answers: { "code_review" => "bug answer", "pattern" => "core answer" },
+      section_ratings: { "code_review" => "too_hard", "pattern" => "right_level" },
+      ai_review: { "code_review" => { "rating" => "developing" }, "pattern" => { "rating" => "solid" } })
+    real_prompts = provider.with(prompt: ->(person, language, **options) {
+      GenerationPrompt.new(person, language, **options, retention_annotation: generation_retention_annotation)
+    })
+    captured = described_class.call(user, language: "ruby_rails", provider: real_prompts)
+    described_class.retry_section(captured, ExerciseSection::CodeReview, "n_plus_one", provider: real_prompts)
+    expect(captured.history.sole[:completion]).to eq(answered: 1, total: 1, skipped_sections: [])
+    expect(captured.history.sole[:sections].map { |section| section[:key] }).to eq([ "pattern" ])
+    generated.each do |request|
+      evidence = request[:prompt].split("Reviewed answer evidence:").last.split("Delivered content").first
+      expect(evidence).to include("1/1 answered", "pattern")
+      expect(evidence).not_to include("code_review", "too_hard", "developing", "bug answer")
+      expect(request[:prompt]).to include("BUG-REPETITION")
+    end
   end
 
   def planted_key_lines
