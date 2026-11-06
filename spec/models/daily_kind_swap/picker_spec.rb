@@ -117,11 +117,11 @@ RSpec.describe DailyKindSwap::Picker do
       expect(option(pickers["code_review"], "challenge").consequences.warning.first).to include("about once every")
     end
 
-    it "explains growth through reviewed answers and completed core work on an available swap" do
+    it "explains growth through reviewed answers and finished sections on an available swap" do
       exercise(size: 2)
       candidate = option(pickers["code_review"], "pattern")
       expect(candidate).to be_available
-      expect(candidate.consequences.warning).to include("Your sets grow based on reviewed answers and completed core work.")
+      expect(candidate.consequences.warning).to include("Your sets grow based on your reviewed answers and the sections you finish.")
       expect(candidate.consequences.warning.join).not_to include("Your two daily sections are also what decides")
     end
   end
