@@ -28,11 +28,16 @@ module GenerationPrompt::DifficultyGuidance
   end
 
   def self.ladder_lines(kinds, ladders)
-    owners = kinds.select { |kind| ladders.fetch(kind, {}).any? }
-    return [] if owners.empty?
-
-    entries = owners.flat_map { |kind| ladders.fetch(kind).to_a }.uniq.sort
-    [ "Concept ladders for #{owners.map(&:key).join(', ')}:", *entries.map { |concept, text| "- #{concept}: #{text}" } ]
+    owners_by_entry = {}
+    kinds.each do |kind|
+      ladders.fetch(kind, {}).each do |entry|
+        (owners_by_entry[entry] ||= []) << kind
+      end
+    end
+    owners_by_entry.group_by { |_entry, owners| owners }.flat_map do |owners, entries|
+      lines = entries.map(&:first).sort.map { |concept, text| "- #{concept}: #{text}" }
+      [ "Concept ladders for #{owners.map(&:key).join(', ')}:", *lines ]
+    end
   end
 
   def self.unlocked_difficulty_line(kinds)

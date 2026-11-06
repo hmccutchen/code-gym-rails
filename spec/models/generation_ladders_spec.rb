@@ -111,5 +111,39 @@ RSpec.describe GenerationLadders do
       expect(ladders.fetch(bug)).to include(gotcha.concept => reference.ladder_senior)
       expect(ladders.fetch(challenge)).not_to have_key(gotcha.concept)
     end
+
+    it "keeps picked-gotcha and challenge-only guidance under their actual owners at the same effective rung" do
+      reference
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "Trace the repeated query.", ladder_principal_engineer: "p")
+      placed = { bug => "senior", challenge => "senior" }
+      ladders = described_class.for(placed, "ruby_rails", :bug_hunt, gotcha: gotcha)
+      text = GenerationPrompt::DifficultyGuidance.render(rungs: placed, difficulty: KindDifficulty.none, ladders: ladders, mode: :bug_hunt)
+
+      expect(ladders.fetch(bug).keys).to eq([ gotcha.concept ])
+      expect(ladders.fetch(challenge).keys).to eq([ "n_plus_one" ])
+      expect(text).to include("Concept ladders for code_review:\n- #{gotcha.concept}: #{reference.ladder_senior}",
+                             "Concept ladders for challenge:\n- n_plus_one: Trace the repeated query.")
+      expect(text).not_to include("Concept ladders for code_review, challenge:")
+    end
+
+    it "deduplicates ordinary guidance only for the actual owners of each concept and text" do
+      ladders = {
+        bug => { "n_plus_one" => "Shared query guidance.", "memoization" => "Review cache behavior.",
+                 "caching" => "Review-specific guidance." },
+        challenge => { "n_plus_one" => "Shared query guidance.", "guard_clauses" => "Implement early returns.",
+                       "caching" => "Challenge-specific guidance." }
+      }
+      [ [ bug, challenge ], [ challenge, bug ] ].each do |kinds|
+        text = GenerationPrompt::DifficultyGuidance.render(rungs: kinds.index_with { "senior" },
+          difficulty: KindDifficulty.none, ladders: ladders, mode: :application_code)
+        groups = text.scan(/Concept ladders for ([^\n]+):\n((?:- [^\n]+\n?)+)/).to_h
+
+        expect(groups.fetch(kinds.map(&:key).join(", "))).to eq("- n_plus_one: Shared query guidance.\n")
+        expect(groups.fetch("code_review")).to eq("- caching: Review-specific guidance.\n- memoization: Review cache behavior.\n")
+        expect(groups.fetch("challenge")).to eq("- caching: Challenge-specific guidance.\n- guard_clauses: Implement early returns.\n")
+        expect(text.scan("- n_plus_one: Shared query guidance.").size).to eq(1)
+      end
+    end
   end
 end

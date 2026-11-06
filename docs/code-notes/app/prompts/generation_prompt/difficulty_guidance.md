@@ -20,9 +20,10 @@ targeted kinds only, and an untargeted kind got nothing but the profile's
 
 Each kind returns its composed `difficulty_definition`. Equal effective
 rungs share a baseline within a configured level, followed by each kind's
-expectation. A conditional heading names the owners of the concept guidance
-directly below that baseline. Only identical concept/text pairs within the
-group are deduplicated; different effective rungs keep separate lists.
+expectation. Within that baseline, each exact concept/text pair retains
+its actual owners. Pairs with the same owner set share a conditional
+heading; a shared entry appears once, and a kind-only entry stays under
+that kind alone. Different effective rungs keep separate lists.
 Both baseline parts remain present without references. Kind-owned context
 handles the bounded bug-hunt exception without a branch in this renderer.
 

@@ -20,7 +20,9 @@ It returns a small immutable value with the effective `rung` and concrete
 `expectation`; `standard` reads the shared meaning for that rung, and the
 string form joins standard and expectation. Within a configured level,
 generation groups equal effective rungs, names each kind's expectation,
-then labels the owners of any concept guidance. The section judge, review
+then groups concept/text pairs by their actual owner sets. Shared guidance
+appears once; kind-only guidance has a narrower heading even when other
+kinds share its effective rung. The section judge, review
 and unanswered walkthroughs use the same value's string form. Shared
 prompts never branch on kind or mode.
 
@@ -242,6 +244,8 @@ first implementation and **47,508** at base. Headroom is **6,198**.
 The current maximum uses JavaScript/application code, levels senior, mid,
 principal, junior respectively, with pattern locked. This is bounded
 customized coverage, not an enumeration of every customized list or order.
+The later same-rung ownership correction was remeasured at these same
+default and customized maxima and shapes; neither worst-case maximum rose.
 
 Coverage was read locally from shared `ConceptReference` identity and
 nonblank-ladder metadata only, on PostgreSQL **14.22 (Homebrew)**. The
