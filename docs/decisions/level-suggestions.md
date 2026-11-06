@@ -71,9 +71,17 @@ kind's own results.
 
 A pooled move's step carries `pooled: true` and the window's favourable
 count, which the card shows. Its event row carries the kind's own counts
-like any other row. An own move needs a full window and a pooled move
-needs a short one, so a `suggestion` row was a pooled move exactly when
-its `window_size` is below five.
+like any other row. An own step up needs a full window and a pooled one
+needs a short one, so a `suggestion` row that moves a kind up was a pooled
+move exactly when its `window_size` is below five. A step back can also
+record a short window, and its `to_level` is the lower rung.
+
+A kind swapped out of the daily kinds usually keeps five or more results
+at its rung from its daily days. It is judged on its newest five alone
+until rotated results replace them or they leave the 60-response read,
+which at one appearance in eight days is slow. That is accepted: counting
+only rotated results toward the full window would let a kind whose own
+record fails move on the pool.
 
 **A cutoff keeps the same work from proposing another move.**
 Not now records each kind's current rung and the newest reviewed response

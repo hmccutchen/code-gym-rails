@@ -264,6 +264,13 @@ RSpec.describe LevelSuggestion do
       expect(propose(results: results, pooled: rotated)).to be_nil
     end
 
+    it "counts results from a kind's daily days toward its own five" do
+      own = [ turn(0), result(5, ai: "developing"), result(6, ai: "developing"), result(7), result(8) ]
+      results = { "pattern" => own, "challenge" => [ turn(1), turn(2) ], "architecture" => [ turn(3), turn(4) ] }
+
+      expect(kinds_in(propose(results: results, pooled: rotated))).to eq(%w[challenge architecture])
+    end
+
     it "judges a kind with five results of its own on those alone" do
       own = [ turn(0), turn(3, ai: "developing"), turn(4, ai: "developing"), turn(5), turn(6) ]
       results = { "pattern" => own, "challenge" => [ turn(1), turn(2) ], "architecture" => [ turn(1), turn(2) ] }

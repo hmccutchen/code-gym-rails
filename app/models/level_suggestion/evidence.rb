@@ -20,7 +20,7 @@ class LevelSuggestion
     private
 
     def day_results(response)
-      daily = response.daily_exercise&.daily_kinds.to_a.map(&:key)
+      daily = response.daily_exercise.daily_kinds.map(&:key)
 
       ReviewedSectionResults.for(response, require_rubric: true).map do |result|
         [ result.kind, Result.new(date: result.date, level: result.level, ai_rating: result.ai_rating,

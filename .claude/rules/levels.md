@@ -43,7 +43,7 @@ read it before changing that area.
   its own five results; a rotated kind (`LevelSuggestion.pooled_kinds`) also
   moves on the window the rotated kinds at its rung share
   (`LevelSuggestion::PooledWindow`), and only with a solid result of its own
-  in that window and fewer than five results of its own. The window holds
+  in that window and fewer than five results of its own at the rung. The window holds
   only results from days the kind was rotated (`Result#rotated`, from the
   row's `plan_notes`), so no daily kind's results move another kind. A rung change records a
   cutoff under the user-row lock (`LevelChange#record_cutoffs`), except a move
