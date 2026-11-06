@@ -99,4 +99,4 @@ or refusal. Existing bang methods delegate and keep true/false and
 `LimitReached`. Corrupt selected suffixes fail the read or command
 explicitly rather than fabricating capacity.
 `docs/decisions/daily-mastery-reconciliation.md` owns the full group,
-restart, legacy-prefix and default-off deployment rules.
+restart, legacy-prefix and staged activation/rollback rules.
