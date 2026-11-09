@@ -7,6 +7,17 @@ RSpec.describe "Setup Daily sections control", type: :request do
 
   def name(key) = I18n.t("sections.#{key}.name")
 
+  [ nil, 2 ].each do |count|
+    it "names the regular sections without promising every-set delivery at #{count || "Automatic"}" do
+      user.update!(daily_section_count: count)
+      login_as(user)
+
+      get setup_path
+
+      expect(page_html.at_css("#exercise-mix .mix-group > legend").text).to eq("Your regular sections")
+    end
+  end
+
   it "offers Automatic and every count from one section up, with the stored one checked" do
     user.update!(daily_section_count: 3)
     login_as(user)
