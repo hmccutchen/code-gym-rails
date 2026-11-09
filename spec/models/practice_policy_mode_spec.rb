@@ -21,6 +21,26 @@ RSpec.describe PracticePolicyMode do
     expect(response.reload.mastery_application["policy"]).to eq(2)
   end
 
+  it "keeps receipt validation uncached and restores the caller's cache scope" do
+    response_with({ "version" => 1, "legacy_sections" => [], "processed_sections" => [],
+      "session_counted" => false, "skip_attempts" => [] })
+    pool = ActiveRecord::Base.connection_pool
+    cache_states = []
+    allow(DailyResponse).to receive(:decode_mastery_application).and_wrap_original do |original, *args|
+      cache_states << pool.query_cache_enabled
+      original.call(*args)
+    end
+
+    user.with_lock do
+      ActiveRecord::Base.cache do
+        expect(pool.query_cache_enabled).to be(true)
+        expect(described_class.active?(user, initiate: false)).to be(false)
+        expect(pool.query_cache_enabled).to be(true)
+      end
+    end
+    expect(cache_states).to eq([ false ])
+  end
+
   %i[receipt journal note].each do |signal|
     it "validates the later #{signal} after a lower-ID v2 receipt with initiation off" do
       first = response_with({ "version" => 2, "policy" => 2, "legacy_sections" => [], "processed_sections" => [],
