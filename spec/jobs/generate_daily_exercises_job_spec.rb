@@ -58,7 +58,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
     it "names the user by id when a concurrent job already generated the day" do
       stub_provider
-      allow(DailyExercise).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
+      expect_any_instance_of(DailyExercise).to receive(:save!).and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
       described_class.new.perform(user_id: user.id)
       expect_logged_by_id
     end
@@ -209,7 +209,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   it "logs and continues when a concurrent job already created today's exercise (unique index race)" do
     stub_provider
-    allow(DailyExercise).to receive(:create!).and_raise(
+    expect_any_instance_of(DailyExercise).to receive(:save!).and_raise(
       ActiveRecord::RecordNotUnique.new("duplicate key value violates unique constraint")
     )
 

@@ -127,10 +127,10 @@ RSpec.describe "Protected-practice writers", type: :model do
 
   it "preserves requests through single/group Stop and Start and keeps eased drilling admitted" do
     stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
-    response = day(0, keys: %w[pattern])
-    ConceptDrills.start!(user, concept: "memoization", bucket: "ruby_rails")
+    response = day(0, keys: %w[pattern], concept: "shallow_module")
+    ConceptDrills.start!(user, concept: "shallow_module", bucket: "ruby_rails")
     review(response, "pattern" => "solid")
-    row = user.concept_masteries.find_by!(concept: "memoization")
+    row = user.concept_masteries.find_by!(concept: "shallow_module")
     pending = row.practice_requests.deep_dup
     stamp = row.drilled_at
     expect(ConceptDrills.for(user).count).to eq(1)
@@ -145,7 +145,7 @@ RSpec.describe "Protected-practice writers", type: :model do
     expect(row.reload.practice_requests).to eq(pending)
     ConceptDrills.start_group!(user, group: group, bucket: row.language)
     expect(row.reload.practice_requests).to eq(pending)
-    normal = day(1, eased: false, keys: %w[pattern])
+    normal = day(1, eased: false, keys: %w[pattern], concept: row.concept)
     review(normal, "pattern" => "strong")
     expect(row.reload).to have_attributes(practice_requests: {}, drilled_at: nil)
   end

@@ -14,7 +14,8 @@ RSpec.describe ApplicationHelper, type: :helper do
   end
 
   it "shows explicit unavailable copy and safely logs a persisted invalid historical receipt" do
-    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, problem_set: {})
+    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+      problem_set: { "pattern" => { "question" => "Explain the pattern." } })
     response = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
       mastery_application: { "version" => 99, "secret" => "RAW-GAP-ANSWER" })
     expect(Rails.logger).to receive(:warn).with("[practice_display] user_id=#{user.id} error=ArgumentError").once

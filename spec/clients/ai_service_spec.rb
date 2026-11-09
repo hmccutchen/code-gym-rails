@@ -4928,7 +4928,7 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
   end
 
   it "keeps the draft and records the fallback" do
-    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, keyword_init: true).new(
+    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, :schedule_context, keyword_init: true).new(
       problem_set: { "code_review" => section }, unusable_sections: [],
       plan: plan_for(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
       kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level)
@@ -4987,12 +4987,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
                                     "kind_rungs" => KindDifficulty.for(user).rungs(skill_level: user.skill_level))
   end
 
-  it "leaves the day to DailyPlan's clock default, passing no weekend: of its own" do
+  it "leaves the day to DailyPlan's clock default without a captured context or explicit weekend" do
     allow(DailyPlan).to receive(:for).and_call_original
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: nil)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: nil, schedule_context: nil)
   end
 
   { "b" => true, "a" => false }.each do |better, matched|
@@ -5346,7 +5346,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     ingest_calls = []
     allow(ProblemSetIngest).to receive(:prune_to_expected_keys).and_call_original
     allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
-      ingest_calls << kw.slice(:expected_keys, :fixed_concepts)
+      ingest_calls << kw.slice(:expected_keys, :fixed_concepts, :assignments)
       m.call(*args, **kw)
     end
 
@@ -5356,7 +5356,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(ProblemSetIngest).to have_received(:prune_to_expected_keys)
       .with(instance_of(Hash), expected_keys: %w[code_review design_comparison pattern challenge])
-    expect(draft_calls).to eq([ { expected_keys: %w[code_review design_comparison pattern challenge] } ])
+    expect(draft_calls).to eq([ { expected_keys: %w[code_review design_comparison pattern challenge], fixed_concepts: {}, assignments: {} } ])
   end
 
   it "does not replay ingest on an already-built judged parsons_problem set" do

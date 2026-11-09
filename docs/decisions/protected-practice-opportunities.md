@@ -36,8 +36,14 @@ come from the original review operation, including after correction.
 - A weak grade with too-hard requests simplified reasoning.
 - Comfortable eased success requests a normal retry.
 - Comfortable normal success clears that kind's request.
-- Weak-but-not-hard after a retry changes it to support. Other evidence
-  retains existing intent, including evidence without a self-rating.
+- Solid/strong with a missing self-rating preserves the entire existing
+  request, including its source and timestamp; it earns no normal retry.
+- Weak-but-not-hard after a retry changes it to support, including when
+  the self-rating is missing. Support keeps normal cognitive demand and takes
+  that weak operation's original source and microsecond timestamp, never
+  the correction or replay clock. It does not assume an effort rating.
+- Other evidence retains existing intent. These per-kind changes preserve
+  unrelated requests and do not skip the ordinary aggregate weak-grade effect.
 
 All-eased comfortable success returns an unpaused row to standard and resets
 stagnation. It never grants or grows retention or clears an admitted drill;

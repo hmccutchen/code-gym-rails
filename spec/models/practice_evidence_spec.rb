@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe PracticeEvidence do
+  include AuthHelpers
+
   let(:user) { create_user_with_key }
 
   def response_on(date, rating:, eased: false, self_rating: "right_level")

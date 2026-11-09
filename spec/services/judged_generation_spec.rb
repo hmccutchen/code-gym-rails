@@ -2,7 +2,7 @@ require "rails_helper"
 
 # Plain callables, since the pipeline reaches a provider only through JudgedGeneration::Provider.
 RSpec.describe JudgedGeneration do
-  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, keyword_init: true) }
+  let(:draft_type) { Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, :schedule_context, keyword_init: true) }
   let(:due_check) { Struct.new(:concept) }
 
   let(:user) { User.new(id: 42, skill_level: "senior") }
@@ -58,6 +58,13 @@ RSpec.describe JudgedGeneration do
   end
 
   def run = described_class.call(user: user, draft: draft, providers: providers, finish: finish)
+
+  it "preserves the draft's opaque captured context on the judged result" do
+    context = Object.new.freeze
+    draft.schedule_context = context
+
+    expect(run.schedule_context).to equal(context)
+  end
 
   it "judges only planned sections, at each kind's rung, and returns the existing JudgedSet" do
     judged = run

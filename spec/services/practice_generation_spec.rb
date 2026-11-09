@@ -66,9 +66,10 @@ RSpec.describe PracticeGeneration do
   it "carries validated readiness while asking for the newly configured regular pair" do
     stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     context = described_class.capture(user, date: Date.yesterday)
-    note = active_judged(context).plan_notes
+    prior = active_judged(context)
+    note = prior.plan_notes
     note["practice_schedule"]["initial_ready"] = true
-    user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, problem_set: {}, plan_notes: note)
+    user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, problem_set: prior.problem_set, plan_notes: note)
     user.update!(daily_section_kinds: %w[architecture pattern])
     expect(PracticeEvidence).to receive(:for).with(an_instance_of(User), before: Date.current,
       kinds: %w[architecture pattern], initial_ready: true).and_call_original
@@ -103,7 +104,8 @@ RSpec.describe PracticeGeneration do
   end
 
   it "checks the original regeneration claim under user, exercise and response locks" do
-    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {})
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: { "code_review" => { "question" => "Review the original code." } })
     claim = exercise.claim_regenerating!
     context = described_class.capture(user, date: exercise.date, replacing: exercise)
     exercise.update!(regenerating_since: claim + 1.second)
@@ -163,7 +165,8 @@ RSpec.describe PracticeGeneration do
 
   it "leaves a regenerated legacy row without a synthetic schedule turn" do
     stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
-    legacy = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {})
+    legacy = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: { "code_review" => { "question" => "Review the original code." } })
     claim = legacy.claim_regenerating!
     context = described_class.capture(user, date: legacy.date, replacing: legacy)
     result = described_class.commit_replacement(user, exercise: legacy, claim: claim, context: context,

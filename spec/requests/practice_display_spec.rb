@@ -58,10 +58,14 @@ RSpec.describe "Protected-practice display failures", type: :request do
       hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [])
     replacement = (selected.notes.fetch("selected_kinds") - selected.notes.fetch("regular_kinds")).sole
     today = exercise_on(Date.current, note: selected.notes)
+    rungs = selected.kinds.to_h { |kind| [ kind.key, "junior" ] }
+    adjustments = PracticeAdjustment.resolve(assignments: rungs.keys.index_with { { mode: "simplified" } },
+      difficulty: KindDifficulty.none, rungs: rungs, reduced: {})
     data = ProblemSetIngest.call(FakeService::EXERCISE_PROBLEM_SET.deep_dup, language: "ruby_rails",
-      expected_keys: selected.kinds.map(&:key), daily: DailyKinds::DEFAULT).problem_set
-    data.each_value { |section| section["practice_adjustment"] = "simplified" }
+      expected_keys: selected.kinds.map(&:key), daily: DailyKinds::DEFAULT, pitched_at: rungs, assignments: adjustments).problem_set
     today.update!(problem_set: data)
+    expect(today.active_section_keys).to match_array(selected.notes.fetch("selected_kinds"))
+    expect(today.active_section_keys).to include(replacement)
     get root_path
     expect(response.body).to include("Practice adjusted from your reviewed feedback.",
       I18n.t("protected_practice.dashboard.variety", kind: I18n.t("sections.#{replacement}.name")))

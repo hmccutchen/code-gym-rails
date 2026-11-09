@@ -7,6 +7,14 @@ RSpec.describe ConceptMastery::PracticePolicy do
       "mastered_at" => nil, "retention_interval_days" => nil, "next_retention_check_on" => nil,
       "drilled_at" => clock, "drill_group" => nil, "practice_requests" => {} }
   end
+  let(:retry_state) do
+    state.merge("tier" => "standard", "streak" => 0, "last_rating" => "solid",
+      "mastered_at" => "2026-11-01T10:00:00.222333Z", "retention_interval_days" => 7, "next_retention_check_on" => "2026-11-07",
+      "practice_requests" => {
+        "pattern" => { "mode" => "normal_retry", "source_response_id" => 11, "requested_at" => "2026-11-05T12:00:00.654321Z" },
+        "challenge" => { "mode" => "support", "source_response_id" => 12, "requested_at" => "2026-11-05T13:00:00.987654Z" }
+      })
+  end
 
   def operation(eased: true, rating: "solid", self_rating: "right_level", pending: [])
     { "type" => "review", "policy" => 2, "response_id" => 17, "work_on" => "2026-11-06",
@@ -43,7 +51,7 @@ RSpec.describe ConceptMastery::PracticePolicy do
         "practice_requests" => include("pattern" => include("mode" => "normal_retry")))
   end
 
-  it "distinguishes support from simplified reasoning and preserves missing-rating intent" do
+  it "distinguishes support from simplified reasoning and preserves favourable missing-rating intent" do
     hard = apply(rating: "developing", self_rating: "too_hard")
     expect(hard.dig("practice_requests", "pattern", "mode")).to eq("simplified")
     expect(apply(hard, rating: "developing").dig("practice_requests", "pattern", "mode")).to eq("simplified")
@@ -52,6 +60,49 @@ RSpec.describe ConceptMastery::PracticePolicy do
     expect(apply(supported, eased: false, self_rating: nil)["practice_requests"]).to eq(supported["practice_requests"])
     retrying = apply
     expect(apply(retrying, eased: false, rating: "developing").dig("practice_requests", "pattern", "mode")).to eq("support")
+  end
+
+  %w[solid strong].each do |rating|
+    it "preserves the full retry and unrelated request tuples for #{rating} with no self-rating" do
+      result = apply(retry_state, eased: false, rating: rating, self_rating: nil)
+
+      expect(result["practice_requests"]).to eq(retry_state["practice_requests"])
+    end
+  end
+
+  %w[beginner developing].each do |rating|
+    it "replaces a retry with normal-demand support at the #{rating} operation's original clock without a self-rating" do
+      result = apply(retry_state, eased: false, rating: rating, self_rating: nil)
+
+      expect(result["practice_requests"]).to eq(retry_state["practice_requests"].merge("pattern" => {
+        "mode" => "support", "source_response_id" => 17, "requested_at" => clock
+      }))
+      expect(result).to include("tier" => "standard", "streak" => 1, "last_rating" => rating,
+        "retention_interval_days" => nil, "next_retention_check_on" => nil, "drilled_at" => clock)
+    end
+  end
+
+  it "keeps the weak missing-rating operation's source and microsecond clock when its sibling arrives later" do
+    fold = ConceptMastery::Reconciliation
+    partial = operation(eased: false, rating: "developing", self_rating: nil, pending: %w[code_review])
+    opened = fold.apply(current: retry_state, journal: {}, operation: partial)
+    expected_requests = retry_state["practice_requests"].merge("pattern" => {
+      "mode" => "support", "source_response_id" => 17, "requested_at" => clock
+    })
+    expect(opened.state["practice_requests"]).to eq(expected_requests)
+    expect(opened.journal["operations"]).to eq([ partial ])
+
+    travel_to(Time.utc(2027, 1, 1)) do
+      closing = partial.merge("pending_sections" => [], "occurred_at" => Time.current.utc.iso8601(6),
+        "reviewed_on" => Date.current.iso8601,
+        "sections" => partial["sections"].merge("code_review" => {
+          "rating" => "strong", "self_rating" => "right_level", "eased" => false
+        }))
+      result = fold.apply(current: opened.state, journal: opened.journal, operation: closing)
+      expect(result.journal).to eq({})
+      expect(result.state["practice_requests"]).to eq(expected_requests)
+      expect(result.state).to eq(opened.state)
+    end
   end
 
   it "requires comfort across siblings while retaining each kind's normal-practice request" do

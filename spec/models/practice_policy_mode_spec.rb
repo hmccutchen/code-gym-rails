@@ -1,10 +1,13 @@
 require "rails_helper"
 
 RSpec.describe PracticePolicyMode do
+  include AuthHelpers
+
   let(:user) { create_user_with_key }
 
   def response_with(receipt, date: Date.current)
-    exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, problem_set: {})
+    exercise = user.daily_exercises.create!(date: date, generated_at: Time.current,
+      problem_set: { "pattern" => { "question" => "Explain the pattern." } })
     user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, mastery_application: receipt)
   end
 
@@ -51,7 +54,8 @@ RSpec.describe PracticePolicyMode do
       when :journal
         user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", review_reconciliation: { "version" => 9 })
       when :note
-        user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {},
+        user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+          problem_set: { "pattern" => { "question" => "Explain the pattern." } },
           plan_notes: { "practice_schedule" => { "version" => 9 } })
       end
       user.with_lock { expect { described_class.active?(user, initiate: false) }.to raise_error(ArgumentError) }
@@ -78,7 +82,8 @@ RSpec.describe PracticePolicyMode do
     selected = PracticeSchedule.plan(context: nil, count: DailyKinds::COUNT, setting: nil, daily: DailyKinds::DEFAULT,
       preferences: KindPreferences.none, evidence: { initial_reviewed_sets: 0, pending: [], struggle: {} },
       hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [])
-    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {},
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: selected.kinds.to_h { |kind| [ kind.key, { "question" => "Explain the decision." } ] },
       plan_notes: { "practice_schedule" => selected.notes })
     expect(described_class.active?(user)).to be(true)
     exercise.update!(plan_notes: { "practice_schedule" => selected.notes.merge("version" => 1.0) })

@@ -25,12 +25,12 @@ two distinct valid concept/bucket identities among the too-hard evidence.
 Keep the existing thresholds, cutoff/rung rules and explicit Apply; practice
 never changes targets. See `docs/decisions/protected-practice-opportunities.md`.
 
-Suggestion evidence retains sixty qualifying response days across kinds,
-filtering basic and strict eligibility before the limit. The newest date
-comes from retained strict results, so skipped or malformed review-only
-activity and supplementary bug hunts cannot advance a dismissal cutoff or
-occupy the retained window. Non-bug weekend evidence still counts. Rung and cutoff policies remain
-unchanged (`docs/decisions/level-suggestions.md`).
+Within that date range, suggestion evidence filters basic and strict
+eligibility before retaining each kind's results. The newest date comes
+from retained strict results, so skipped or malformed review-only activity
+and supplementary bug hunts cannot advance a dismissal cutoff or occupy
+the retained window. Non-bug weekend evidence still counts. Rung and cutoff
+policies remain unchanged (`docs/decisions/level-suggestions.md`).
 
 Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;

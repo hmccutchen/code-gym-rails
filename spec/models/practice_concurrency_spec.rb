@@ -162,7 +162,8 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
       problem_set: { "pattern" => { "concept" => "memoization", "eased" => true } })
     response = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, submitted_at: Time.current,
       answers: { "pattern" => "A substantive answer" }, concept_tags: { "pattern" => "memoization" }, section_ratings: { "pattern" => "right_level" })
-    legacy_set = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, problem_set: {})
+    legacy_set = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+      problem_set: { "pattern" => { "question" => "Explain the pattern." } })
     legacy = user.daily_responses.create!(date: legacy_set.date, daily_exercise: legacy_set, mastery_application: {
       "version" => 1, "legacy_sections" => [], "processed_sections" => [], "session_counted" => false, "skip_attempts" => []
     })
@@ -197,7 +198,8 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
     end
     user.with_lock do
       if signal == :receipt
-        source = user.daily_exercises.create!(date: Date.tomorrow, generated_at: Time.current, problem_set: {})
+        source = user.daily_exercises.create!(date: Date.tomorrow, generated_at: Time.current,
+          problem_set: { "pattern" => { "question" => "Explain the pattern." } })
         user.daily_responses.create!(date: source.date, daily_exercise: source, mastery_application: {
           "version" => 2, "policy" => 2, "legacy_sections" => [], "processed_sections" => [],
           "session_counted" => false, "skip_attempts" => []

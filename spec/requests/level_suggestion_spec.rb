@@ -13,8 +13,10 @@ RSpec.describe "Level suggestion proposals", type: :request do
     sections = sections.transform_values { |section| section.is_a?(Hash) ? section : { rung: section } }
     exercise = DailyExercise.create!(
       user: user, date: date, generated_at: Time.current,
-      problem_set: sections.transform_values { |section| { "question" => "q", "snippet" => "s", "pitched_at" => section[:rung],
-        "concept" => ConceptVocabulary::RAILS_CONCEPTS[date.jd % ConceptVocabulary::RAILS_CONCEPTS.size] } }
+      problem_set: sections.to_h do |kind, section|
+        concepts = ConceptVocabulary.for_section(kind, "ruby_rails")
+        [ kind, { "question" => "q", "snippet" => "s", "pitched_at" => section[:rung], "concept" => concepts[date.jd % concepts.size] } ]
+      end
     )
     DailyResponse.create!(
       user: user, daily_exercise: exercise, date: date, submitted_at: Time.current,
