@@ -8,12 +8,14 @@ class PracticeGeneration
     User.transaction do
       fresh = User.lock.find(user.id)
       active = PracticePolicyMode.active?(fresh)
+      predecessor = PracticeSchedule.context_for(fresh)
       note = PracticeSchedule.context_for(fresh, replacing: replacing)
       context = { active: active, date: date, user_id: user.id, latest_id: fresh.daily_exercises.maximum(:id),
-        predecessor: PracticeSchedule.context_for(fresh), note: note, replacing_id: replacing&.id,
+        predecessor: predecessor, note: note, replacing_id: replacing&.id,
         settings: fresh.attributes.slice(*SETTINGS), difficulty: KindDifficulty.for(fresh),
         kind_rungs: fresh.kind_rungs, skill_level: fresh.skill_level,
-        evidence: active ? PracticeEvidence.for(fresh, before: date) : nil }
+        evidence: active ? PracticeEvidence.for(fresh, before: date, kinds: DailyKinds.pair(fresh).map(&:key),
+          initial_ready: predecessor.fetch("initial_ready", false)) : nil }
       freeze_context(context)
     end
   end

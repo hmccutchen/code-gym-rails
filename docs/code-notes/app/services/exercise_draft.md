@@ -14,6 +14,11 @@ adjustments through retries and the final judged result. The method-length
 exemption keeps this capture/plan/call/ingest sequence together; policy
 decisions remain in the named model and prompt collaborators.
 
+The captured date fixes weekday mode, workload cutoff and the eventual stored
+date. Initial delivered-history, due/overdue checks, inactive coverage and
+featured selection remain live reads; this is not a historical snapshot of
+every planning input.
+
 `LanguagePrompts.for` runs first. Planning reads `ConceptVocabulary`, which
 raises its own unknown-language error, so checking first makes an unsupported
 language fail as `SetupError` before any planning work.

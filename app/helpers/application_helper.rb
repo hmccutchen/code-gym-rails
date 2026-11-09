@@ -1,12 +1,30 @@
 module ApplicationHelper
-  def protected_practice?
-    return @protected_practice if defined?(@protected_practice)
-
-    @protected_practice = current_user.present? && PracticePolicyMode.active?(current_user)
+  def practice_display_status
+    @practice_display_status ||= current_user.present? ? PracticePolicyMode.display_status(current_user) : :inactive
   end
 
   def practice_copy(key, **values)
-    t(protected_practice? ? "protected_practice.#{key}" : key, **values)
+    return t("protected_practice.unavailable") if practice_display_status == :unavailable
+
+    t(practice_display_status == :active ? "protected_practice.#{key}" : key, **values)
+  end
+
+  def practice_notes(exercise)
+    return [ t("protected_practice.unavailable") ] if practice_display_status == :unavailable
+
+    note = exercise.practice_schedule
+    replacement = (note.fetch("selected_kinds", []) - note.fetch("regular_kinds", [])) & exercise.active_section_keys
+    lines = []
+    if note["omitted_kind"] && replacement.any?
+      lines << t("protected_practice.dashboard.variety", kind: t("sections.#{replacement.first}.name"))
+    end
+    if exercise.active_section_keys.any? { |key| exercise.problem_set.dig(key, "practice_adjustment") == "simplified" }
+      lines << t("protected_practice.dashboard.adjusted")
+    end
+    lines
+  rescue ArgumentError => error
+    Rails.logger.warn("[practice_display] user_id=#{exercise.user_id} exercise_id=#{exercise.id} error=#{error.class.name}")
+    [ t("protected_practice.unavailable") ]
   end
 
   def page_title(title)

@@ -1,0 +1,36 @@
+{
+  "journal": {
+    "version": 1,
+    "baseline": {
+      "tier": "reduced", "streak": 1, "last_rating": "developing", "cooldown_remaining": 0,
+      "mastered_at": null, "retention_interval_days": null, "next_retention_check_on": null,
+      "drilled_at": "2026-11-06T12:00:00.123456Z", "drill_group": null
+    },
+    "operations": [
+      {
+        "type": "review", "response_id": 17, "work_on": "2026-11-06", "reviewed_on": "2026-11-06",
+        "occurred_at": "2026-11-06T12:00:00.123456Z", "pending_sections": ["code_review"],
+        "sections": {"pattern": {"rating": "solid", "self_rating": "right_level"}}
+      },
+      {"type": "session", "response_id": 18},
+      {
+        "type": "review", "response_id": 18, "work_on": "2026-11-14", "reviewed_on": "2026-11-14",
+        "occurred_at": "2026-11-14T01:02:03.654321Z", "pending_sections": [],
+        "sections": {"pattern": {"rating": "strong", "self_rating": "right_level"}}
+      },
+      {"type": "skip", "response_id": 19, "work_on": "2026-11-29", "reviewed_on": "2026-11-30"},
+      {"type": "drill", "action": "clear"},
+      {"type": "drill", "action": "set", "drilled_at": "2026-12-01T01:02:03.456789Z", "drill_group": null, "end_pause": true}
+    ]
+  },
+  "materialized": {
+    "tier": "standard", "streak": 0, "last_rating": "strong", "cooldown_remaining": 0,
+    "mastered_at": "2026-11-06T12:00:00.123456Z", "retention_interval_days": 14,
+    "next_retention_check_on": "2026-12-14", "drilled_at": "2026-12-01T01:02:03.456789Z", "drill_group": null
+  },
+  "corrected": {
+    "tier": "reduced", "streak": 0, "last_rating": "beginner", "cooldown_remaining": 0,
+    "mastered_at": null, "retention_interval_days": null, "next_retention_check_on": null,
+    "drilled_at": "2026-12-01T01:02:03.456789Z", "drill_group": null
+  }
+}

@@ -109,6 +109,67 @@ RSpec.describe "Protected-practice opportunity simulation", type: :model do
     puts "PRACTICE_MEASUREMENT weekdays_eased_first=#{ease_first} results=#{report.to_json} workload=#{DailyKinds::COUNT} candidates=#{pool.size}"
   end
 
+  it "takes a real eased review through a pending protected normal retry, ingest and normal assessment at two sections" do
+    user = create_user_with_key
+    user.update!(daily_section_count: 2, daily_section_kinds: %w[pattern code_review], skill_level: "junior")
+    pair = DailyKinds.for(user)
+    date = Date.new(2026, 11, 2)
+    reviewer = Object.new
+    reviewer.define_singleton_method(:review_sections) do |*_args, sections:|
+      sections.index_with { { ok: true, review: { "rating" => "solid", "rubric" => ReviewedSectionResults::RUBRIC_VERSION } } }
+    end
+    save_and_review = lambda do |day, set, notes, &before_review|
+      exercise = user.daily_exercises.create!(date: day, generated_at: Time.current, problem_set: set, plan_notes: notes)
+      expect(exercise.active_section_keys.size).to eq(2)
+      response = user.daily_responses.create!(date: day, daily_exercise: exercise, submitted_at: Time.current,
+        answers: set.keys.index_with { "Explain the decision and its tradeoffs." },
+        section_ratings: set.keys.index_with { "right_level" }, concept_tags: set.transform_values { |section| section["concept"] })
+      before_review&.call
+      expect(ResponseReview.new(response, user: user, reviewer: reviewer).call.status).to eq(:ready)
+      response
+    end
+    assignments = { "pattern" => { concept: "service_objects", bucket: "ruby_rails", mode: "simplified" } }
+    rungs = pair.map(&:key).index_with { "junior" }
+    initial_adjustment = PracticeAdjustment.resolve(assignments: assignments, difficulty: KindDifficulty.none, rungs: rungs, reduced: {})
+    payload = FakeService::EXERCISE_PROBLEM_SET.slice(*rungs.keys).deep_dup
+    first = ProblemSetIngest.call(payload, language: "ruby_rails", expected_keys: rungs.keys, daily: pair,
+      pitched_at: rungs, assignments: initial_adjustment).problem_set
+    expect(first.dig("pattern", "eased")).to be(true)
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
+    travel_to(date.noon) { save_and_review.call(date, first, { "daily_kinds" => pair.map(&:key) }) }
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
+    row = user.concept_masteries.find_by!(concept: "service_objects", language: "ruby_rails")
+    request = row.practice_requests.deep_dup
+    expect(request).to include("pattern" => include("mode" => "normal_retry"))
+    expect(row.mastered_at).to be_nil
+    expect(LevelSuggestion::Evidence.for(user, today: date).results.fetch("pattern", [])).to be_empty
+    facts = PracticeEvidence.for(user, before: date + 1, kinds: pair.map(&:key))
+    expect(facts[:pending].sole).to include(kind: "pattern", concept: "service_objects", mode: "normal_retry")
+    selected = PracticeSchedule.plan(context: nil, count: 2, setting: 2, daily: pair,
+      preferences: KindPreferences.none, evidence: facts, hosts: DayHosts.new("ruby_rails", mode: :application_code),
+      rotation_history: [], due: [], drills: [])
+    expect(selected.assignments.fetch("pattern")).to include(reason: "normal_retry", concept: "service_objects")
+    resolved = PracticeAdjustment.resolve(assignments: selected.assignments, difficulty: KindDifficulty.none,
+      rungs: rungs, reduced: { "pattern" => %w[service_objects] })
+    expect(resolved.fetch("pattern")).to include(mode: "normal_retry", eased: false)
+    retry_set = ProblemSetIngest.call(payload.deep_dup, language: "ruby_rails", expected_keys: rungs.keys, daily: pair,
+      pitched_at: rungs, assignments: resolved, eased_for: { "pattern" => %w[service_objects] },
+      fixed_concepts: { "pattern" => "service_objects" }).problem_set
+    expect(retry_set.dig("pattern", "eased")).not_to be(true)
+    expect(retry_set.dig("pattern", "practice_adjustment")).to eq("normal_retry")
+    travel_to((date + 1).noon) do
+      save_and_review.call(date + 1, retry_set, { "daily_kinds" => pair.map(&:key), "practice_schedule" => selected.notes }) do
+        expect(row.reload.practice_requests).to eq(request)
+      end
+    end
+    expect(row.reload.practice_requests).to eq({})
+    expect(row.mastered_at).to be_present
+    normal = LevelSuggestion::Evidence.for(user, today: date + 1).results.fetch("pattern")
+    expect(normal.map(&:date)).to eq([ date + 1 ])
+    puts "PRACTICE_MEASUREMENT protected_retry=#{ { concept: row.concept, first_eased_on: date, first_normal_on: normal.sole.date,
+      normal_opportunity: 2, workload: 2, pending_after_review: row.practice_requests.size }.to_json }"
+  end
+
   it "feeds actual offered weekday dates and strict evidence into the own-kind selector" do
     run_weekdays(ease_first: false)
   end

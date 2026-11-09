@@ -1,0 +1,75 @@
+require "rails_helper"
+
+RSpec.describe "Protected-practice display failures", type: :request do
+  let(:user) { create_user_with_key }
+
+  before { login_as(user) }
+
+  def exercise_on(date, note: nil)
+    user.daily_exercises.create!(date: date, generated_at: Time.current,
+      problem_set: { "code_review" => { "question" => "Review this", "snippet" => "value" },
+        "design_comparison" => { "question" => "Compare", "option_a" => "A", "option_b" => "B" } },
+      plan_notes: { "size" => 2 }.tap { |notes| notes["practice_schedule"] = note unless note.nil? })
+  end
+
+  it "keeps Setup, dashboard and Learn available without either policy's promises on invalid historical receipts" do
+    old = exercise_on(Date.yesterday)
+    receipt = { "version" => 99, "secret" => "PRIVATE-GAP-ANSWER" }
+    row = user.daily_responses.create!(daily_exercise: old, date: old.date, mastery_application: receipt)
+    today = exercise_on(Date.current)
+    warnings = []
+    allow(Rails.logger).to receive(:warn) { |message| warnings << message }
+    pages = [ setup_path, root_path, learn_concept_path(bucket: "ruby_rails", concept: "memoization") ]
+    pages.each do |path|
+      get path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("protected_practice.unavailable"))
+      expect(response.body).not_to include(I18n.t("learn.drill.offer"), I18n.t("protected_practice.learn.drill.offer"),
+        "PRIVATE-GAP-ANSWER", "weeks to cycle")
+    end
+    display_warnings = warnings.grep(/\[practice_display\]/)
+    expect(display_warnings.size).to be_between(1, pages.size * (DailyKinds::COUNT + 1))
+    expect(display_warnings).to all(eq("[practice_display] user_id=#{user.id} error=ArgumentError"))
+    expect(row.reload.mastery_application).to eq(receipt)
+    expect(today.reload.plan_notes).to eq("size" => 2)
+  end
+
+  it "renders an unavailable dashboard note and picker for malformed current schedule state without rewriting it" do
+    note = { "version" => 42, "hidden" => "PRIVATE-NOTE" }
+    today = exercise_on(Date.current, note: note)
+    get root_path
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(I18n.t("protected_practice.unavailable"))
+    expect(response.body).not_to include("PRIVATE-NOTE", I18n.t("protected_practice.dashboard.adjusted"))
+    expect(today.reload.plan_notes["practice_schedule"]).to eq(note)
+    expect { today.practice_schedule }.to raise_error(ArgumentError)
+  end
+
+  it "still refuses Learn's selected corrupt reservation suffix instead of inventing capacity" do
+    row = user.concept_masteries.create!(concept: "memoization", language: "ruby_rails",
+      review_reconciliation: { "version" => 99 })
+    expect { get learn_path }.to raise_error(ArgumentError)
+    expect(row.reload.review_reconciliation).to eq("version" => 99)
+  end
+
+  it "shows only delivered variety and the approved generic adjustment, qualified for unchanged settings" do
+    selected = PracticeSchedule.plan(context: nil, count: 2, setting: nil, daily: DailyKinds::DEFAULT,
+      preferences: KindPreferences.none, evidence: { initial_reviewed_sets: 2, pending: [], struggle: {} },
+      hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [])
+    replacement = (selected.notes.fetch("selected_kinds") - selected.notes.fetch("regular_kinds")).sole
+    today = exercise_on(Date.current, note: selected.notes)
+    data = ProblemSetIngest.call(FakeService::EXERCISE_PROBLEM_SET.deep_dup, language: "ruby_rails",
+      expected_keys: selected.kinds.map(&:key), daily: DailyKinds::DEFAULT).problem_set
+    data.each_value { |section| section["practice_adjustment"] = "simplified" }
+    today.update!(problem_set: data)
+    get root_path
+    expect(response.body).to include("Practice adjusted from your reviewed feedback.",
+      I18n.t("protected_practice.dashboard.variety", kind: I18n.t("sections.#{replacement}.name")))
+    expect(response.body).not_to include("normal retry follows", "simpler reasoning")
+    continuation = today.practice_schedule.fetch("continuation")
+    today.update!(problem_set: today.problem_set.except(replacement), dropped_sections: [ replacement ])
+    get root_path
+    expect(response.body).not_to include("for variety")
+    expect(today.reload.practice_schedule.fetch("continuation")).to eq(continuation)
+  end
+end

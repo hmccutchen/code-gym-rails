@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe PracticePolicyMode do
   let(:user) { create_user_with_key }
 
-  def response_with(receipt)
-    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {})
+  def response_with(receipt, date: Date.current)
+    exercise = user.daily_exercises.create!(date: date, generated_at: Time.current, problem_set: {})
     user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, mastery_application: receipt)
   end
 
@@ -21,9 +21,21 @@ RSpec.describe PracticePolicyMode do
     expect(response.reload.mastery_application["policy"]).to eq(2)
   end
 
-  it "refuses unknown state even when another receipt already enrolls the account" do
-    response_with({ "version" => 9 })
-    user.with_lock { expect { described_class.active?(user, initiate: true) }.to raise_error(ArgumentError) }
+  %i[receipt journal note].each do |signal|
+    it "validates the later #{signal} after a lower-ID v2 receipt with initiation off" do
+      first = response_with({ "version" => 2, "policy" => 2, "legacy_sections" => [], "processed_sections" => [],
+        "session_counted" => false, "skip_attempts" => [] }, date: Date.yesterday)
+      case signal
+      when :receipt
+        expect(response_with({ "version" => 9 }).id).to be > first.id
+      when :journal
+        user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", review_reconciliation: { "version" => 9 })
+      when :note
+        user.daily_exercises.create!(date: Date.current, generated_at: Time.current, problem_set: {},
+          plan_notes: { "practice_schedule" => { "version" => 9 } })
+      end
+      user.with_lock { expect { described_class.active?(user, initiate: false) }.to raise_error(ArgumentError) }
+    end
   end
 
   it "honors materialized requests after every suffix has compacted" do

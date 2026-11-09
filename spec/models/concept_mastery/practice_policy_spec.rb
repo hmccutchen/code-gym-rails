@@ -95,6 +95,28 @@ RSpec.describe ConceptMastery::PracticePolicy do
     result = fold.apply(current: result.state, journal: result.journal, operation: operation(pending: %w[code_review]).merge("response_id" => 18))
     result = fold.apply(current: result.state, journal: result.journal, operation: legacy.merge("pending_sections" => []))
     expect(result.journal.dig("baseline", "practice_requests")).to eq(initial["practice_requests"])
+    closing = operation(pending: []).merge("response_id" => 18)
+    result = fold.apply(current: result.state, journal: result.journal, operation: closing)
+    expect(result.journal).to eq({})
+    expect(result.state).to eq("tier" => "standard", "streak" => 0, "last_rating" => "solid", "cooldown_remaining" => 0,
+      "mastered_at" => clock, "retention_interval_days" => 7, "next_retention_check_on" => "2026-11-13",
+      "drilled_at" => nil, "drill_group" => nil, "practice_requests" => {
+        "pattern" => { "mode" => "normal_retry", "source_response_id" => 18, "requested_at" => clock }
+      })
+  end
+
+  it "matches a serialized v1 oracle through later review, session, skip, Stop/Start and final correction" do
+    fixture = JSON.parse(File.read(Rails.root.join("spec/fixtures/practice/v1-replay.json")))
+    journal = fixture.fetch("journal")
+    folded = journal.fetch("operations").reduce(journal.fetch("baseline")) { |state, event| ConceptMastery::Transition.apply(state, event) }
+    expect(folded).to eq(fixture.fetch("materialized"))
+    correcting = journal.fetch("operations").first.deep_dup
+    correcting["sections"]["code_review"] = { "rating" => "beginner", "self_rating" => "too_hard" }
+    correcting["pending_sections"] = []
+    result = ConceptMastery::Reconciliation.apply(current: fixture.fetch("materialized"), journal: journal, operation: correcting)
+    expect(result.state).to eq(fixture.fetch("corrected"))
+    expect(result.journal).to eq({})
+    expect(result.state.keys).to match_array(ConceptMastery::Transition::FIELDS)
   end
 
   it "reads a frozen v1 journal unchanged and keeps its nine-field baseline when initiation is off" do

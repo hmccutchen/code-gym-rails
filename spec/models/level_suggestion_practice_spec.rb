@@ -28,6 +28,11 @@ RSpec.describe LevelSuggestion do
     distinct = result(1, concept: "n_plus_one", self_rating: "too_hard")
     expect(offer([ first, distinct ]).basis).to eq(:struggling)
     expect(offer([ first, result(1, concept: "invented", self_rating: "too_hard") ])).to be_nil
+    [ nil, :n_plus_one, {} ].each do |invalid|
+      expect(offer([ first, result(1, concept: invalid, self_rating: "too_hard") ])).to be_nil
+    end
+    bad_bucket = distinct.with(bucket: "unknown")
+    expect(offer([ first, bad_bucket ])).to be_nil
   end
 
   it "never creates an offer from elapsed time" do

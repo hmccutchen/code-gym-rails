@@ -18,6 +18,20 @@ RSpec.describe GenerateDailyExercisesJob do
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
+  it "discards one already-billed inactive draft after an explicit settings edit, without retrying" do
+    service = stub_provider
+    expect(service).to receive(:generate_judged_exercise).once do |_caller, language:, schedule_context:|
+      expect(schedule_context[:active]).to be(false)
+      expect(language).to eq("ruby_rails")
+      User.find(user.id).update!(daily_section_count: 2)
+      AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "paid draft" } },
+        dropped_sections: [], outcomes: {}, plan_notes: {}, schedule_context: schedule_context)
+    end
+    expect { described_class.new.perform(user_id: user.id) }.not_to change { user.daily_exercises.count }
+    expect(user.reload).to have_attributes(daily_section_count: 2, last_generation_error_date: Date.current,
+      last_generation_error: "Settings or another set changed while this set was being prepared. Generate again when ready.")
+  end
+
   describe "the user named in log lines" do
     let(:logged) { StringIO.new }
 

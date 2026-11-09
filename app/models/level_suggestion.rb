@@ -109,8 +109,7 @@ class LevelSuggestion
     return unless fresh?(at_level)
 
     identities = hard.filter_map do |entry|
-      [ entry.concept, entry.bucket ] if ConceptBucket.slice_for("mixed").include?(entry.bucket) &&
-        ConceptBucket.vocabulary_for(entry.bucket).include?(entry.concept)
+      [ entry.concept, entry.bucket ] if ConceptBucket.valid_identity?(concept: entry.concept, bucket: entry.bucket)
     end
     return if identities.uniq.size < STEP_BACK_CONCEPTS
 

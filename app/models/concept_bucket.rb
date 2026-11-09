@@ -23,6 +23,11 @@ class ConceptBucket
     language_buckets_for(language) + LANGUAGE_INDEPENDENT
   end
 
+  def self.valid_identity?(concept:, bucket:)
+    concept.is_a?(String) && bucket.is_a?(String) && slice_for("mixed").include?(bucket) &&
+      vocabulary_for(bucket).include?(concept)
+  end
+
   def self.for(sections, language)
     Array(sections).each do |section|
       special = SPECIAL_BUCKETS[section.to_s]

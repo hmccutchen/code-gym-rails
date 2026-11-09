@@ -1,6 +1,13 @@
 require "rails_helper"
 
 RSpec.describe ConceptBucket do
+  it "recognizes only closed string concept/bucket identities" do
+    expect(described_class.valid_identity?(concept: "memoization", bucket: "ruby_rails")).to be(true)
+    [ [ "invented", "ruby_rails" ], [ "memoization", "invented" ], [ nil, "ruby_rails" ],
+      [ :memoization, "ruby_rails" ], [ "memoization", :ruby_rails ], [ {}, [] ] ].each do |concept, bucket|
+      expect(described_class.valid_identity?(concept: concept, bucket: bucket)).to be(false)
+    end
+  end
   describe ".for" do
     it "buckets the architecture section independently of the day's language" do
       expect(described_class.for("architecture", "ruby_rails")).to eq("architecture")

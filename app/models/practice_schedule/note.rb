@@ -67,8 +67,7 @@ class PracticeSchedule::Note
   end
 
   def self.identity!(value)
-    invalid! unless ConceptBucket.slice_for("mixed").include?(value["bucket"]) && value["concept"].is_a?(String) &&
-      ConceptBucket.vocabulary_for(value["bucket"]).include?(value["concept"])
+    invalid! unless ConceptBucket.valid_identity?(concept: value["concept"], bucket: value["bucket"])
   end
 
   def self.kinds!(value)

@@ -60,6 +60,23 @@ RSpec.describe PracticeSchedule do
     expect(PracticeSchedule::Note.decode({})).to eq({})
   end
 
+  it "raises on invalid identities and incompatible kind buckets rather than omitting assignments" do
+    note = plan(count: 2, setting: 2).notes
+    assigned = note.fetch("selected_kinds").first
+    valid = { "concept" => "memoization", "bucket" => "ruby_rails", "reason" => "support", "adjustment" => "support" }
+    note["assignments"] = { assigned => valid }
+    expect(PracticeSchedule::Note.decode(note)).to eq(note)
+    [ { "concept" => nil }, { "concept" => :memoization }, { "concept" => "invented" },
+      { "bucket" => [] }, { "bucket" => "invented" } ].each do |change|
+      bad = note.deep_dup
+      bad["assignments"][assigned].merge!(change)
+      expect { PracticeSchedule::Note.decode(bad) }.to raise_error(ArgumentError)
+    end
+    wrong_kind = plan(count: 2, setting: 2, pair: [ ExerciseSection::Architecture, ExerciseSection::Pattern ]).notes
+    wrong_kind["assignments"] = { "architecture" => valid }
+    expect { PracticeSchedule::Note.decode(wrong_kind) }.to raise_error(ArgumentError)
+  end
+
   it "reuses a regenerated variety selection and never spends its continuation again" do
     original = plan
     replacement = described_class.plan(context: original.notes, count: DailyKinds::COUNT, setting: nil, daily: daily,

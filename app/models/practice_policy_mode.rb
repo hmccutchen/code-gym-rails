@@ -1,6 +1,13 @@
 module PracticePolicyMode
   INITIATE_PRACTICE_POLICY = false
 
+  def self.display_status(user)
+    active?(user) ? :active : :inactive
+  rescue ArgumentError => error
+    Rails.logger.warn("[practice_display] user_id=#{user.id} error=#{error.class.name}")
+    :unavailable
+  end
+
   # Writers call this under the user lock; no enrollment result survives a provider call.
   def self.active?(user, initiate: INITIATE_PRACTICE_POLICY)
     ActiveRecord::Base.uncached do

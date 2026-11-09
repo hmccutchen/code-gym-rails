@@ -1,18 +1,21 @@
 class PracticeEvidence
   GAP_LIMIT = 300
 
-  def self.for(user, before:)
+  def self.for(user, before:, kinds: ExerciseSection.keys, initial_ready: false)
     struggle = {}
-    reviewed = 0
-    AdaptationHistory.each(user, before: before) do |response|
+    required = PracticeSchedule::Turns::INITIAL_REVIEWED_SETS
+    reviewed = initial_ready ? required : 0
+    history = initial_ready && kinds.empty? ? [] : AdaptationHistory.each(user, before: before)
+    history.each do |response|
       reviewed += 1 if reviewed < PracticeSchedule::Turns::INITIAL_REVIEWED_SETS &&
         response.completion_evidence?(sections: response.adaptation_section_keys)
       response.assessed_adaptation_sections.each do |key|
-        next if struggle.key?(key)
+        next if !kinds.include?(key) || struggle.key?(key)
 
         value = informative(response, key)
         struggle[key] = value unless value.nil?
       end
+      break if reviewed >= required && (kinds - struggle.keys).empty?
     end
     { initial_reviewed_sets: reviewed, struggle: struggle, pending: pending_for(user) }
   end

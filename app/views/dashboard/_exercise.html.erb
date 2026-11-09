@@ -65,10 +65,9 @@
 
         <% if exercise.dropped_sections.any? %>
           <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
-        <% end %><% if exercise.practice_schedule["omitted_kind"] %>
-          <p class="hint"><%= t("protected_practice.dashboard.variety") %></p>
-        <% end %><% if exercise.active_section_keys.any? { |key| exercise.problem_set.dig(key, "practice_adjustment") == "simplified" } %>
-          <p class="hint"><%= t("protected_practice.dashboard.adjusted") %></p>
+        <% end %>
+        <% practice_notes(exercise).each do |line| %>
+          <p class="hint"><%= line %></p>
         <% end %>
         <% if (coverage_reason = exercise.coverage_shown) %>
           <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>

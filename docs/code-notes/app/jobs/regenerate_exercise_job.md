@@ -24,3 +24,7 @@ rather than claiming that a review landed.
 It records no error banner: the dashboard's set is intact. The caller
 releases only its original token; a retaken claim is untouched. Supersession
 can also mean a relevant setting changed during generation.
+That settings check applies to inactive users too, so it can discard an
+already-billed draft. The old content, draft response, notes and
+`regenerated_at` remain unchanged. No automatic paid retry or cadence turn
+follows.

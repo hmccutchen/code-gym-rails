@@ -57,6 +57,11 @@ plus restorable drill intent; scheduling sees only active drills.
 answered core section and no unanswered assessment for an answered core
 section. Fixed sets count. Skips need no walkthrough; supplementary bug
 hunts do not count. This readiness check has no rubric/rung requirement.
+Capture carries validated readiness and asks only for the current regular
+kinds' latest informative verdicts. The history reader stops when both needs
+are settled. A missing verdict still requires a full scan, and an old weak
+verdict survives intervening neutral or eased work without a row/date cap.
+Pending requests load separately. Mandatory durable-mode scans remain.
 
 Once ready, a newly inserted Automatic two-section set repeats variety,
 pair, pair. Variety replaces one place; it never adds workload. Other sizes,
@@ -96,6 +101,15 @@ then compares settings, mode, latest exercise and predecessor continuation.
 A same-date duplicate returns the winner; an obsolete different-date result
 is discarded as superseded. No failed/duplicate/superseded call spends a
 turn or silently purchases another generation.
+An explicit settings edit can discard an already-billed draft, including
+for an inactive user. New-set generation records its existing retryable
+message; regeneration keeps the old set, draft and notes and releases only
+its own claim. Neither path retries automatically or spends a cadence turn.
+
+The captured date controls weekday mode, the workload cutoff and the stored
+work date. Initial delivered-history, retention due/overdue, inactive
+coverage and featured-concept reads still use their live clocks. Capture is
+not an all-read historical snapshot.
 
 Replacement locks user, exercise, then response and checks the original
 claim token and replace blocker. It reuses the original optional turn where
@@ -138,8 +152,16 @@ and graders use their existing explicit context fields.
 
 Inactive pages and prompts retain legacy wording. Enrolled Welcome, Setup,
 Learn and swap copy describes replacement within capacity and competing
-drills. Dashboard notes disclose variety and delivered simplification
-without exposing mastery tier or hidden concepts. Targets never change
+drills. A dashboard variety note names a replacement only when the stored
+selection and delivered active kinds agree, and qualifies the next-pair
+statement with unchanged settings. Delivered simplification shows only
+“Practice adjusted from your reviewed feedback.” It names no diagnosis,
+hidden concept or retry promise. A dropped replacement earns no compensation.
+Invalid optional policy copy, dashboard notes and picker consequences show
+explicit unavailable text and log only record/user identity and error class.
+They never substitute legacy promises. Strict writers still validate every
+signal; Learn still refuses corrupt selected reservation suffixes rather
+than inventing library contents or capacity. Targets never change
 automatically; #720's preview/Apply/version and target-preservation behavior
 is unchanged.
 
