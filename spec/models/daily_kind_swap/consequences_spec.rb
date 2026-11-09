@@ -4,10 +4,10 @@ RSpec.describe DailyKindSwap::Consequences do
   def kind(key) = ExerciseSection.find(key)
 
   def consequences(kind_key, place: 0, pair: DailyKinds::DEFAULT, weights: {}, excluded: [], setting: nil, planned_size: 3,
-                   brake: false, held: DailyKinds::COUNT, languages: %w[ruby_rails])
+                   brake: false, held: DailyKinds::COUNT, languages: %w[ruby_rails], practice_policy: :inactive)
     described_class.for(pair: pair, place: place, kind: kind(kind_key),
                         preferences: KindPreferences.new(weights: weights, excluded: excluded),
-                        day: described_class::Day.new(setting: setting, planned_size: planned_size, brake: brake, held: held),
+                        day: described_class::Day.new(setting: setting, planned_size: planned_size, brake: brake, held: held, practice_policy: practice_policy),
                         languages: languages, pair_shares: described_class.shares_a_concept?(pair, languages))
   end
 
@@ -47,8 +47,14 @@ RSpec.describe DailyKindSwap::Consequences do
       expect(consequences("challenge", weights: { "challenge" => 1.0 }).sentences.join).not_to include("Exercise mix")
     end
 
-    it "says an excluded incoming kind is in every set while it is daily" do
-      expect(consequences("challenge", excluded: %w[challenge]).sentences).to include(t(:excluded_incoming, kind: "Coding Challenge"))
+    %i[active inactive].each do |policy|
+      it "explains that Skip does not remove a regular choice under #{policy} practice without promising every set" do
+        sentences = consequences("challenge", excluded: %w[challenge], planned_size: 2, practice_policy: policy).sentences
+
+        expect(sentences).to include(t(:excluded_incoming, kind: "Coding Challenge"))
+        expect(sentences.join).to include("Skip does not remove it from your regular sections.")
+        expect(sentences.join).not_to include("every set")
+      end
     end
   end
 
