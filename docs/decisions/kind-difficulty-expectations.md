@@ -123,6 +123,34 @@ over a branch is less decisive than an independent requirement could make
 it. This ambiguity predates #718; the reused comparison expectations do
 not resolve it, and the fixture/key were not rewritten to claim agreement.
 
+### Shipping fixture correction, 2026-11-09
+
+#732 corrects that synthetic fixture without changing either code snippet
+or any expected rating. The scenario now states that changes to
+`ShippingQuote#cost_cents` require checkout recertification, while carrier
+registration and individual rate classes can change without it. Both pieces
+still need a new rate class and a carrier-list edit. B keeps that edit in
+`RATES`; A puts it inside `cost_cents`. The key's open/closed claim applies
+to the calculation method, not to the whole class.
+
+The complete answer connects this constraint, the code and the principle.
+The partial answer names B and the constraint but omits the structural
+explanation and principle. The missed answer still argues only readability.
+The alternative A answer now correctly describes a small branch addition
+and a new rate class, tied to monthly carrier additions; it overlooks the
+decisive recertification cost. Its expected `developing` rating follows the
+existing non-principal other-pick rule, not the former false claim that A
+avoids classes. The vague matching-pick range is unchanged.
+
+The calibration runner spec checks that the corrected constraint and
+decoded alternative reason reach the grader. Its fake-provider run checks
+fixture plumbing, not grading quality. No new live-provider calibration,
+rating agreement or cost measurement is claimed. The actual-problem rule,
+four rating meanings, principal comparison exception, `RUBRIC_VERSION`
+and historical eligibility remain unchanged.
+
+### Other fixture limits
+
 The discount fixture does not specify failed saves, nil expiry or rounding.
 Those are not new essential requirements. Likewise, the export fixture
 does not state scale interactions despite its senior stamp. It remains
