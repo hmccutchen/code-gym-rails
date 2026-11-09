@@ -1387,6 +1387,115 @@ RSpec.describe DailyPlan, "retention checks left waiting" do
   end
 end
 
+RSpec.describe DailyPlan, "protected weekend variety hosts" do
+  let(:pair) { %w[pattern design_comparison] }
+  let(:replacement) { "code_review" }
+  let(:user) { User.create!(email: "weekend-variety@example.com", daily_section_kinds: pair, daily_section_count: nil) }
+  let(:trap) { BugHuntGotchas.find("rb_memo_falsy") }
+  let(:requests) { { "pattern" => { "mode" => "normal_retry", "source_response_id" => 17, "requested_at" => "2026-11-06T12:00:00.123456Z" } } }
+  let(:mastery) do
+    user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails", tier: :standard,
+      mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.yesterday, practice_requests: requests)
+  end
+  let(:note) do
+    daily = DailyKinds.for(user)
+    pool = ExerciseSection.optional_slots(daily: daily).values.flatten.map(&:key)
+    PracticeSchedule::Note.decode({
+      "version" => 1, "policy" => 2, "sequence" => 3, "initial_ready" => true,
+      "regular_kinds" => pair, "selected_kinds" => pair, "phase" => 2, "assignments" => {},
+      "continuation" => { "next_phase" => 0, "kind_order" => [ replacement ] + (pool - [ replacement ]),
+        "next_kind_index" => 0, "last_omitted_kind" => nil, "service" => {
+          "pattern" => { "last_lane" => "maintenance", "last_maintenance" => "drill",
+            "concepts" => [ { "concept" => trap.concept, "bucket" => "ruby_rails", "sequence" => 1 } ] }
+        } }
+    })
+  end
+
+  around { |example| travel_to(Time.zone.local(2026, 11, 7, 9)) { example.run } }
+
+  before do
+    mastery
+    pin_code_review_mode(:bug_hunt)
+    expect(BugHuntGotchas).to receive(:pick).once.and_return(trap)
+    expect(PracticeSchedule::Turns).to receive(:plan).once.and_call_original
+  end
+
+  def weekend_plan(replacing: false)
+    previous = note.deep_dup
+    if replacing
+      previous.merge!("selected_kinds" => [ pair.first, replacement ], "omitted_kind" => pair.last, "phase" => 0)
+      previous["continuation"].merge!("next_phase" => 1, "next_kind_index" => 1, "last_omitted_kind" => pair.last)
+    end
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: previous["selected_kinds"].index_with { { "question" => "Explain the choice." } },
+      plan_notes: { "daily_kinds" => pair, "practice_schedule" => previous })
+    context = PracticeGeneration.capture(user, date: Date.current, replacing: (exercise if replacing))
+    plan = described_class.for(user, language: "ruby_rails", schedule_context: context)
+    expect(context.fetch(:active)).to be(true)
+    expect(user.daily_section_count).to be_nil
+    expect(plan.size.count).to eq(DailyKinds::COUNT)
+    expect(plan.kinds.map(&:key)).to eq([ pair.first, replacement ])
+    expect(plan.daily_kinds.map(&:key)).to eq(pair)
+    expect(plan.code_review_mode).to eq(:bug_hunt)
+    expect(plan.coverage).to be_nil
+    final_hosts = DayHosts.new("ruby_rails", mode: plan.code_review_mode, gotcha: plan.code_review_gotcha,
+      featured_concept: plan.featured_concept)
+    plan.assignments.each do |key, entry|
+      expect(final_hosts.can_tag?(ExerciseSection.for(key), entry[:concept], entry[:bucket])).to be(true)
+    end
+    expect(mastery.reload.practice_requests).to eq(requests)
+    if replacing
+      expect(plan.practice_schedule.slice("sequence", "phase", "continuation")).to eq(previous.slice("sequence", "phase", "continuation"))
+    else
+      expect(plan.practice_schedule["sequence"]).to eq(previous.fetch("sequence") + 1)
+      expect(plan.practice_schedule.dig("continuation", "next_phase")).to eq(1)
+      expect(plan.practice_schedule.dig("continuation", "next_kind_index")).to eq(1)
+    end
+    plan
+  end
+
+  [ false, true ].each do |replacing|
+    it "withholds a pending trap and its due check when #{replacing ? 'replacement keeps' : 'variety adds'} the bug hunt" do
+      plan = weekend_plan(replacing: replacing)
+
+      expect(plan.code_review_gotcha).to eq(trap)
+      expect(plan.notes["bug_hunt"]).to eq(trap.id)
+      expect(plan.assignments).to eq({})
+      expect(plan.due_checks + plan.fourth_due_checks).to be_empty
+      expect(plan.waiting_checks).to include(a_hash_including(concept: trap.concept, reason: :no_host))
+      expect(plan.practice_schedule.dig("continuation", "service")).to eq(note.dig("continuation", "service"))
+    end
+  end
+
+  context "when the chosen set omits the configured bug hunt" do
+    let(:pair) { %w[design_comparison code_review] }
+    let(:replacement) { "pattern" }
+
+    [ false, true ].each do |replacing|
+      it "allows the retry without a trap when #{replacing ? 'replacing the held variety set' : 'selecting variety'}" do
+        plan = weekend_plan(replacing: replacing)
+
+        expect(plan.code_review_gotcha).to be_nil
+        expect(plan.notes).not_to have_key("bug_hunt")
+        expect(plan.assignments.fetch("pattern")).to include(concept: trap.concept, mode: "normal_retry")
+      end
+    end
+
+    context "with a drill rather than a pending request" do
+      let(:requests) { {} }
+
+      it "reloads candidates under the final restrictions instead of refiltering the old excluded list" do
+        mastery.update!(next_retention_check_on: nil, drilled_at: Time.current)
+        plan = weekend_plan
+
+        expect(plan.code_review_gotcha).to be_nil
+        expect(plan.assignments.values).to include(a_hash_including(concept: trap.concept, reason: "drill"))
+        expect(mastery.reload.drilled_at).to be_present
+      end
+    end
+  end
+end
+
 RSpec.describe DailyPlan, "the coverage exception" do
   include ActiveSupport::Testing::TimeHelpers
   include DailyPlanGateStubs

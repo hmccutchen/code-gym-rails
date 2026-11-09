@@ -18,6 +18,22 @@ The captured date controls weekday mode and the workload cutoff; persistence
 uses the same work date. Initial rotation history, due/overdue checks,
 inactive coverage and featured selection still read their live clocks.
 
+For enrolled plans, `.protected_selection` selects the turn once through
+`PracticeSchedule.select_turn`, including replacement of a held turn. It then
+builds hosts from those actual selected kinds before passing that turn to
+`PracticeSchedule.plan` for matching and spare-host sharing. The configured
+pair remains metadata, not a reconstruction of the selected set.
+
+The initial hosts still inform optional-pool seeding. Reinforcement and drill
+candidates are read again under the selected set's restrictions: filtering
+the old list cannot recover a concept that an omitted bug hunt had withheld
+before the history reader's limit. Final hosts also determine waiting reasons.
+The single picked trap applies only when the selected set contains CodeReview;
+the same applicability rule supplies the result, prompt and ladders. Adding
+the bug hunt withholds its concept without clearing requests or crediting
+service; omitting it removes that restriction. Replacement preserves its whole
+original continuation and does not select or spend another turn.
+
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
 
 Rotation receives delivered/scheduled history independently of performance.

@@ -2,11 +2,9 @@ class PracticeSchedule
   Selection = Data.define(:kinds, :rotation, :assignments, :notes, :continuation)
 
   def self.plan(context:, count:, setting:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false,
-                regular: daily.first(DailyKinds::COUNT))
-    turn_evidence = replacing && context.blank? ? evidence.merge(initial_reviewed_sets: 0) : evidence
-    turn = Turns.plan(context: context, count: count, setting: setting, daily: daily, regular: regular, preferences: preferences,
-      evidence: turn_evidence, hosts: hosts, rotation_history: rotation_history, due: due, drills: drills)
-    turn = replacement_turn(turn, context, count, setting, daily, regular, preferences, rotation_history) if replacing && context.present?
+                regular: daily.first(DailyKinds::COUNT), turn: nil)
+    turn ||= select_turn(context: context, count: count, setting: setting, daily: daily, regular: regular, preferences: preferences,
+      evidence: evidence, hosts: hosts, rotation_history: rotation_history, due: due, drills: drills, replacing: replacing)
     assignments, service = Assignments.plan(kinds: turn.kinds, hosts: hosts, pending: evidence.fetch(:pending),
       reinforcement: evidence.fetch(:reinforcement, []), due: due, drills: drills,
       service: turn.note.fetch("continuation").fetch("service"), sequence: turn.note.fetch("sequence"))
@@ -19,6 +17,13 @@ class PracticeSchedule
     note["continuation"]["service"] = service unless replacing
     Selection.new(kinds: turn.kinds, rotation: turn.rotation, assignments: assignments,
       notes: Note.decode(note), continuation: note.fetch("continuation"))
+  end
+
+  def self.select_turn(context:, count:, setting:, daily:, regular:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing:)
+    turn_evidence = replacing && context.blank? ? evidence.merge(initial_reviewed_sets: 0) : evidence
+    turn = Turns.plan(context: context, count: count, setting: setting, daily: daily, regular: regular, preferences: preferences,
+      evidence: turn_evidence, hosts: hosts, rotation_history: rotation_history, due: due, drills: drills)
+    replacing && context.present? ? replacement_turn(turn, context, count, setting, daily, regular, preferences, rotation_history) : turn
   end
 
   def self.replacement_turn(turn, original, count, setting, daily, regular, preferences, history)
