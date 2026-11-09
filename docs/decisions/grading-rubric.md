@@ -109,13 +109,16 @@ listed, and 6/6 complete answers at solid or better**, on
 `claude-sonnet-5-5` for $0.2613 (10,713 in, 24,426 cache write, 0 cache
 read, 17,878 out). The fixtures are deliberately
 clear-cut: they show the levels separate, not where a borderline answer
-lands. That includes the design comparison fixture's two extra answers,
+lands. That run included the design comparison fixture's two extra answers,
 which had not been run before: a matching pick with a vague reason graded
 `beginner` and the other pick with a sound reason graded `developing`,
-both as the kind's grading note asks.
+both as the kind's grading note asks. The shipping fixture was corrected
+afterward in #732; these historical ratings and costs do not measure the
+revised fixture.
 
 The #718 offline reassessment of all six fixtures and adjacent-level and
 missing-format cases is in `docs/decisions/kind-difficulty-expectations.md`.
 It preserves the actual-problem rule, all four rating meanings,
 `RUBRIC_VERSION` and historical evidence. It is not a repeat of the paid
-October run, and records the comparison fixture's unresolved limitation.
+October run, and records the comparison fixture's limitation at that time
+and its later offline correction.

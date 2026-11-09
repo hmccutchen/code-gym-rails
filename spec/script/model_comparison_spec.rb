@@ -465,12 +465,14 @@ end
       expect(out.string).to match(%r{^  other_pick_sound_reason solid +expected developing +MISMATCH})
     end
 
-    it "grades a design comparison's extra cases from the decoded answer and the key" do
+    it "sends the shipping constraint and code-grounded alternative reason to the grader" do
       comparison.review_calibration
 
       prompts = posted.map { |body| body["system"].is_a?(Array) ? body["system"].first["text"] : body["system"] }
-      expect(prompts.join).to include("Picked: A. Reason:\n<#{UserText::TAG}>\nThe scenario says carriers are added monthly")
-      expect(prompts.join).not_to include("pick:a")
+      expect(prompts.join).to include("Changes to ShippingQuote#cost_cents require checkout recertification")
+      expect(prompts.join).to include("Picked: A. Reason:\n<#{UserText::TAG}>\nThe scenario says carriers are added monthly. A adds one branch and a new rate class")
+      expect(prompts.join).to include("Both options need their carrier list extended.")
+      expect(prompts.join).not_to include("pick:a", "A keeps every rule in one case statement", "cheaper than adding a class")
     end
 
     it "every extra answer carries a label, an answer and its own expected ratings" do
