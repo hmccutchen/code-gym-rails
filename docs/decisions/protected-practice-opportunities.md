@@ -165,7 +165,9 @@ still asks the learner to write a plan; hidden concepts and planted answers
 stay hidden and planted counts do not change. Judges strip server stamps
 and graders use their existing explicit context fields.
 
-Inactive pages and prompts retain legacy wording. Enrolled Welcome, Setup,
+Policy-dependent text on inactive pages and in prompts retains legacy wording.
+Shared labels name regular choices without promising delivery in every set.
+Enrolled Welcome, Setup,
 Learn and swap copy describes replacement within capacity and competing
 drills. Setup distinguishes equal shares in protected Automatic two-section
 rounds from weighted ordinary rotating places in three/four-section sets.

@@ -117,8 +117,8 @@ feature:
   `AllSectionsRejectedError` and no set is written, as it does for any day
   whose every section is dropped.
 - The Daily sections chooser offers a kind the user skips in the Exercise
-  mix and says nothing about it. The chosen kind is in every set anyway, as
-  a swapped-in skipped kind is.
+  mix and says nothing about it. Choosing a regular section overrides Skip,
+  just as swapping it in does; the setting applies again in optional rotation.
 
 A user's stored list is never rewritten by a count or registry change; the
 next write stores a list of the new length.
@@ -203,7 +203,7 @@ slots. Every reader takes the pair:
   addition) chose per optional slot. `#fourth` is the day's fourth kind,
   daily or rotated, since the fourth track plans either the same way.
 - The shared-concept prompt line, `DailyExercise#shared_concept_shown?` and
-  the dashboard hint name the row's pair; Setup's "Always in your set" group and
+  the dashboard hint name the row's pair; Setup's "Your regular sections" group and
   the Daily sections hint name the user's current pair.
 
 ## Pattern's rotating role
