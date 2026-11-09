@@ -234,13 +234,14 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).to include(KindPreferences::MULTIPLIERS.to_json)
     end
 
-    it "says excluding is a different action from a low weight" do
+    it "distinguishes skipping from protected ordering and ordinary frequency" do
       login_as(user)
 
       get setup_path
 
-      expect(response.body).to include("stronger, different action")
-      expect(response.body).to include("come up less often on shorter days")
+      expect(response.body).to include("equal shares of scheduled variety turns", "Frequency sliders only break ties in the initial order")
+      expect(response.body).to include("places that still rotate use frequency weights", "Fixed chosen sections stay chosen")
+      expect(response.body).to include("Skip means never")
     end
 
     it "reflects stored preferences in the rendered controls" do
@@ -451,7 +452,7 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
 
       text = Nokogiri::HTML(response.body).at_css("#exercise-mix").text
-      expect(text).to include("Skipping is a stronger, different action than turning a slider down.", "Skip means never", "Skipping can also make")
+      expect(text).to include("Skip means never", "Skipping can change which group fills those places.")
       expect(text).to include("will not appear again until you turn Skip off.")
       expect(text).not_to include("turn it back on")
       expect(text).not_to include("Exclude")
