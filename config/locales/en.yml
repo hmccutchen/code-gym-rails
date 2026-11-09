@@ -5,6 +5,8 @@ en:
       daily_sections: "Your regular pair starts with %{sections}. After two reviewed sets, Automatic two-section days rotate one place through other eligible kinds, followed by two days with the pair. Fixed counts keep their chosen kinds."
     exercise_mix:
       intro: "Frequency helps choose the initial order of optional kinds. Exclusions keep optional kinds out. After two reviewed sets, Automatic two-section days offer one variety place, then two days with your regular pair. Larger or fixed sets pause that cycle."
+      exclude_body_weak: "On Automatic two-section days, eligible kinds get equal shares of scheduled variety turns over a complete round while your settings stay the same. Frequency sliders only break ties in the initial order; they do not change those shares."
+      exclude_body_frequency: "In three- or four-section sets, places that still rotate use frequency weights and give priority to kinds not seen for a long time. Skipping can change which group fills those places. Fixed chosen sections stay chosen; sliders do not replace them."
     learn:
       drill:
         offer: "A drill shares eligible section places with practice and retention checks. It does not add a section or promise the next place. Simplified success keeps the drill for a normal retry."

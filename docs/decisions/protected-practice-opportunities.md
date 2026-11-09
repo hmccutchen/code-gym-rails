@@ -167,9 +167,14 @@ and graders use their existing explicit context fields.
 
 Inactive pages and prompts retain legacy wording. Enrolled Welcome, Setup,
 Learn and swap copy describes replacement within capacity and competing
-drills. A dashboard variety note names a replacement only when the stored
-selection and delivered active kinds agree, and qualifies the next-pair
-statement with unchanged settings. Delivered simplification shows only
+drills. Setup distinguishes equal shares in protected Automatic two-section
+rounds from weighted ordinary rotating places in three/four-section sets.
+Weights break initial-order ties in the protected round; fixed chosen places
+stay chosen. Its policy-dependent help follows the same active, inactive and
+unavailable display status as the intro. A dashboard variety note names a
+replacement only when the stored selection and delivered active kinds agree,
+and qualifies the next-pair statement with unchanged settings. Delivered
+simplification shows only
 “Practice adjusted from your reviewed feedback.” It names no diagnosis,
 hidden concept or retry promise. A dropped replacement earns no compensation.
 Invalid optional policy copy, dashboard notes and picker consequences show

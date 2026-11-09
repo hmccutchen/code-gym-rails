@@ -23,10 +23,28 @@ RSpec.describe "Protected-practice display", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(copy)
       expect(response.body).not_to include(I18n.t("protected_practice.unavailable"))
+      if path == setup_path
+        %w[exclude_body_weak exclude_body_frequency].each do |key|
+          expect(response.body).to include(ERB::Util.h(I18n.t("protected_practice.exercise_mix.#{key}")))
+          expect(response.body).not_to include(ERB::Util.h(I18n.t("exercise_mix.#{key}")))
+        end
+        expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.exclude_body_strong")))
+      end
     end
     expect(user.daily_responses).to be_empty
     expect(user.concept_masteries).to be_empty
     expect(user.daily_exercises.sole.plan_notes).not_to have_key("practice_schedule")
+  end
+
+  it "keeps the legacy Setup frequency help and Skip wording with initiation off" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
+    get setup_path
+    expect(response).to have_http_status(:ok)
+    %w[exclude_body_weak exclude_body_frequency].each do |key|
+      expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.#{key}")))
+      expect(response.body).not_to include(ERB::Util.h(I18n.t("protected_practice.exercise_mix.#{key}")))
+    end
+    expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.exclude_body_strong")))
   end
 
   it "keeps Setup, dashboard and Learn available without either policy's promises on invalid historical receipts" do
@@ -43,6 +61,10 @@ RSpec.describe "Protected-practice display", type: :request do
       expect(response.body).to include(I18n.t("protected_practice.unavailable"))
       expect(response.body).not_to include(I18n.t("learn.drill.offer"), I18n.t("protected_practice.learn.drill.offer"),
         "PRIVATE-GAP-ANSWER", "weeks to cycle")
+      %w[exclude_body_weak exclude_body_frequency].each do |key|
+        expect(response.body).not_to include(ERB::Util.h(I18n.t("exercise_mix.#{key}")),
+          ERB::Util.h(I18n.t("protected_practice.exercise_mix.#{key}")))
+      end
     end
     display_warnings = warnings.grep(/\[practice_display\]/)
     expect(display_warnings.size).to be_between(1, pages.size * (DailyKinds::COUNT + 1))
