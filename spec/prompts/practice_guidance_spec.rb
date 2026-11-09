@@ -4,11 +4,11 @@ RSpec.describe GenerationPrompt::PracticeGuidance do
   let(:user) { User.new(skill_level: "junior", focus_areas: []) }
   let(:kinds) { [ ExerciseSection::Pattern, ExerciseSection::ParsonsProblem ] }
 
-  def prompt(mode:, locked: false, gap: nil)
+  def prompt(mode: nil, locked: false, gap: nil, assignments: nil)
     plan = plan_for(selected_kinds: kinds, reinforcement: [ { concept: "memoization", tier: "reduced" } ])
     rungs = KindDifficulty.none.rungs(skill_level: "junior")
     difficulty = KindDifficulty.new(levels: rungs, locked: locked ? kinds.map(&:key) : [])
-    assigned = kinds.to_h { |kind| [ kind.key, { concept: "memoization", bucket: "ruby_rails", mode: mode, gap: gap } ] }
+    assigned = assignments || kinds.to_h { |kind| [ kind.key, { concept: "memoization", bucket: "ruby_rails", mode: mode, gap: gap } ] }
     adjustments = PracticeAdjustment.resolve(assignments: assigned, difficulty: difficulty, rungs: rungs.slice(*kinds.map(&:key)), reduced: {})
     GenerationPrompt.new(user, "ruby_rails", plan: plan, history: [], delivered_history: [], difficulty: difficulty,
       ladders: {}, kind_rungs: rungs, adjustments: adjustments, retention_annotation: generation_retention_annotation).render
@@ -19,6 +19,18 @@ RSpec.describe GenerationPrompt::PracticeGuidance do
     expect(text).to include("normal reasoning demand", "Use exactly `memoization`", "deterministic order grading")
     expect(text).not_to include("must not repeat within the same week", "simplify and add more scaffolding",
       "keep reinforcing, and let the tier", "Pitch these at FULL difficulty")
+  end
+
+  it "keeps a reduced-tier drill's simplification outside the normal-demand retention instruction" do
+    assignments, = PracticeSchedule::Assignments.plan(kinds: kinds, hosts: DayHosts.new("ruby_rails", mode: :application_code),
+      pending: [], reinforcement: [], due: [], drills: [ { concept: "memoization", bucket: "ruby_rails", tier: "reduced" } ],
+      service: {}, sequence: 1)
+    expect(assignments.values).to contain_exactly(include(reason: "drill", mode: "simplified"))
+
+    text = prompt(assignments: assignments)
+    expect(text).to include("Use exactly `memoization`", "remove an interacting difficulty to simplify the reasoning",
+      "Assigned retention checks stay at normal demand")
+    expect(text).not_to include("Assigned maintenance stays at normal demand")
   end
 
   it "quotes and bounds a gap and suppresses all gap-driven help for locked sections" do

@@ -11,7 +11,7 @@ module GenerationPrompt::DifficultyGuidance
       "Reasoning deepens within each kind's stated format and size limits, without unstated requirements.",
       "Concept ladders refine, never override, the applicable baseline and format.",
       *paragraphs, "",
-      (assigned ? "Assigned maintenance stays at normal demand at that section's level." :
+      (assigned ? "Assigned retention checks stay at normal demand at that section's level." :
         "A retention check or established concept placed in one of these sections is pitched at that " \
         "section's level, with no easing."),
       (assigned ? "Follow the assigned practice instruction; keep locked sections at normal demand." : unlocked_difficulty_line(unlocked)),
