@@ -9,8 +9,14 @@ RSpec.describe ApplicationHelper, type: :helper do
   end
 
   it "retains inactive copy verbatim with initiation off" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     expect(helper.practice_copy("exercise_mix.intro")).to eq(I18n.t("exercise_mix.intro"))
     expect(helper.practice_copy("learn.drill.offer")).to eq(I18n.t("learn.drill.offer"))
+  end
+
+  it "shows active copy for an untouched user under the source-controlled default" do
+    expect(helper.practice_copy("exercise_mix.intro")).to eq(I18n.t("protected_practice.exercise_mix.intro"))
+    expect(helper.practice_copy("learn.drill.offer")).to eq(I18n.t("protected_practice.learn.drill.offer"))
   end
 
   it "shows explicit unavailable copy and safely logs a persisted invalid historical receipt" do

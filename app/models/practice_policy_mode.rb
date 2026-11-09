@@ -1,5 +1,5 @@
 module PracticePolicyMode
-  INITIATE_PRACTICE_POLICY = false
+  INITIATE_PRACTICE_POLICY = true
 
   def self.display_status(user)
     active?(user) ? :active : :inactive

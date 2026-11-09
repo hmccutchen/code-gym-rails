@@ -33,7 +33,7 @@ paths:
 
 # Day planning, sizing and mastery
 
-Protected-practice P-C is implemented with initiation off. Its mode, mixed
+Protected-practice P-A enables initiation after the P-C deployment gate. Its mode, mixed
 policies, within-capacity schedule, fair assignments and persistence contract
 are in `docs/decisions/protected-practice-opportunities.md`. Durable v2 state
 always wins over the switch. Capture under the user lock; validate again at

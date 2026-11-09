@@ -2,12 +2,16 @@ require "rails_helper"
 
 RSpec.describe GenerateDailyExercisesJob do
   include ActiveSupport::Testing::TimeHelpers
+  include PracticeGenerationHelpers
 
   let(:user) { User.create!(email: "cronuser@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC") }
 
-  def stub_provider(u = user, problem_set: { "code_review" => {} })
-    judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: [], outcomes: {}, plan_notes: {})
-    svc = instance_double(ClaudeService, generate_judged_exercise: judged)
+  def stub_provider(u = user, problem_set: { "code_review" => {} }, dropped: [], notes: {}, solves: [])
+    judged = AiService::JudgedSet.new(problem_set: problem_set, dropped_sections: dropped, outcomes: {}, plan_notes: notes, solves: solves)
+    svc = instance_double(ClaudeService)
+    allow(svc).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:|
+      with_practice_context(judged, user: caller, language: language, schedule_context: schedule_context)
+    end
     allow(AiService).to receive(:for).with(u).and_return(svc)
     svc
   end
@@ -19,6 +23,7 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "discards one already-billed inactive draft after an explicit settings edit, without retrying" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     service = stub_provider
     expect(service).to receive(:generate_judged_exercise).once do |_caller, language:, schedule_context:|
       expect(schedule_context[:active]).to be(false)
@@ -258,31 +263,28 @@ RSpec.describe GenerateDailyExercisesJob do
   end
 
   it "writes the plan notes with the row on both paths" do
-    notes = { "coverage" => "plan_review", "shared_concept" => "feature_envy" }
-    judged = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {},
-                                      plan_notes: notes)
-    svc = instance_double(ClaudeService, generate_judged_exercise: judged)
-    allow(AiService).to receive(:for).with(user).and_return(svc)
+    notes = { "shared_concept" => "feature_envy" }
+    svc = stub_provider(notes: notes)
+    returned = nil
+    allow(svc).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:|
+      result = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: notes)
+      returned = with_practice_context(result, user: caller, language: language, schedule_context: schedule_context)
+    end
 
     travel_to(Time.utc(2026, 7, 13, 15, 0)) do
       described_class.new.perform(user_id: user.id)
-      expect(DailyExercise.find_by(user: user, date: Date.current).plan_notes).to eq(notes)
+      expect(DailyExercise.find_by(user: user, date: Date.current).plan_notes).to eq(returned.plan_notes)
+      expect(returned.plan_notes).to include(notes).and have_key("practice_schedule")
     end
     travel_to(Time.utc(2026, 7, 18, 15, 0)) do
       described_class.new.perform(user_id: user.id)
-      expect(DailyExercise.find_by(user: user, date: Date.current).plan_notes).to eq(notes)
+      expect(DailyExercise.find_by(user: user, date: Date.current).plan_notes).to eq(returned.plan_notes)
+      expect(returned.plan_notes).to include(notes).and have_key("practice_schedule")
     end
   end
 
   it "judges on the cron path and records dropped sections" do
-    judged_set = AiService::JudgedSet.new(
-      problem_set:      { "code_review" => { "question" => "q", "concept" => "n_plus_one" } },
-      dropped_sections: [ "pattern" ],
-      outcomes:         {},
-      plan_notes:       {}
-    )
-    fake_service = instance_double(ClaudeService, generate_judged_exercise: judged_set)
-    allow(AiService).to receive(:for).with(user).and_return(fake_service)
+    stub_provider(problem_set: { "code_review" => { "question" => "q", "concept" => "n_plus_one" } }, dropped: [ "pattern" ])
 
     travel_to(Time.utc(2026, 7, 13, 15, 0)) do
       described_class.new.perform
@@ -293,39 +295,35 @@ RSpec.describe GenerateDailyExercisesJob do
 
   it "judges an on-demand generation on a weekday" do
     user.update!(language: "javascript")
-    svc = stub_provider
-    allow(svc).to receive(:generate_judged_exercise).and_return(
-      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "pattern" ], outcomes: {}, plan_notes: {})
-    )
+    svc = stub_provider(dropped: [ "pattern" ])
 
     travel_to(Time.utc(2026, 7, 13, 6, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: false))
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: true))
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "pattern" ])
     end
   end
 
   it "judges an on-demand generation on a weekend too, since its code review is a bug hunt" do
     user.update!(language: "javascript")
-    svc = stub_provider
-    allow(svc).to receive(:generate_judged_exercise).and_return(
-      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [ "design_comparison" ], outcomes: {}, plan_notes: {})
-    )
+    svc = stub_provider(dropped: [ "design_comparison" ])
 
     travel_to(Time.utc(2026, 7, 18, 12, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: false))
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: true))
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "design_comparison" ])
     end
   end
 
   it "dates the set by the day it was planned for, when the judged run crosses midnight" do
     svc = stub_provider
-    allow(svc).to receive(:generate_judged_exercise) do
+    allow(svc).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:|
+      result = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
+      judged = with_practice_context(result, user: caller, language: language, schedule_context: schedule_context)
       travel(30.minutes)
-      AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
+      judged
     end
 
     travel_to(Time.utc(2026, 10, 18, 23, 40)) { described_class.new.perform(user_id: user.id) }
@@ -344,9 +342,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   describe "hourly batch (no user_id), zone-gated" do
     def stub_generation_for(u)
-      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
-      svc = instance_double(ClaudeService, generate_judged_exercise: judged_set)
-      allow(AiService).to receive(:for).with(u).and_return(svc)
+      stub_provider(u)
     end
 
     let(:pac) { User.create!(email: "pac@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles") }
@@ -441,9 +437,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   describe "the push reminder" do
     def stub_generation_for(u)
-      judged_set = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
-      svc = instance_double(ClaudeService, generate_judged_exercise: judged_set)
-      allow(AiService).to receive(:for).with(u).and_return(svc)
+      stub_provider(u)
     end
 
     let(:pac) { User.create!(email: "reminded@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles") }
@@ -587,11 +581,8 @@ RSpec.describe GenerateDailyExercisesJob do
     let(:logged) { StringIO.new }
 
     def stub_judged(solves)
-      judged = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {},
-                                        solves: solves)
-      svc = instance_double(ClaudeService, generate_judged_exercise: judged)
+      svc = stub_provider(solves: solves)
       allow(svc).to receive(:model_for).with("generate_exercise").and_return("claude-opus-5-5")
-      allow(AiService).to receive(:for).with(user).and_return(svc)
       svc
     end
 

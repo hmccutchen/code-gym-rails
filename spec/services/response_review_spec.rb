@@ -97,7 +97,7 @@ RSpec.describe ResponseReview do
 
         expect(review.status).to eq(:partial)
         expect(response.reload).to have_attributes(reviewing_since: nil,
-          mastery_application: { "version" => 1, "legacy_sections" => [], "processed_sections" => %w[pattern],
+          mastery_application: { "version" => 2, "policy" => 2, "legacy_sections" => [], "processed_sections" => %w[pattern],
             "session_counted" => true, "skip_attempts" => [] })
         expect(mastery.reload.review_reconciliation["operations"].first).to include(
           "type" => "review", "response_id" => response.id, "pending_sections" => %w[code_review])
@@ -187,6 +187,7 @@ RSpec.describe ResponseReview do
     end
 
     it "keeps an untouched default-off user on batch semantics without receipts or suffixes" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       batch(response, { "pattern" => "strong" }, initiate: false)
       batch(response, { "code_review" => "developing" }, initiate: false)
       expect(response.reload.mastery_application).to eq({})
@@ -195,6 +196,7 @@ RSpec.describe ResponseReview do
     end
 
     it "ignores an existing retired concept row with initiation off and creates no reconciliation state" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       retired = user.concept_masteries.create!(concept: "retired_concept", language: "ruby_rails",
         last_rating: "developing", streak: 1)
       original = retired.attributes
@@ -332,6 +334,7 @@ RSpec.describe ResponseReview do
     end
 
     it "takes a legacy partial as baseline without reapplying its keys or countdown" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       batch(response, { "pattern" => "strong" }, initiate: false)
       batch(response, { "code_review" => "developing" }, initiate: true)
       expect(mastery.reload).to have_attributes(tier: "standard", streak: 1, last_rating: "developing", drilled_at: nil)
@@ -379,7 +382,8 @@ RSpec.describe ResponseReview do
       expect(mastery.reload.next_retention_check_on).to eq(Date.current + 14)
     end
 
-    it "keeps eased comfortable success on current retention policy" do
+    it "keeps eased comfortable success on the legacy v1 retention policy" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       mastery.update!(tier: :reduced)
       exercise.update!(problem_set: exercise.problem_set.transform_values { |entry| entry.merge("eased" => true) })
       batch(response, "pattern" => "strong", "code_review" => "strong")

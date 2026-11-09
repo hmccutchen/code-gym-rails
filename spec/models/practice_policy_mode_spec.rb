@@ -12,7 +12,14 @@ RSpec.describe PracticePolicyMode do
   end
 
   it "does not enroll an untouched user with initiation off" do
-    user.with_lock { expect(described_class.active?(user)).to be(false) }
+    user.with_lock { expect(described_class.active?(user, initiate: false)).to be(false) }
+  end
+
+  it "selects protected practice for an untouched user under the source-controlled default" do
+    user.with_lock { expect(described_class.active?(user)).to be(true) }
+    expect(user.daily_responses).to be_empty
+    expect(user.daily_exercises).to be_empty
+    expect(user.concept_masteries).to be_empty
   end
 
   it "honors a compacted v2 receipt without an open journal" do

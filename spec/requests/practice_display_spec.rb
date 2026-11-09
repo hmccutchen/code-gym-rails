@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Protected-practice display failures", type: :request do
+RSpec.describe "Protected-practice display", type: :request do
   let(:user) { create_user_with_key }
 
   before { login_as(user) }
@@ -10,6 +10,23 @@ RSpec.describe "Protected-practice display failures", type: :request do
       problem_set: { "code_review" => { "question" => "Review this", "snippet" => "value" },
         "design_comparison" => { "question" => "Compare", "option_a" => "A", "option_b" => "B" } },
       plan_notes: { "size" => 2 }.tap { |notes| notes["practice_schedule"] = note unless note.nil? })
+  end
+
+  it "shows active Setup, Learn and picker copy for an untouched account without an enrollment override" do
+    exercise_on(Date.current)
+    {
+      setup_path => I18n.t("protected_practice.exercise_mix.intro"),
+      learn_concept_path(bucket: "ruby_rails", concept: "memoization") => I18n.t("protected_practice.learn.drill.offer"),
+      root_path => I18n.t("protected_practice.daily_kinds.outgoing", outgoing: "Code Review")
+    }.each do |path, copy|
+      get path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(copy)
+      expect(response.body).not_to include(I18n.t("protected_practice.unavailable"))
+    end
+    expect(user.daily_responses).to be_empty
+    expect(user.concept_masteries).to be_empty
+    expect(user.daily_exercises.sole.plan_notes).not_to have_key("practice_schedule")
   end
 
   it "keeps Setup, dashboard and Learn available without either policy's promises on invalid historical receipts" do

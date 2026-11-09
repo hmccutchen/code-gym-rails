@@ -112,17 +112,29 @@ RSpec.describe DailyKindSwap::Picker do
     end
 
     it "reads today's planned size for the outgoing warning" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise(size: 2)
 
       expect(option(pickers["code_review"], "challenge").consequences.warning.first).to include("about once every")
     end
 
     it "explains growth through reviewed answers and finished sections on an available swap" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise(size: 2)
       candidate = option(pickers["code_review"], "pattern")
       expect(candidate).to be_available
       expect(candidate.consequences.warning).to include("Your sets grow based on your reviewed answers and the sections you finish.")
       expect(candidate.consequences.warning.join).not_to include("Your two daily sections are also what decides")
+    end
+
+    it "describes eligible variety without additive coverage under the active default" do
+      exercise(size: 2)
+      candidate = option(pickers["code_review"], "pattern")
+      expect(candidate).to be_available
+      expect(candidate.consequences.warning).to eq([
+        I18n.t("protected_practice.daily_kinds.outgoing", outgoing: "Code Review")
+      ])
+      expect(candidate.consequences.warning.join).not_to include("extra section", "weeks")
     end
   end
 
@@ -169,6 +181,7 @@ RSpec.describe DailyKindSwap::Picker do
   end
 
   it "reads the brake from the row, so a braked two-section day gets no weeks figure" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     exercise(size: 2)
     @exercise.update!(plan_notes: @exercise.plan_notes.merge("brake" => true))
 

@@ -22,7 +22,33 @@ RSpec.describe "Protected-practice writers", type: :model do
     ResponseReview.new(response.reload, user: user, reviewer: reviewer).call
   end
 
+  it "enrolls an eased review by default and preserves its original request through rollback and manual commands" do
+    clock = Time.iso8601("2026-11-02T12:34:56.123456Z")
+    response = nil
+    travel_to(clock, with_usec: true) do
+      response = day(0, keys: %w[pattern])
+      expect(review(response, "pattern" => "solid").status).to eq(:ready)
+    end
+    row = user.concept_masteries.find_by!(concept: "memoization", language: "ruby_rails")
+    request = { "pattern" => { "mode" => "normal_retry", "source_response_id" => response.id, "requested_at" => clock.iso8601(6) } }
+    expect(response.reload.mastery_application).to include("version" => 2, "policy" => 2)
+    expect(row).to have_attributes(practice_requests: request, mastered_at: nil, review_reconciliation: {})
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
+    travel_to(clock + 1.day, with_usec: true) do
+      ConceptDrills.start!(user, concept: row.concept, bucket: row.language)
+      ConceptDrills.stop!(user, concept: row.concept, bucket: row.language)
+      expect(row.reload.practice_requests).to eq(request)
+      normal = day(0, eased: false, keys: %w[pattern])
+      expect(review(normal, "pattern" => "solid").status).to eq(:ready)
+      expect(normal.reload.mastery_application).to include("version" => 2, "policy" => 2)
+      expect(row.reload).to have_attributes(practice_requests: {}, mastered_at: clock + 1.day)
+    end
+    expect(response.reload.mastery_application).to include("version" => 2, "policy" => 2)
+    expect(PracticePolicyMode.active?(user)).to be(true)
+  end
+
   it "replays a same-concept late v1 correction before normal v2 earning and later Stop/Start across DST" do
+        stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
         user.update!(time_zone: "America/New_York")
         d_clock = Time.iso8601("2026-11-01T03:59:59.123456Z")
         e_clock = Time.iso8601("2026-11-01T06:30:01.654321Z")
@@ -71,7 +97,6 @@ RSpec.describe "Protected-practice writers", type: :model do
       end
 
       it "rolls back v2 requests, session ticks, open suffixes and the final response after successful mastery writes" do
-        stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
         open_response = day(-1)
         review(open_response, "pattern" => "solid")
         retry_row = user.concept_masteries.find_by!(concept: "memoization")
@@ -97,6 +122,7 @@ RSpec.describe "Protected-practice writers", type: :model do
       end
 
   it "keeps an existing v1 response policy while new enrolled responses use v2 with initiation off" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     legacy = day(0)
     review(legacy, "pattern" => "solid")
     expect(legacy.reload.mastery_application["version"]).to eq(1)
@@ -119,14 +145,12 @@ RSpec.describe "Protected-practice writers", type: :model do
     response.update!(ai_review: { "pattern" => { "rating" => "solid" } })
     user.concept_masteries.create!(concept: "memoization", language: "ruby_rails",
       mastered_at: 1.day.ago, retention_interval_days: 7, next_retention_check_on: Date.current + 6)
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     review(response, "code_review" => "solid")
     expect(response.reload.mastery_application["legacy_sections"]).to eq(%w[pattern])
     expect(user.concept_masteries.find_by!(concept: "memoization").practice_requests.keys).to eq(%w[code_review])
   end
 
   it "preserves requests through single/group Stop and Start and keeps eased drilling admitted" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     response = day(0, keys: %w[pattern], concept: "shallow_module")
     ConceptDrills.start!(user, concept: "shallow_module", bucket: "ruby_rails")
     review(response, "pattern" => "solid")

@@ -102,6 +102,7 @@ RSpec.describe "Mastery reconciliation on PostgreSQL", type: :model do
   end
 
   it "chooses reconciliation after locking even when the default-off provider started before enrollment" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     target = submitted_day(Date.current + 1, keys: %w[code_review pattern])
     later = submitted_day(Date.current + 2, concept: "caching")
     @initiation[target.id] = true
@@ -140,6 +141,7 @@ RSpec.describe "Mastery reconciliation on PostgreSQL", type: :model do
   end
 
   it "keeps a default-off result committed before enrollment in the legacy baseline" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     legacy = submitted_day(Date.current + 1, keys: %w[code_review pattern])
     enrolling = submitted_day(Date.current + 2, concept: "caching")
     @initiation[enrolling.id] = true

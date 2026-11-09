@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe RegenerateExerciseJob, type: :job do
   include ActiveSupport::Testing::TimeHelpers
+  include PracticeGenerationHelpers
 
   let(:user) { create_user_with_key(email: "regen-job@example.com") }
 
@@ -28,13 +29,16 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     if result.is_a?(StandardError)
       allow(fake_service).to receive(:generate_judged_exercise).and_raise(result)
     else
-      allow(fake_service).to receive(:generate_judged_exercise).and_return(judged_set(result))
+      allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+        with_practice_context(judged_set(result), user: caller, language: language, schedule_context: schedule_context)
+      end
     end
 
     fake_service
   end
 
   it "keeps the old inactive set, draft and notes after settings change during one paid call" do
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise = claimed_exercise
       exercise.update!(plan_notes: { "size" => 2, "daily_kinds" => DailyKinds::DEFAULT.map(&:key) })
       draft = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise,
@@ -85,9 +89,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       exercise = claimed_exercise
       fake_service = instance_double(ClaudeService)
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
-      allow(fake_service).to receive(:generate_judged_exercise) do
+      allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+        result = with_practice_context(judged_set({ "code_review" => { "question" => "new" } }),
+          user: caller, language: language, schedule_context: schedule_context)
         exercise.update_columns(regenerating_since: nil)
-        judged_set({ "code_review" => { "question" => "new" } })
+        result
       end
       described_class.new.perform(user_id: user.id)
       expect_logged_by_id
@@ -133,10 +139,10 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     exercise.update!(plan_notes: { "coverage" => "plan_review", "shared_concept" => "feature_envy" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_judged_exercise).and_return(
-      AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "new" } }, dropped_sections: [],
-                               outcomes: {}, plan_notes: { "shared_concept" => "long_method" })
-    )
+    allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+      result = judged_set({ "code_review" => { "question" => "new" } }).with(plan_notes: { "shared_concept" => "long_method" })
+      with_practice_context(result, user: caller, language: language, schedule_context: schedule_context)
+    end
 
     described_class.new.perform(user_id: user.id)
 
@@ -160,9 +166,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                   answers: { "code_review" => "a draft worth keeping here" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_judged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+      result = with_practice_context(judged_set({ "code_review" => { "question" => "new" } }),
+        user: caller, language: language, schedule_context: schedule_context)
       exercise.update_columns(regenerating_since: nil)
-      judged_set({ "code_review" => { "question" => "new" } })
+      result
     end
 
     described_class.new.perform(user_id: user.id)
@@ -182,9 +190,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                   answers: { "code_review" => "a draft worth keeping here" })
     fake_service = instance_double(ClaudeService)
     allow(AiService).to receive(:for).with(user).and_return(fake_service)
-    allow(fake_service).to receive(:generate_judged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+      result = with_practice_context(judged_set({ "code_review" => { "question" => "new" } }),
+        user: caller, language: language, schedule_context: schedule_context)
       exercise.update_columns(regenerating_since: newer_claim)
-      judged_set({ "code_review" => { "question" => "new" } })
+      result
     end
 
     described_class.new.perform(user_id: user.id)
@@ -297,9 +307,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                            answers: { "code_review" => "a" * 20 })
     fake_service = stub_provider({ "code_review" => { "question" => "new" } })
-    allow(fake_service).to receive(:generate_judged_exercise) do
+    allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+      result = with_practice_context(judged_set({ "code_review" => { "question" => "new" } }),
+        user: caller, language: language, schedule_context: schedule_context)
       daily_response.destroy
-      judged_set({ "code_review" => { "question" => "new" } })
+      result
     end
 
     expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
@@ -323,8 +335,10 @@ RSpec.describe RegenerateExerciseJob, type: :job do
   it "records a section the provider returned unusable as dropped" do
     exercise = claimed_exercise
     stub_provider({ "code_review" => { "question" => "new" } })
-    allow(AiService.for(user)).to receive(:generate_judged_exercise)
-      .and_return(judged_set({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]))
+    allow(AiService.for(user)).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+      with_practice_context(judged_set({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]),
+        user: caller, language: language, schedule_context: schedule_context)
+    end
 
     described_class.new.perform(user_id: user.id)
 
@@ -495,9 +509,10 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     claim = exercise.reload.regenerating_since
     fake_service = stub_provider({ "code_review" => { "question" => "new" } })
     handed = nil
-    allow(fake_service).to receive(:generate_judged_exercise) do |_user, deadline:, **|
+    allow(fake_service).to receive(:generate_judged_exercise) do |caller, deadline:, language:, schedule_context:|
       handed = deadline
-      judged_set({ "code_review" => { "question" => "new" } })
+      with_practice_context(judged_set({ "code_review" => { "question" => "new" } }),
+        user: caller, language: language, schedule_context: schedule_context)
     end
 
     described_class.new.perform(user_id: user.id)
@@ -554,7 +569,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
                                         outcomes: {}, plan_notes: {}, solves: solves)
       fake_service = instance_double(ClaudeService)
       allow(fake_service).to receive(:model_for).with("generate_exercise").and_return("claude-opus-5-5")
-      allow(fake_service).to receive(:generate_judged_exercise) { before_return&.call; judged }
+      allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+        result = with_practice_context(judged, user: caller, language: language, schedule_context: schedule_context)
+        before_return&.call
+        result
+      end
       allow(AiService).to receive(:for).with(user).and_return(fake_service)
     end
 

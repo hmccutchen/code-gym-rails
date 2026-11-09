@@ -1,7 +1,8 @@
 # Daily mastery reconciliation
 
-Protected-practice P-C adds a policy-2 interpreter and version-2 envelopes
-while initiation remains off. Existing receipts and operations retain the
+Protected-practice P-C added a policy-2 interpreter and version-2 envelopes
+with initiation off; P-A enables new protected-practice enrollment after
+the compatibility deployment gate. Existing v1 receipts and operations retain the
 policy described here, including eased retention. Mixed journals dispatch
 each operation by policy and preserve the extended request map through
 v1 replay and manual commands. See `protected-practice-opportunities.md`

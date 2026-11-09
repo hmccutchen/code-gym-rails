@@ -135,7 +135,6 @@ RSpec.describe "Protected-practice opportunity simulation", type: :model do
     first = ProblemSetIngest.call(payload, language: "ruby_rails", expected_keys: rungs.keys, daily: pair,
       pitched_at: rungs, assignments: initial_adjustment).problem_set
     expect(first.dig("pattern", "eased")).to be(true)
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     travel_to(date.noon) { save_and_review.call(date, first, { "daily_kinds" => pair.map(&:key) }) }
     stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     row = user.concept_masteries.find_by!(concept: "service_objects", language: "ruby_rails")

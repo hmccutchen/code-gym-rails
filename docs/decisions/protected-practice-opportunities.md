@@ -1,12 +1,15 @@
 # Protected practice opportunities
 
-## Compatibility release
+## Activation and compatibility
 
-P-C implements #712, #714 and #716 with
-`PracticePolicyMode::INITIATE_PRACTICE_POLICY = false`. It does not enroll
-untouched users. P-S supplied `concept_masteries.practice_requests`; this
-release adds no migration. The existing reconciliation initiation switch
-stays true.
+P-C implemented #712, #714 and #716 with
+`PracticePolicyMode::INITIATE_PRACTICE_POLICY = false`. P-A sets it to true
+after the verified P-C web/worker rollout and removal of older writers,
+so untouched users enter protected practice on their next qualifying write.
+P-S supplied `concept_masteries.practice_requests`; activation adds no
+migration. The existing reconciliation initiation switch stays true.
+The source default does not establish that the activated deployment is
+complete; the post-activation gate below still applies.
 
 The uncached mode reader validates every nonempty receipt, journal, request
 map and schedule note before choosing the writer under the user lock. Any
@@ -200,6 +203,8 @@ writers, replicas and one-offs. Only a separate activation change may flip
 initiation. After any v2 state exists, P-C is the rollback floor, including
 after journal compaction. P-A → P-C stops new enrollment and continues
 enrolled users; deleting receipts/requests/notes is not a rollback.
+After P-A, verify both services and removal of older instances again before
+closing #712, #714 or #716. PRs reference those issues without closing them.
 
 CI specs cover mixed-policy corrections, real PostgreSQL locking,
 opportunity bounds, weekday proposal dates, and actual rendered prompt

@@ -19,7 +19,7 @@ alone does not preserve replay semantics.
 
 `ConceptMastery.practice_requests` is non-null jsonb, default `{}`, keyed by
 kind with closed mode, source response ID and original operation timestamp.
-P-C reads it after the P-S deployment gate, while initiation remains false.
+P-C introduced compatible readers after P-S; P-A enables initiation after the P-C deployment gate.
 Version-2 receipts and mixed-policy journals preserve enrollment after
 compaction. `DailyExercise.plan_notes["practice_schedule"]` holds format-1,
 policy-2 continuation and assignment metadata. Missing legacy notes are

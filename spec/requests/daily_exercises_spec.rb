@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "DailyExercises", type: :request do
   include ActiveJob::TestHelper
+  include PracticeGenerationHelpers
 
   let(:user) { create_user_with_key }
 
@@ -167,8 +168,11 @@ RSpec.describe "DailyExercises", type: :request do
             },
             "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
           }
-          fake_service = instance_double(ClaudeService, path =>
-            AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}, plan_notes: {}))
+          fake_service = instance_double(ClaudeService)
+          allow(fake_service).to receive(path) do |caller, language:, schedule_context:, **|
+            result = AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}, plan_notes: {})
+            with_practice_context(result, user: caller, language: language, schedule_context: schedule_context)
+          end
           allow(AiService).to receive(:for).with(user).and_return(fake_service)
           perform_enqueued_jobs
 
