@@ -7,6 +7,39 @@ RSpec.describe PracticeGeneration do
   let(:user) { create_fake_provider_user }
   let(:service) { FakeService.new("fake-key") }
 
+  it "enrolls through real default generation and continues note-only enrollment after initiation is disabled" do
+    pin_code_review_mode(:application_code)
+    travel_to(Time.utc(2026, 11, 2, 12)) do
+      expect(user.daily_exercises).to be_empty
+      expect(user.daily_responses).to be_empty
+      expect(user.concept_masteries).to be_empty
+      context = described_class.capture(user, date: Date.current)
+      expect(context[:active]).to be(true)
+      result = service.generate_judged_exercise(user, language: "ruby_rails", schedule_context: context)
+      first = described_class.commit_new(user, context: context, judged: result, language: "ruby_rails", drafted_by: service)
+      expect(first.status).to eq(:saved)
+      expect(first.exercise.active_section_keys).to match_array(DailyKinds::DEFAULT.map(&:key))
+      expect(first.exercise.plan_notes).not_to have_key("coverage")
+      expect(first.exercise.practice_schedule).to include("policy" => 2, "sequence" => 1)
+      expect(user.daily_responses).to be_empty
+      expect(user.concept_masteries).to be_empty
+
+      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
+      next_context = described_class.capture(user, date: Date.tomorrow)
+      expect(next_context[:active]).to be(true)
+      next_result = service.generate_judged_exercise(user, language: "ruby_rails", schedule_context: next_context)
+      second = described_class.commit_new(user, context: next_context, judged: next_result, language: "ruby_rails", drafted_by: service)
+      expect(second.status).to eq(:saved)
+      expect(second.exercise.practice_schedule["sequence"]).to eq(2)
+      expect(second.exercise.active_section_keys.size).to eq(DailyKinds::COUNT)
+      expect(first.exercise.reload.practice_schedule["sequence"]).to eq(1)
+      untouched = create_fake_provider_user
+      inactive = described_class.capture(untouched, date: Date.current)
+      expect(inactive[:active]).to be(false)
+      expect(untouched.daily_exercises).to be_empty
+    end
+  end
+
   def judged(context)
     AiService::JudgedSet.new(problem_set: { "pattern" => { "concept" => "memoization" } },
       dropped_sections: [], outcomes: {}, schedule_context: context,
@@ -23,7 +56,6 @@ RSpec.describe PracticeGeneration do
 
   [ false, true ].each do |change_after_capture|
     it "plans from fresh captured settings with a stale caller, later edit=#{change_after_capture}" do
-      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
       caller = User.find(user.id)
       fresh = User.find(user.id)
       fresh.update!(daily_section_count: 3, daily_section_kinds: %w[architecture pattern code_review],
@@ -64,7 +96,6 @@ RSpec.describe PracticeGeneration do
   end
 
   it "carries validated readiness while asking for the newly configured regular pair" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     context = described_class.capture(user, date: Date.yesterday)
     prior = active_judged(context)
     note = prior.plan_notes
@@ -81,15 +112,15 @@ RSpec.describe PracticeGeneration do
     first = described_class.capture(user, date: Date.current)
     second = described_class.capture(user, date: Date.current + 1)
     expect(user.daily_exercises.count).to eq(0)
-    expect(described_class.commit_new(user, context: first, judged: judged(first), language: "ruby_rails", drafted_by: service).status).to eq(:saved)
-    expect(described_class.commit_new(user, context: second, judged: judged(second), language: "ruby_rails", drafted_by: service).status).to eq(:superseded)
+    expect(described_class.commit_new(user, context: first, judged: active_judged(first), language: "ruby_rails", drafted_by: service).status).to eq(:saved)
+    expect(described_class.commit_new(user, context: second, judged: active_judged(second), language: "ruby_rails", drafted_by: service).status).to eq(:superseded)
     expect(user.daily_exercises.count).to eq(1)
   end
 
   it "returns the winner on same-date duplicate completion without another insert" do
     context = described_class.capture(user, date: Date.current)
     2.times.map do |index|
-      result = described_class.commit_new(user, context: context, judged: judged(context), language: "ruby_rails", drafted_by: service)
+      result = described_class.commit_new(user, context: context, judged: active_judged(context), language: "ruby_rails", drafted_by: service)
       expect(result.status).to eq(index.zero? ? :saved : :duplicate)
     end
     expect(user.daily_exercises.count).to eq(1)
@@ -122,7 +153,6 @@ RSpec.describe PracticeGeneration do
     { section_kind_preferences_version: 1 }
   ].each do |change|
     it "discards an enrolled in-flight set after #{change.keys.join('/')} changes" do
-      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
       context = described_class.capture(user, date: Date.current)
       result = active_judged(context)
       user.update!(change)
@@ -132,7 +162,6 @@ RSpec.describe PracticeGeneration do
   end
 
   it "allows a review arriving during generation without clearing its new request on delivery" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     old = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, problem_set: { "pattern" => {} })
     context = described_class.capture(user, date: Date.current)
     response = user.daily_responses.create!(date: old.date, daily_exercise: old, submitted_at: Time.current,
@@ -145,7 +174,6 @@ RSpec.describe PracticeGeneration do
   end
 
   it "keeps an older set's continuation when Start over returns after a newer set" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     original_context = described_class.capture(user, date: Date.yesterday)
     original = described_class.commit_new(user, context: original_context, judged: active_judged(original_context),
       language: "ruby_rails", drafted_by: service).exercise
@@ -164,7 +192,6 @@ RSpec.describe PracticeGeneration do
   end
 
   it "leaves a regenerated legacy row without a synthetic schedule turn" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     legacy = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
       problem_set: { "code_review" => { "question" => "Review the original code." } })
     claim = legacy.claim_regenerating!
@@ -176,7 +203,6 @@ RSpec.describe PracticeGeneration do
   end
 
   it "rolls back destruction of an active draft and its full continuation when replacement persistence fails" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     first = described_class.capture(user, date: Date.current)
     exercise = described_class.commit_new(user, context: first, judged: active_judged(first),
       language: "ruby_rails", drafted_by: service).exercise

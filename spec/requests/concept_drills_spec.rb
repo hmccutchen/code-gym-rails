@@ -200,11 +200,12 @@ RSpec.describe "Concept drills", type: :request do
   end
 
   describe "the concept page" do
-    it "offers the drill with a note that it clears on its own" do
+    it "offers the drill with its shared-place and normal-retry rules" do
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
       expect(response.body).to include("Drill this")
-      expect(response.body).to include("clears on its own")
+      expect(response.body).to include("does not add a section or promise the next place")
+      expect(response.body).to include("Simplified success keeps the drill for a normal retry.")
       expect(response.body).not_to include("Stop drilling")
     end
 

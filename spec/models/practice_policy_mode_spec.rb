@@ -12,7 +12,14 @@ RSpec.describe PracticePolicyMode do
   end
 
   it "does not enroll an untouched user with initiation off" do
-    user.with_lock { expect(described_class.active?(user)).to be(false) }
+    user.with_lock { expect(described_class.active?(user, initiate: false)).to be(false) }
+  end
+
+  it "selects protected practice for an untouched user under the source-controlled default" do
+    user.with_lock { expect(described_class.active?(user)).to be(true) }
+    expect(user.daily_responses).to be_empty
+    expect(user.daily_exercises).to be_empty
+    expect(user.concept_masteries).to be_empty
   end
 
   it "honors a compacted v2 receipt without an open journal" do
@@ -20,7 +27,7 @@ RSpec.describe PracticePolicyMode do
       "version" => 2, "policy" => 2, "legacy_sections" => [], "processed_sections" => [],
       "session_counted" => false, "skip_attempts" => []
     })
-    user.with_lock { expect(described_class.active?(user)).to be(true) }
+    user.with_lock { expect(described_class.active?(user, initiate: false)).to be(true) }
     expect(response.reload.mastery_application["policy"]).to eq(2)
   end
 
@@ -66,7 +73,7 @@ RSpec.describe PracticePolicyMode do
     user.concept_masteries.create!(concept: "memoization", language: "ruby_rails",
       practice_requests: { "pattern" => { "mode" => "normal_retry", "source_response_id" => 1,
         "requested_at" => "2026-11-06T12:00:00.123456Z" } })
-    user.with_lock { expect(described_class.active?(user)).to be(true) }
+    user.with_lock { expect(described_class.active?(user, initiate: false)).to be(true) }
   end
 
   it "honors a v2 envelope containing only v1 operations" do
@@ -75,7 +82,7 @@ RSpec.describe PracticePolicyMode do
     journal["baseline"]["practice_requests"] = {}
     journal["operations"].each { |entry| entry["policy"] = 1 }
     user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", review_reconciliation: journal)
-    expect(described_class.active?(user)).to be(true)
+    user.with_lock { expect(described_class.active?(user, initiate: false)).to be(true) }
   end
 
   %i[assignment service].each do |field|
@@ -113,9 +120,9 @@ RSpec.describe PracticePolicyMode do
     exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
       problem_set: selected.kinds.to_h { |kind| [ kind.key, { "question" => "Explain the decision." } ] },
       plan_notes: { "practice_schedule" => selected.notes })
-    expect(described_class.active?(user)).to be(true)
+    user.with_lock { expect(described_class.active?(user, initiate: false)).to be(true) }
     exercise.update_columns(plan_notes: { "practice_schedule" => selected.notes.merge("version" => 1.0) })
     expect(exercise.reload.plan_notes.dig("practice_schedule", "version")).to eql(1.0)
-    expect { described_class.active?(user, initiate: true) }.to raise_error(ArgumentError)
+    user.with_lock { expect { described_class.active?(user, initiate: true) }.to raise_error(ArgumentError) }
   end
 end

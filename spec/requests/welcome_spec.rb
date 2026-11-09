@@ -43,12 +43,12 @@ RSpec.describe "Welcome", type: :request do
     expect(box["data-welcome-setup-url-value"]).to eq(setup_path)
   end
 
-  it "names the default daily sections and says either can be swapped from its card" do
+  it "names the regular pair and explains within-capacity variety under the active default" do
     login_as(new_account)
     get "/welcome"
 
     names = DailyKinds::DEFAULT.map { |kind| I18n.t("sections.#{kind.key}.name") }.to_sentence
-    expect(response.body).to include(ERB::Util.h(I18n.t("welcome.daily_sections", sections: names)))
+    expect(response.body).to include(ERB::Util.h(I18n.t("protected_practice.welcome.daily_sections", sections: names)))
     expect(names).to eq("Code Review and Design Comparison")
   end
 

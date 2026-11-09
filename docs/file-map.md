@@ -2,7 +2,7 @@
 
 What each listed file does. Specs, migrations and the skills under `.claude/` are not listed.
 
-- `app/models/practice_policy_mode.rb` — uncached validated durable enrollment, with initiation off.
+- `app/models/practice_policy_mode.rb` — uncached validated durable enrollment and default-on initiation.
 - `app/models/concept_mastery/practice_policy.rb` — pure v2 requests and eased-retention interpretation; ordinary retention delegates to `Transition`.
 - `app/models/practice_evidence.rb` — basic reviewed readiness, informative struggle and owner-scoped bounded review gaps.
 - `app/models/practice_schedule.rb` — composes selected turns and assignments; reads the latest continuation.

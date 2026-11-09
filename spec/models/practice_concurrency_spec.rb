@@ -30,7 +30,6 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
   end
 
   it "discards a v2 review after another connection takes the claim, preserving the new token and request" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
       problem_set: { "pattern" => { "concept" => "memoization" } })
     response = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, submitted_at: Time.current,
@@ -62,7 +61,6 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
 
   %i[settings held_date takeover].each do |change|
     it "rejects an active replacement after #{change} changes while the draft is away" do
-      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
       service = FakeService.new("fake-key")
       initial = PracticeGeneration.capture(user, date: Date.yesterday)
       exercise = PracticeGeneration.commit_new(user, context: initial, judged: judged(initial),
@@ -110,7 +108,6 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
   end
 
   it "refuses an active new set when another connection changes settings during the fake draft" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
     ready, release = Queue.new, Queue.new
     worker = connected do
       caller = User.find(user.id)
@@ -133,7 +130,6 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
 
   [ 0, 1 ].each do |offset|
     it "commits one successor when concurrent captures target dates #{offset} day apart" do
-      stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", true)
       ready, release = Queue.new, Queue.new
       threads = [ 0, offset ].map do |day|
         connected do
@@ -158,6 +154,7 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
 
   %i[receipt schedule].each do |signal|
     it "chooses v2 only after the lock with an actual cached negative #{signal} query" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
       problem_set: { "pattern" => { "concept" => "memoization", "eased" => true } })
     response = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, submitted_at: Time.current,

@@ -9,8 +9,20 @@ RSpec.describe ApplicationHelper, type: :helper do
   end
 
   it "retains inactive copy verbatim with initiation off" do
+    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
     expect(helper.practice_copy("exercise_mix.intro")).to eq(I18n.t("exercise_mix.intro"))
     expect(helper.practice_copy("learn.drill.offer")).to eq(I18n.t("learn.drill.offer"))
+    %w[exclude_body_weak exclude_body_frequency].each do |key|
+      expect(helper.practice_copy("exercise_mix.#{key}")).to eq(I18n.t("exercise_mix.#{key}"))
+    end
+  end
+
+  it "shows active copy for an untouched user under the source-controlled default" do
+    expect(helper.practice_copy("exercise_mix.intro")).to eq(I18n.t("protected_practice.exercise_mix.intro"))
+    expect(helper.practice_copy("learn.drill.offer")).to eq(I18n.t("protected_practice.learn.drill.offer"))
+    expect(helper.practice_copy("exercise_mix.exclude_body_weak")).to include("equal shares", "initial order", "do not change those shares")
+    expect(helper.practice_copy("exercise_mix.exclude_body_frequency")).to include(
+      "three- or four-section", "places that still rotate", "not seen for a long time", "Fixed chosen sections stay chosen")
   end
 
   it "shows explicit unavailable copy and safely logs a persisted invalid historical receipt" do
@@ -21,6 +33,9 @@ RSpec.describe ApplicationHelper, type: :helper do
     expect(Rails.logger).to receive(:warn).with("[practice_display] user_id=#{user.id} error=ArgumentError").once
     expect(helper.practice_copy("exercise_mix.intro")).to eq(I18n.t("protected_practice.unavailable"))
     expect(helper.practice_copy("learn.drill.offer")).to eq(I18n.t("protected_practice.unavailable"))
+    %w[exclude_body_weak exclude_body_frequency].each do |key|
+      expect(helper.practice_copy("exercise_mix.#{key}")).to eq(I18n.t("protected_practice.unavailable"))
+    end
     expect(response.reload.mastery_application).to include("secret" => "RAW-GAP-ANSWER")
     expect { PracticePolicyMode.active?(user) }.to raise_error(ArgumentError)
   end
