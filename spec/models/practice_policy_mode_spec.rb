@@ -78,6 +78,34 @@ RSpec.describe PracticePolicyMode do
     expect(described_class.active?(user)).to be(true)
   end
 
+  %i[assignment service].each do |field|
+    it "refuses an incompatible kind/bucket #{field} as the only persisted signal with initiation off" do
+      selected = PracticeSchedule.plan(context: nil, count: DailyKinds::COUNT, setting: DailyKinds::COUNT, daily: DailyKinds::DEFAULT,
+        preferences: KindPreferences.none, evidence: { initial_reviewed_sets: 0, pending: [], struggle: {} },
+        hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [])
+      note = selected.notes
+      identity = { "concept" => "sync_vs_async", "bucket" => "architecture" }
+      if field == :assignment
+        note["assignments"] = { "code_review" => identity.merge("reason" => "support", "adjustment" => "support") }
+      else
+        note["continuation"]["service"] = { "code_review" => {
+          "last_lane" => "practice", "last_maintenance" => nil,
+          "concepts" => [ identity.merge("sequence" => note.fetch("sequence")) ]
+        } }
+      end
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+        problem_set: selected.kinds.to_h { |kind| [ kind.key, { "question" => "Explain the decision." } ] },
+        plan_notes: { "practice_schedule" => note })
+
+      expect(user.daily_responses).to be_empty
+      expect(user.concept_masteries).to be_empty
+      user.with_lock do
+        expect { described_class.active?(user, initiate: false) }.to raise_error(ArgumentError, "Invalid practice schedule format")
+      end
+      expect(exercise.reload.plan_notes).to eq("practice_schedule" => note)
+    end
+  end
+
   it "honors schedule-only enrollment and rejects a later malformed note" do
     selected = PracticeSchedule.plan(context: nil, count: DailyKinds::COUNT, setting: nil, daily: DailyKinds::DEFAULT,
       preferences: KindPreferences.none, evidence: { initial_reviewed_sets: 0, pending: [], struggle: {} },

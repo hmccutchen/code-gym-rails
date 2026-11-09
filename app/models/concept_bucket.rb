@@ -28,6 +28,11 @@ class ConceptBucket
       vocabulary_for(bucket).include?(concept)
   end
 
+  def self.valid_kind_identity?(kind:, concept:, bucket:)
+    ExerciseSection.keys.include?(kind) && valid_identity?(concept: concept, bucket: bucket) &&
+      DailyExercise::LANGUAGES.any? { |language| self.for(kind, language) == bucket }
+  end
+
   def self.for(sections, language)
     Array(sections).each do |section|
       special = SPECIAL_BUCKETS[section.to_s]

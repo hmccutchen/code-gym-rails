@@ -14,6 +14,12 @@ v2 receipt, v2 journal, nonempty request map or policy-2 schedule note keeps
 the user enrolled regardless of the initiation switch. Unknown or malformed
 nonempty state raises before writes. Exact `{}` alone means unused.
 
+Scheduler assignments and service entries validate their owning kind through
+`ConceptBucket.valid_kind_identity?`: the closed concept/bucket pair must be
+recordable by that registered kind under a supported exercise language.
+Historical service may belong to a currently unselected kind. Validation
+does not depend on the user's current language or today's host restrictions.
+
 Existing response receipts retain their policy. A response first received
 after enrollment gets a v2 receipt; its already-reviewed legacy prefix is
 grandfathered. A v2 journal has the nine v1 state fields plus

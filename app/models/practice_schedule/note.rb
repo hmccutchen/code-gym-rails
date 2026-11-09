@@ -31,8 +31,7 @@ class PracticeSchedule::Note
     invalid! unless value.is_a?(Hash) && (value.keys - selected).empty?
     value.each do |kind, assignment|
       keys!(assignment, %w[concept bucket reason adjustment])
-      identity!(assignment)
-      invalid! unless ConceptBucket.for(kind, assignment["bucket"]) == assignment["bucket"]
+      identity!(assignment, kind: kind)
       invalid! unless REASONS.include?(assignment["reason"]) && ADJUSTMENTS.include?(assignment["adjustment"])
     end
   end
@@ -50,14 +49,14 @@ class PracticeSchedule::Note
   def self.service!(value, sequence)
     invalid! unless value.is_a?(Hash)
     kinds!(value.keys)
-    value.each_value do |service|
+    value.each do |kind, service|
       keys!(service, %w[last_lane last_maintenance concepts])
       invalid! unless [ nil, "practice", "maintenance" ].include?(service["last_lane"])
       invalid! unless [ nil, "retention", "drill" ].include?(service["last_maintenance"])
       invalid! unless service["concepts"].is_a?(Array)
       identities = service["concepts"].map do |entry|
         keys!(entry, %w[concept bucket sequence])
-        identity!(entry)
+        identity!(entry, kind: kind)
         integer!(entry["sequence"], minimum: 1)
         invalid! if entry["sequence"] > sequence
         entry.values_at("concept", "bucket")
@@ -66,8 +65,8 @@ class PracticeSchedule::Note
     end
   end
 
-  def self.identity!(value)
-    invalid! unless ConceptBucket.valid_identity?(concept: value["concept"], bucket: value["bucket"])
+  def self.identity!(value, kind:)
+    invalid! unless ConceptBucket.valid_kind_identity?(kind: kind, concept: value["concept"], bucket: value["bucket"])
   end
 
   def self.kinds!(value)

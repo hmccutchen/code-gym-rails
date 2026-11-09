@@ -77,6 +77,53 @@ RSpec.describe PracticeSchedule do
     expect { PracticeSchedule::Note.decode(wrong_kind) }.to raise_error(ArgumentError)
   end
 
+  it "refuses an ordinary kind assignment to a globally valid special-bucket identity" do
+    note = plan(count: 2, setting: 2).notes
+    note["assignments"] = { "code_review" => {
+      "concept" => "sync_vs_async", "bucket" => "architecture", "reason" => "support", "adjustment" => "support"
+    } }
+
+    expect { PracticeSchedule::Note.decode(note) }.to raise_error(ArgumentError, "Invalid practice schedule format")
+  end
+
+  [ [ "code_review", "architecture", "sync_vs_async" ], [ "architecture", "ruby_rails", "memoization" ] ].each do |kind, bucket, concept|
+    it "refuses service-only #{kind}/#{bucket} identities even when the global pair is valid" do
+      note = plan(count: 2, setting: 2).notes
+      note["continuation"]["service"] = { kind => {
+        "last_lane" => "practice", "last_maintenance" => nil,
+        "concepts" => [ { "concept" => concept, "bucket" => bucket, "sequence" => note.fetch("sequence") } ]
+      } }
+
+      expect(note["assignments"]).to eq({})
+      expect { PracticeSchedule::Note.decode(note) }.to raise_error(ArgumentError, "Invalid practice schedule format")
+    end
+  end
+
+  it "accepts Ruby, JavaScript and special-kind assignments with matching service identities" do
+    [ [ "code_review", "ruby_rails", "memoization" ], [ "code_review", "javascript", "closures" ],
+      [ "architecture", "architecture", "sync_vs_async" ] ].each do |kind, bucket, concept|
+      note = plan(count: 2, setting: 2, pair: [ ExerciseSection.for(kind), ExerciseSection::Pattern ]).notes
+      note["assignments"] = { kind => { "concept" => concept, "bucket" => bucket, "reason" => "support", "adjustment" => "support" } }
+      note["continuation"]["service"] = { kind => {
+        "last_lane" => "practice", "last_maintenance" => nil,
+        "concepts" => [ { "concept" => concept, "bucket" => bucket, "sequence" => note.fetch("sequence") } ]
+      } }
+
+      expect(PracticeSchedule::Note.decode(note)).to eq(note)
+    end
+  end
+
+  it "retains valid service for a registered kind absent from the current selected set" do
+    note = plan(count: 2, setting: 2).notes
+    note["continuation"]["service"] = { "architecture" => {
+      "last_lane" => "practice", "last_maintenance" => nil,
+      "concepts" => [ { "concept" => "sync_vs_async", "bucket" => "architecture", "sequence" => note.fetch("sequence") } ]
+    } }
+
+    expect(note["selected_kinds"]).not_to include("architecture")
+    expect(PracticeSchedule::Note.decode(note)).to eq(note)
+  end
+
   it "reuses a regenerated variety selection and never spends its continuation again" do
     original = plan
     replacement = described_class.plan(context: original.notes, count: DailyKinds::COUNT, setting: nil, daily: daily,
