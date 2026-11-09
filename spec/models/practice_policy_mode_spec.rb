@@ -86,7 +86,8 @@ RSpec.describe PracticePolicyMode do
       problem_set: selected.kinds.to_h { |kind| [ kind.key, { "question" => "Explain the decision." } ] },
       plan_notes: { "practice_schedule" => selected.notes })
     expect(described_class.active?(user)).to be(true)
-    exercise.update!(plan_notes: { "practice_schedule" => selected.notes.merge("version" => 1.0) })
+    exercise.update_columns(plan_notes: { "practice_schedule" => selected.notes.merge("version" => 1.0) })
+    expect(exercise.reload.plan_notes.dig("practice_schedule", "version")).to eql(1.0)
     expect { described_class.active?(user, initiate: true) }.to raise_error(ArgumentError)
   end
 end
