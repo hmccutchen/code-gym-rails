@@ -7,7 +7,7 @@ class ProfileUpdate
   end
 
   PREFERENCE_KEYS = %i[section_kind_weights excluded_section_kinds section_kind_levels locked_section_kinds].freeze
-  LOCKED_KEYS = %i[choose_track skill_level section_kind_levels daily_section_kinds].freeze
+  LOCKED_KEYS = %i[choose_track skill_level section_kind_levels daily_section_kinds daily_section_count].freeze
   TRACK_CHOICE_KEYS = %w[choose_track skill_level].freeze
   TRACK_CONFIRMATION_KEYS = %w[from to preferences_version].freeze
   WHOLE_NUMBER = /\A\d+\z/

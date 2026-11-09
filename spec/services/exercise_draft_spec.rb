@@ -35,7 +35,7 @@ RSpec.describe ExerciseDraft do
 
   it "keeps the draft to its user and language, the plan, the drafted inputs and the ingest results" do
     expect(described_class::Draft.members)
-      .to eq(%i[user skill_level language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections])
+      .to eq(%i[user skill_level language problem_set plan kinds difficulty kind_rungs ladders history delivered_history suggested_concepts unusable_sections schedule_context adjustments])
   end
 
   it "asks for the week's featured concept and plans the day around it, so a hiding kind is never offered it" do
@@ -45,7 +45,7 @@ RSpec.describe ExerciseDraft do
 
     draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: featured)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: featured, schedule_context: nil)
     expect(draft.plan.featured_concept).to eq(featured)
   end
 
@@ -67,6 +67,78 @@ RSpec.describe ExerciseDraft do
     expect(described_class.call(user, language: "ruby_rails", provider: provider).plan.featured_concept).to be_nil
   end
 
+  it "keeps the selected weekend trap out of Pattern's initial and retry assignments and vocabulary" do
+    travel_to(Time.zone.local(2026, 11, 7, 9)) do
+      user.update!(daily_section_kinds: %w[pattern design_comparison], daily_section_count: nil)
+      pin_code_review_mode(:bug_hunt)
+      trap = BugHuntGotchas.find("rb_memo_falsy")
+      expect(BugHuntGotchas).to receive(:pick).once.and_return(trap)
+      expect(PracticeSchedule::Turns).to receive(:plan).once.and_call_original
+      daily = DailyKinds.for(user)
+      pool = ExerciseSection.optional_slots(daily: daily).values.flatten.map(&:key)
+      note = PracticeSchedule::Note.decode({
+        "version" => 1, "policy" => 2, "sequence" => 3, "initial_ready" => true,
+        "regular_kinds" => daily.map(&:key), "selected_kinds" => daily.map(&:key), "phase" => 2, "assignments" => {},
+        "continuation" => { "next_phase" => 0, "kind_order" => [ "code_review" ] + (pool - [ "code_review" ]),
+          "next_kind_index" => 0, "last_omitted_kind" => nil, "service" => {} }
+      })
+      user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+        problem_set: daily.to_h { |kind| [ kind.key, { "question" => "Explain the choice." } ] },
+        plan_notes: { "daily_kinds" => daily.map(&:key), "practice_schedule" => note })
+      row = user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails",
+        practice_requests: { "pattern" => { "mode" => "normal_retry", "source_response_id" => 17,
+          "requested_at" => "2026-11-06T12:00:00.123456Z" } })
+      pending = row.practice_requests.deep_dup
+      [ trap.concept, "service_objects" ].each do |concept|
+        ConceptReference.create!(concept: concept, language: "ruby_rails",
+          **ConceptReference::LADDER_FIELDS.index_with { "Reason about #{concept}." })
+      end
+      reply["pattern"]["concept"] = "service_objects"
+      reply["code_review"] = {
+        "concept" => trap.concept, "question" => "What is wrong and how would you fix it?",
+        "purpose" => "Return the first supplied value for a key without replacing a cached value.",
+        "snippet" => "def cached(values, key)\n  cache = {}\n  2.times { cache[key] ||= values.shift }\n  cache[key]\nend",
+        "answer_key" => { "issue" => "`cache[key] ||= values.shift` replaces a false value.", "why_it_matters" => "A later value wins.",
+          "fix" => "Use key? to test presence.", "witness" => { "call" => "cached([false, true], :a)", "expected" => "false", "returns" => "true" },
+          "looks_right_on" => { "call" => "cached([1, 2], :a)", "expected" => "1" },
+          "fixed_snippet" => "def cached(values, key)\n  cache = {}\n  2.times { cache[key] = values.shift unless cache.key?(key) }\n  cache[key]\nend" }
+      }
+      plans = []
+      ladders = []
+      real_prompts = provider.with(prompt: ->(person, language, **options) {
+        plans << options.fetch(:plan)
+        ladders << options.fetch(:ladders)
+        GenerationPrompt.new(person, language, **options, retention_annotation: generation_retention_annotation)
+      })
+      captured = described_class.call(user, language: "ruby_rails", provider: real_prompts,
+        schedule_context: PracticeGeneration.capture(user, date: Date.current))
+      retried = described_class.retry_section(captured, ExerciseSection::Pattern, "service_objects", provider: real_prompts)
+
+      expect(captured.plan.kinds.map(&:key)).to eq(%w[pattern code_review])
+      expect(captured.plan.size.count).to eq(DailyKinds::COUNT)
+      expect(captured.unusable_sections).to be_empty
+      expect(captured.plan.code_review_gotcha).to eq(trap)
+      expect(plans.last).to equal(plans.first)
+      expect(generated.map { |request| request[:purpose] }).to eq(%w[generate_exercise retry_section])
+      expect(captured.problem_set.fetch("pattern")["concept"]).to eq("service_objects")
+      expect(retried["concept"]).to eq("service_objects")
+      expect(generated.first[:prompt]).to include("- Plant exactly this trap: #{trap.rule}")
+      expect(generated.last[:prompt]).to include("Its concept must be exactly `service_objects`")
+      generated.each do |request|
+        vocabulary = request[:prompt].lines.find { |line| line.include?("Choose the pattern concept from this vocabulary") }
+        expect(vocabulary).to include("service_objects")
+        expect(vocabulary).not_to include(trap.concept)
+        expect(request[:prompt]).not_to include("- pattern: Use exactly `#{trap.concept}`.")
+      end
+      ladders.each do |by_kind|
+        expect(by_kind.fetch(ExerciseSection::Pattern)).to have_key("service_objects")
+        expect(by_kind.fetch(ExerciseSection::Pattern)).not_to have_key(trap.concept)
+      end
+      expect(ladders.first.fetch(ExerciseSection::CodeReview)).to have_key(trap.concept)
+      expect(row.reload.practice_requests).to eq(pending)
+    end
+  end
+
   it "generates with no featured concept, and logs, when the weekly lookup raises a database error" do
     allow(FeaturedConcept).to receive(:for).with(user).and_raise(ActiveRecord::StatementInvalid, "boom")
     allow(Rails.logger).to receive(:warn)
@@ -84,7 +156,19 @@ RSpec.describe ExerciseDraft do
   end
 
   it "drafts with no timeout of its own: only the user, language, provider and deadline" do
-    expect(described_class.method(:call).parameters).to eq([ %i[req user], %i[keyreq language], %i[keyreq provider], %i[key deadline] ])
+    expect(described_class.method(:call).parameters).to eq([ %i[req user], %i[keyreq language], %i[keyreq provider], %i[key deadline], %i[key schedule_context] ])
+  end
+
+  it "uses the captured work date if planning crosses midnight" do
+    context = nil
+    travel_to(Time.utc(2026, 11, 6, 23, 59)) { context = PracticeGeneration.capture(user, date: Date.current) }
+    allow(DailyPlan).to receive(:size_for).and_call_original
+    allow(WeightedRoll).to receive(:pick).and_call_original
+    expect(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
+    travel_to(Time.utc(2026, 11, 7, 0, 1)) do
+      described_class.call(user, language: "ruby_rails", provider: provider, schedule_context: context)
+    end
+    expect(DailyPlan).to have_received(:size_for).with(user, before: Date.new(2026, 11, 6))
   end
 
   it "finishes only with every log the judged path hands it" do

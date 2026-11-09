@@ -20,21 +20,23 @@ class LevelSuggestionEvent < ApplicationRecord
     moved = rungs(after).reject { |kind, rung| before_rungs[kind] == rung }
     return [] if moved.empty?
 
-    results = LevelSuggestion::Evidence.for(user).results
+    today = Time.use_zone(user.effective_time_zone) { Date.current }
+    results = LevelSuggestion::Evidence.for(user, today: today).results
     moved.map do |kind, rung|
       { kind: kind, action: APPLIED, source: source_for(kind, rung, before, after, shown),
-        from_level: before_rungs[kind], to_level: rung, **evidence(kind, before_rungs[kind], results, cutoffs) }
+        from_level: before_rungs[kind], to_level: rung, **evidence(kind, before_rungs[kind], results, cutoffs, today) }
     end
   end
 
   # A tab opened before cards posted their steps sends none, so its rows fall back to the proposal recomputed now.
   def self.dismissal_rows(user, kinds:, action:, results:, shown: {})
     levels = user.kind_rungs
+    today = Time.use_zone(user.effective_time_zone) { Date.current }
     offered = kinds.all? { |kind| shown.key?(kind) } ? {} :
-      offered_moves(levels, user.locked_section_kinds, results, user.level_suggestion_cutoffs)
+      offered_moves(levels, user.locked_section_kinds, results, user.level_suggestion_cutoffs, today)
     kinds.map do |kind|
       { kind: kind, action: action, from_level: levels[kind], to_level: shown.fetch(kind) { offered[kind] },
-        **evidence(kind, levels[kind], results, user.level_suggestion_cutoffs) }
+        **evidence(kind, levels[kind], results, user.level_suggestion_cutoffs, today) }
     end
   end
 
@@ -48,15 +50,15 @@ class LevelSuggestionEvent < ApplicationRecord
     shown[kind] == rung ? "suggestion" : "setup_edit"
   end
 
-  def self.offered_moves(levels, locked, results, cutoffs)
-    proposal = LevelSuggestion.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs)
+  def self.offered_moves(levels, locked, results, cutoffs, today)
+    proposal = LevelSuggestion.proposal(levels: levels || {}, locked: locked || [], results: results, cutoffs: cutoffs, today: today)
     (proposal&.steps || []).to_h { |step| [ step.kind, step.to ] }
   end
 
-  def self.evidence(kind, level, results, cutoffs)
+  def self.evidence(kind, level, results, cutoffs, today)
     return {} if KindDifficulty::LEVELS.exclude?(level)
 
-    LevelSuggestion.summary(kind: kind, level: level, results: results, cutoffs: cutoffs).to_h
+    LevelSuggestion.summary(kind: kind, level: level, results: results, cutoffs: cutoffs, today: today).to_h
   end
 
   private_class_method :rungs, :source_for, :offered_moves, :evidence

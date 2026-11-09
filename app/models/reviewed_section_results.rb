@@ -6,8 +6,8 @@ class ReviewedSectionResults
   # The lowest AI rating a co-favourable result can carry.
   FAVOURABLE_BAR = DailyResponse::AI_RATING_FAVORABLE.min_by { |rating| ConceptMastery::AI_RATING_RANK.fetch(rating) }
 
-  Result = Data.define(:date, :kind, :level, :ai_rating, :self_rating, :eased) do
-    def initialize(date:, kind:, level:, ai_rating:, self_rating:, eased: false)
+  Result = Data.define(:date, :kind, :level, :ai_rating, :self_rating, :eased, :concept, :bucket) do
+    def initialize(date:, kind:, level:, ai_rating:, self_rating:, eased: false, concept: nil, bucket: nil)
       super
     end
 
@@ -36,8 +36,9 @@ class ReviewedSectionResults
       review = response.ai_review[section]
       next unless counts?(data, review, require_rubric, include_eased)
 
+      bucket, concept = response.mastery_tag(section)
       Result.new(date: response.date, kind: section, level: data["pitched_at"], ai_rating: review["rating"],
-                 self_rating: response.self_rating_for(section), eased: data["eased"].present?)
+                 self_rating: response.self_rating_for(section), eased: data["eased"].present?, concept: concept, bucket: bucket)
     end
   end
 

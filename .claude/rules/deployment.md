@@ -28,6 +28,14 @@ paths:
 
 ## Migrations
 
+- Protected practice has its own P-S/P-C/P-A gates. P-S #741 supplies the
+  request column. P-C implements compatible writers with initiation false;
+  no new migration. Before P-A, verify web/worker SUCCESS at P-C or compatible
+  descendants and stop every older writer. After v2 data exists, P-C is the
+  rollback floor even after compaction. Never delete state to disable it.
+  Keep #712/#714/#716 open through activation. See
+  `docs/decisions/protected-practice-opportunities.md`.
+
 - Mastery reconciliation ships S (columns), C (complete compatible writers,
   initiation false), then separately gated A (initiation true). Before A,
   positively verify web and worker SUCCESS at C or descendants and remove

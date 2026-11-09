@@ -1,7 +1,15 @@
 # Daily kinds
 
+For enrolled protected-practice users, the pair is the regular pair rather
+than a promise of both kinds in every set: Automatic two-section variety
+replaces one place, then the next two eligible sets show the pair.
+Fixed/large settings and pair acknowledgement pause that cycle. The
+additive-coverage warnings below describe inactive users only. See
+`protected-practice-opportunities.md`; daily-fourth sibling exclusions
+continue even when that daily kind is omitted.
+
 `DailyKinds` (`app/models/daily_kinds.rb`) decides which section kinds a
-user gets in every set. Before it, "every day holds code review and design
+user normally gets in a set. Before it, "every day holds code review and design
 comparison" was a facet on two kinds (`fixed?`) that a dozen readers asked
 the registry about. Now the pair is a per-user value, and every reader that
 needs it takes it as an argument. A user changes their pair from a daily card's

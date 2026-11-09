@@ -1,4 +1,10 @@
 class DailyExercise < ApplicationRecord
+  def practice_schedule
+    return {} unless plan_notes.is_a?(Hash) && plan_notes.key?("practice_schedule")
+
+    PracticeSchedule::Note.decode(plan_notes.fetch("practice_schedule"))
+  end
+
   belongs_to :user
   has_one    :daily_response, dependent: :destroy
   has_one    :duck_thread, dependent: :delete

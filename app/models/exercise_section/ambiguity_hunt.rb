@@ -19,6 +19,10 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     :ambiguity_hunt
   end
 
+  def self.practice_guidance(mode:)
+    "#{super} Keep exactly #{PLANTED_COUNT} planted ambiguities. Never name the hidden concept or hint at a planted ambiguity."
+  end
+
   def self.answer_key_fields
     [ PLANTED_FIELD ]
   end

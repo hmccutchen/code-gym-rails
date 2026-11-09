@@ -1,5 +1,14 @@
 # Each section records the rung it was pitched at
 
+The legacy adjustment rules below remain for inactive users. Enrolled
+protected-practice generation resolves one explicit adjustment per section:
+support changes wording only, simplified changes reasoning demand, and
+normal/retry use normal demand. Only simplified stamps `eased: true`;
+`practice_adjustment` is another server stamp removed from judge input.
+Locks suppress help/easing without clearing requests. Assigned concepts
+are enforced and extra provider sections are pruned on the first draft as
+well as retries. See `protected-practice-opportunities.md`.
+
 `ProblemSetIngest`
 stamps `pitched_at` (`junior` / `mid_level` / `senior` / `principal_engineer`) into every
 section the provider returned, not only the ones the day asked for, because

@@ -1,5 +1,12 @@
 # Drills
 
+For enrolled protected-practice users, active drills alternate with retention
+within maintenance and with practice on contested hosts. A reservation is
+admission capacity only. Comfortable eased success retains the drill for a
+normal retry; qualifying normal success clears it. Start/Stop/group commands
+preserve per-kind requests. The priority-only description below remains the
+inactive policy. See `protected-practice-opportunities.md`.
+
 a user can mark one concept, or a whole Learn display group, as
 drilled from the Learn tab (`ConceptDrills`, `ConceptDrillsController`). A
 drilled concept leads `User#concepts_needing_reinforcement`, and since

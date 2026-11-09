@@ -6,6 +6,34 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 ## `.for`
 
+A captured active schedule context selects `PracticeSchedule`, never additive
+coverage. `Result#kinds` then uses the explicit selection, since the regular
+pair may omit a place on variety days. The configured pair stays separate
+from the held kinds at fixed counts, so a temporary one-section setting
+does not impersonate a pair change. The method-length exemption keeps the
+legacy and enrolled assembly paths together while their decisions live in
+separate collaborators.
+
+The captured date controls weekday mode and the workload cutoff; persistence
+uses the same work date. Initial rotation history, due/overdue checks,
+inactive coverage and featured selection still read their live clocks.
+
+For enrolled plans, `.protected_selection` selects the turn once through
+`PracticeSchedule.select_turn`, including replacement of a held turn. It then
+builds hosts from those actual selected kinds before passing that turn to
+`PracticeSchedule.plan` for matching and spare-host sharing. The configured
+pair remains metadata, not a reconstruction of the selected set.
+
+The initial hosts still inform optional-pool seeding. Reinforcement and drill
+candidates are read again under the selected set's restrictions: filtering
+the old list cannot recover a concept that an omitted bug hunt had withheld
+before the history reader's limit. Final hosts also determine waiting reasons.
+The single picked trap applies only when the selected set contains CodeReview;
+the same applicability rule supplies the result, prompt and ladders. Adding
+the bug hunt withholds its concept without clearing requests or crediting
+service; omitting it removes that restriction. Replacement preserves its whole
+original continuation and does not select or spend another turn.
+
 The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
 
 Rotation receives delivered/scheduled history independently of performance.
@@ -55,7 +83,7 @@ The query builds one condition per bucket and ORs them, so a language concept ca
 
 ## `CODE_REVIEW_MODE_WEIGHTS`, `WEEKEND_CODE_REVIEW_MODE_WEIGHTS` and `CODE_REVIEW_MODES`
 
-A weekday rolls `CODE_REVIEW_MODE_WEIGHTS`, which holds no `bug_hunt`. A weekend day takes `WEEKEND_CODE_REVIEW_MODE_WEIGHTS`, whose one entry is `bug_hunt`, so every weekend `code_review` is a bug hunt (`docs/decisions/bug-hunt.md`). `.for` takes `weekend:`, defaulting to `Date.current.on_weekend?`, so a caller can state the kind of day it plans for: the jobs leave it to the clock in the user's zone, and the measurement scripts pass `false` so a weekend run plans a weekday set. Every set is judged, so the plan reads no path flag, and multi-file rolls on any day whose mode allows it. The weekend roll goes through `WeightedRoll` with a one-entry table, rather than naming the mode, so a spec can pin it like any other roll (`pin_code_review_mode` stubs both tables, and `roll_defaults` turns the weekend one into a weekday roll). `CODE_REVIEW_MODES` lists every mode once, for the readers that ask what any day could hold (`ConceptHosts`, `DailyKindSwap::Consequences`).
+A weekday rolls `CODE_REVIEW_MODE_WEIGHTS`, which holds no `bug_hunt`. A weekend day takes `WEEKEND_CODE_REVIEW_MODE_WEIGHTS`, whose one entry is `bug_hunt`, so every weekend `code_review` is a bug hunt (`docs/decisions/bug-hunt.md`). `.for` takes `weekend:`, defaulting to `Date.current.on_weekend?`, so a caller can state the kind of day it plans for: jobs use their captured user-local work date, and measurement scripts without a captured context pass `false` so a weekend run plans a weekday set. Every set is judged, so the plan reads no path flag, and multi-file rolls on any day whose mode allows it. The weekend roll goes through `WeightedRoll` with a one-entry table, rather than naming the mode, so a spec can pin it like any other roll (`pin_code_review_mode` stubs both tables, and `roll_defaults` turns the weekend one into a weekday roll). `CODE_REVIEW_MODES` lists every mode once, for the readers that ask what any day could hold (`ConceptHosts`, `DailyKindSwap::Consequences`).
 
 ## `.code_review_gotcha_for`
 

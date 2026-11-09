@@ -1,5 +1,12 @@
 # Personalization loop
 
+Protected-practice enrollment adds per-kind requests and within-capacity
+opportunities as described in `protected-practice-opportunities.md`.
+Existing response receipts retain v1 behavior; new enrolled responses use
+v2, where all-eased comfort does not earn retention or clear a drill.
+No historical backfill, automatic target move or workload-rule change is
+part of that compatibility release.
+
 `DailyResponse#assessed_sections` owns basic performance eligibility: a
 submitted response, an answered active section and a grade from
 `ConceptMastery::AI_RATING_RANK`. Valid partial reviews contribute immediately.

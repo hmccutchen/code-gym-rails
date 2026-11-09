@@ -1,6 +1,12 @@
-# Decided after the fact, like GenerationDiagnostics' retention log, since the plan ties a concept to a section only in slot four.
 module JudgedGeneration::UnhostedConcepts
   def self.for(plan, dropped_concepts)
+    if plan.practice_schedule
+      return dropped_concepts.keys.filter_map do |key|
+        assignment = plan.assignments[key]
+        { section: key, concept: assignment[:concept], bucket: assignment[:bucket], planned_as: assignment[:reason] } if assignment
+      end
+    end
+
     retention     = (plan.due_checks + plan.fourth_due_checks).map(&:concept)
     reinforcement = (plan.reinforcement.to_a + plan.fourth_reinforcement.to_a).map { |entry| entry[:concept] }
 

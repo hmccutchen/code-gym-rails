@@ -30,8 +30,32 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     else
       allow(fake_service).to receive(:generate_judged_exercise).and_return(judged_set(result))
     end
+
     fake_service
   end
+
+  it "keeps the old inactive set, draft and notes after settings change during one paid call" do
+      exercise = claimed_exercise
+      exercise.update!(plan_notes: { "size" => 2, "daily_kinds" => DailyKinds::DEFAULT.map(&:key) })
+      draft = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise,
+        answers: { "code_review" => "Keep my unsent work" })
+      old_set = exercise.attributes.except("regenerating_since", "updated_at")
+      old_draft = draft.attributes
+      service = stub_provider({})
+      expect(service).to receive(:generate_judged_exercise).once do |_caller, language:, deadline:, schedule_context:|
+        expect(schedule_context[:active]).to be(false)
+        expect(language).to eq(exercise.language)
+        expect(deadline).to be_a(GenerationDeadline)
+        User.find(user.id).update!(daily_section_count: 2)
+        judged_set({ "code_review" => { "question" => "paid replacement" } }).with(schedule_context: schedule_context)
+      end
+      described_class.new.perform(user_id: user.id)
+      expect(exercise.reload.attributes.except("regenerating_since", "updated_at")).to eq(old_set)
+      expect(exercise.regenerating_since).to be_nil
+      expect(draft.reload.attributes).to eq(old_draft)
+      expect(user.reload.daily_section_count).to eq(2)
+      expect(user.last_generation_error).to be_nil
+    end
 
   describe "the user named in log lines, by id since an email in a log is personal data nobody deletes" do
     let(:logged) { StringIO.new }

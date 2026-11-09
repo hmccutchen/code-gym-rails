@@ -1587,7 +1587,7 @@ RSpec.describe AiService do
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
       # Renders every level assignment at maximum rung length, since headings and overhead vary; a proxy misses the max.
-      def largest_block_for(language, mode, kinds)
+      def largest_block_for(language, mode, kinds, assigned: false)
         assignments = KindDifficulty::LEVELS.repeated_permutation(kinds.size).map do |levels|
           placed = kinds.zip(levels)
           difficulty = KindDifficulty.new(levels: placed.to_h { |kind, level| [ kind.key, level ] }, locked: kinds.map(&:key))
@@ -1596,31 +1596,31 @@ RSpec.describe AiService do
             acc[kind] = vocabulary.index_with { "x" * ConceptReference::MAX_LADDER_RUNG_LENGTH }
           end
 
-          [ difficulty_block(placed.to_h, difficulty, ladders, mode: mode).length, levels ]
+          [ difficulty_block(placed.to_h, difficulty, ladders, mode: mode, assigned: assigned).length, levels ]
         end
         length, levels = assignments.max_by(&:first)
-        locked = lock_subsets(kinds).max_by { |subset| lock_overhead(kinds, subset) }
-        length += lock_overhead(kinds, locked)
+        locked = lock_subsets(kinds).max_by { |subset| lock_overhead(kinds, subset, assigned: assigned) }
+        length += lock_overhead(kinds, locked, assigned: assigned)
         (@block_measurements ||= []) << { characters: length, language: language, mode: mode,
                                          rungs: kinds.map(&:key).zip(levels).to_h, locked: locked.map(&:key) }
         length
       end
 
-      def difficulty_block(rungs, difficulty, ladders, mode: nil)
-        GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders, mode: mode)
+      def difficulty_block(rungs, difficulty, ladders, mode: nil, assigned: false)
+        GenerationPrompt::DifficultyGuidance.render(rungs: rungs, difficulty: difficulty, ladders: ladders, mode: mode, assigned: assigned)
       end
 
       def lock_subsets(kinds)
         (0..kinds.size).flat_map { |count| kinds.combination(count).to_a }
       end
 
-      def lock_overhead(kinds, locked)
+      def lock_overhead(kinds, locked, assigned: false)
         rungs      = kinds.index_with { KindDifficulty::LEVELS.first }
         targets    = rungs.transform_keys(&:key)
         all_locked = KindDifficulty.new(levels: targets, locked: targets.keys)
         difficulty = KindDifficulty.new(levels: targets, locked: locked.map(&:key))
 
-        difficulty_block(rungs, difficulty, {}).length - difficulty_block(rungs, all_locked, {}).length
+        difficulty_block(rungs, difficulty, {}, assigned: assigned).length - difficulty_block(rungs, all_locked, {}, assigned: assigned).length
       end
 
       def day_shapes
@@ -1637,7 +1637,35 @@ RSpec.describe AiService do
         shapes = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODES, day_shapes)
 
         expect(shapes.map { |shape| largest_block_for(*shape) }.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
+        puts "PRACTICE_MEASUREMENT ladder_before=#{@block_measurements.max_by { |entry| entry.fetch(:characters) }.to_json}"
         warn @block_measurements.max_by { |entry| entry.fetch(:characters) }.to_json if ENV["MEASURE_DIFFICULTY_BLOCK"]
+      end
+
+      it "measures every reachable protected/fixed shape without raising the ladder ceiling" do
+        shapes = (DailyKinds::FEWEST..DailyKinds::MOST).flat_map do |count|
+          ExerciseSection.all.combination(count).select { |kinds| kinds.count(&:fourth?) <= DailyPlan::FOURTH_SLOT_CAPACITY }
+        end
+        measurements = DailyExercise::LANGUAGES.product(DailyPlan::CODE_REVIEW_MODES, shapes)
+          .map { |language, mode, kinds| largest_block_for(language, mode, kinds, assigned: true) }
+        largest = @block_measurements.max_by { |entry| entry.fetch(:characters) }
+        longest_concepts = ExerciseSection.all.to_h do |kind|
+          [ kind, DailyExercise::LANGUAGES.flat_map { |language| ConceptVocabulary.for_section(kind.key, language) }.max_by(&:length) ]
+        end
+        practice = shapes.map do |kinds|
+          modes = kinds.to_h do |kind|
+            mode = PracticeSchedule::Note::ADJUSTMENTS.max_by do |candidate|
+              GenerationPrompt::PracticeGuidance.render(kinds: [ kind ], adjustments: {
+                kind.key => { mode: candidate, concept: longest_concepts.fetch(kind),
+                  gap: "x" * PracticeEvidence::GAP_LIMIT }
+              }).length
+            end
+            [ kind.key, { mode: mode, concept: longest_concepts.fetch(kind),
+              gap: "x" * PracticeEvidence::GAP_LIMIT } ]
+          end
+          GenerationPrompt::PracticeGuidance.render(kinds: kinds, adjustments: modes).length
+        end.max
+        puts "PRACTICE_MEASUREMENT ladder_after=#{largest.to_json} practice_characters=#{practice} approximate_extra_tokens=#{(practice / 4.0).ceil} shapes=#{shapes.size}"
+        expect(measurements.max).to be <= AiService::MAX_LADDER_GUIDANCE_CHARS
       end
 
       it "counts only day shapes a plan can produce" do
@@ -4900,7 +4928,7 @@ RSpec.describe AiService, "#judge_section given a prose reply" do
   end
 
   it "keeps the draft and records the fallback" do
-    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, keyword_init: true).new(
+    draft = Struct.new(:problem_set, :plan, :kinds, :difficulty, :kind_rungs, :unusable_sections, :schedule_context, keyword_init: true).new(
       problem_set: { "code_review" => section }, unusable_sections: [],
       plan: plan_for(due_checks: [], fourth_due_checks: [], reinforcement: [], fourth_reinforcement: nil),
       kinds: [ ExerciseSection::CodeReview ], difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level)
@@ -4959,12 +4987,12 @@ RSpec.describe AiService, "#generate_judged_exercise" do
                                     "kind_rungs" => KindDifficulty.for(user).rungs(skill_level: user.skill_level))
   end
 
-  it "leaves the day to DailyPlan's clock default, passing no weekend: of its own" do
+  it "leaves the day to DailyPlan's clock default without a captured context or explicit weekend" do
     allow(DailyPlan).to receive(:for).and_call_original
 
     FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: nil)
+    expect(DailyPlan).to have_received(:for).with(user, language: "ruby_rails", featured_concept: nil, schedule_context: nil)
   end
 
   { "b" => true, "a" => false }.each do |better, matched|
@@ -5318,7 +5346,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
     ingest_calls = []
     allow(ProblemSetIngest).to receive(:prune_to_expected_keys).and_call_original
     allow(ProblemSetIngest).to receive(:call).and_wrap_original do |m, *args, **kw|
-      ingest_calls << kw.slice(:expected_keys, :fixed_concepts)
+      ingest_calls << kw.slice(:expected_keys, :fixed_concepts, :assignments)
       m.call(*args, **kw)
     end
 
@@ -5328,7 +5356,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     expect(ProblemSetIngest).to have_received(:prune_to_expected_keys)
       .with(instance_of(Hash), expected_keys: %w[code_review design_comparison pattern challenge])
-    expect(draft_calls).to eq([ { expected_keys: %w[code_review design_comparison pattern challenge] } ])
+    expect(draft_calls).to eq([ { expected_keys: %w[code_review design_comparison pattern challenge], fixed_concepts: {}, assignments: {} } ])
   end
 
   it "does not replay ingest on an already-built judged parsons_problem set" do

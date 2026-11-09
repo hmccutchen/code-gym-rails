@@ -66,6 +66,9 @@
         <% if exercise.dropped_sections.any? %>
           <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>
         <% end %>
+        <% practice_notes(exercise).each do |line| %>
+          <p class="hint"><%= line %></p>
+        <% end %>
         <% if (coverage_reason = exercise.coverage_shown) %>
           <p class="hint"><%= t("dashboard.coverage_added.#{coverage_reason}") %></p>
         <% end %>

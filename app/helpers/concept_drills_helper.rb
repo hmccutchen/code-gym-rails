@@ -18,7 +18,7 @@ module ConceptDrillsHelper
     else
       paused ? "waiting" : "drilling"
     end
-    t("learn.drill.#{key}")
+    key == "drilling" ? practice_copy("learn.drill.drilling") : t("learn.drill.#{key}")
   end
 
   def drill_stop_path(entry)

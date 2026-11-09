@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "baseline": {
+    "tier": "reduced",
+    "streak": 1,
+    "last_rating": "developing",
+    "cooldown_remaining": 0,
+    "mastered_at": null,
+    "retention_interval_days": null,
+    "next_retention_check_on": null,
+    "drilled_at": "2026-11-06T12:00:00.123456Z",
+    "drill_group": null
+  },
+  "operations": [
+    {
+      "type": "review",
+      "response_id": 17,
+      "work_on": "2026-11-06",
+      "reviewed_on": "2026-11-06",
+      "occurred_at": "2026-11-06T12:00:00.123456Z",
+      "pending_sections": ["code_review"],
+      "sections": {"pattern": {"rating": "solid", "self_rating": "right_level"}}
+    }
+  ]
+}

@@ -18,6 +18,20 @@ RSpec.describe GenerateDailyExercisesJob do
     allow(AiService).to receive(:for).with(u).and_return(svc)
   end
 
+  it "discards one already-billed inactive draft after an explicit settings edit, without retrying" do
+    service = stub_provider
+    expect(service).to receive(:generate_judged_exercise).once do |_caller, language:, schedule_context:|
+      expect(schedule_context[:active]).to be(false)
+      expect(language).to eq("ruby_rails")
+      User.find(user.id).update!(daily_section_count: 2)
+      AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "paid draft" } },
+        dropped_sections: [], outcomes: {}, plan_notes: {}, schedule_context: schedule_context)
+    end
+    expect { described_class.new.perform(user_id: user.id) }.not_to change { user.daily_exercises.count }
+    expect(user.reload).to have_attributes(daily_section_count: 2, last_generation_error_date: Date.current,
+      last_generation_error: "Settings or another set changed while this set was being prepared. Generate again when ready.")
+  end
+
   describe "the user named in log lines" do
     let(:logged) { StringIO.new }
 
@@ -44,7 +58,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
     it "names the user by id when a concurrent job already generated the day" do
       stub_provider
-      allow(DailyExercise).to receive(:create!).and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
+      expect_any_instance_of(DailyExercise).to receive(:save!).and_raise(ActiveRecord::RecordNotUnique.new("duplicate key"))
       described_class.new.perform(user_id: user.id)
       expect_logged_by_id
     end
@@ -195,7 +209,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   it "logs and continues when a concurrent job already created today's exercise (unique index race)" do
     stub_provider
-    allow(DailyExercise).to receive(:create!).and_raise(
+    expect_any_instance_of(DailyExercise).to receive(:save!).and_raise(
       ActiveRecord::RecordNotUnique.new("duplicate key value violates unique constraint")
     )
 
@@ -287,7 +301,7 @@ RSpec.describe GenerateDailyExercisesJob do
     travel_to(Time.utc(2026, 7, 13, 6, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript")
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: false))
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "pattern" ])
     end
   end
@@ -302,7 +316,7 @@ RSpec.describe GenerateDailyExercisesJob do
     travel_to(Time.utc(2026, 7, 18, 12, 0)) do
       described_class.new.perform(user_id: user.id)
 
-      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript")
+      expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: false))
       expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "design_comparison" ])
     end
   end

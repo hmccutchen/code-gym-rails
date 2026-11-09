@@ -17,7 +17,9 @@ by the AI, and fewer than two of the latest three self-rated too hard: the
 AI rating proposes and the engineer's own rating can veto. A step back
 mirrors it: at least two of the latest three self-rated too hard (two of
 two qualifies) propose one rung down, and the AI vetoes it when it rated
-every one of those solid or better. A step back is shown alone, before any
+every one of those solid or better. Those too-hard results must also span
+two distinct valid concept/bucket identities; missing tags prove no breadth.
+A step back is shown alone, before any
 step up. Step ups for several kinds share one card when they start from the
 same level, so every kind it lists moves to the same one; registry order
 picks that level, and the other kinds wait for a later card. Each kind is
@@ -25,9 +27,9 @@ judged on its own results only: there is no lead kind and no bundle, so a
 kind without its own five results is never offered a step up. Locked kinds
 are omitted; exclusions remain a scheduling preference.
 
-`LevelSuggestion::Evidence` uses `AdaptationHistory.recent` to select the
-latest 60 qualifying submitted response days across all kinds, filtering
-before the limit and preloading exercises in cursor batches. Identifiable
+`LevelSuggestion::Evidence` uses `AdaptationHistory.each` over the last
+180 user-local calendar days (today minus 179 inclusive), preloading
+exercises in cursor batches without a global response-count cap. Identifiable
 supplementary bug hunts supply no up/down evidence, cannot clear a veto,
 advance newest dates or occupy that window. Other weekend core work keeps
 its effects. Only assessed,
@@ -45,14 +47,15 @@ The selector applies `.reviewed` and the shared
 responses and exercises. Neither proves strict eligibility; the full Ruby
 projection still rejects malformed, inactive, skipped, eased or unstamped
 sections. Candidate batches use `AdaptationHistory::BATCH_SIZE`, independent
-of the sixty qualifying days retained.
+of the calendar evidence window. Each kind keeps at most one result per
+date, and an offer requires its newest result within the last 30 days
+(today minus 29 inclusive).
 
-**Rare kinds may never qualify.** A kind appears at most once a day, so five
-results take at least five days with it. On a two-section day only the
-two daily kinds (code review and design comparison by default) can reach five within the 60-response read,
-and on a three-section day an optional kind needs about 70% of its
-appearances answered and un-eased; the others move only when the user
-changes them in Setup.
+**Opportunities do not guarantee qualification.** A kind still needs five
+normal results of its own for an up offer. Enrolled Automatic two-section
+sets provide bounded variety opportunities within capacity; unanswered,
+eased, stale or old-rung work cannot qualify. See
+`protected-practice-opportunities.md` for the cadence and CI simulations.
 
 **A cutoff keeps the same work from proposing another move.**
 Not now records each kind's current rung and the newest retained strict result
@@ -137,11 +140,9 @@ is a starting value, not a measured one.
 (`/setup?show=level_suggestions#level-suggestions`, which renders the mix
 open and moves focus to the switch). While it is off the dashboard
 computes no proposal; turning it back on resumes them with every cutoff as
-it was. At most 60 qualifying response days are retained. Ineligible rows
-cannot displace them or advance the newest result date. Candidate reads are
-uncapped and can span several cursor batches; the old fixed-60-row timing
-claim no longer applies. Other kinds' eligible results still consume this
-global window, before each kind's current-rung and explicit cutoff rules.
+it was. Reads span the same 180-day range in cursor batches. Ineligible rows
+cannot advance newest result dates, and other kinds cannot evict this
+kind's evidence. Each kind's current-rung and explicit-cutoff rules still apply.
 
 **Renamed from the track.** This was `TrackGraduation`, for junior-track
 accounts only. The endpoints moved to `POST /level_suggestion/dismissal`

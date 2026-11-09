@@ -1,5 +1,11 @@
 # Shared concept on a real struggle
 
+Enrolled protected-practice plans first match distinct practice and
+maintenance assignments, then share ordinary reduced reinforcement only
+on spare compatible hosts. `SharedConcept.match` is the shared distinct-host
+matcher. The legacy selection described below remains for inactive users;
+see `protected-practice-opportunities.md`.
+
 when reinforcement holds a
 reduced-tier concept, drilled or not, that every daily kind can tag,
 `SharedConcept.pick` places the first such entry in both daily sections

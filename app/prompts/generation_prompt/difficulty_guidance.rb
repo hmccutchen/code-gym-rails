@@ -1,6 +1,6 @@
 # Design notes: docs/code-notes/app/prompts/generation_prompt/difficulty_guidance.md
 module GenerationPrompt::DifficultyGuidance
-  def self.render(rungs:, difficulty:, ladders:, mode: nil)
+  def self.render(rungs:, difficulty:, ladders:, mode: nil, assigned: false)
     locked, unlocked = rungs.keys.partition { |kind| difficulty.locked?(kind) }
     paragraphs = KindDifficulty::LEVELS.filter_map do |level|
       at_level = rungs.select { |_kind, rung| rung == level }.keys
@@ -11,9 +11,11 @@ module GenerationPrompt::DifficultyGuidance
       "Reasoning deepens within each kind's stated format and size limits, without unstated requirements.",
       "Concept ladders refine, never override, the applicable baseline and format.",
       *paragraphs, "",
-      "A retention check or established concept placed in one of these sections is pitched at that " \
-      "section's level, with no easing.",
-      unlocked_difficulty_line(unlocked), locked_difficulty_line(locked) ].compact.join("\n")
+      (assigned ? "Assigned retention checks stay at normal demand at that section's level." :
+        "A retention check or established concept placed in one of these sections is pitched at that " \
+        "section's level, with no easing."),
+      (assigned ? "Follow the assigned practice instruction; keep locked sections at normal demand." : unlocked_difficulty_line(unlocked)),
+      (locked_difficulty_line(locked) unless assigned) ].compact.join("\n")
   end
 
   def self.level_difficulty_paragraph(level, kinds, ladders, mode)

@@ -25,6 +25,10 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     :pseudocode_to_code
   end
 
+  def self.practice_guidance(mode:)
+    "#{super} The learner still writes the plan; do not supply pseudocode, decomposition, or the hidden missable requirement."
+  end
+
   def self.refusal_codes = %w[problem_statement_missing]
 
   # Rejects rather than repairs: the statement is the whole task, so a missing or non-string one leaves nothing to answer.

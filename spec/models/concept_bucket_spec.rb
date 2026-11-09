@@ -1,6 +1,35 @@
 require "rails_helper"
 
 RSpec.describe ConceptBucket do
+  it "recognizes only closed string concept/bucket identities" do
+    expect(described_class.valid_identity?(concept: "memoization", bucket: "ruby_rails")).to be(true)
+    [ [ "invented", "ruby_rails" ], [ "memoization", "invented" ], [ nil, "ruby_rails" ],
+      [ :memoization, "ruby_rails" ], [ "memoization", :ruby_rails ], [ {}, [] ] ].each do |concept, bucket|
+      expect(described_class.valid_identity?(concept: concept, bucket: bucket)).to be(false)
+    end
+  end
+
+  it "distinguishes a valid global pair from an incompatible kind-qualified identity in both directions" do
+    expect(described_class.valid_identity?(concept: "sync_vs_async", bucket: "architecture")).to be(true)
+    expect(described_class.valid_kind_identity?(kind: "code_review", concept: "sync_vs_async", bucket: "architecture")).to be(false)
+    expect(described_class.valid_kind_identity?(kind: "architecture", concept: "memoization", bucket: "ruby_rails")).to be(false)
+  end
+
+  it "accepts kind identities recordable under either supported exercise language" do
+    [ [ "code_review", "ruby_rails", "memoization" ], [ "code_review", "javascript", "closures" ],
+      [ "architecture", "architecture", "sync_vs_async" ] ].each do |kind, bucket, concept|
+      expect(described_class.valid_kind_identity?(kind: kind, concept: concept, bucket: bucket)).to be(true)
+    end
+  end
+
+  it "requires a registered kind and a closed concept/bucket pair" do
+    [ nil, "invented" ].each do |kind|
+      expect(described_class.valid_kind_identity?(kind: kind, concept: "memoization", bucket: "ruby_rails")).to be(false)
+    end
+    expect(described_class.valid_kind_identity?(kind: "code_review", concept: "invented", bucket: "ruby_rails")).to be(false)
+    expect(described_class.valid_kind_identity?(kind: "code_review", concept: "memoization", bucket: nil)).to be(false)
+  end
+
   describe ".for" do
     it "buckets the architecture section independently of the day's language" do
       expect(described_class.for("architecture", "ruby_rails")).to eq("architecture")

@@ -38,7 +38,8 @@ class JudgedGeneration
     reject_empty_day!(set, dropped)
     finish(set, dropped, outcomes)
     AiService::JudgedSet.new(problem_set: set, dropped_sections: dropped, outcomes: outcomes, plan_notes: @draft.plan.notes(kind_rungs: @draft.kind_rungs),
-                             solves: @chains.flat_map { |key, chain| chain.solves(dropped: dropped.include?(key)) })
+                             solves: @chains.flat_map { |key, chain| chain.solves(dropped: dropped.include?(key)) },
+                             schedule_context: @draft.schedule_context)
   end
 
   private

@@ -1,5 +1,5 @@
 class ProblemSetIngest
-  SERVER_STAMPS = %w[pitched_at eased source].freeze
+  SERVER_STAMPS = %w[pitched_at eased source practice_adjustment].freeze
   REFERENCE_PROSE_FIELDS = %w[tagline explanation senior_lens].freeze
 
   Suggestion = Data.define(:bucket, :name)
@@ -13,10 +13,10 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
   def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1, code_review_mode: nil,
-                pitched_at: nil, eased_for: {}, fixed_concepts: {})
+                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
     new(problem_set, language: language, expected_keys: expected_keys, daily: daily, code_review_source: code_review_source,
         code_review_files: code_review_files, code_review_mode: code_review_mode, pitched_at: pitched_at, eased_for: eased_for,
-        fixed_concepts: fixed_concepts).call
+        fixed_concepts: fixed_concepts, assignments: assignments).call
   end
 
   def self.prune_to_expected_keys(problem_set, expected_keys:)
@@ -24,7 +24,7 @@ class ProblemSetIngest
   end
 
   def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1,
-                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {})
+                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
@@ -36,6 +36,7 @@ class ProblemSetIngest
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
+    @assignments        = assignments
     @suggested_concepts = []
     @unusable_sections  = []
     @dropped_keys       = {}
@@ -131,7 +132,7 @@ class ProblemSetIngest
   end
 
   def prune_retry_extras!
-    return if @fixed_concepts.empty?
+    return if @fixed_concepts.empty? && @assignments.empty?
 
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
@@ -294,7 +295,16 @@ class ProblemSetIngest
       next unless section.is_a?(Hash) && @pitched_at.key?(key)
 
       section["pitched_at"] = @pitched_at.fetch(key)
-      section["eased"] = true if @eased_for.fetch(key, []).include?(section["concept"])
+      if (adjustment = @assignments[key])
+        mode = adjustment.fetch(:mode)
+        raise ArgumentError, "Invalid practice adjustment" unless PracticeSchedule::Note::ADJUSTMENTS.include?(mode) &&
+          adjustment.fetch(:eased) == (mode == "simplified")
+
+        section["practice_adjustment"] = mode
+        section["eased"] = true if adjustment.fetch(:eased)
+      else
+        section["eased"] = true if @eased_for.fetch(key, []).include?(section["concept"])
+      end
     end
   end
 

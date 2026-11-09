@@ -3,14 +3,19 @@ class DailyPlan
   Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
                         :fourth_reinforcement, :fourth_due_checks, :fourth_established,
                         :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :featured_concept, :scenario_flavor,
-                        :shared_concept, :coverage, :waiting_checks, :size) do
+                        :shared_concept, :coverage, :waiting_checks, :size, :selected_kinds, :practice_schedule, :assignments) do
+    def initialize(**attributes)
+      super(**{ selected_kinds: nil, practice_schedule: nil, assignments: {} }.merge(attributes))
+    end
+
     def notes(kind_rungs: nil)
       { "daily_kinds" => daily_kinds.map(&:key), "size" => size&.count, "size_reason" => size&.reason&.to_s,
         "brake" => (true if size&.brake?), "coverage" => coverage&.kind&.key, "coverage_reason" => coverage&.reason&.to_s,
-        "shared_concept" => shared_concept, "bug_hunt" => code_review_gotcha&.id, "kind_rungs" => kind_rungs }.compact
+        "shared_concept" => shared_concept, "bug_hunt" => code_review_gotcha&.id, "kind_rungs" => kind_rungs,
+        "practice_schedule" => practice_schedule }.compact
     end
 
-    def kinds = ExerciseSection.for_plan(daily: daily_kinds, rotation: rotation)
+    def kinds = selected_kinds || ExerciseSection.for_plan(daily: daily_kinds, rotation: rotation)
 
     def fourth = kinds.find(&:fourth?)&.key&.to_sym
 
@@ -43,34 +48,90 @@ class DailyPlan
 
   NO_FOURTH_TRACK = { fourth_reinforcement: [], fourth_due_checks: [], fourth_established: [] }.freeze
 
-  def self.for(user, language:, featured_concept: nil, weekend: Date.current.on_weekend?)
+  def self.for(user, language:, featured_concept: nil, weekend: Date.current.on_weekend?, schedule_context: nil) # rubocop:disable Metrics/MethodLength
+    weekend = schedule_context.fetch(:date).on_weekend? if schedule_context
     history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
-    size             = size_for(user)
+    size             = schedule_context ? size_for(user, before: schedule_context.fetch(:date)) : size_for(user)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
     rotation         = SectionRotation.for(history, count: size.count, preferences: preferences, daily: daily)
     code_review_mode = WeightedRoll.pick(weekend ? WEEKEND_CODE_REVIEW_MODE_WEIGHTS : CODE_REVIEW_MODE_WEIGHTS)
     trap             = code_review_gotcha_for(user, language, code_review_mode, featured_concept)
-    hosts_for        = lambda do |day_rotation, featured = featured_concept|
-      DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, daily, day_rotation), featured_concept: featured)
+    hosts_for        = lambda do |day_rotation, featured = featured_concept, kinds: ExerciseSection.for_plan(daily: daily, rotation: day_rotation)|
+      DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, kinds), featured_concept: featured)
     end
     unfeatured_for   = ->(day_rotation) { hosts_for.call(day_rotation, nil) if featured_concept }
     hosts            = hosts_for.call(rotation)
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
-    tracks           = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts, unfeatured: unfeatured_for.call(rotation))
-    coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, daily, tracks.fetch(:waiting_checks), hosts),
+    if schedule_context&.fetch(:active)
+      selection, tracks = protected_tracks(user, daily, size, preferences, history, due, hosts, schedule_context, hosts_for)
+      rotation = selection.rotation
+      coverage = nil
+    else
+      tracks = concept_tracks(user, language, daily, rotation, due: due, hosts: hosts, unfeatured: unfeatured_for.call(rotation))
+      coverage, rotation, tracks = with_coverage(coverage_for(user, size, preferences, daily, tracks.fetch(:waiting_checks), hosts),
                                                daily, rotation, tracks, user, language, due: due, hosts_for: hosts_for,
                                                unfeatured_for: unfeatured_for)
+    end
 
     source = code_review_source_for(user, language, code_review_mode)
     single = source || !ExerciseSection::CodeReview.multi_file_mode?(code_review_mode)
 
     Result.new(daily_kinds: daily, rotation: rotation, **tracks, coverage: coverage, size: size,
+               selected_kinds: selection&.kinds, practice_schedule: selection&.notes, assignments: selection&.assignments || {},
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: day_gotcha(trap, daily, rotation), featured_concept: featured_concept,
+               code_review_gotcha: day_gotcha(trap, selection&.kinds || ExerciseSection.for_plan(daily: daily, rotation: rotation)), featured_concept: featured_concept,
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
+
+  def self.protected_selection(user, daily, size, preferences, history, due, hosts, context, hosts_for)
+    candidates_for = ->(day_hosts) {
+      user.concepts_needing_reinforcement(hostable: ->(concept, bucket) { day_hosts.hosts(ExerciseSection.all, concept, bucket).any? })
+    }
+    checks = due.reject(&:tier_paused?).map { |row| { concept: row.concept, bucket: row.language, overdue_ratio: overdue_ratio(row) } }
+    options = { context: context.fetch(:note), count: size.count, setting: size.setting, daily: daily,
+      preferences: preferences, evidence: context.fetch(:evidence), hosts: hosts, rotation_history: history, due: checks,
+      drills: candidates_for.call(hosts).select { |entry| entry[:drilled] },
+      replacing: context[:replacing_id].present?, regular: DailyKinds.pair(user) }
+    turn = PracticeSchedule.select_turn(**options)
+    hosts = hosts_for.call(turn.rotation, kinds: turn.kinds)
+    drilled, ordinary = candidates_for.call(hosts).partition { |entry| entry[:drilled] }
+    selection = PracticeSchedule.plan(**options, turn: turn, hosts: hosts, drills: drilled,
+      evidence: context.fetch(:evidence).merge(reinforcement: ordinary))
+    [ selection, hosts ]
+  end
+  private_class_method :protected_selection
+
+  def self.protected_tracks(user, daily, size, preferences, history, due, hosts, context, hosts_for)
+    selection, hosts = protected_selection(user, daily, size, preferences, history, due, hosts, context, hosts_for)
+    assigned = selection.assignments.values
+    selected_checks = due.select { |row| assigned.any? { |entry| entry[:reason] == "retention" && entry.values_at(:concept, :bucket) == [ row.concept, row.language ] } }
+    reinforcement = assigned.reject { |entry| entry[:reason] == "retention" }.map do |entry|
+      entry.slice(:concept, :bucket, :kind).merge(tier: entry[:mode] == "simplified" ? "reduced" : "standard", drilled: entry[:reason] == "drill")
+    end
+    fourth, main = reinforcement.partition { |entry| ExerciseSection.for(entry.fetch(:kind)).fourth? }
+    fourth_checks, main_checks = selected_checks.partition do |row|
+      assigned.any? { |entry| entry.values_at(:concept, :bucket) == [ row.concept, row.language ] && ExerciseSection.for(entry.fetch(:kind)).fourth? }
+    end
+    tracks = { reinforcement: main, due_checks: main_checks, established: [], fourth_reinforcement: fourth,
+      fourth_due_checks: fourth_checks, fourth_established: [], shared_concept: shared_assignment(selection, daily) }
+    tracks[:waiting_checks] = waiting_checks(tracks, due, kinds: selection.kinds, hosts: hosts, unfeatured: nil)
+    [ selection, tracks ]
+  end
+  private_class_method :protected_tracks
+
+  def self.shared_assignment(selection, daily)
+    pair = DailyKinds.shared_pair(daily)
+    return if pair.empty?
+
+    entries = pair.map { |kind| selection.assignments[kind.key] }
+    return unless entries.all? { |entry| entry && entry[:reason] == "reinforcement" } &&
+      entries.map { |entry| entry.values_at(:concept, :bucket) }.uniq.one?
+
+    entries.first.fetch(:concept)
+  end
+  private_class_method :shared_assignment
 
   def self.code_review_gotcha_for(user, language, mode, featured_concept)
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
@@ -79,15 +140,10 @@ class DailyPlan
   end
   private_class_method :code_review_gotcha_for
 
-  def self.day_gotcha(trap, daily, rotation)
-    trap if code_review_day?(daily, rotation)
+  def self.day_gotcha(trap, kinds)
+    trap if kinds.include?(ExerciseSection::CodeReview)
   end
   private_class_method :day_gotcha
-
-  def self.code_review_day?(daily, rotation)
-    ExerciseSection.for_plan(daily: daily, rotation: rotation).include?(ExerciseSection::CodeReview)
-  end
-  private_class_method :code_review_day?
 
   def self.size_for(user, before: Date.current)
     return DaySize.for(setting: user.daily_section_count) if user.daily_section_count

@@ -8,6 +8,27 @@ RSpec.describe ConceptDrills do
   end
 
   describe "Start outcomes" do
+    it "refuses a valid drill before any write when a persisted schedule has an incompatible kind/bucket identity" do
+      selected = PracticeSchedule.plan(context: nil, count: DailyKinds::COUNT, setting: DailyKinds::COUNT, daily: DailyKinds::DEFAULT,
+        preferences: KindPreferences.none, evidence: { initial_reviewed_sets: 0, pending: [], struggle: {} },
+        hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [])
+      note = selected.notes
+      note["assignments"] = { "code_review" => {
+        "concept" => "sync_vs_async", "bucket" => "architecture", "reason" => "support", "adjustment" => "support"
+      } }
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+        problem_set: selected.kinds.to_h { |kind| [ kind.key, { "question" => "Explain the decision." } ] },
+        plan_notes: { "practice_schedule" => note })
+      expect(user.concept_masteries.count).to eq(0)
+
+      expect { described_class.start(user, concept: "memoization", bucket: "ruby_rails") }
+        .to raise_error(ArgumentError, "Invalid practice schedule format")
+
+      expect(user.concept_masteries.reload).to be_empty
+      expect(row("memoization")).to be_nil
+      expect(exercise.reload.plan_notes).to eq("practice_schedule" => note)
+    end
+
     it "distinguishes a new single drill from an active repeat without restamping it" do
       expect(described_class.start(user, concept: "n_plus_one", bucket: "ruby_rails").status).to eq(:started)
       stamp = row("n_plus_one").drilled_at
