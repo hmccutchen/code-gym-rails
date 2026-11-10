@@ -1,8 +1,8 @@
 Rails.application.configure do
-  importmap = Importmap::Map.new.draw(Rails.root.join("config/importmap.rb"))
-  module_cdn_packages = importmap.packages.values.filter_map do |package|
-    package.path[%r{\Ahttps://cdn\.jsdelivr\.net/npm/[^/]+/}]
-  end
+  module_cdn_packages = %w[
+    https://cdn.jsdelivr.net/npm/mermaid@11.17.2/
+    https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/
+  ]
 
   config.content_security_policy do |policy|
     policy.default_src :self

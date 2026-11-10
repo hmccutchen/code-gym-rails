@@ -142,10 +142,12 @@ says what a deviation from one requires.
 - **Page behavior is a Stimulus controller** — a view carries markup and
   `data-action` attributes, never a `<script>` tag or an `on*` handler.
   `config/initializers/content_security_policy.rb` enforces it: a script runs
-  only from this origin, from the two `cdn.jsdelivr.net` package directories
-  the mermaid and Parsons controllers import, or under the nonce
-  `javascript_importmap_tags` puts on its own tags, so an inline tag or
-  handler is dead code. `spec/conventions/app_views_spec.rb` fails on either
+  only from this origin, from a `cdn.jsdelivr.net` package directory the
+  policy lists explicitly, or under the nonce `javascript_importmap_tags`
+  puts on its own tags, so an inline tag or handler is dead code. A remote
+  module is pinned in `config/importmap.rb`, the CSP names its directory
+  outright, and `spec/requests/content_security_policy_spec.rb` fails when
+  the two disagree. `spec/conventions/app_views_spec.rb` fails on either
   before CSP has to.
 - **One way to send a request** — a page script sends through
   `CodeGymRequest.send`, and a save that must not overlap another goes

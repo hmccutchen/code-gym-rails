@@ -28,25 +28,25 @@ the `sortablejs` pin. A dynamic `import()` is checked against the source
 list, not against the nonce of the module that issued it, so the source has to
 be named outright.
 
-The versions are written once, in those pins in `config/importmap.rb`. The
-initializer builds each directory from a pin's URL, cut after its
-`npm/<package>@<version>/` segment. It draws its own `Importmap::Map` from that
-file, because `Rails.application.importmap` is still `nil` when
-`config/initializers` load: importmap-rails sets it in its engine's
-initializer, which runs after the application's. A pin to any other host adds
-no source, so it would be blocked until the initializer learns that host.
+The initializer writes both directories out, versions included. An earlier
+version built them from the pins in `config/importmap.rb`, so pinning any new
+CDN package widened `script-src` without anyone deciding to, and its pattern
+would have allowed a whole `@scope/` for a scoped package. Allowing a new CDN
+source is now a deliberate edit to this list.
 
 They are directories, not the bare host. jsdelivr serves any npm package and
 any public GitHub repository (`/gh/<user>/<repo>/`), so allowing the whole
 host would let injected markup load a script anyone can publish, which is the
 attack the policy is there to stop. A source ending in `/` matches every path
 under it, which covers mermaid's own chunk imports from `dist/chunks/`.
-Bumping either version means changing its pin, and the directory follows.
-`spec/requests/content_security_policy_spec.rb` reads every remote URL in
-`config/importmap.rb` and the page scripts and fails when one falls outside
-the policy's sources. It also fails when a page script names a remote URL
-itself, since `bin/importmap audit` reads only `pin` lines and would never
-check that package.
+Bumping either version means changing its pin and its directory here
+together. `spec/requests/content_security_policy_spec.rb` draws
+`config/importmap.rb` and fails when a remote pin's URL starts with none of
+the policy's directories, so a bump that misses this file fails the suite
+instead of blocking the import in the browser. It also checks each source has
+the `npm/<package>@<version>/` shape, and fails when a page script names a
+remote URL itself, since `bin/importmap audit` reads only `pin` lines and
+would never check that package.
 
 The nonce covers the three tag kinds `javascript_importmap_tags` emits — the
 inline importmap JSON, the `type="module"` entry tag, and every `modulepreload`
