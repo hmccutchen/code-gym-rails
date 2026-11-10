@@ -88,13 +88,19 @@ named constants: a model taking `session` as an argument, a level write
 spelled as an `update!` key, a `fetch` in JavaScript, and the isolation specs'
 word matches such as `where(trial_ends_at: …)`.
 
-The `:rails` preset has no loop check, and `Archspec.rb` adds none.
-`no_cycles` would fail twice today. Among the preset's folders, jobs and
-services depend on each other, because `PracticeGeneration`, a service,
-includes `RecordsJudgeSolves` from `app/jobs/concerns`. Across all
-components, clients and services do too, because `AiService` hands drafts and
-reviews to `ExerciseDraft`, `JudgedGeneration` and `ReviewGrading` (the
-"provider calls as callables" pattern), and those services call `AiService`.
+The `:rails` preset has no loop check, so `Archspec.rb` adds `no_cycles`
+among the preset's folders: controllers, models, helpers, mailers, jobs and
+services. Jobs and controllers call services, so a service that reached back
+into a job would close a loop. One did: `PracticeGeneration` included
+`RecordsJudgeSolves` from `app/jobs/concerns`, which both generation jobs had
+once shared. It was the concern's last caller, so the method moved into
+`PracticeGeneration` and the concern was deleted (#751).
+
+The check leaves out `clients`, `prompts`, `forms` and `provider_registry`.
+Clients and services depend on each other on purpose: `AiService` hands
+drafts and reviews to `ExerciseDraft`, `JudgedGeneration` and `ReviewGrading`
+(the "provider calls as callables" pattern), and those services call
+`AiService`.
 
 Archspec reads constants statically. `CodeFormat`, a model, picks its
 formatter by name (`"CodeFormat::Javascript".constantize`), so that

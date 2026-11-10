@@ -6,6 +6,8 @@ architecture :rails, components: {
   jobs: "app/jobs/**/*.rb",
   services: "app/services/**/*.rb"
 }
+no_cycles among: %i[controllers models helpers mailers jobs services],
+  because: "jobs and controllers call services, so a service never reaches back into a job or controller"
 
 component :prompts, in: "app/prompts/**/*.rb"
 component :clients, in: "app/clients/**/*.rb"
