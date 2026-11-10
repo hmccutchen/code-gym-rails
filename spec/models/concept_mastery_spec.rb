@@ -135,6 +135,8 @@ RSpec.describe ConceptMastery, type: :model do
   end
 
   describe "retention scheduling" do
+    around { |example| travel_to(Time.utc(2026, 11, 10, 3)) { Time.use_zone(user.effective_time_zone) { example.run } } }
+
     it "schedules the first check 7 days out on initial mastery" do
       cm = review!(concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong")
       expect(cm.mastered_at).to be_present

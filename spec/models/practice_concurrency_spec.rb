@@ -60,50 +60,54 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
   end
 
   %i[settings held_date takeover].each do |change|
-    it "rejects an active replacement after #{change} changes while the draft is away" do
-      service = FakeService.new("fake-key")
-      initial = PracticeGeneration.capture(user, date: Date.yesterday)
-      exercise = PracticeGeneration.commit_new(user, context: initial, judged: judged(initial),
-        language: "ruby_rails", drafted_by: service).exercise
-      response = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, answers: { "code_review" => "Old draft" })
-      JudgeSolve.record!(exercise, [ live_solve ])
-      old_solves = JudgeSolve.where(daily_exercise_id: exercise.id).map(&:attributes)
-      claim = exercise.claim_regenerating!
-      ready, release = Queue.new, Queue.new
-      worker = connected do
-        caller = User.find(user.id)
-        held = DailyExercise.find(exercise.id)
-        context = PracticeGeneration.capture(caller, date: held.date, replacing: held)
-        draft = judged(context).with(solves: [ live_solve(judge_pick: "a", matched: false) ])
-        ready << true
-        await(release)
-        result = PracticeGeneration.commit_replacement(caller, exercise: held, claim: claim, context: context,
-          judged: draft, drafted_by: service)
-        held.release_regenerating!(claim)
-        result
+    context "after #{change} changes" do
+      around { |example| change == :held_date ? travel_to(Time.utc(2026, 11, 10, 3)) { example.run } : example.run }
+
+      it "rejects an active replacement after #{change} changes while the draft is away" do
+        service = FakeService.new("fake-key")
+        initial = PracticeGeneration.capture(user, date: Time.use_zone(user.effective_time_zone) { Date.yesterday })
+        exercise = PracticeGeneration.commit_new(user, context: initial, judged: judged(initial),
+          language: "ruby_rails", drafted_by: service).exercise
+        response = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, answers: { "code_review" => "Old draft" })
+        JudgeSolve.record!(exercise, [ live_solve ])
+        old_solves = JudgeSolve.where(daily_exercise_id: exercise.id).map(&:attributes)
+        claim = exercise.claim_regenerating!
+        ready, release = Queue.new, Queue.new
+        worker = connected do
+          caller = User.find(user.id)
+          held = DailyExercise.find(exercise.id)
+          context = PracticeGeneration.capture(caller, date: held.date, replacing: held)
+          draft = judged(context).with(solves: [ live_solve(judge_pick: "a", matched: false) ])
+          ready << true
+          await(release)
+          result = PracticeGeneration.commit_replacement(caller, exercise: held, claim: claim, context: context,
+            judged: draft, drafted_by: service)
+          held.release_regenerating!(claim)
+          result
+        end
+        await(ready)
+        case change
+        when :settings then user.update!(daily_section_count: 2)
+        when :held_date
+          user.update!(paused_generation_at: 2.days.ago)
+          expect(user.carry_held_set_forward!&.id).to eq(exercise.id)
+        when :takeover
+          exercise.update_columns(regenerating_since: (DailyExercise::REGENERATION_STALE_AFTER + 1.minute).ago)
+          expect(exercise.reload.claim_regenerating!).to be_present
+        end
+        expected_set = exercise.reload.attributes.except("regenerating_since", "updated_at")
+        expected_token = change == :takeover ? exercise.regenerating_since : nil
+        expected_response = response.reload.attributes
+        release << true
+        expect(worker.value.status).to eq(:superseded)
+        expect(exercise.reload.attributes.except("regenerating_since", "updated_at")).to eq(expected_set)
+        expect(exercise.regenerating_since).to eq(expected_token)
+        expect(response.reload.attributes).to eq(expected_response)
+        expect(JudgeSolve.where(daily_exercise_id: exercise.id).map(&:attributes)).to eq(old_solves)
+      ensure
+        release << true if release
+        worker&.join
       end
-      await(ready)
-      case change
-      when :settings then user.update!(daily_section_count: 2)
-      when :held_date
-        user.update!(paused_generation_at: 2.days.ago)
-        expect(user.carry_held_set_forward!&.id).to eq(exercise.id)
-      when :takeover
-        exercise.update_columns(regenerating_since: (DailyExercise::REGENERATION_STALE_AFTER + 1.minute).ago)
-        expect(exercise.reload.claim_regenerating!).to be_present
-      end
-      expected_set = exercise.reload.attributes.except("regenerating_since", "updated_at")
-      expected_token = change == :takeover ? exercise.regenerating_since : nil
-      expected_response = response.reload.attributes
-      release << true
-      expect(worker.value.status).to eq(:superseded)
-      expect(exercise.reload.attributes.except("regenerating_since", "updated_at")).to eq(expected_set)
-      expect(exercise.regenerating_since).to eq(expected_token)
-      expect(response.reload.attributes).to eq(expected_response)
-      expect(JudgeSolve.where(daily_exercise_id: exercise.id).map(&:attributes)).to eq(old_solves)
-    ensure
-      release << true if release
-      worker&.join
     end
   end
 
