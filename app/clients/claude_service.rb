@@ -66,7 +66,7 @@ class ClaudeService < AiService
   end
 
   def read_result(parsed, request)
-    usage = parsed["usage"] || {}
+    usage = object_field(parsed, "usage")
     # A leading thinking block means the text block is not reliably content[0].
     text_block = (parsed["content"] || []).find { |block| block["type"] == "text" }
 
@@ -142,7 +142,8 @@ class ClaudeService < AiService
   def refusal_category(parsed)
     return nil unless parsed["stop_reason"] == "refusal"
 
-    parsed.dig("stop_details", "category") || "unspecified"
+    category = object_field(parsed, "stop_details")["category"]
+    category.is_a?(String) ? category : "unspecified"
   end
 
   def build_connection

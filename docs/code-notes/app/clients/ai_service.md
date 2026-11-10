@@ -249,11 +249,25 @@ page, a cut-off reply) must arrive as one.
 Every provider nests error detail as `{"error": {"message": ...}}`. Each
 provider's `raise_for_status` parses the body once through `#error_envelope`
 and passes the resulting hash here, so the body is never parsed twice. A
-missing or blank message falls back to `fallback`. `#error_envelope` returns an
+missing or blank message falls back to `fallback`, and so does a message that
+is not a string: a hash or an array would otherwise reach `ProviderError` and
+show up as its `inspect` text. `#error_envelope` returns an
 empty hash for a body that is not JSON or whose `"error"` is a string or an
 array, as in a 500 reply of `{"error":"upstream down"}`, so those fall back
 too. Reading the message with `dig` raised `TypeError`, which escaped
 `call_and_log` without writing a usage row.
+
+## `#object_field`
+
+Returns the named field when it is a JSON object and an empty hash otherwise.
+`#error_envelope` and each provider's `read_result` read nested reply fields
+through it (`usage`, OpenAI's `input_tokens_details` and
+`incomplete_details`, Claude's `stop_details`), because `dig` or `[]` on a
+string a provider sent in place of an object raises `TypeError` or
+`NoMethodError`. Neither is a `ProviderError`, so the call escaped
+`call_and_log` without its usage row. Each field is optional, so an unreadable
+one reads as absent: no cache counts, no content-filter reason, no refusal
+category.
 
 ## `#log_raw_snippet`
 

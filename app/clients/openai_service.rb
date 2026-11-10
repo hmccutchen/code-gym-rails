@@ -96,7 +96,7 @@ class OpenaiService < AiService
   def routed_model(purpose) = route_for(purpose)[:model]
 
   def read_result(parsed, request)
-    usage = read_usage(parsed["usage"] || {}, route_for(request.purpose))
+    usage = read_usage(object_field(parsed, "usage"), route_for(request.purpose))
     return unfinished_reply(usage, parsed["status"]) unless FINISHED_STATUSES.include?(parsed["status"])
 
     content = Array(parsed["output"]).select { |item| item["type"] == "message" }.flat_map { |item| Array(item["content"]) }
@@ -108,8 +108,9 @@ class OpenaiService < AiService
   end
 
   def read_usage(usage, route)
-    cached_tokens = usage.dig("input_tokens_details", "cached_tokens").to_i
-    cache_write_tokens = usage.dig("input_tokens_details", "cache_write_tokens").to_i
+    details = object_field(usage, "input_tokens_details")
+    cached_tokens = details["cached_tokens"].to_i
+    cache_write_tokens = details["cache_write_tokens"].to_i
 
     {
       input_tokens:  usage["input_tokens"].to_i - cached_tokens - cache_write_tokens,
@@ -138,7 +139,7 @@ class OpenaiService < AiService
 
   # A content filter also reports "incomplete", so it is told apart from truncation here.
   def filtered?(parsed)
-    parsed.dig("incomplete_details", "reason") == "content_filter"
+    object_field(parsed, "incomplete_details")["reason"] == "content_filter"
   end
 
   def refusal_category(parsed, content)

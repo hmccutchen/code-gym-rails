@@ -479,7 +479,8 @@ class AiService
   end
 
   def extract_provider_message(error, fallback:)
-    error["message"].presence || fallback
+    message = error["message"]
+    message.is_a?(String) && message.present? ? message : fallback
   end
 
   def raise_if_key_rejected(company, status)
@@ -586,9 +587,11 @@ class AiService
     {}
   end
 
-  def error_envelope(body)
-    error = parse_error_body(body)["error"]
-    error.is_a?(Hash) ? error : {}
+  def error_envelope(body) = object_field(parse_error_body(body), "error")
+
+  def object_field(parent, key)
+    value = parent[key]
+    value.is_a?(Hash) ? value : {}
   end
 
   def self.daily_quota_reset_at(failed_at)

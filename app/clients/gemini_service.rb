@@ -52,7 +52,7 @@ class GeminiService < AiService
   end
 
   def read_result(parsed, request)
-    usage  = read_usage(parsed["usage"] || {}, request.purpose)
+    usage  = read_usage(object_field(parsed, "usage"), request.purpose)
     status = parsed["status"]
     return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
 

@@ -1941,6 +1941,13 @@ RSpec.describe AiService do
       expect(service.send(:extract_provider_message, { "message" => "" }, fallback: "fallback text"))
         .to eq("fallback text")
     end
+
+    it "falls back when the message is not a string" do
+      [ { "text" => "nested" }, [ "listed" ], 42 ].each do |message|
+        expect(service.send(:extract_provider_message, { "message" => message }, fallback: "fallback text"))
+          .to eq("fallback text")
+      end
+    end
   end
 
   describe "#error_envelope" do
