@@ -13,7 +13,6 @@ paths:
   - "spec/**/*{response,dashboard,answer,submit,parsons,offline,draft,fold}*"
   - "app/models/problem_set_ingest.rb"
   - "app/views/shared/_duck_thread.html.erb"
-  - "app/javascript/controllers/review_button_controller.js"
   - "spec/**/*{daily_exercises,save_status}*"
 ---
 

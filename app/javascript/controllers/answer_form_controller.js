@@ -49,11 +49,6 @@ export default class extends Controller {
 
     saveStatus.watch(() => this.saveTimer !== null)
     if (restored || this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
-    this.onPageShow = (event) => {
-      // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
-      if (event.persisted && this.reviewRequested) window.location.reload()
-    }
-    window.addEventListener("pageshow", this.onPageShow)
 
     this.updateProgress()
   }
@@ -61,7 +56,11 @@ export default class extends Controller {
   disconnect() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
-    window.removeEventListener("pageshow", this.onPageShow)
+  }
+
+  // Safari bfcaches this no-store page anyway (every iOS home-screen launch), so reload a stale submitted form.
+  pageShow(event) {
+    if (event.persisted && this.reviewRequested) window.location.reload()
   }
 
   restoreDraft() {

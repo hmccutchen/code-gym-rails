@@ -10,10 +10,8 @@
     <%= button_to response.reviewed? ? t("review.finish_button") : t("review.get_button", provider: response.user.provider_label),
           review_response_path(response), method: :post,
           class: "btn btn-primary btn-sm",
-          data: { review_button_target: "button" },
           form: { class: "review-form",
-                  data: { turbo: false, controller: "review-button", action: "submit->review-button#submit",
-                          review_button_loading_label_value: t("review.generating_label") } } %>
+                  data: { turbo: false, **loading_form_data(label: t("review.generating_label")) } } %>
   <% end %>
 </div>
 <% if response.reviewing? %>
