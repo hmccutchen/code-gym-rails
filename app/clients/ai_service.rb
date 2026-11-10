@@ -479,11 +479,7 @@ class AiService
   end
 
   def extract_provider_message(body, fallback:)
-    parsed  = JSON.parse(body.to_s)
-    message = parsed.is_a?(Hash) ? parsed.dig("error", "message") : nil
-    message.presence || fallback
-  rescue JSON::ParserError
-    fallback
+    error_envelope(body)["message"].presence || fallback
   end
 
   def raise_if_key_rejected(company, status)

@@ -247,7 +247,10 @@ page, a cut-off reply) must arrive as one.
 ## `#extract_provider_message`
 
 Every provider nests error detail as `{"error": {"message": ...}}`; anything
-else falls back to `fallback`.
+else falls back to `fallback`. It reads the message through `#error_envelope`,
+so an `"error"` that is a string or an array, as in a 500 reply of
+`{"error":"upstream down"}`, falls back too. Reading it with `dig` raised
+`TypeError`, which escaped `call_and_log` without writing a usage row.
 
 ## `#log_raw_snippet`
 

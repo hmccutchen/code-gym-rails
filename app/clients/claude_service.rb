@@ -108,12 +108,16 @@ class ClaudeService < AiService
   def raise_if_out_of_credit(error, status)
     out_of_credit = status == 402 ||
                     (status == 400 && error["message"].to_s.match?(SPEND_LIMIT_MESSAGE)) ||
-                    (status == 429 && error.dig("details", "error_code") == ENFORCED_SPEND_LIMIT)
+                    (status == 429 && spend_limit_details?(error["details"]))
     return unless out_of_credit
 
     Rails.logger.warn("Anthropic reports the account is out of credit or over its spend limit (HTTP #{status})")
     raise ProviderError::BillingError.new("Anthropic reports the account is out of credit or over its spend limit",
                                           http_status: status)
+  end
+
+  def spend_limit_details?(details)
+    details.is_a?(Hash) && details["error_code"] == ENFORCED_SPEND_LIMIT
   end
 
   def quota_id_from(resp, error)
