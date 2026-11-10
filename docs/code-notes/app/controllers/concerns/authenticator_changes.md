@@ -8,7 +8,7 @@ Turning the authenticator on, turning it off and making new recovery codes count
 
 ## `no-store`
 
-The setup page shows the secret, and the recovery code page shows codes that are meant to be seen once. `forbid_caching` sends `Cache-Control: no-store` on both, so neither the browser cache nor the back-forward cache keeps a copy the back button could show again. `show_recovery_codes` calls it itself, so no caller can show the codes without it.
+The setup page shows the secret, and the recovery code page shows codes that are meant to be seen once. Rails' `no_store` sends `Cache-Control: no-store` on both, so neither the browser cache nor the back-forward cache keeps a copy the back button could show again. `show_recovery_codes` calls it itself, so no caller can show the codes without it.
 
 ## Notices
 

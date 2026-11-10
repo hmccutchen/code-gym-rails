@@ -2,7 +2,7 @@ class AuthenticatorsController < ApplicationController
   include AuthenticatorChanges
 
   skip_before_action :require_provider
-  before_action :forbid_caching, only: %i[show create]
+  before_action :no_store, only: %i[show create]
   before_action :redirect_when_enabled, only: :show
   before_action :require_recent_sign_in, only: %i[show create]
 
