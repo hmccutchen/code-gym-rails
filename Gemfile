@@ -57,6 +57,7 @@ end
 
 group :test do
   gem "capybara"
+  gem "chunky_png"
   # capybara-playwright-driver's pin must move with playwright-core in spec/playwright/package.json.
   gem "capybara-playwright-driver", "~> 0.5.14"
 end
