@@ -88,13 +88,23 @@ named constants: a model taking `session` as an argument, a level write
 spelled as an `update!` key, a `fetch` in JavaScript, and the isolation specs'
 word matches such as `where(trial_ends_at: …)`.
 
-The `:rails` preset has no loop check, and `Archspec.rb` adds none.
-`no_cycles` would fail twice today. Among the preset's folders, jobs and
-services depend on each other, because `PracticeGeneration`, a service,
-includes `RecordsJudgeSolves` from `app/jobs/concerns`. Across all
-components, clients and services do too, because `AiService` hands drafts and
-reviews to `ExerciseDraft`, `JudgedGeneration` and `ReviewGrading` (the
+The `:rails` preset has no loop check, so `Archspec.rb` adds `no_cycles`
+across every component except `clients`. Each folder uses only the folders
+below it, so any loop means one reached back up. One did: `PracticeGeneration`
+included `RecordsJudgeSolves` from `app/jobs/concerns`, which both generation
+jobs had shared until their calls moved into `PracticeGeneration`. It was the
+concern's last caller, so the method moved into `PracticeGeneration` and the
+concern was deleted (#751). `services.cannot_use :jobs` also names that edge
+directly, because a loop is reported at the first link archspec finds, often
+an unrelated job file, while the ban points at the service's own line.
+
+`clients` stays out of the loop check on purpose. `AiService` hands drafts
+and reviews to `ExerciseDraft`, `JudgedGeneration` and `ReviewGrading` (the
 "provider calls as callables" pattern), and those services call `AiService`.
+That loop runs through models, prompts and the provider registry as well, so
+including `clients` would fail on all of them. `no_cycles` comes after the
+component lines in `Archspec.rb`, because archspec refuses a component it has
+not seen declared yet.
 
 Archspec reads constants statically. `CodeFormat`, a model, picks its
 formatter by name (`"CodeFormat::Javascript".constantize`), so that

@@ -12,6 +12,9 @@ component :clients, in: "app/clients/**/*.rb"
 component :forms, in: "app/forms/**/*.rb"
 component :provider_registry, in: "app/models/ai_provider.rb"
 
+no_cycles among: %i[controllers models provider_registry helpers mailers jobs services prompts forms],
+  because: "each folder uses only the folders below it; clients stay out because AiService and the services it hands calls to use each other on purpose"
+
 controllers.can_only_use :prompts, :clients, :forms, :provider_registry
 
 models.cannot_use :services, :clients, :jobs, :forms, :mailers,
@@ -24,6 +27,8 @@ prompts.cannot_use :services, :clients, :controllers, :jobs, :helpers, :forms, :
   because: "a prompt class is pure text built from values"
 clients.cannot_use :controllers, :helpers, :jobs,
   because: "an adapter to the outside never reaches back into the HTTP layer or the job queue"
+services.cannot_use :jobs,
+  because: "jobs call services, so a service never reaches back into a job"
 jobs.cannot_use :controllers, :helpers,
   because: "a job runs outside any request, so it never reaches into the HTTP layer"
 mailers.cannot_use :controllers, :jobs, :services,

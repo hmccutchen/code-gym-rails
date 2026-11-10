@@ -1,6 +1,5 @@
+# Design notes: docs/code-notes/app/services/practice_generation.md
 class PracticeGeneration
-  include RecordsJudgeSolves
-
   Outcome = Data.define(:status, :exercise)
   SETTINGS = %w[daily_section_count daily_section_kinds section_kind_preferences_version skill_level section_kind_levels locked_section_kinds section_kind_weights excluded_section_kinds].freeze
 
@@ -51,7 +50,7 @@ class PracticeGeneration
 
       exercise = fresh.daily_exercises.create!(date: @context.fetch(:date), language: language,
         **content, generated_at: Time.current)
-      record_judge_solves(exercise, @judged.solves, drafted_by: @provider)
+      record_judge_solves(exercise)
       outcome(:saved, exercise)
     end
   end
@@ -69,7 +68,7 @@ class PracticeGeneration
         response&.destroy!
         exercise.update!(**content, plan_notes: replacement_notes(exercise), generated_at: Time.current,
           regenerated_at: Time.current, regenerating_since: nil)
-        record_judge_solves(exercise, @judged.solves, drafted_by: @provider)
+        record_judge_solves(exercise)
         outcome(:saved, exercise)
       end
     end
@@ -92,6 +91,15 @@ class PracticeGeneration
   def content
     PracticeSchedule::Note.decode(@judged.plan_notes.fetch("practice_schedule")) if @context.fetch(:active)
     { problem_set: @judged.problem_set, dropped_sections: @judged.dropped_sections, plan_notes: @judged.plan_notes }
+  end
+
+  def record_judge_solves(exercise)
+    return if @judged.solves.empty?
+
+    draft_model = @provider.model_for("generate_exercise")
+    JudgeSolve.transaction(requires_new: true) { JudgeSolve.record!(exercise, @judged.solves, draft_model: draft_model) }
+  rescue JudgeSolve::RecordError => e
+    Rails.logger.warn("[judge_solves_record_failed] user=#{exercise.user_id} exercise=#{exercise.id} reason=#{e.message}")
   end
 
   def replacement_notes(exercise)

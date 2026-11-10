@@ -59,11 +59,11 @@ RSpec.describe "Archspec.rb rules" do
     [ "app/services/planted_service.rb", "services must not reference Faraday" ]
   ].freeze
 
-  def violations_with_plants
+  def violations_with_plants(plants = PLANTS)
     Dir.mktmpdir do |root|
       FileUtils.cp(Rails.root.join("Archspec.rb"), root)
       FileUtils.cp_r(Rails.root.join("app"), root)
-      PLANTS.each { |path, source| File.write(File.join(root, path), source, mode: path.end_with?("ai_provider.rb") ? "a" : "w") }
+      plants.each { |path, source| File.write(File.join(root, path), source, mode: path.end_with?("ai_provider.rb") ? "a" : "w") }
 
       output, status = Open3.capture2(RbConfig.ruby, Gem.bin_path("archspec", "archspec"), "check", "--format", "json",
                                       "--config", File.join(root, "Archspec.rb"))
@@ -73,9 +73,25 @@ RSpec.describe "Archspec.rb rules" do
   end
 
   it "reports each planted break by its own ban, and nothing in the code that is already there" do
-    found = violations_with_plants.map { |violation| [ violation["path"], violation["message"] ] }.uniq.sort
+    bans = violations_with_plants.reject { |violation| violation["rule"] == "dependencies.no_cycles" }
+    found = bans.map { |violation| [ violation["path"], violation["message"] ] }.uniq.sort
 
-    expect(found).to eq(EXPECTED.sort)
+    expect(found).to eq(EXPECTED.sort), "unexpected: #{found - EXPECTED}\nmissing: #{EXPECTED - found}"
+  end
+
+  it "reports a service that reaches back into a job at the service's own line, and as a loop" do
+    plant = { "app/services/planted_service.rb" => "class PlantedService\n  def self.job = GenerateDailyExercisesJob\nend\n" }
+    found = violations_with_plants(plant).map { |violation| [ violation["path"], violation["line"], violation["message"] ] }
+
+    expect(found).to include([ "app/services/planted_service.rb", 2, "services must not depend on jobs" ])
+    expect(found.map(&:last)).to include("component dependency cycle: jobs -> services -> jobs")
+  end
+
+  it "reports a loop through the prompt classes, which sit outside the Rails preset" do
+    plants = { "app/models/planted_model.rb" => "class PlantedModel\n  def self.prompt = PlantedPrompt\nend\n",
+               "app/prompts/planted_prompt.rb" => "class PlantedPrompt\n  def self.model = PlantedModel\nend\n" }
+
+    expect(violations_with_plants(plants).map { |violation| violation["rule"] }).to include("dependencies.no_cycles")
   end
 
   it "puts every Ruby folder under app/ in a component, so no folder escapes the bans" do
