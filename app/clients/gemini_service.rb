@@ -84,7 +84,7 @@ class GeminiService < AiService
     end
 
     log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
-    message = extract_provider_message(resp.body, fallback: "Gemini API error #{resp.status}")
+    message = extract_provider_message(error, fallback: "Gemini API error #{resp.status}")
     raise ProviderError.new(message, http_status: resp.status)
   end
 

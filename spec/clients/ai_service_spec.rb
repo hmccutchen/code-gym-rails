@@ -1905,43 +1905,45 @@ RSpec.describe AiService do
   end
 
   describe "#extract_provider_message" do
-    it "returns the provider's error.message when the body is a matching JSON error object" do
-      body = {
-        "type"  => "error",
-        "error" => { "type" => "insufficient_quota", "message" => "Your credit balance is too low to access the Anthropic API." }
-      }.to_json
+    it "returns the provider's error message from the parsed error envelope" do
+      error = { "type" => "insufficient_quota", "message" => "Your credit balance is too low to access the Anthropic API." }
 
-      expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
+      expect(service.send(:extract_provider_message, error, fallback: "fallback text"))
         .to eq("Your credit balance is too low to access the Anthropic API.")
     end
 
-    it "falls back when the body is not JSON" do
-      expect(service.send(:extract_provider_message, "not json", fallback: "fallback text"))
+    it "falls back when the error has no message" do
+      expect(service.send(:extract_provider_message, { "type" => "overloaded_error" }, fallback: "fallback text"))
         .to eq("fallback text")
     end
 
-    it "falls back when the JSON body has no error.message" do
+    it "falls back when the message is blank" do
+      expect(service.send(:extract_provider_message, { "message" => "" }, fallback: "fallback text"))
+        .to eq("fallback text")
+    end
+  end
+
+  describe "#error_envelope" do
+    it "returns the error object from a JSON error body" do
       body = { "type" => "error", "error" => { "type" => "overloaded_error" } }.to_json
 
-      expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
-        .to eq("fallback text")
+      expect(service.send(:error_envelope, body)).to eq("type" => "overloaded_error")
     end
 
-    it "falls back when error.message is blank" do
-      body = { "error" => { "message" => "" } }.to_json
-
-      expect(service.send(:extract_provider_message, body, fallback: "fallback text"))
-        .to eq("fallback text")
+    it "returns an empty hash when the body is not JSON" do
+      expect(service.send(:error_envelope, "not json")).to eq({})
     end
 
-    it "falls back when the body is nil instead of raising" do
-      expect(service.send(:extract_provider_message, nil, fallback: "fallback text"))
-        .to eq("fallback text")
+    it "returns an empty hash when the body is nil instead of raising" do
+      expect(service.send(:error_envelope, nil)).to eq({})
     end
 
-    it "falls back when the body is not a String instead of raising" do
-      expect(service.send(:extract_provider_message, 123, fallback: "fallback text"))
-        .to eq("fallback text")
+    it "returns an empty hash when the body is not a String instead of raising" do
+      expect(service.send(:error_envelope, 123)).to eq({})
+    end
+
+    it "returns an empty hash when error is a string rather than an object" do
+      expect(service.send(:error_envelope, { "error" => "upstream down" }.to_json)).to eq({})
     end
   end
 

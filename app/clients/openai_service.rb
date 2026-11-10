@@ -77,7 +77,7 @@ class OpenaiService < AiService
     end
 
     log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
-    message = extract_provider_message(resp.body, fallback: "OpenAI API error #{resp.status}")
+    message = extract_provider_message(error, fallback: "OpenAI API error #{resp.status}")
     raise ProviderError.new(message, http_status: resp.status)
   end
 

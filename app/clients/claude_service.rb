@@ -101,7 +101,7 @@ class ClaudeService < AiService
     end
 
     log_raw_snippet("Claude API error #{resp.status} body", resp.body)
-    message = extract_provider_message(resp.body, fallback: "Claude API error #{resp.status}")
+    message = extract_provider_message(error, fallback: "Claude API error #{resp.status}")
     raise ProviderError.new(message, http_status: resp.status)
   end
 
