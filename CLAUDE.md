@@ -278,10 +278,11 @@ rather than only catching it afterward:
   - No model names `AiService` or a provider class; `.claude/rules/patterns.md`
     ("Domain data stays off provider classes") says which one may
     (`Archspec.rb`).
-- `Archspec.rb` holds the layer rules, a loop check among the Rails preset's
-  folders, and the `Thread`, `Faraday`, `send` and `ExerciseDraft.call` bans,
-  each with its reason, and `archspec check` fails on a break. `archspec_rules_spec` plants a break in each component, and
-  fails on a folder under `app/` with no component.
+- `Archspec.rb` holds the layer rules, a loop check across every component
+  but `clients`, and the `Thread`, `Faraday`, `send` and `ExerciseDraft.call`
+  bans, each with its reason, and `archspec check` fails on a break.
+  `archspec_rules_spec` plants a break in each component, and fails on a
+  folder under `app/` with no component.
   A deliberate exception is a one-line
   `# archspec:disable-next-line <rule> -- <reason>` on the line it excuses,
   and it counts toward the file's five comments.

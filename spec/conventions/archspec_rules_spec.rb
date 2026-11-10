@@ -79,10 +79,19 @@ RSpec.describe "Archspec.rb rules" do
     expect(found).to eq(EXPECTED.sort), "unexpected: #{found - EXPECTED}\nmissing: #{EXPECTED - found}"
   end
 
-  it "reports a service that reaches back into a job as a loop between the two folders" do
+  it "reports a service that reaches back into a job at the service's own line, and as a loop" do
     plant = { "app/services/planted_service.rb" => "class PlantedService\n  def self.job = GenerateDailyExercisesJob\nend\n" }
+    found = violations_with_plants(plant).map { |violation| [ violation["path"], violation["line"], violation["message"] ] }
 
-    expect(violations_with_plants(plant).map { |violation| violation["message"] }).to eq([ "component dependency cycle: jobs -> services -> jobs" ])
+    expect(found).to include([ "app/services/planted_service.rb", 2, "services must not depend on jobs" ])
+    expect(found.map(&:last)).to include("component dependency cycle: jobs -> services -> jobs")
+  end
+
+  it "reports a loop through the prompt classes, which sit outside the Rails preset" do
+    plants = { "app/models/planted_model.rb" => "class PlantedModel\n  def self.prompt = PlantedPrompt\nend\n",
+               "app/prompts/planted_prompt.rb" => "class PlantedPrompt\n  def self.model = PlantedModel\nend\n" }
+
+    expect(violations_with_plants(plants).map { |violation| violation["rule"] }).to include("dependencies.no_cycles")
   end
 
   it "puts every Ruby folder under app/ in a component, so no folder escapes the bans" do
