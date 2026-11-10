@@ -502,24 +502,22 @@ class AiService
   end
 
   def log_usage(user, result, purpose:)
-    ActiveRecord::Base.connection_pool.with_connection do
-      ApiUsage.create!(
-        user:       user,
-        house_key:  house_key?,
-        tokens_in:  result[:input_tokens].to_i,
-        tokens_out: result[:output_tokens].to_i,
-        model:      result[:model],
-        provider:   self.class.provider_key,
-        cache_read_tokens:  result[:cache_read_tokens],
-        cache_write_tokens: result[:cache_write_tokens],
-        http_status: result[:http_status],
-        failure:     result[:failure],
-        quota_id:    result[:quota_id],
-        cost_usd:    usage_cost(result),
-        purpose:    purpose,
-        date:       Date.current
-      )
-    end
+    ApiUsage.create!(
+      user:       user,
+      house_key:  house_key?,
+      tokens_in:  result[:input_tokens].to_i,
+      tokens_out: result[:output_tokens].to_i,
+      model:      result[:model],
+      provider:   self.class.provider_key,
+      cache_read_tokens:  result[:cache_read_tokens],
+      cache_write_tokens: result[:cache_write_tokens],
+      http_status: result[:http_status],
+      failure:     result[:failure],
+      quota_id:    result[:quota_id],
+      cost_usd:    usage_cost(result),
+      purpose:    purpose,
+      date:       Date.current
+    )
   rescue ActiveRecord::ActiveRecordError => e
     Rails.logger.warn(
       "[usage] ApiUsage log failed for purpose=#{purpose} user_id=#{user&.id} " \

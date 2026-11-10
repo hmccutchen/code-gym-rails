@@ -266,6 +266,14 @@ flash alerts and error trackers. `.scrub` repairs a multi-byte character that
 Rescues database errors only. Swallowing anything else would silently empty the
 table that cost questions rely on.
 
+It checks out no connection by hand. `ApiUsage.create!` takes one through
+Active Record's `with_connection` and returns it after the write, on any
+thread, and a fan-out thread also runs inside the executor
+(`docs/code-notes/app/clients/caller_zone_thread.md`). The block that wrapped
+the write in `connection_pool.with_connection` came out with #754; a failed
+checkout still raises `ActiveRecord::ConnectionTimeoutError`, which the rescue
+logs.
+
 The row's `cost_usd` is priced here, at call time, from the subclass's
 `PRICE_PER_MILLION`, so a later price change never rewrites an old row. A model
 with no price writes a null cost and a warning instead of raising, because the

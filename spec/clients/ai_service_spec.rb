@@ -251,6 +251,26 @@ RSpec.describe AiService do
   end
 
   describe "usage rows" do
+    context "on a thread with no executor and no transactional test" do
+      self.use_transactional_tests = false
+
+      let(:own_user) { User.create!(email: "usage-connection-#{SecureRandom.hex(8)}@example.com") }
+
+      after { own_user.destroy! }
+
+      it "returns the connection its write checked out" do
+        pool = ActiveRecord::Base.connection_pool
+        svc = double_class.new
+        request = AiService::Request.build(purpose: "duck_thread", system: "s", prompt: "p")
+        before = pool.connections.count(&:in_use?)
+
+        Thread.new { svc.send(:call_and_log, own_user, request) }.join
+
+        expect(pool.connections.count(&:in_use?)).to eq(before)
+        expect(own_user.api_usages.count).to eq(1)
+      end
+    end
+
     it "records the model and both cache counts the provider reported" do
       svc = double_class.new
       allow(svc).to receive(:call).and_return(

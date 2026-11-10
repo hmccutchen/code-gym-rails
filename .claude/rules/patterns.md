@@ -113,8 +113,10 @@ says what a deviation from one requires.
   draft makes one call and a retry runs on the thread that asked for it. `AiService` keeps the calls and builds the prompts, or
   takes them from a prompt class;
   the module keeps the orchestration and the policy, and its specs drive it
-  with lambdas. Threads start through `CallerZoneThread.start`; `Archspec.rb`
-  holds the thread and `send` bans.
+  with lambdas. Threads start through `CallerZoneThread.start`, which runs
+  the work in the caller's time zone and inside `ActiveSupport::Executor`,
+  never `Rails.application.executor`, whose development reload lock would
+  deadlock the joining parent; `Archspec.rb` holds the thread and `send` bans.
 - **Outcomes at the HTTP edge** — domain work an action triggers returns a
   value naming what happened (`ResponseReview::Outcome`, like
   `ProblemSetIngest::Result`), and the action only maps it to a redirect and a
