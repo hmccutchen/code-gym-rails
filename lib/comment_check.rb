@@ -10,11 +10,15 @@ module CommentCheck
   module_function
 
   def checked_path?(path)
-    !path.start_with?(*SKIPPED_FOLDERS) && !path.include?("node_modules/") && !Scanners.for(path).nil?
+    !path.start_with?(*SKIPPED_FOLDERS) && !path.include?("node_modules/") && !Scanners.for(path, first_line(path)).nil?
+  end
+
+  def first_line(path)
+    File.open(path, "rb", &:gets) if File.extname(path).empty? && File.file?(path)
   end
 
   def offenses_for(path, text)
-    scanner = Scanners.for(path) or return []
+    scanner = Scanners.for(path, text) or return []
     comments = scanner.call(text).sort_by(&:first_line)
     lines = text.lines
     multi_line(path, comments) + unattached(path, comments, lines) + over_limit(path, comments)

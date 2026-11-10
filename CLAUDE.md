@@ -83,8 +83,9 @@ deadline or a "temporary" comment. The one exemption is a skill vendored under
 `.claude/skills/`, which keeps the comments it came with; neither RuboCop nor
 `bin/comment-check` scans that folder. CI enforces the first three, so a
 broken one fails the build: RuboCop in Ruby files, and `bin/comment-check` in
-ERB (including its `<script>` and `<style>` blocks), JavaScript, CSS, YAML and
-Python. The cop names below are the Ruby side.
+ERB (including its `<script>` and `<style>` blocks), JavaScript, CSS, YAML,
+Python and shell scripts (read by their shebang). The cop names below are the
+Ruby side.
 
 - **Each comment is attached to the code it comments on.** It sits on the line
   directly above that code, or at the end of the same line. No blank line, no

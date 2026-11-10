@@ -5,11 +5,21 @@ module CommentCheck
   module Scanners
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
+    SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function
 
-    def for(path)
-      case File.extname(path)
+    def for(path, text = nil)
+      extension = File.extname(path)
+      extension.empty? ? for_shebang(text.to_s.lines.first.to_s) : for_extension(extension)
+    end
+
+    def for_shebang(line)
+      method(:shell_comments) if line.match?(SHELL_SHEBANG)
+    end
+
+    def for_extension(extension)
+      case extension
       when ".yml", ".yaml" then method(:yaml_comments)
       when ".py" then method(:python_comments)
       when ".css" then method(:css_comments)
@@ -29,7 +39,15 @@ module CommentCheck
     def python_tooling?(comment)
       return false unless comment.own_line && comment.first_line <= 2
 
-      comment.text.start_with?("#!") && comment.first_line == 1 || comment.text.match?(PYTHON_ENCODING)
+      shebang?(comment) || comment.text.match?(PYTHON_ENCODING)
+    end
+
+    def shell_comments(text)
+      LineScan.line_comments(text, "#", require_space: true).reject { |comment| shebang?(comment) }
+    end
+
+    def shebang?(comment)
+      comment.first_line == 1 && comment.text.start_with?("#!")
     end
 
     def css_comments(text, offset: 0)

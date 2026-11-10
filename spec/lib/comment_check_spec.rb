@@ -1,3 +1,4 @@
+require "tempfile"
 require_relative "../../lib/comment_check"
 
 RSpec.describe CommentCheck do
@@ -101,6 +102,35 @@ RSpec.describe CommentCheck do
 
   it "treats an encoding-like YAML comment as prose" do
     expect(messages("config/a.yml", "# coding: utf-8\n\nkey: 1\n")).to eq([ [ 1, "Put the comment directly above the code it discusses." ] ])
+  end
+
+  def script(first_line)
+    Tempfile.create("script") do |file|
+      file.write("#{first_line}\nrun\n")
+      file.close
+      yield file.path
+    end
+  end
+
+  it "checks a file with no extension when its shebang names a shell, and leaves a Ruby script to RuboCop" do
+    checked = [ "#!/bin/bash -e", "#!/usr/bin/env bash", "#!/bin/sh", "#!/usr/bin/env sh" ].map { |line| script(line) { described_class.checked_path?(_1) } }
+
+    expect(checked).to all(be(true))
+    expect([ "#!/usr/bin/env ruby", "run" ].map { |line| script(line) { described_class.checked_path?(_1) } }).to all(be(false))
+  end
+
+  it "picks the shell scanner for a shell shebang and no scanner for a Ruby one" do
+    expect(described_class::Scanners.for("bin/a", "#!/bin/bash -e\n")).to eq(described_class::Scanners.method(:shell_comments))
+    expect(described_class::Scanners.for("bin/a", "#!/usr/bin/env ruby\n")).to be_nil
+    expect(described_class::Scanners.for("bin/a", "")).to be_nil
+  end
+
+  it "reads shell comments, ignoring the shebang and a hash inside a parameter expansion" do
+    text = "#!/bin/bash -e\n\n# One\n# Two\necho ${#items[@]} $# \"# quoted\"\n"
+
+    expect(messages("bin/a", text)).to contain_exactly(
+      [ 4, "Keep each comment to a single line." ], [ 3, "Put the comment directly above the code it discusses." ]
+    )
   end
 
   it "skips file types it has no scanner for" do
