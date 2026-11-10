@@ -21,6 +21,8 @@
     "application": "/assets/application-DIGEST.js",
     "@hotwired/stimulus": "/assets/stimulus.min-DIGEST.js",
     "@hotwired/stimulus-loading": "/assets/stimulus-loading-DIGEST.js",
+    "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs",
+    "sortablejs": "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js",
     "controllers/answer_form_controller": "/assets/controllers/answer_form_controller-DIGEST.js",
     "controllers/application": "/assets/controllers/application-DIGEST.js",
     "controllers/code_lines_controller": "/assets/controllers/code_lines_controller-DIGEST.js",
@@ -48,7 +50,6 @@
     "controllers/push_enable_controller": "/assets/controllers/push_enable_controller-DIGEST.js",
     "controllers/push_launch_controller": "/assets/controllers/push_launch_controller-DIGEST.js",
     "controllers/review_alternates_controller": "/assets/controllers/review_alternates_controller-DIGEST.js",
-    "controllers/review_button_controller": "/assets/controllers/review_button_controller-DIGEST.js",
     "controllers/save_switch_controller": "/assets/controllers/save_switch_controller-DIGEST.js",
     "controllers/time_zone_controller": "/assets/controllers/time_zone_controller-DIGEST.js",
     "controllers/value_row_controller": "/assets/controllers/value_row_controller-DIGEST.js",
@@ -91,7 +92,6 @@
 <link rel="modulepreload" href="/assets/controllers/push_enable_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/push_launch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/review_alternates_controller-DIGEST.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/review_button_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/save_switch_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/time_zone_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/value_row_controller-DIGEST.js" nonce="NONCE">
@@ -544,7 +544,8 @@
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
-  <div class="today-day" data-controller="answer-form" data-answer-form-answered-sections-value="[]"
+  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow"
+       data-answer-form-answered-sections-value="[]"
        data-answer-form-submit-blocker-value="unanswered"
        data-answer-form-draft-scope-value="900001-1790694000000000"
        data-answer-form-draft-token-value="900001-1790694000000000:new:643d5437104296e2"

@@ -23,11 +23,9 @@ class SchemaWait
     end
   end
 
-  # Asks Postgres directly because #table_exists? answers from a schema cache loaded before the table existed.
+  # The connection's table_exists? queries pg_class each time; the model-level one reads a schema cache.
   def self.ready?
-    connection = ActiveRecord::Base.connection
-    # ::text avoids an "unknown OID" warning in the deploy log.
-    connection.select_value("SELECT to_regclass(#{connection.quote(REQUIRED_TABLE)})::text").present?
+    ActiveRecord::Base.connection.table_exists?(REQUIRED_TABLE)
   rescue ActiveRecord::ActiveRecordError
     # The database may not be reachable yet on a cold preview environment; that is a wait.
     false

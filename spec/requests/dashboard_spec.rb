@@ -175,6 +175,22 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(page_html.css(".regenerate-row").size).to eq(1)
     end
 
+    it "reloads the answer form through its controller when the browser restores the page from its back-forward cache" do
+      create_exercise
+      get root_path
+
+      expect(page_html.at_css(".today-day")["data-action"]).to eq("pageshow@window->answer-form#pageShow")
+    end
+
+    it "drives the review button on a submitted day with the loading-form controller" do
+      create_response(create_exercise)
+      get root_path
+
+      review_form = page_html.at_css("form.review-form")
+      expect(review_form["action"]).to eq(review_response_path(DailyResponse.last))
+      expect(review_form["data-controller"].split).to include("loading-form")
+    end
+
     it "keeps the side column on a submitted day, holding only the regenerate row" do
       create_response(create_exercise)
       get root_path
@@ -1689,7 +1705,9 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("flowchart TD")
       expect(response.body).to include("mermaid")
       source = Rails.root.join("app/javascript/controllers/mermaid_controller.js").read
-      expect(source).to include("mermaid@11.17.2")
+      expect(diagrams_awaiting_mermaid(response.body)).not_to be_empty
+      expect(source).to include('import("mermaid")')
+      expect(Rails.application.importmap.packages["mermaid"].path).to start_with("https://cdn.jsdelivr.net/npm/mermaid@")
       expect(source).to match(/securityLevel:\s*["']strict["']/)
 
       expect(response.body).to include('data-owns-details="1"')
@@ -1720,7 +1738,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(response.body).not_to include('class="mermaid-diagram"')
-      expect(response.body).not_to include("mermaid@11.17.2")
+      expect(diagrams_awaiting_mermaid(response.body)).to be_empty
     end
 
     it "renders no disclosure, no container, and no script for an exercise generated before diagrams existed" do

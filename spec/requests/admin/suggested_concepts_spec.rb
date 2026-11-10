@@ -17,6 +17,15 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       expect(flash[:alert]).to eq("Not authorized.")
     end
 
+    it "grants admin when the ADMIN_EMAILS entry has surrounding spaces and capitals" do
+      ENV["ADMIN_EMAILS"] = "member@example.com,  Admin@Example.COM "
+      login_as(admin)
+
+      get admin_suggested_concepts_path
+
+      expect(response).to have_http_status(:ok)
+    end
+
     it "lists pending suggestions ordered by occurrences desc, for an admin" do
       login_as(admin)
       low  = SuggestedConcept.record!(language: "ruby_rails", name: "low_freq")
@@ -27,6 +36,17 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       get admin_suggested_concepts_path
 
       expect(response.body.index(high.display_name)).to be < response.body.index(low.display_name)
+    end
+
+    it "shows when each suggestion was first and last seen as a short month and day" do
+      login_as(admin)
+      travel_to(Time.utc(2026, 10, 3, 12)) { SuggestedConcept.record!(language: "ruby_rails", name: "seen_twice") }
+      travel_to(Time.utc(2026, 10, 21, 12)) { SuggestedConcept.record!(language: "ruby_rails", name: "seen_twice") }
+
+      get admin_suggested_concepts_path
+
+      row = Nokogiri::HTML(response.body).css(".suggested-table tbody tr").find { |tr| tr.text.include?("seen_twice") }
+      expect(row.css("td").map { |cell| cell.text.strip }).to include("Oct 3", "Oct 21")
     end
 
     it "excludes promoted and dismissed suggestions from the default listing" do

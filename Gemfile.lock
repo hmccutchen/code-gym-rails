@@ -435,6 +435,7 @@ DEPENDENCIES
   brakeman
   capybara
   capybara-playwright-driver (~> 0.5.14)
+  chunky_png
   debug
   faraday (~> 2.15)
   faraday-retry

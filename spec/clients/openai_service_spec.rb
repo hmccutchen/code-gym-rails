@@ -408,4 +408,8 @@ RSpec.describe OpenaiService do
         .to raise_error(ProviderError, "OpenAI API error 400") { |error| expect(error.http_status).to eq(400) }
     end
   end
+
+  describe "an error body with a field that is not an object" do
+    include_examples "a provider reading an error field that is not an object"
+  end
 end

@@ -1,4 +1,4 @@
-<%= t("review_mailer.send_review.intro", app_name: t("app_name"), date: @response.date.strftime("%A, %B %-d, %Y")) %>
+<%= t("review_mailer.send_review.intro", app_name: t("app_name"), date: l(@response.date, format: :weekday_with_year)) %>
 
 <% @response.ai_review.each do |section, fb| -%>
 <% next unless fb.is_a?(Hash) -%>

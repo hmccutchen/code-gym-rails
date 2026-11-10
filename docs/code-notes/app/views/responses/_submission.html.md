@@ -7,17 +7,19 @@ trigger, the AI review and the email button. Only the dashboard's submitted
 state renders it. The history page renders `responses/_answered_sections` plus
 its own review disclosure, never this partial.
 
-## Review button controller
+## Review button
 
-`data-controller="review-button"` on the review form drives the button;
-`docs/code-notes/app/javascript/controllers/review_button_controller.md` covers
-the deferred disable, the bfcache reset, and why the wiring guard and the
-button-versus-input branch the inline script carried are both gone.
+The review form takes `loading_form_data(label: t("review.generating_label"))`,
+so the shared `loading-form` controller drives its button: the deferred
+disable, `btn-loading`, the "Generating review…" label, and the reset on a
+back-forward cache restore.
+`docs/code-notes/app/javascript/controllers/loading_form_controller.md` covers
+each. A `review-button` controller once did the same for this form alone.
 
 Every exit from `#review` redirects to `root_path`. If the user then navigates
 Back, some browsers restore the page from the back-forward cache exactly as it
 was, button disabled and label swapped, which is what the controller's
-`pageshow` listener resets.
+`pageshow` action resets.
 
 ## A review still running
 

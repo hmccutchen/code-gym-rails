@@ -15,7 +15,7 @@
   <section class="card">
     <h2><%= t("accounts.show.practice_heading") %></h2>
     <% if current_user.paused_generation_at? %>
-      <p class="card-note"><%= t("accounts.show.paused", date: current_user.paused_generation_at.to_date.strftime("%B %-d")) %></p>
+      <p class="card-note"><%= t("accounts.show.paused", date: l(current_user.paused_generation_at.to_date, format: :month_day)) %></p>
       <%= button_to t("accounts.show.resume"), toggle_generation_account_path, method: :patch, params: { paused: "0" }, class: "btn btn-ghost btn-block" %>
     <% else %>
       <p class="card-note"><%= t("accounts.show.active") %></p>

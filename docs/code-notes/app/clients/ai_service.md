@@ -246,8 +246,14 @@ page, a cut-off reply) must arrive as one.
 
 ## `#extract_provider_message`
 
-Every provider nests error detail as `{"error": {"message": ...}}`; anything
-else falls back to `fallback`.
+Every provider nests error detail as `{"error": {"message": ...}}`. Each
+provider's `raise_for_status` parses the body once through `#error_envelope`
+and passes the resulting hash here, so the body is never parsed twice. A
+missing or blank message falls back to `fallback`. `#error_envelope` returns an
+empty hash for a body that is not JSON or whose `"error"` is a string or an
+array, as in a 500 reply of `{"error":"upstream down"}`, so those fall back
+too. Reading the message with `dig` raised `TypeError`, which escaped
+`call_and_log` without writing a usage row.
 
 ## `#log_raw_snippet`
 

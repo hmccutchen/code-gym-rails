@@ -151,6 +151,16 @@ RSpec.describe "Second-factor sign-in", type: :request do
     expect(user.reload.second_factor_challenge_at).to be_nil
   end
 
+  it "writes the retry time with the day unpadded" do
+    travel_to Time.utc(2027, 3, 4, 9)
+    user.update!(second_factor_failures: User::Authenticator::DAILY_FAILURES, second_factor_failures_since: Time.utc(2027, 3, 4, 8))
+    enter_email
+
+    answer(current_totp(secret))
+
+    expect(response.body).to include("You can try again after March 5, 2027 08:00.")
+  end
+
   it "leaves sign-in unchanged for an account with the authenticator off" do
     other = create_user_with_key(email: "plain@example.com")
     post login_path, params: { email: other.email }

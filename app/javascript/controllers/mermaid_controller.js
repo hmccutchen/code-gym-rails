@@ -1,14 +1,12 @@
 // Design notes: docs/code-notes/app/javascript/controllers/mermaid_controller.md
 import { Controller } from "@hotwired/stimulus"
 
-const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs"
-
 export default class extends Controller {
   async connect() {
     if (this.pending.length === 0) return
 
     try {
-      const mermaid = (await import(MERMAID_URL)).default
+      const mermaid = (await import("mermaid")).default
       // securityLevel stays strict: the diagram source is model-generated.
       mermaid.initialize({ startOnLoad: false, securityLevel: "strict" })
       await this.renderAll(mermaid)

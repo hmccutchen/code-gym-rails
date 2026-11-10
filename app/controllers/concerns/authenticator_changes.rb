@@ -15,16 +15,12 @@ module AuthenticatorChanges
 
   private
 
-  def forbid_caching
-    response.headers["Cache-Control"] = "no-store"
-  end
-
   def notify_second_factor_change(change, changed_at = Time.current)
     UserMailer.second_factor_changed(current_user, change.to_s, changed_at).deliver_later
   end
 
   def show_recovery_codes(codes, notice)
-    forbid_caching
+    no_store
     @recovery_codes = codes
     flash.now[:notice] = notice
     render "recovery_codes/show"

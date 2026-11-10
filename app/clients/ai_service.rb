@@ -478,12 +478,8 @@ class AiService
     raise ProviderError::InvalidResponseError, "#{provider} returned an unreadable response"
   end
 
-  def extract_provider_message(body, fallback:)
-    parsed  = JSON.parse(body.to_s)
-    message = parsed.is_a?(Hash) ? parsed.dig("error", "message") : nil
-    message.presence || fallback
-  rescue JSON::ParserError
-    fallback
+  def extract_provider_message(error, fallback:)
+    error["message"].presence || fallback
   end
 
   def raise_if_key_rejected(company, status)

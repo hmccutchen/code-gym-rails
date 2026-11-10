@@ -20,7 +20,7 @@
 
 <% @responses.each_with_index do |daily_response, i| %>
   <div class="history-entry" id="response-<%= daily_response.id %>">
-    <h2><%= daily_response.date.strftime("%A, %B %-d, %Y") %></h2>
+    <h2><%= l(daily_response.date, format: :weekday_with_year) %></h2>
 
     <div class="history-meta">
       <span class="history-pill">

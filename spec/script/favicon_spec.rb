@@ -5,7 +5,7 @@ require_relative "../support/png_pixels"
 RSpec.describe "public favicons" do
   def public_file(name) = File.expand_path("../../public/#{name}", __dir__)
   def size_of(rows) = [ rows.first.size, rows.size ]
-  def opaque?(rows) = rows.flatten(1).map { |pixel| pixel[3] || 255 }.uniq == [ 255 ]
+  def opaque?(rows) = rows.flatten(1).map { |pixel| pixel[3] }.uniq == [ 255 ]
 
   let(:ico_frames) { PngPixels.inside_ico(public_file("favicon.ico")).map { |png| PngPixels.rows(png) } }
   let(:png_rows) { PngPixels.rows(File.binread(public_file("favicon-96.png"))) }

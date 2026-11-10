@@ -35,16 +35,37 @@ RSpec.describe "Content security policy", type: :request do
     end
   end
 
-  it "covers every remote module a script names with a package directory, never a whole host" do
-    sources = policy[/script-src [^;]+/].split.select { |source| source.start_with?("https://") }
-    remote_urls = Dir[Rails.root.join("app/{javascript,assets/javascripts}/**/*.js")].flat_map do |path|
-      File.read(path).scan(%r{https://[^"'`\s]+})
-    end
+  def remote_urls_in(paths)
+    paths.flat_map { |path| File.read(path).scan(%r{https://[^"'`\s]+}) }
+  end
 
-    expect(remote_urls).not_to be_empty
-    expect(sources).to all(match(%r{\Ahttps://[^/]+/.+/\z}))
-    remote_urls.each do |url|
+  def page_script_paths
+    Dir[Rails.root.join("app/{javascript,assets/javascripts}/**/*.js")]
+  end
+
+  def cdn_sources
+    policy[/script-src [^;]+/].split.select { |source| source.start_with?("https://") }
+  end
+
+  def remote_pin_urls
+    Importmap::Map.new.draw(Rails.root.join("config/importmap.rb")).packages.values.map(&:path).grep(%r{\Ahttps://})
+  end
+
+  it "names each CDN source as a package directory, never a whole host" do
+    expect(cdn_sources).not_to be_empty
+    expect(cdn_sources).to all(match(%r{\Ahttps://cdn\.jsdelivr\.net/npm/(?:@[^/]+/)?[^@/]+@[^/]+/\z}))
+  end
+
+  it "lists the directory of every remote pin in config/importmap.rb" do
+    sources = cdn_sources
+
+    expect(remote_pin_urls).not_to be_empty
+    remote_pin_urls.each do |url|
       expect(sources.any? { |source| url.start_with?(source) }).to be(true), "#{url} is outside every script-src source"
     end
+  end
+
+  it "pins every remote module in config/importmap.rb, the one file importmap audit reads" do
+    expect(remote_urls_in(page_script_paths)).to be_empty
   end
 end

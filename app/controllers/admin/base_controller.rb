@@ -12,11 +12,11 @@ module Admin
     end
 
     def admin?
-      admin_emails.include?(current_user.email.to_s.downcase)
+      admin_emails.include?(current_user.email)
     end
 
     def admin_emails
-      ENV.fetch("ADMIN_EMAILS", "").split(",").map { |e| e.strip.downcase }
+      ENV.fetch("ADMIN_EMAILS", "").split(",").map { |e| User.normalize_value_for(:email, e) }
     end
   end
 end

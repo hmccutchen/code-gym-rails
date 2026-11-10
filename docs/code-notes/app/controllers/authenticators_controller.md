@@ -14,4 +14,4 @@ Turning the authenticator on or off sets `users.sessions_valid_after` to the tim
 
 ## `no-store`
 
-`show` and `create` send `Cache-Control: no-store` through `AuthenticatorChanges#forbid_caching`, since both can render the secret or the recovery codes. `destroy` only redirects, so it needs none.
+`show` and `create` send `Cache-Control: no-store` through Rails' `no_store`, since both can render the secret or the recovery codes. `destroy` only redirects, so it needs none.

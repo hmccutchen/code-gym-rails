@@ -624,4 +624,13 @@ RSpec.describe ClaudeService do
       expect(captured_body(purpose: "judge_section")["output_config"]).not_to have_key("format")
     end
   end
+
+  describe "an error body with a field that is not an object" do
+    include_examples "a provider reading an error field that is not an object"
+
+    it "reads a 429 whose details is a string as a rate limit and records one usage row" do
+      body = { "type" => "error", "error" => { "type" => "rate_limit_error", "message" => "x", "details" => "slow down" } }
+      expect { failed_logged_call(429, body, error_class: ProviderError::RateLimitError) }.to change(ApiUsage, :count).by(1)
+    end
+  end
 end

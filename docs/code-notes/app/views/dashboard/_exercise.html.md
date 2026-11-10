@@ -144,6 +144,8 @@ header starts. The header stops the browser replaying this response on Back,
 but Safari keeps a `no-store` page in its back-forward cache anyway and would
 restore this form, still editable, for a day that is submitted and reviewed by
 then. The app meets this on every iOS home-screen launch. The page reloads
-rather than resetting the button the way the review and loading-form scripts
-do: there only the button went stale, while here the whole form has. Answers
-are autosaved, so the reload loses nothing.
+rather than resetting the button the way the loading-form script does on the
+review form: there only the button went stale, while here the whole form has.
+Answers are autosaved, so the reload loses nothing. The `.today-day` root binds
+it as a Stimulus global action, `pageshow@window->answer-form#pageShow`, so
+Stimulus adds and removes the window listener with the controller.

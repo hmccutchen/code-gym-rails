@@ -7,7 +7,7 @@ class PreviewSeed
   def self.run! = new.run!
 
   def self.target_email
-    ENV[EMAIL_VAR].to_s.strip.downcase.presence || DEFAULT_EMAIL
+    User.normalize_value_for(:email, ENV[EMAIL_VAR].to_s).presence || DEFAULT_EMAIL
   end
 
   # Only the create path sets the dummy key, so a real account at this address never gets auto-logged in.

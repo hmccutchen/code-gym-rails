@@ -18,16 +18,17 @@ needs no change here (see `docs/code-notes/app/models/glossary.md`).
 Pass `seen:` to share one set across several calls that make up one field.
 `#glossary_wrap_prose` does this.
 
-The text goes in as raw text, and each fragment is escaped before the result is
-marked `html_safe`. Reference fields come from a provider, so they can't be
-trusted to be free of markup. If the helper trusted its input, a field holding
-`<b>raw</b>` would render as bold, and a field holding a script tag would run.
-Escaping the pieces keeps the only markup in the output the spans the helper
-builds itself.
+The text goes in as raw text. Each span is built with `tag.span`, which
+escapes the term and its attributes, and `safe_join` escapes the plain text
+between the spans as it joins them. Reference fields come from a provider, so
+they can't be trusted to be free of markup. If the helper trusted its input, a
+field holding `<b>raw</b>` would render as bold, and a field holding a script
+tag would run. Escaping the pieces keeps the only markup in the output the
+spans the helper builds itself.
 
-An input that is already `html_safe` would defeat this, because `html_escape`
-leaves a safe string alone. The helper calls `to_str` first so the escape
-always runs.
+An input that is already `html_safe` would defeat this, because `safe_join`
+and `tag.span` leave a safe string alone. The helper calls `to_str` first so
+the escape always runs.
 
 Text with no term in it comes back escaped and marked `html_safe` too, so every
 non-blank result is safe HTML, whatever it matched. A view would escape a

@@ -551,4 +551,8 @@ RSpec.describe GeminiService do
       expect(verdict.status).to eq(:keep)
     end
   end
+
+  describe "an error body with a field that is not an object" do
+    include_examples "a provider reading an error field that is not an object"
+  end
 end
