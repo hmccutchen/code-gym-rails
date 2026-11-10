@@ -277,7 +277,12 @@ rather than only catching it afterward:
     (`app_source_spec`).
   - No model names `AiService` or a provider class; `.claude/rules/patterns.md`
     ("Domain data stays off provider classes") says which one may
-    (`app_source_spec`).
+    (`Archspec.rb`).
+- `Archspec.rb` holds the layer rules and the `Thread`, `Faraday`, `send` and
+  draft bans, each with its reason, and `archspec check` fails on a break.
+  A deliberate exception is a one-line
+  `# archspec:disable-next-line <rule> -- <reason>` on the line it excuses,
+  and it counts toward the file's five comments.
 - Method, class and module length in `app/` is held by RuboCop's `Metrics`
   cops, with the limits set in `.rubocop.yml`. A method that exceeds its limit
   carries a trailing `# rubocop:disable Metrics/MethodLength` on its `def`
@@ -291,7 +296,7 @@ rather than only catching it afterward:
 RuboCop, `bin/comment-check`, `archspec check`, Brakeman, and `importmap audit`. The convention specs in
 `spec/conventions/` also fail on a path an instruction doc names that no longer
 exists, a table missing from `.claude/rules/models.md`, a CI job off
-`ubuntu-24.04`, a file under `app/`, `lib/`, `script/`, `config/` or `bin/` with no entry in `docs/file-map.md`, Faraday elsewhere in `app/` than `app/clients`, and a `fetch` outside
+`ubuntu-24.04`, a file under `app/`, `lib/`, `script/`, `config/` or `bin/` with no entry in `docs/file-map.md`, and a `fetch` outside
 `request.js`. It does *not* run a Ruby dependency
 CVE audit (`bundle-audit` is not installed) or any complexity check beyond
 length, and this

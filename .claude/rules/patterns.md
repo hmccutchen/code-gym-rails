@@ -113,9 +113,8 @@ says what a deviation from one requires.
   draft makes one call and a retry runs on the thread that asked for it. `AiService` keeps the calls and builds the prompts, or
   takes them from a prompt class;
   the module keeps the orchestration and the policy, and its specs drive it
-  with lambdas. Threads start through `CallerZoneThread.start`, and
-  `spec/conventions/app_source_spec.rb` fails on any other `Thread.new` and on
-  `send(:...)` anywhere in `app/`.
+  with lambdas. Threads start through `CallerZoneThread.start`; `Archspec.rb`
+  holds the thread and `send` bans.
 - **Outcomes at the HTTP edge** — domain work an action triggers returns a
   value naming what happened (`ResponseReview::Outcome`, like
   `ProblemSetIngest::Result`), and the action only maps it to a redirect and a
@@ -169,8 +168,7 @@ says what a deviation from one requires.
   timing built from them are `CallProfiles`, which names no provider, so a
   model, view or job reads a worst-case call time there. `AiProvider`, the
   provider registry, is the one model that may name `AiService` or a provider
-  class, for a provider's own quota day, and `app_source_spec` fails on any
-  other model that names one.
+  class, for a provider's own quota day.
 - **Folders by layer** (`docs/decisions/folders-by-layer.md`) — a folder
   under `app/` says which layer its classes are in. `app/services` holds only
   classes that orchestrate side effects (a claim, a write, a provider call
@@ -178,7 +176,6 @@ says what a deviation from one requires.
   `app/prompts`, and adapters to the outside (the provider clients, push
   credentials, the Node formatter, environment switches, thread and cache
   helpers) in `app/clients`. Moving a file between them keeps its constant
-  name. `Archspec.rb` fails CI when a model or prompt class references a
-  service or a client; `AiProvider`, the provider registry, is the one
-  exception. A new class goes in the folder for what it does, not next to
-  the class that first calls it.
+  name. `Archspec.rb` states which folder may use which, starting from
+  archspec's Rails preset, with each rule's reason. A new class goes in the
+  folder for what it does, not next to the class that first calls it.

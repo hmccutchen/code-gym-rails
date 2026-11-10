@@ -18,6 +18,7 @@ module CodeFormat
 
     def self.run(input)
       Open3.popen3("node", SCRIPT) do |stdin, stdout, stderr, wait|
+        # archspec:disable-next-line constants.forbid -- Prettier's output readers touch neither Time.zone nor the database
         readers = [ stdout, stderr ].map { |io| Thread.new { io.read } }
         stdin.write(input)
         stdin.close

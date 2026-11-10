@@ -104,6 +104,7 @@ class AiService
   def model_for(purpose) = routed_model(purpose)
 
   def generate_judged_exercise(user, language: user.language_for_today, deadline: GenerationDeadline::NONE, schedule_context: nil)
+    # archspec:disable-next-line methods.forbid -- AiService judges every draft it takes
     draft = ExerciseDraft.call(user, language: language, deadline: deadline, provider: exercise_draft_provider, schedule_context: schedule_context)
     JudgedGeneration.call(
       user: user, draft: draft,
