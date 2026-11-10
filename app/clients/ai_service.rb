@@ -1,4 +1,6 @@
 require "json"
+require "faraday"
+require "faraday/retry"
 
 # Design notes: docs/code-notes/app/clients/ai_service.md
 class AiService
@@ -10,6 +12,19 @@ class AiService
 
     !env.request.context.to_h[:long_running]
   end
+
+  # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
+  BASE_RETRY_OPTIONS = {
+    max:                 CallProfiles::RETRY_MAX,
+    interval:            0.5,
+    max_interval:        CallProfiles::RETRY_MAX_INTERVAL,
+    backoff_factor:      2,
+    interval_randomness: 0.5,
+    methods:             [],
+    retry_if:            RETRY_TIMEOUT_GUARD
+  }.freeze
+
+  def self.retry_options(retry_statuses:) = BASE_RETRY_OPTIONS.merge(retry_statuses: retry_statuses).freeze
 
   DIFFICULTY_ASSESSMENT_GRACE_SECONDS = 5
 
@@ -364,7 +379,7 @@ class AiService
 
   def long_running?(request) = request.read_timeout > CallProfiles::READ_TIMEOUT
 
-  # Subclasses supply API_URL and the hooks below; read_result returns text, token and cache counts, model, truncated and refusal.
+  # Subclasses supply API_URL and the hooks below; build_connection returns a Faraday::Connection, read_result text, token and cache counts, model, truncated and refusal.
   def request_body(_request)
     raise NotImplementedError, "#{self.class} must implement #request_body"
   end
@@ -381,9 +396,19 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #raise_for_status"
   end
 
-  # Subclasses must implement: returns a configured Faraday::Connection.
   def build_connection
     raise NotImplementedError, "#{self.class} must implement #build_connection"
+  end
+
+  def provider_connection(retry_options, headers)
+    Faraday.new do |f|
+      f.options.open_timeout = CallProfiles::OPEN_TIMEOUT
+      f.options.timeout      = CallProfiles::READ_TIMEOUT
+      headers.each { |name, value| f.headers[name] = value }
+      f.headers["content-type"] = "application/json"
+      f.request :retry, retry_options
+      f.adapter :net_http
+    end
   end
 
   def build_system_prompt(language = "ruby_rails") = GenerationPrompt.system_prompt(**LanguagePrompts.for(language).slice(:coach, :focus))

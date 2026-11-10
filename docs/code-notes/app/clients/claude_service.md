@@ -7,3 +7,9 @@ When the request carries `max_tokens`, thinking is turned off. A tight cap is sh
 ## `#read_result`
 
 A refusal is returned as data in the result hash rather than raised here. That lets `call_and_log` write the usage row first, because a refused request still charges its input tokens.
+
+## `RETRY_OPTIONS`
+
+Built from `AiService.retry_options`. Claude retries 529 (`overloaded_error`)
+as well as 429 and the 5xx gateway statuses the other providers retry, since
+Anthropic answers 529 when it is overloaded.

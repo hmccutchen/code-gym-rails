@@ -25,6 +25,20 @@ rescues catch it.
 A timeout on a long-running call is final: the provider has likely finished and
 billed the work, so a retry pays twice.
 
+## `BASE_RETRY_OPTIONS`, `.retry_options` and `#provider_connection`
+
+The three providers retry and connect the same way, so the shared part lives
+here once. `BASE_RETRY_OPTIONS` holds the backoff and the retry limits from
+`CallProfiles`, and `.retry_options(retry_statuses:)` adds the statuses a
+provider retries; each subclass keeps the result as its own `RETRY_OPTIONS`.
+`methods: []` sends every retry decision through `retry_if`
+(`RETRY_TIMEOUT_GUARD`), since faraday-retry retries a listed method without
+asking `retry_if`. `#provider_connection(retry_options, headers)` builds the
+Faraday connection with the default timeouts from `CallProfiles`, the
+subclass's auth headers, a JSON content type and that retry middleware. Each
+subclass's `#build_connection` calls it with its own `RETRY_OPTIONS` and
+headers.
+
 ## `MAX_GENERATED_CODE_LENGTH`
 
 Provider output is rendered into the page, so it is bounded at the boundary.

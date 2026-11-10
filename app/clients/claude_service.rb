@@ -1,6 +1,3 @@
-require "faraday"
-require "faraday/retry"
-
 # Design notes: docs/code-notes/app/clients/claude_service.md
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
@@ -34,17 +31,7 @@ class ClaudeService < AiService
   # Must clear a full-day review plus default thinking, which max_tokens caps too; 2500 once truncated reviews mid-string.
   MAX_TOKENS = 16_000
 
-  # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
-  RETRY_OPTIONS = {
-    max:                 CallProfiles::RETRY_MAX,
-    interval:            0.5,
-    max_interval:        CallProfiles::RETRY_MAX_INTERVAL,
-    backoff_factor:      2,
-    interval_randomness: 0.5,
-    methods:             [],
-    retry_if:            AiService::RETRY_TIMEOUT_GUARD,
-    retry_statuses:      [ 429, 500, 502, 503, 504, 529 ]
-  }.freeze
+  RETRY_OPTIONS = retry_options(retry_statuses: [ 429, 500, 502, 503, 504, 529 ])
 
   private
 
@@ -146,15 +133,5 @@ class ClaudeService < AiService
     category.is_a?(String) ? category : "unspecified"
   end
 
-  def build_connection
-    Faraday.new do |f|
-      f.options.open_timeout         = CallProfiles::OPEN_TIMEOUT
-      f.options.timeout              = CallProfiles::READ_TIMEOUT
-      f.headers["x-api-key"]         = @api_key
-      f.headers["anthropic-version"] = "2023-06-01"
-      f.headers["content-type"]      = "application/json"
-      f.request :retry, RETRY_OPTIONS
-      f.adapter :net_http
-    end
-  end
+  def build_connection = provider_connection(RETRY_OPTIONS, "x-api-key" => @api_key, "anthropic-version" => "2023-06-01")
 end

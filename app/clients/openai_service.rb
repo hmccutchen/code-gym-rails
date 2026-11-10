@@ -1,6 +1,3 @@
-require "faraday"
-require "faraday/retry"
-
 class OpenaiService < AiService
   API_URL = "https://api.openai.com/v1/responses"
 
@@ -22,17 +19,8 @@ class OpenaiService < AiService
 
   JSON_MODE_REQUEST = "Reply with a JSON object matching this JSON Schema:".freeze
 
-  # `methods: []` routes every retry decision through retry_if; an exhausted-quota 429 is retried too, as statuses match.
-  RETRY_OPTIONS = {
-    max:                 CallProfiles::RETRY_MAX,
-    interval:            0.5,
-    max_interval:        CallProfiles::RETRY_MAX_INTERVAL,
-    backoff_factor:      2,
-    interval_randomness: 0.5,
-    methods:             [],
-    retry_if:            AiService::RETRY_TIMEOUT_GUARD,
-    retry_statuses:      [ 429, 500, 502, 503, 504 ]
-  }.freeze
+  # An exhausted-quota 429 is retried like any other, since retry_statuses match on status alone.
+  RETRY_OPTIONS = retry_options(retry_statuses: [ 429, 500, 502, 503, 504 ])
 
   private
 
@@ -148,14 +136,5 @@ class OpenaiService < AiService
     "unspecified" if content.any? { |part| part["type"] == "refusal" }
   end
 
-  def build_connection
-    Faraday.new do |f|
-      f.options.open_timeout     = CallProfiles::OPEN_TIMEOUT
-      f.options.timeout          = CallProfiles::READ_TIMEOUT
-      f.headers["authorization"] = "Bearer #{@api_key}"
-      f.headers["content-type"]  = "application/json"
-      f.request :retry, RETRY_OPTIONS
-      f.adapter :net_http
-    end
-  end
+  def build_connection = provider_connection(RETRY_OPTIONS, "authorization" => "Bearer #{@api_key}")
 end
