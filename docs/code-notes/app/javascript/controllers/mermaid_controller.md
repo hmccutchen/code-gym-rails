@@ -38,8 +38,9 @@ Mermaid release cannot change behavior without a deliberate bump, and the
 controller imports the bare name. The pin is what lets `bin/importmap audit`
 see the package. `preload: false` keeps it off every page's `modulepreload`
 links, so it loads only on a page with a diagram. The content security policy
-builds its jsDelivr directory from the same pin. The import still carries no
-Subresource Integrity hash.
+lists the package's jsDelivr directory explicitly, so a version bump edits both
+the pin and the policy's list; `spec/requests/content_security_policy_spec.rb`
+fails if they disagree. The import still carries no Subresource Integrity hash.
 
 ## Known limit
 
