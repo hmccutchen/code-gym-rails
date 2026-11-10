@@ -19,7 +19,7 @@ Record registers three hooks on that class in
 - `QueryCache::ExecutorHooks` turns the query cache on for the thread and
   clears it when the work ends.
 - `ConnectionPool::ExecutorHooks` releases the thread's connection when the
-  work ends, unless a transaction is still open on it.
+  work ends, unless a joinable transaction is still open on it.
 - `AsynchronousQueriesTracker` tracks `load_async` queries.
 
 Without the wrap, a connection the work took with `lease_connection` (or the
@@ -57,7 +57,11 @@ it yielded the parent's share only to loads, never to an unload.
 `ActiveSupport::Executor` itself carries the Active Record hooks without the
 interlock hook or the `active_support.reset_execution_context` hooks
 (`ExecutionContext` and `CurrentAttributes`, which the app does not use). The
-parent's share already keeps code from unloading while its threads run.
+parent's share keeps code from unloading only while the parent waits on its
+threads. A thread it stops waiting for, such as `ReviewGrading`'s difficulty
+assessment after its grace period, runs on without a share once the request
+ends, so in development a reload in that window can unload code under it. The
+plain thread before #754 had the same exposure.
 
 ### What the wrap changes
 
@@ -65,6 +69,9 @@ parent's share already keeps code from unloading while its threads run.
   or job that started it. A thread's cache clears on its own writes, not on
   another thread's, so a thread that reads the same row twice with no write
   between sees the first answer. Locked reads and `reload` bypass the cache.
+  The trial cap check stays fresh: every `call_and_log` writes a usage row,
+  and that write clears the thread's cache before its next call checks the
+  count.
 - `ExecutionWrapper.wrap` reports an exception that escapes the work to
   `Rails.error` as unhandled (`source: "application.active_support"`) before
   it re-raises, and the caller still gets it from `Thread#value`. The app
