@@ -61,7 +61,11 @@ These points about how the gem works shaped the file:
   except one file". A class in several components is judged under all of
   them, which broke the preset's controller allowlist. `AiProvider` has a
   component of its own for the same reason: excluded from `models` and put in
-  nothing, it escaped every ban.
+  nothing, it escaped every ban. Leaving `models` also drops the preset's
+  rules for it, so `Archspec.rb` states them again for the registry: no
+  controllers or helpers, and no bare controller call, read from the preset's
+  own `ArchSpec::Architectures::CONTROLLER_METHODS` so the two lists can't
+  drift apart.
 - A deliberate exception is an `archspec:disable-next-line` note on the line
   it excuses: the two `Thread.new` calls in `CallerZoneThread` and
   `CodeFormat::Javascript`, and the one `ExerciseDraft.call` in `AiService`.

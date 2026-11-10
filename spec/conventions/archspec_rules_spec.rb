@@ -19,6 +19,9 @@ RSpec.describe "Archspec.rb rules" do
         def self.planted_thread = Thread.new { 1 }
         def self.planted_reach(record) = record.send(:secret)
         def self.planted_side_effect = ResponseReview
+        def self.planted_http = ApplicationController
+        def self.planted_view = ApplicationHelper
+        def self.planted_request = params
       end
     RUBY
     "app/prompts/planted_prompt.rb" => "class PlantedPrompt\n  def self.provider = ClaudeService\nend\n",
@@ -39,7 +42,10 @@ RSpec.describe "Archspec.rb rules" do
     [ "app/helpers/planted_helper.rb", "helpers must not depend on services" ],
     [ "app/jobs/planted_job.rb", "jobs must not depend on controllers" ],
     [ "app/mailers/planted_mailer.rb", "mailers must not depend on services" ],
+    [ "app/models/ai_provider.rb", "provider_registry must not call #params" ],
     [ "app/models/ai_provider.rb", "provider_registry must not call #send" ],
+    [ "app/models/ai_provider.rb", "provider_registry must not depend on controllers" ],
+    [ "app/models/ai_provider.rb", "provider_registry must not depend on helpers" ],
     [ "app/models/ai_provider.rb", "provider_registry must not depend on services" ],
     [ "app/models/ai_provider.rb", "provider_registry must not reference Thread" ],
     [ "app/models/planted_model.rb", "models must not call #call" ],

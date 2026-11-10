@@ -16,8 +16,10 @@ controllers.can_only_use :prompts, :clients, :forms, :provider_registry
 
 models.cannot_use :services, :clients, :jobs, :forms, :mailers,
   because: "a domain decision never starts a side effect or a provider call; AiProvider, the provider registry, is the one model that names provider classes"
-provider_registry.cannot_use :services, :jobs, :forms, :mailers,
+provider_registry.cannot_use :controllers, :helpers, :services, :jobs, :forms, :mailers,
   because: "the provider registry names provider classes and nothing else outside the models"
+provider_registry.cannot_call(*ArchSpec::Architectures::CONTROLLER_METHODS, receiver: :none,
+  because: "the provider registry, like every model, never reaches the controller's request or response")
 prompts.cannot_use :services, :clients, :controllers, :jobs, :helpers, :forms, :mailers,
   because: "a prompt class is pure text built from values"
 clients.cannot_use :controllers, :helpers, :jobs,
