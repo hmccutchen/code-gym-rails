@@ -110,6 +110,30 @@ RSpec.describe "Conventions held over app/ source" do
     expect(level_writes("rungs(skill_level: user.skill_level); User.new(skill_level: 'junior')").size).to eq(0)
   end
 
+  def draft_provider_reaches(source)
+    found = []
+    visit = lambda do |node|
+      found << node.location.start_line if node.is_a?(Prism::CallNode) && node.name == :exercise_draft_provider
+      node.compact_child_nodes.each(&visit)
+    end
+    visit.call(Prism.parse(source).value)
+    found
+  end
+
+  it "reaches the draft provider only inside AiService, which judges every draft, including from a provider subclass" do
+    offenders = Dir[Rails.root.join("app/**/*.rb")].sort.reject { |path| relative(path) == "app/clients/ai_service.rb" }.flat_map do |path|
+      draft_provider_reaches(File.read(path)).map { |line| "#{relative(path)}:#{line}" }
+    end
+
+    expect(offenders).to be_empty, "the draft provider reached outside AiService: #{offenders.join(', ')}"
+  end
+
+  it "finds a bare, self or foreign reach for the draft provider, and not a mention in a comment or string" do
+    expect(draft_provider_reaches("class Sub < AiService\n  def go = exercise_draft_provider\nend")).to eq([ 2 ])
+    expect(draft_provider_reaches("self.exercise_draft_provider; service.exercise_draft_provider")).to eq([ 1, 1 ])
+    expect(draft_provider_reaches("# exercise_draft_provider\n\"exercise_draft_provider\"")).to eq([])
+  end
+
   it "sends every page request through CodeGymRequest, the one place that calls fetch" do
     scripts = Dir[Rails.root.join("app/{javascript,assets/javascripts}/**/*.js")].sort
     offenders = scripts.reject { |path| relative(path) == "app/javascript/code_gym/request.js" }.select do |path|

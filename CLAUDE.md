@@ -279,7 +279,9 @@ rather than only catching it afterward:
     ("Domain data stays off provider classes") says which one may
     (`Archspec.rb`).
 - `Archspec.rb` holds the layer rules and the `Thread`, `Faraday`, `send` and
-  draft bans, each with its reason, and `archspec check` fails on a break.
+  `ExerciseDraft.call` bans, each with its reason, and `archspec check` fails
+  on a break. `archspec_rules_spec` plants a break in each component, and
+  fails on a folder under `app/` with no component.
   A deliberate exception is a one-line
   `# archspec:disable-next-line <rule> -- <reason>` on the line it excuses,
   and it counts toward the file's five comments.

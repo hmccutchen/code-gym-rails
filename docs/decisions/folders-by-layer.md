@@ -34,35 +34,63 @@ development group.
 archspec's `architecture :rails` preset, as its getting-started guide
 recommends. The preset keeps models and services off controllers and helpers,
 and off a bare `render`, `params`, `session`, `cookies` or `flash`. The file
-then adds the three folders the preset doesn't know (`prompts`, `clients`,
-`forms`), lets controllers use them, and keeps models, prompts and clients off
-the folders above them. Every folder is also banned from `Thread`, from
-`send`, and from taking a draft (`ExerciseDraft.call`,
-`#exercise_draft_provider`), and every folder outside `app/clients` is
-banned from `Faraday`. These bans replaced four hand-written Prism scans in
-`spec/conventions/app_source_spec.rb`.
+then adds the folders the preset doesn't know (`prompts`, `clients`, `forms`,
+and `provider_registry`, which holds only `AiProvider`), lets controllers use
+them, and keeps models, the registry, prompts, clients, jobs, mailers, forms
+and helpers off the folders above them. A helper may read a client, because
+`PushHelper` reads the public push key from `WebPushCredentials`.
 
-Three points about how the gem works shaped the file:
+Every component is also banned from `Thread`, from `send` and from
+`ExerciseDraft.call`, and every component outside `app/clients` is banned
+from `Faraday`. These replaced five checks in
+`spec/conventions/app_source_spec.rb`: the thread, `send` and draft Prism
+scans, the Faraday text match, and the scan for models naming a provider
+class, which `models.cannot_use :clients` now covers. The new bans are
+stricter than the scans: `Thread.current` fails as `Thread.new` did, and so
+does a `send` whose argument is not a symbol.
+
+`spec/conventions/archspec_rules_spec.rb` copies `app/` and `Archspec.rb`
+into a temporary folder, plants a break in each component, and fails unless
+archspec reports each one and nothing else. It also fails when a folder under
+`app/` holds Ruby files and has no component, since a file in no component
+escapes every ban.
+
+These points about how the gem works shaped the file:
 
 - A component is a real folder, never a catch-all such as "all of `app/`
   except one file". A class in several components is judged under all of
-  them, which broke the preset's controller allowlist.
+  them, which broke the preset's controller allowlist. `AiProvider` has a
+  component of its own for the same reason: excluded from `models` and put in
+  nothing, it escaped every ban.
 - A deliberate exception is an `archspec:disable-next-line` note on the line
   it excuses: the two `Thread.new` calls in `CallerZoneThread` and
   `CodeFormat::Javascript`, and the one `ExerciseDraft.call` in `AiService`.
-  A note excuses one line, so a second thread in an exempt file fails, which
-  the old spec needed an exact per-file count to catch. Each note counts
-  toward the file's five comments.
-- Archspec merges every constant ban on a component into one rule, and every
-  call ban into another, and a rule can carry only one reason, so each
-  merged rule's reason covers all its bans.
+  A note excuses one line, so a second thread on another line of an exempt
+  file fails, which the old spec needed an exact per-file count to catch. A
+  note names a rule, not a call, so the one on `AiService`'s draft line would
+  also excuse a `send` added to that same line. Each note counts toward the
+  file's five comments.
+- Archspec merges the constant bans on a component into one rule, and the
+  call bans that share a receiver into another. A rule carries one reason, so
+  the `Thread` and `Faraday` ban shares its reason, while the `send` ban and
+  the `ExerciseDraft` ban, whose receivers differ, keep their own.
+- A bare call to a method a class defines or inherits is never flagged. A
+  provider subclass calling `exercise_draft_provider` on itself would pass,
+  so that one check stays a spec in `app_source_spec`, which fails on the
+  name anywhere in `app/` outside `ai_service.rb`.
 
-Some convention specs stay, because archspec sees only method calls and named
-constants: a model taking `session` as an argument, a level write spelled as
-an `update!` key, a `fetch` in JavaScript, and the isolation specs' word
-matches such as `where(trial_ends_at: …)`. The preset's loop check
-(`no_cycles`) is left off, because `PracticeGeneration`, a service, includes
-`RecordsJudgeSolves` from `app/jobs/concerns`.
+Other convention specs stay, because archspec sees only method calls and
+named constants: a model taking `session` as an argument, a level write
+spelled as an `update!` key, a `fetch` in JavaScript, and the isolation specs'
+word matches such as `where(trial_ends_at: …)`.
+
+The `:rails` preset has no loop check, and `Archspec.rb` adds none.
+`no_cycles` would fail twice today. Among the preset's folders, jobs and
+services depend on each other, because `PracticeGeneration`, a service,
+includes `RecordsJudgeSolves` from `app/jobs/concerns`. Across all
+components, clients and services do too, because `AiService` hands drafts and
+reviews to `ExerciseDraft`, `JudgedGeneration` and `ReviewGrading` (the
+"provider calls as callables" pattern), and those services call `AiService`.
 
 Archspec reads constants statically. `CodeFormat`, a model, picks its
 formatter by name (`"CodeFormat::Javascript".constantize`), so that
