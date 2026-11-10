@@ -5,7 +5,7 @@ module CommentCheck
   module Scanners
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
-    YAML_BLOCK_SCALAR = /(?:\A|\s)[|>][-+1-9]{0,2}[ \t]*(?:#.*)?\z/
+    YAML_BLOCK_SCALAR = /(?:\A[ \t]*|:[ \t]+|(?:\A|[ \t])-[ \t]+)[|>][-+1-9]{0,2}[ \t]*(?:#.*)?\z/
     SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function

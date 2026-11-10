@@ -157,6 +157,12 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:yaml_comments, "run: | # shell\n  echo hi\n")).to eq([ "shell" ])
   end
 
+  it "reads a plain value that ends in > or | as text, so a comment indented below it still counts" do
+    text = "title: a > b\nlist: x |\n  # real one\nnested:\n  # real two\n  key: 1\n"
+
+    expect(comment_bodies(:yaml_comments, text)).to eq([ "real one", "real two" ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end
