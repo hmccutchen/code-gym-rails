@@ -31,18 +31,27 @@ RSpec.describe "Archspec.rb rules" do
     "app/helpers/planted_helper.rb" => "module PlantedHelper\n  def planted = ResponseReview\nend\n"
   }.freeze
 
-  EXPECTED = {
-    "app/models/planted_model.rb" => %w[constants.forbid methods.forbid dependencies.forbid],
-    "app/models/ai_provider.rb" => %w[constants.forbid methods.forbid dependencies.forbid],
-    "app/prompts/planted_prompt.rb" => %w[dependencies.forbid],
-    "app/clients/planted_client.rb" => %w[constants.forbid dependencies.forbid],
-    "app/services/planted_service.rb" => %w[constants.forbid],
-    "app/controllers/planted_controller.rb" => %w[constants.forbid],
-    "app/jobs/planted_job.rb" => %w[dependencies.forbid],
-    "app/mailers/planted_mailer.rb" => %w[dependencies.forbid],
-    "app/forms/planted_form.rb" => %w[dependencies.forbid],
-    "app/helpers/planted_helper.rb" => %w[dependencies.forbid]
-  }.freeze
+  EXPECTED = [
+    [ "app/clients/planted_client.rb", "clients must not depend on controllers" ],
+    [ "app/clients/planted_client.rb", "clients must not reference Thread" ],
+    [ "app/controllers/planted_controller.rb", "controllers must not reference Thread" ],
+    [ "app/forms/planted_form.rb", "forms must not depend on services" ],
+    [ "app/helpers/planted_helper.rb", "helpers must not depend on services" ],
+    [ "app/jobs/planted_job.rb", "jobs must not depend on controllers" ],
+    [ "app/mailers/planted_mailer.rb", "mailers must not depend on services" ],
+    [ "app/models/ai_provider.rb", "provider_registry must not call #send" ],
+    [ "app/models/ai_provider.rb", "provider_registry must not depend on services" ],
+    [ "app/models/ai_provider.rb", "provider_registry must not reference Thread" ],
+    [ "app/models/planted_model.rb", "models must not call #call" ],
+    [ "app/models/planted_model.rb", "models must not call #send" ],
+    [ "app/models/planted_model.rb", "models must not depend on clients" ],
+    [ "app/models/planted_model.rb", "models must not depend on jobs" ],
+    [ "app/models/planted_model.rb", "models must not depend on services" ],
+    [ "app/models/planted_model.rb", "models must not reference Faraday" ],
+    [ "app/models/planted_model.rb", "models must not reference Thread" ],
+    [ "app/prompts/planted_prompt.rb", "prompts must not depend on clients" ],
+    [ "app/services/planted_service.rb", "services must not reference Faraday" ]
+  ].freeze
 
   def violations_with_plants
     Dir.mktmpdir do |root|
@@ -57,10 +66,10 @@ RSpec.describe "Archspec.rb rules" do
     end
   end
 
-  it "reports each planted break, and nothing in the code that is already there" do
-    found = violations_with_plants.group_by { |violation| violation["path"] }.transform_values { |list| list.map { |v| v["rule"] }.uniq.sort }
+  it "reports each planted break by its own ban, and nothing in the code that is already there" do
+    found = violations_with_plants.map { |violation| [ violation["path"], violation["message"] ] }.uniq.sort
 
-    expect(found).to eq(EXPECTED.transform_values(&:sort))
+    expect(found).to eq(EXPECTED.sort)
   end
 
   it "puts every Ruby folder under app/ in a component, so no folder escapes the bans" do
