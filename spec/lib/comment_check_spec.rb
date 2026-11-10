@@ -133,6 +133,30 @@ RSpec.describe CommentCheck do
     )
   end
 
+  def comment_bodies(scanner, text) = described_class::Scanners.public_send(scanner, text).map(&:body)
+
+  it "does not read a JavaScript regex literal as a comment" do
+    text = "const scheme = /https?:\\/\\//;\nconst glob = /[/*]/g;\nconst quote = /[\"']/;\nconst found = text.match(/\\/\\/+/) || [];\nrun();\n"
+
+    expect(comment_bodies(:js_comments, text)).to be_empty
+  end
+
+  it "still reads a comment after JavaScript division or a regex literal" do
+    text = "const half = total / 2; // halve it\nconst ratio = (a + b) / c / d; // ratio\nconst path = url.replace(/\\/+$/, \"\"); // trim\n"
+
+    expect(comment_bodies(:js_comments, text)).to eq([ "halve it", "ratio", "trim" ])
+  end
+
+  it "does not read a hash line inside a YAML block scalar as a comment" do
+    text = "# Runs the checks.\nrun: |\n  # not a comment\n  echo hi\n\n  # nor this\nnote: >-\n  # folded text\nsteps:\n  - |\n    # list item text\n  - plain # real\nkey: 1\n"
+
+    expect(comment_bodies(:yaml_comments, text)).to eq([ "Runs the checks.", "real" ])
+  end
+
+  it "counts a comment on a YAML block scalar's indicator line" do
+    expect(comment_bodies(:yaml_comments, "run: | # shell\n  echo hi\n")).to eq([ "shell" ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end

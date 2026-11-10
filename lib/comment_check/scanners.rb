@@ -5,6 +5,7 @@ module CommentCheck
   module Scanners
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
+    YAML_BLOCK_SCALAR = /(?:\A|\s)[|>][-+1-9]{0,2}[ \t]*(?:#.*)?\z/
     SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function
@@ -29,7 +30,22 @@ module CommentCheck
     end
 
     def yaml_comments(text)
-      LineScan.line_comments(text, "#", require_space: true)
+      LineScan.line_comments(without_yaml_block_scalars(text), "#", require_space: true)
+    end
+
+    def without_yaml_block_scalars(text)
+      parent_indent = nil
+      text.lines.map do |line|
+        indent = line[/\A */].length
+        next line.gsub(/[^\n]/, " ") if parent_indent && (line.strip.empty? || indent > parent_indent)
+
+        parent_indent = (indent if yaml_block_start?(line))
+        line
+      end.join
+    end
+
+    def yaml_block_start?(line)
+      !line.lstrip.start_with?("#") && line.chomp.match?(YAML_BLOCK_SCALAR)
     end
 
     def python_comments(text)

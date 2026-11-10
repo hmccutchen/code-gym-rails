@@ -3,6 +3,9 @@ require_relative "located"
 module CommentCheck
   module CStyleScan
     QUOTES = [ "\"", "'", "`" ].freeze
+    REGEX_PRECEDERS = "(,=:[!&|?{};+-*%<>~^".chars.freeze
+    REGEX_KEYWORDS = /\b(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)\z/
+    LOOKBEHIND = 32
 
     module_function
 
@@ -21,10 +24,31 @@ module CommentCheck
           found << Located.comment(text, index, stop, offset)
           index = stop
           next
+        elsif line_comments && text[index] == "/" && (stop = regex_end(text, index))
+          index = stop
+          next
         end
         index += 1
       end
       found
+    end
+
+    def regex_end(text, start)
+      return unless regex_start?(text, start)
+
+      in_class = false
+      index = start + 1
+      while (char = text[index]) && char != "\n"
+        return index + 1 if char == "/" && !in_class
+
+        in_class = char == "[" || (in_class && char != "]")
+        index += char == "\\" ? 2 : 1
+      end
+    end
+
+    def regex_start?(text, start)
+      before = text[[ start - LOOKBEHIND, 0 ].max...start].rstrip
+      before.empty? || REGEX_PRECEDERS.include?(before[-1]) || before.match?(REGEX_KEYWORDS)
     end
 
     def comment_end(text, start)
