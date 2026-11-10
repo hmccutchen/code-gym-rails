@@ -227,8 +227,9 @@ are the standing exceptions).
 **Does AI-calling code bypass `AiService.for`?** BLOCKING. Shared logic lives
 in `ai_service.rb`, the prompt classes it calls (`app/prompts/*_prompt.rb`)
 and `ProviderError`; subclasses own only provider-specific HTTP and auth. A controller building its own Faraday
-request is a violation, and `spec/conventions/app_source_spec.rb` fails on
-Faraday anywhere in `app/` outside `app/clients`.
+request is a violation, and `Archspec.rb` fails on Faraday in any of its
+components outside `app/clients`; `archspec_rules_spec` fails on a folder
+under `app/` with no component.
 
 **Can a concept tag bypass normalization against the closed vocabulary?**
 BLOCKING. `RAILS_CONCEPTS`, `JS_CONCEPTS`, and the rest are deliberately closed
@@ -246,12 +247,12 @@ mailer settings get extra scrutiny and must not be bundled into an unrelated
 feature PR.
 
 **Does new code reach a private method through `send`, or start a thread with
-`Thread.new`?** BLOCKING. `spec/conventions/app_source_spec.rb` fails on both,
-so the finding is usually a red build; say what to do instead. A module that
-needs a provider call takes it as a callable on its `Provider` struct, the way
-`ReviewGrading` and `JudgedGeneration` do, and a thread starts through
-`CallerZoneThread.start` so it keeps the caller's time zone. A new exemption
-in that spec needs a stated reason and the exact number of threads it covers.
+`Thread.new`?** BLOCKING. `Archspec.rb` fails on both, so the finding is
+usually a red build; say what to do instead. A module that needs a provider
+call takes it as a callable on its `Provider` struct, the way `ReviewGrading`
+and `JudgedGeneration` do, and a thread starts through `CallerZoneThread.start`
+so it keeps the caller's time zone. A new exemption is an
+`archspec:disable-next-line` note on the one line it excuses, with its reason.
 
 **Is a claim released without its own token, or written under without being
 checked again?** BLOCKING. A `Claimable` claim is released with the token

@@ -38,6 +38,8 @@ RSpec.describe ForcedConceptDrafts do
   describe "the week's featured concept" do
     include MetConceptHelpers
 
+    around { |example| travel_to(Time.utc(2026, 11, 9, 3)) { Time.use_zone(user.effective_time_zone) { example.run } } }
+
     it "plans and builds ladders with this week's stored featured concept, as production does" do
       submit_set_showing(user, "n_plus_one", date: Date.current - 3)
       user.featured_concepts.create!(week_of: FeaturedConcept.week_of(Date.current), concept: "n_plus_one", bucket: "ruby_rails")
