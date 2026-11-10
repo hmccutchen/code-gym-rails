@@ -38,6 +38,17 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
     end
   end
 
+  it "writes the day a trial ended without padding it" do
+    travel_to Time.utc(2026, 9, 26, 14)
+    early_user = create_trial_user(provider: "fake", days: 7, time_zone: "America/New_York")
+    travel_to(early_user.trial_ends_at + 1.hour)
+    login_as(early_user)
+
+    get root_path
+
+    expect(response.body).to include("Your trial ended on October 2, 2026, so no set was generated today.")
+  end
+
   describe "once the trial has ended" do
     # A session from the trial's first week would have expired by then.
     before do

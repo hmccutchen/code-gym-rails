@@ -15,7 +15,10 @@ The placeholders mean:
 
 Pages and emails write a date with `l(value, format: :name)`, so each shape is
 set once under `date.formats` or `time.formats`. A `Date` reads `date.formats`
-and a `Time` reads `time.formats`, so a shape used for both is listed in both.
+and a `Time` reads `time.formats`. A call site that shows only a day or a month
+of a `Time` passes `.to_date` first, so the day shapes (`month_day`, `month`,
+`short_month_day`) live only under `date.formats` and no shape is listed twice.
+`time.formats` keeps only `long`, which shows the hour.
 Rails' own English formats pad the day (`November 03, 2026`); `long` here
 overrides them with `%-d`, as every other format does.
 

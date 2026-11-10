@@ -5,12 +5,11 @@ en:
       weekday: "%A, %B %-d"
       weekday_with_year: "%A, %B %-d, %Y"
       month_day: "%B %-d"
+      month: "%B"
+      short_month_day: "%b %-d"
   time:
     formats:
       long: "%B %-d, %Y %H:%M"
-      month: "%B"
-      month_day: "%B %-d"
-      short_month_day: "%b %-d"
   protected_practice:
     unavailable: "Practice information is unavailable. Your saved settings have not changed."
     welcome:

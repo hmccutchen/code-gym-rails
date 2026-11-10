@@ -15,6 +15,18 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include("Log out")
     end
 
+    it "says since when the authenticator has been on, with the day unpadded" do
+      user = create_user_with_key(email: "dev@example.com")
+      secret, _recovery_codes = enroll_second_factor(user)
+      user.update!(two_factor_enabled_at: Time.utc(2026, 10, 3, 12))
+      login_as(user)
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+
+      get account_path
+
+      expect(response.body).to include("On since October 3, 2026.")
+    end
+
     it "links the shared phone stylesheet" do
       login_as(create_user_with_key(email: "dev@example.com"))
 
