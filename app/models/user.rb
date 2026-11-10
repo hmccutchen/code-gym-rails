@@ -44,8 +44,7 @@ class User < ApplicationRecord
 
   normalizes :display_preferences, with: ->(values) { DisplayPreferences.sparse(values) }
   normalizes :api_keys, with: ->(keys) { keys.presence }
-
-  before_save { email.downcase! }
+  normalizes :email, with: ->(email) { email.strip.downcase }
 
   before_save :bump_section_kind_preferences_version, if: -> { section_kind_settings.changed? }
 
@@ -67,7 +66,7 @@ class User < ApplicationRecord
   def self.signed_in(user_id) = active.find_by(id: user_id)
 
   def self.login_pending?(email:, requested_at:)
-    sent_at = active.find_by(email: email.to_s.strip.downcase)&.login_code_sent_at
+    sent_at = active.find_by(email: email.to_s)&.login_code_sent_at
     [ requested_at, sent_at ].compact.max >= LOGIN_CODE_EXPIRY.ago
   end
 
@@ -83,7 +82,7 @@ class User < ApplicationRecord
 
   # Under a row lock: unlocked, parallel posts of one code each redeem it (spec/models/login_code_concurrency_spec.rb).
   def self.authenticate_login_code(email:, code:)
-    user = active.find_by(email: email.to_s.strip.downcase)
+    user = active.find_by(email: email.to_s)
     return nil unless user
 
     user.with_lock do

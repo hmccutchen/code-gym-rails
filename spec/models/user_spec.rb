@@ -23,6 +23,16 @@ RSpec.describe User, type: :model do
       expect(user.reload.email).to eq("mixed@example.com")
     end
 
+    it "strips surrounding spaces from email before validating it" do
+      user = User.create!(email: " A@B.com ")
+      expect(user.reload.email).to eq("a@b.com")
+    end
+
+    it "finds a user by an email typed with spaces and capitals" do
+      user = create_user(email: "dev@example.com")
+      expect(User.find_by(email: " DEV@Example.com ")).to eq(user)
+    end
+
     it "allows a nil provider" do
       user = User.new(email: "dev@example.com", provider: nil)
       expect(user).to be_valid

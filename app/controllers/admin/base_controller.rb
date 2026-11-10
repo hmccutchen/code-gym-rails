@@ -12,7 +12,7 @@ module Admin
     end
 
     def admin?
-      admin_emails.include?(current_user.email.to_s.downcase)
+      admin_emails.include?(current_user.email)
     end
 
     def admin_emails

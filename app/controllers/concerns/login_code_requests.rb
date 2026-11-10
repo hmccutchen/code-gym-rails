@@ -23,9 +23,9 @@ module LoginCodeRequests
 
   private
 
-  # The one normalization rule, so the address limit's `by:` and the request itself can't drift apart.
+  # User's own rule, so the address limit's `by:` key and the session hold the address as stored.
   def normalized_email
-    params[:email].to_s.strip.downcase
+    User.normalize_value_for(:email, params[:email].to_s)
   end
 
   # `active` only: an anonymized row's email was rewritten, so this creates a fresh account instead.
