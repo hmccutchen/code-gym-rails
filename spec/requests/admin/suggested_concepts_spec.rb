@@ -17,6 +17,15 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       expect(flash[:alert]).to eq("Not authorized.")
     end
 
+    it "grants admin when the ADMIN_EMAILS entry has surrounding spaces and capitals" do
+      ENV["ADMIN_EMAILS"] = "member@example.com,  Admin@Example.COM "
+      login_as(admin)
+
+      get admin_suggested_concepts_path
+
+      expect(response).to have_http_status(:ok)
+    end
+
     it "lists pending suggestions ordered by occurrences desc, for an admin" do
       login_as(admin)
       low  = SuggestedConcept.record!(language: "ruby_rails", name: "low_freq")

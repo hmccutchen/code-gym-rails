@@ -16,7 +16,7 @@ module Admin
     end
 
     def admin_emails
-      ENV.fetch("ADMIN_EMAILS", "").split(",").map { |e| e.strip.downcase }
+      ENV.fetch("ADMIN_EMAILS", "").split(",").map { |e| User.normalize_value_for(:email, e) }
     end
   end
 end
