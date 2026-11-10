@@ -30,6 +30,9 @@ says what a deviation from one requires.
   define the `API_URL` it posts to, keep a private `route_for`, and own the model each purpose routes to
   (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). A subclass overrides
   `long_running?` only when its retry rule differs, as `OpenaiService` does.
+  A subclass's `build_connection` passes its own retry statuses and headers to
+  `AiService.retry_options` and `#provider_connection`, which hold the shared
+  timeouts and retry rule.
   Adding a provider is adding a subclass and listing it in `AiProvider.all`,
   the closed registry used by dispatch, key detection and user validation.
   Each subclass owns its `provider_key`, `key_pattern` and any environment

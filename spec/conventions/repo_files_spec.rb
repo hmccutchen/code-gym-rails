@@ -158,6 +158,24 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(unchecked).to be_empty, "files under bin/ that neither RuboCop nor bin/comment-check reads:\n#{unchecked.join("\n")}"
   end
 
+  def rubocop_excludes(config_path)
+    root = "#{Rails.root}/"
+    RuboCop::ConfigLoader.configuration_from_file(config_path).for_all_cops["Exclude"].map { |pattern| pattern.to_s.delete_prefix(root) }
+  end
+
+  def inherited_rubocop_excludes
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, ".rubocop.yml"), "inherit_gem: { rubocop-rails-omakase: rubocop.yml }\n")
+      Dir.chdir(Rails.root) { rubocop_excludes(File.join(dir, ".rubocop.yml")) }
+    end
+  end
+
+  it "restates every exclude RuboCop, rubocop-rails and omakase set, apart from bin/*, so a new upstream one is not lost" do
+    restated = Dir.chdir(Rails.root) { rubocop_excludes(Rails.root.join(".rubocop.yml").to_s) } - [ ".claude/**/*" ]
+
+    expect(restated).to match_array(inherited_rubocop_excludes - [ "bin/*" ])
+  end
+
   it "reads a file as listed by its full path and an unknown file as unlisted" do
     expect(mapped?("app/models/coverage_exception/history.rb")).to be(true)
     expect(mapped?("app/models/definitely_not_a_file_xyz.rb")).to be(false)
