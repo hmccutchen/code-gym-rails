@@ -14,9 +14,7 @@ module PngPixels
   def rows(png)
     image = ChunkyPNG::Image.from_blob(png)
     image.height.times.map do |y|
-      image.row(y).map do |pixel|
-        [ ChunkyPNG::Color.r(pixel), ChunkyPNG::Color.g(pixel), ChunkyPNG::Color.b(pixel), ChunkyPNG::Color.a(pixel) ]
-      end
+      image.row(y).map { |pixel| ChunkyPNG::Color.to_truecolor_alpha_bytes(pixel) }
     end
   end
 end
