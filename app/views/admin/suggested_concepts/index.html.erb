@@ -37,8 +37,8 @@
               <td><%= concept.display_name %></td>
               <td><%= concept.language %></td>
               <td><%= concept.occurrences %></td>
-              <td><%= concept.first_seen_at.strftime("%b %-d") %></td>
-              <td><%= concept.last_seen_at.strftime("%b %-d") %></td>
+              <td><%= l(concept.first_seen_at, format: :short_month_day) %></td>
+              <td><%= l(concept.last_seen_at, format: :short_month_day) %></td>
               <td>
                 <% if @referenced_keys.include?([ concept.language, concept.normalized_name ]) %>
                   <span class="has-reference"><%= t("admin.suggested_concepts.index.has_reference") %></span>

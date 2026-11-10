@@ -2,10 +2,10 @@
 <section class="card api-usage" aria-labelledby="api-usage-heading">
   <h2 id="api-usage-heading"><%= t("accounts.api_usage.heading") %></h2>
   <% if usage.providers.empty? %>
-    <p class="card-note"><%= t("accounts.api_usage.empty", since: since.strftime("%B %-d")) %></p>
+    <p class="card-note"><%= t("accounts.api_usage.empty", since: l(since, format: :month_day)) %></p>
   <% else %>
     <% if usage.priced? %>
-      <p class="card-note api-usage-label"><%= t("accounts.api_usage.spent_label", month: since.strftime("%B")) %></p>
+      <p class="card-note api-usage-label"><%= t("accounts.api_usage.spent_label", month: l(since, format: :month)) %></p>
       <p class="api-usage-total"><%= usage_dollars(usage.total) %></p>
     <% end %>
     <% if usage.projected %>

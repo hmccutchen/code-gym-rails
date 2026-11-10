@@ -52,6 +52,12 @@ RSpec.describe UserMailer, type: :mailer do
       expect(mail.body.encoded).to include("If you didn't do this")
     end
 
+    it "writes a day below ten without a leading zero" do
+      mail = described_class.second_factor_changed(user, "enabled", Time.utc(2026, 11, 3, 15, 5))
+
+      expect(mail.body.encoded).to include("November 3, 2026 10:05")
+    end
+
     it "has a sentence for each change" do
       expect(described_class.second_factor_changed(user, "disabled", changed_at).body.encoded).to include("turned off")
       expect(described_class.second_factor_changed(user, "recovery_codes", changed_at).body.encoded)

@@ -211,3 +211,16 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
     expect(response).to redirect_to(welcome_path)
   end
 end
+
+RSpec.describe "Trial dates", type: :request do
+  around { |example| travel_to(Time.utc(2026, 10, 27, 14)) { example.run } }
+
+  it "writes a day below ten without a leading zero" do
+    user = create_trial_user(provider: "fake", days: 7, cap: 12, time_zone: "America/New_York")
+    login_as(user)
+
+    get trial_path
+
+    expect(response.body).to include("Your trial runs until the end of November 2, 2026: 7 days left.")
+  end
+end
