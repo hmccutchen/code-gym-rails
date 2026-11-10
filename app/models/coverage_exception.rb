@@ -69,12 +69,7 @@ class CoverageException
   private_class_method :gap
 
   def self.weekdays_before(today, count)
-    date = today
-    while count.positive?
-      date = date.prev_day
-      count -= 1 if date.on_weekday?
-    end
-    date
+    count.times.reduce(today) { |date, _| date.prev_weekday }
   end
   private_class_method :weekdays_before
 end
