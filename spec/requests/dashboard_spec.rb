@@ -1689,7 +1689,8 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(response.body).to include("flowchart TD")
       expect(response.body).to include("mermaid")
       source = Rails.root.join("app/javascript/controllers/mermaid_controller.js").read
-      expect(source).to include("mermaid@11.17.2")
+      expect(source).to include('import("mermaid")')
+      expect(Rails.application.importmap.packages["mermaid"].path).to start_with("https://cdn.jsdelivr.net/npm/mermaid@")
       expect(source).to match(/securityLevel:\s*["']strict["']/)
 
       expect(response.body).to include('data-owns-details="1"')
@@ -1720,7 +1721,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(response.body).not_to include('class="mermaid-diagram"')
-      expect(response.body).not_to include("mermaid@11.17.2")
+      expect(response.body).not_to match(/<(?:script|link)[^>]+mermaid@/)
     end
 
     it "renders no disclosure, no container, and no script for an exercise generated before diagrams existed" do

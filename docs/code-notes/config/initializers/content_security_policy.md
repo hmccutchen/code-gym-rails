@@ -23,19 +23,30 @@ Three sources, and each is there for a reason.
 Propshaft serves them from this origin.
 
 Two package directories on `cdn.jsdelivr.net` cover the two dynamic imports:
-`mermaid_controller.js` loads `mermaid@11.17.2` and `parsons_controller.js`
-loads `sortablejs@1.15.6`. A dynamic `import()` is checked against the source
+`mermaid_controller.js` imports the `mermaid` pin and `parsons_controller.js`
+the `sortablejs` pin. A dynamic `import()` is checked against the source
 list, not against the nonce of the module that issued it, so the source has to
 be named outright.
+
+The versions are written once, in those pins in `config/importmap.rb`. The
+initializer builds each directory from a pin's URL, cut after its
+`npm/<package>@<version>/` segment. It draws its own `Importmap::Map` from that
+file, because `Rails.application.importmap` is still `nil` when
+`config/initializers` load: importmap-rails sets it in its engine's
+initializer, which runs after the application's. A pin to any other host adds
+no source, so it would be blocked until the initializer learns that host.
 
 They are directories, not the bare host. jsdelivr serves any npm package and
 any public GitHub repository (`/gh/<user>/<repo>/`), so allowing the whole
 host would let injected markup load a script anyone can publish, which is the
 attack the policy is there to stop. A source ending in `/` matches every path
 under it, which covers mermaid's own chunk imports from `dist/chunks/`.
-Bumping either version means changing the directory here too;
-`spec/requests/content_security_policy_spec.rb` reads every remote URL in the
-page scripts and fails when one falls outside the policy's sources.
+Bumping either version means changing its pin, and the directory follows.
+`spec/requests/content_security_policy_spec.rb` reads every remote URL in
+`config/importmap.rb` and the page scripts and fails when one falls outside
+the policy's sources. It also fails when a page script names a remote URL
+itself, since `bin/importmap audit` reads only `pin` lines and would never
+check that package.
 
 The nonce covers the three tag kinds `javascript_importmap_tags` emits — the
 inline importmap JSON, the `type="module"` entry tag, and every `modulepreload`

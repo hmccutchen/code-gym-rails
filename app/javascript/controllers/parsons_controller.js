@@ -1,7 +1,6 @@
 // Design notes: docs/code-notes/app/javascript/controllers/parsons_controller.md
 import { Controller } from "@hotwired/stimulus"
 
-const SORTABLE_URL = "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js"
 const DRAG_FALLBACK_MS = 3000
 
 export default class extends Controller {
@@ -29,7 +28,7 @@ export default class extends Controller {
 
   async loadSortable() {
     try {
-      const { default: Sortable } = await import(SORTABLE_URL)
+      const { default: Sortable } = await import("sortablejs")
       if (!this.element.isConnected) return
       // delayOnTouchOnly: a touch drag needs a brief hold so an ordinary swipe still scrolls the page.
       this.sortable = Sortable.create(this.listTarget, {

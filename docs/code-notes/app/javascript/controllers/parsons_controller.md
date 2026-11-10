@@ -26,12 +26,15 @@ drag and no arrows — unanswerable. `DRAG_FALLBACK_MS` injects the arrows after
 three seconds whenever `data-sortable-done` is still absent. Both paths end in
 `addControls`, which is idempotent through `data-parsons-controls`.
 
-## SortableJS is imported by absolute URL
+## SortableJS is imported through the importmap
 
-There is no `pin` for it in `config/importmap.rb`. A dynamic `import()` of the
-full jsDelivr URL needs no map entry, and leaving it out keeps the dependency
-visible at its one call site. The URL has to stay byte-identical: the system
-spec intercepts it by glob to drive both fallback branches.
+`config/importmap.rb` pins `sortablejs` to its jsDelivr URL with
+`preload: false`, and the controller imports the bare name. The pin is what
+lets `bin/importmap audit` see the package, since the audit reads only `pin`
+lines. `preload: false` keeps the module off every page's `modulepreload`
+links, so it still loads only when a Parsons problem connects. The resolved
+URL still has to match the system spec's `cdn.jsdelivr.net**sortable` glob,
+which intercepts it to drive both fallback branches.
 
 ## disconnect destroys Sortable
 

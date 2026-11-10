@@ -270,7 +270,8 @@ RSpec.describe "History", type: :request do
       expect(response.body).to include("flowchart TD")
       expect(response.body).to include(%(data-controller="glossary code-lines mermaid"))
       source = Rails.root.join("app/javascript/controllers/mermaid_controller.js").read
-      expect(source).to include("cdn.jsdelivr.net")
+      expect(source).to include('import("mermaid")')
+      expect(Rails.application.importmap.packages["mermaid"].path).to start_with("https://cdn.jsdelivr.net/npm/mermaid@")
       expect(source).to match(/securityLevel:\s*["']strict["']/)
 
       # Without data-owns-details, a failed render removes only the diagram div; the controller names the attribute.
@@ -294,7 +295,7 @@ RSpec.describe "History", type: :request do
       get history_path
 
       expect(response.body).not_to include('<div class="mermaid-diagram"')
-      expect(response.body).not_to include("mermaid@11.17.2")
+      expect(response.body).not_to match(/<(?:script|link)[^>]+mermaid@/)
     end
 
     it "mounts the review controllers once per reviewed section and the mermaid module exactly once" do

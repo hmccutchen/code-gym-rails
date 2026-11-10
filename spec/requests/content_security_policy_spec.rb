@@ -35,16 +35,26 @@ RSpec.describe "Content security policy", type: :request do
     end
   end
 
-  it "covers every remote module a script names with a package directory, never a whole host" do
+  def remote_urls_in(paths)
+    paths.flat_map { |path| File.read(path).scan(%r{https://[^"'`\s]+}) }
+  end
+
+  def page_script_paths
+    Dir[Rails.root.join("app/{javascript,assets/javascripts}/**/*.js")]
+  end
+
+  it "covers every remote module the importmap or a script names with a package directory, never a whole host" do
     sources = policy[/script-src [^;]+/].split.select { |source| source.start_with?("https://") }
-    remote_urls = Dir[Rails.root.join("app/{javascript,assets/javascripts}/**/*.js")].flat_map do |path|
-      File.read(path).scan(%r{https://[^"'`\s]+})
-    end
+    remote_urls = remote_urls_in([ Rails.root.join("config/importmap.rb"), *page_script_paths ])
 
     expect(remote_urls).not_to be_empty
     expect(sources).to all(match(%r{\Ahttps://[^/]+/.+/\z}))
     remote_urls.each do |url|
       expect(sources.any? { |source| url.start_with?(source) }).to be(true), "#{url} is outside every script-src source"
     end
+  end
+
+  it "pins every remote module in config/importmap.rb, the one file importmap audit reads" do
+    expect(remote_urls_in(page_script_paths)).to be_empty
   end
 end

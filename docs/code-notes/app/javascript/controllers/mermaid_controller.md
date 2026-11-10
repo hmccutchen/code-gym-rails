@@ -33,10 +33,13 @@ container is removed rather than left showing raw diagram source.
 
 ## The import is pinned exactly
 
-The version is pinned, not `@11`, so a Mermaid release cannot change behavior
-without a deliberate bump. SRI and CSP hardening for this CDN import is a known
-gap, deferred to its own PR, because enabling a CSP interacts with every
-inline script in the app.
+`config/importmap.rb` pins `mermaid` to an exact jsDelivr URL, not `@11`, so a
+Mermaid release cannot change behavior without a deliberate bump, and the
+controller imports the bare name. The pin is what lets `bin/importmap audit`
+see the package. `preload: false` keeps it off every page's `modulepreload`
+links, so it loads only on a page with a diagram. The content security policy
+builds its jsDelivr directory from the same pin. The import still carries no
+Subresource Integrity hash.
 
 ## Known limit
 
