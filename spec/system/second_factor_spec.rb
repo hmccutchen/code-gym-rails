@@ -37,7 +37,7 @@ RSpec.describe "Authenticator app", type: :system do
     secret, _codes = enroll_second_factor(user)
 
     visit login_path
-    fill_in "Work email *", with: user.email
+    fill_in "Email *", with: user.email
     click_button "Send code"
 
     expect(page).to have_current_path(second_factor_challenge_path)

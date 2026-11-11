@@ -88,8 +88,8 @@ en:
     new:
       page_title: "Log in"
       intro_html: "Daily dev exercises.<br>Enter your email to get a login code."
-      email_label: "Work email *"
-      email_placeholder: "you@company.com"
+      email_label: "Email *"
+      email_placeholder: "you@example.com"
       submit: "Send code"
     enter_code:
       page_title: "Enter your code"
@@ -287,13 +287,15 @@ en:
     setup:
       own_key:
         title: "Your account's setup has a problem Coding Gym can't work around, so %{outcome}."
-        next: "Check your provider, API key and language in Setup. If they look right, tell the person who runs Coding Gym."
+        next: "Check your provider, API key and language in Setup."
       trial:
         title: "Your account's setup has a problem Coding Gym can't work around, so %{outcome}."
         next: "Tell the person who runs Coding Gym."
     other:
       own_key:
         title: "%{provider} sent back something Coding Gym couldn't use, so %{outcome}."
+        next: "Try again. If it keeps happening, check that your %{provider} account can use the API."
+      trial:
         next: "Try again. If it keeps happening, tell the person who runs Coding Gym."
   errors:
     no_exercise_today: "No exercise set for today."

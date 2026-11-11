@@ -864,7 +864,7 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("Claude sent back something Coding Gym couldn't use, so the review didn't run. Your answers are saved. " \
-                                  "Try again. If it keeps happening, tell the person who runs Coding Gym.")
+                                  "Try again. If it keeps happening, check that your Claude account can use the API.")
     end
 
     it "shows a Setup-pointing sentence for a rejected key and stores the kind, never the message" do
@@ -890,7 +890,7 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("Claude sent back something Coding Gym couldn't use, so the review didn't run. Your answers are saved. " \
-                                  "Try again. If it keeps happening, tell the person who runs Coding Gym.")
+                                  "Try again. If it keeps happening, check that your Claude account can use the API.")
     end
 
     it "names the provider the section's call went to, on the redirect and the dashboard" do

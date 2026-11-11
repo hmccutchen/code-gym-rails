@@ -77,6 +77,28 @@ RSpec.describe ProviderFailureText, type: :model do
     expect(text("timeout", surface: :duck, variant: "trial").full).to eq(text("timeout", surface: :duck).full)
   end
 
+  it "sends an own-key reader to their own provider account and Setup, never to the person who runs the app" do
+    expect(text("other", surface: :generation).full).to eq(
+      "Gemini sent back something Coding Gym couldn't use, so nothing was generated. " \
+      "Try again. If it keeps happening, check that your Gemini account can use the API."
+    )
+    expect(text("setup", surface: :generation).full).to eq(
+      "Your account's setup has a problem Coding Gym can't work around, so nothing was generated. " \
+      "Check your provider, API key and language in Setup."
+    )
+  end
+
+  it "still sends a trial reader to the person who runs the app, since the key is theirs" do
+    expect(text("other", surface: :generation, variant: "trial").full).to eq(
+      "Gemini sent back something Coding Gym couldn't use, so nothing was generated. " \
+      "Try again. If it keeps happening, tell the person who runs Coding Gym."
+    )
+    expect(text("setup", surface: :generation, variant: "trial").full).to eq(
+      "Your account's setup has a problem Coding Gym can't work around, so nothing was generated. " \
+      "Tell the person who runs Coding Gym."
+    )
+  end
+
   it "picks the trial variant for a trial account with no key of its own" do
     trial = create_trial_user(provider: "fake")
     expect(described_class.variant_for(trial)).to eq("trial")
