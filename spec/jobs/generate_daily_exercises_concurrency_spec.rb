@@ -10,6 +10,36 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(SolidQueue::BlockedExecution.count).to eq(0)
   end
 
+  it "discards a batch-started generation for a user whose dashboard job holds the permit" do
+    enqueue(user_id: 1)
+
+    expect { enqueue(user_id: 1, remind: true) }.not_to change(SolidQueue::Job, :count)
+    expect(SolidQueue::BlockedExecution.count).to eq(0)
+  end
+
+  it "discards a dashboard generation for a user whose batch-started job holds the permit" do
+    enqueue(user_id: 1, remind: true)
+
+    expect { enqueue(user_id: 1) }.not_to change(SolidQueue::Job, :count)
+    expect(SolidQueue::BlockedExecution.count).to eq(0)
+  end
+
+  it "leaves one job when two batch runs enqueue the same user" do
+    enqueue(user_id: 1, remind: true)
+
+    expect { enqueue(user_id: 1, remind: true) }.not_to change(SolidQueue::Job, :count)
+    expect(SolidQueue::Job.where(class_name: described_class.name).count).to eq(1)
+    expect(SolidQueue::BlockedExecution.count).to eq(0)
+  end
+
+  it "reports a discarded enqueue as not enqueued, without raising" do
+    enqueue(user_id: 1)
+    discarded = described_class.new(user_id: 1, remind: true)
+
+    expect { SolidQueue::Job.enqueue(discarded) }.not_to raise_error
+    expect(discarded.successfully_enqueued?).to be(false)
+  end
+
   it "lets different users generate at the same time" do
     enqueue(user_id: 1)
 

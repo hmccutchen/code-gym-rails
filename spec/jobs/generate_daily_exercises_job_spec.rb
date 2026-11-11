@@ -587,6 +587,69 @@ RSpec.describe GenerateDailyExercisesJob do
     end
   end
 
+  describe "a batch run while a generation for the same user is in progress" do
+    let(:pac) { User.create!(email: "inflight@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles") }
+
+    around do |example|
+      adapter = ActiveJob::Base.queue_adapter
+      ActiveJob::Base.queue_adapter = :solid_queue
+      example.run
+    ensure
+      ActiveJob::Base.queue_adapter = adapter
+    end
+
+    let(:worker) do
+      SolidQueue::Process.create!(kind: "Worker", name: SecureRandom.uuid, pid: Process.pid,
+                                 hostname: "localhost", last_heartbeat_at: Time.current)
+    end
+
+    def queued_generations = SolidQueue::Job.where(class_name: described_class.name)
+
+    def perform_ready_jobs
+      SolidQueue::ReadyExecution.claim("*", 10, worker.id).each(&:perform)
+    end
+
+    def stub_provider_that_runs_a_batch_mid_call(user)
+      calls = 0
+      service = stub_provider(user)
+      allow(service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:|
+        calls += 1
+        yield if calls == 1
+        judged = AiService::JudgedSet.new(problem_set: { "code_review" => {} }, dropped_sections: [], outcomes: {}, plan_notes: {})
+        with_practice_context(judged, user: caller, language: language, schedule_context: schedule_context)
+      end
+      -> { calls }
+    end
+
+    it "makes no second provider call for that user" do
+      added_by_batch = nil
+      calls = stub_provider_that_runs_a_batch_mid_call(pac) do
+        before_batch = queued_generations.count
+        described_class.new.perform
+        added_by_batch = queued_generations.count - before_batch
+      end
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        described_class.perform_later(user_id: pac.id)
+        perform_ready_jobs
+        perform_ready_jobs
+      end
+
+      expect(calls.call).to eq(1)
+      expect(added_by_batch).to eq(0)
+      expect(SolidQueue::FailedExecution.count).to eq(0)
+      expect(DailyExercise.where(user: pac).count).to eq(1)
+    end
+
+    it "enqueues the user once the permit is free, which is what the example above would do without it" do
+      stub_provider(pac)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform }.to change { queued_generations.count }.by(1)
+      end
+    end
+  end
+
   describe "the unfinished-set nudge on a later tick" do
     it "nudges when the set exists and nothing has been answered" do
       user.update!(reminder_level: :ready_and_nudges)
