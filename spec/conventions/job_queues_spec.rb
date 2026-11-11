@@ -1,8 +1,11 @@
 require "rails_helper"
 
 RSpec.describe "The queue each job runs on" do
-  PROVIDER_QUEUE = "provider_calls".freeze
-  GENERAL_QUEUE = "default".freeze
+  include ActiveJob::TestHelper
+
+  def provider_queue = "provider_calls"
+
+  def general_queue = "default"
 
   def parsed(file) = ActiveSupport::ConfigurationFile.parse(Rails.root.join("config", file))
 
@@ -42,16 +45,16 @@ RSpec.describe "The queue each job runs on" do
   end
 
   it "puts every job that calls a provider on the provider queue, and no other job there" do
-    expect(provider_job_classes.map(&:queue_name).uniq).to eq([ PROVIDER_QUEUE ])
-    expect((job_classes - provider_job_classes).map(&:queue_name).uniq).to eq([ GENERAL_QUEUE ])
-    expect(mailer_queue).to eq(GENERAL_QUEUE)
+    expect(provider_job_classes.map(&:queue_name).uniq).to eq([ provider_queue ])
+    expect((job_classes - provider_job_classes).map(&:queue_name).uniq).to eq([ general_queue ])
+    expect(mailer_queue).to eq(general_queue)
   end
 
   it "keeps the hourly batch, which calls no provider, off the provider queue" do
     batches = recurring_tasks.select { |_key, options| options.fetch("class") == "GenerateDailyExercisesJob" }
 
     expect(batches).not_to be_empty
-    expect(batches.map { |task| recurring_queue(task) }.uniq).to eq([ GENERAL_QUEUE ])
+    expect(batches.map { |task| recurring_queue(task) }.uniq).to eq([ general_queue ])
   end
 
   it "gives each queue a worker of its own, so no worker takes both and none takes a wildcard" do
@@ -59,8 +62,8 @@ RSpec.describe "The queue each job runs on" do
       workers = queues_by_worker(environment)
 
       expect(workers.flatten.grep(/\*/)).to eq([]), "#{environment} has a wildcard worker"
-      expect(workers.select { |queues| ([ PROVIDER_QUEUE, GENERAL_QUEUE ] - queues).empty? }).to eq([]), "#{environment} has a worker on both queues"
-      expect(workers.flatten).to include(PROVIDER_QUEUE, GENERAL_QUEUE)
+      expect(workers.select { |queues| ([ provider_queue, general_queue ] - queues).empty? }).to eq([]), "#{environment} has a worker on both queues"
+      expect(workers.flatten).to include(provider_queue, general_queue)
     end
   end
 end

@@ -220,9 +220,9 @@ class RealSource
     Method.new("app/models/concept_mastery.rb", "record_review!"),
     Method.new("app/models/daily_plan.rb", "retention_checks_for"),
     Method.new("app/models/daily_response.rb", "improved_code_visible?"),
-    Method.new("app/jobs/generate_daily_exercises_job.rb", "generate_if_due"),
     Method.new("app/jobs/send_push_reminder_job.rb", "stage_for"),
-    Method.new("app/models/concerns/claimable.rb", "take_claim")
+    Method.new("app/models/concerns/claimable.rb", "take_claim"),
+    Method.new("app/jobs/generate_daily_exercises_job.rb", "generate_due_set")
   ].freeze
 
   SCHEMA_REVIEW = [
