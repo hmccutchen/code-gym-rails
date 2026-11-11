@@ -163,6 +163,22 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:yaml_comments, text)).to eq([ "real one", "real two" ])
   end
 
+  it "reads a slash after a postfix ++ or -- as division, so the comment after it counts" do
+    text = "const a = total++ / 2; // first\nconst b = total-- / 2; // second\n"
+
+    expect(comment_bodies(:js_comments, text)).to eq([ "first", "second" ])
+  end
+
+  it "still reads a regex literal that starts the line after a postfix ++" do
+    expect(comment_bodies(:js_comments, "count++\n/https?:\\/\\//.test(url) // real\n")).to eq([ "real" ])
+  end
+
+  it "ends a block scalar opened by a list item's key at that item's next key" do
+    text = "steps:\n  - run: |\n      # script text\n    name: hi # inline\n    # own line\n  - |\n    # item text\n"
+
+    expect(comment_bodies(:yaml_comments, text)).to eq([ "inline", "own line" ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end

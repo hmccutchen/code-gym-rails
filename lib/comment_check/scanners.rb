@@ -39,9 +39,14 @@ module CommentCheck
         indent = line[/\A */].length
         next line.gsub(/[^\n]/, " ") if parent_indent && (line.strip.empty? || indent > parent_indent)
 
-        parent_indent = (indent if yaml_block_start?(line))
+        parent_indent = (yaml_block_parent_indent(line) if yaml_block_start?(line))
         line
       end.join
+    end
+
+    def yaml_block_parent_indent(line)
+      prefix = line[/\A[ \t]*(?:-[ \t]+)*/]
+      line.delete_prefix(prefix).match?(/\A[|>]/) ? (prefix.rindex("-") || prefix.length) : prefix.length
     end
 
     def yaml_block_start?(line)

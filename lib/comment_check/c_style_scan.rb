@@ -48,7 +48,14 @@ module CommentCheck
 
     def regex_start?(text, start)
       before = text[[ start - LOOKBEHIND, 0 ].max...start].rstrip
+      return false if postfix_step?(text, start)
+
       before.empty? || REGEX_PRECEDERS.include?(before[-1]) || before.match?(REGEX_KEYWORDS)
+    end
+
+    def postfix_step?(text, start)
+      line_start = (text.rindex("\n", start - 1) || -1) + 1
+      text[line_start...start].rstrip.end_with?("++", "--")
     end
 
     def comment_end(text, start)
