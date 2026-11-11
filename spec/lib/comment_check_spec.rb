@@ -179,6 +179,15 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:yaml_comments, text)).to eq([ "inline", "own line" ])
   end
 
+  it "ends a block scalar at a comment indented less than its text" do
+    expect(comment_bodies(:yaml_comments, "run: |\n    echo hi\n  # after\nkey: 1\n")).to eq([ "after" ])
+    expect(comment_bodies(:yaml_comments, "run: |4\n    echo hi\n  # after\nkey: 1\n")).to eq([ "after" ])
+  end
+
+  it "opens no block scalar for a | inside a comment" do
+    expect(comment_bodies(:yaml_comments, "nested: # example: |\n  a: 1 # real\n")).to eq([ "example: |", "real" ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end

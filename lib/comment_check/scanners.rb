@@ -1,3 +1,4 @@
+require "psych"
 require_relative "line_scan"
 require_relative "c_style_scan"
 
@@ -5,7 +6,6 @@ module CommentCheck
   module Scanners
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
-    YAML_BLOCK_SCALAR = /(?:\A[ \t]*|:[ \t]+|(?:\A|[ \t])-[ \t]+)[|>][-+1-9]{0,2}[ \t]*(?:#.*)?\z/
     SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function
@@ -34,23 +34,23 @@ module CommentCheck
     end
 
     def without_yaml_block_scalars(text)
-      parent_indent = nil
-      text.lines.map do |line|
-        indent = line[/\A */].length
-        next line.gsub(/[^\n]/, " ") if parent_indent && (line.strip.empty? || indent > parent_indent)
-
-        parent_indent = (yaml_block_parent_indent(line) if yaml_block_start?(line))
-        line
-      end.join
+      lines = text.lines
+      yaml_block_scalar_lines(text).each { |index| lines[index] = lines[index].gsub(/[^\n]/, " ") }
+      lines.join
     end
 
-    def yaml_block_parent_indent(line)
-      prefix = line[/\A[ \t]*(?:-[ \t]+)*/]
-      line.delete_prefix(prefix).match?(/\A[|>]/) ? (prefix.rindex("-") || prefix.length) : prefix.length
+    def yaml_block_scalar_lines(text)
+      yaml_block_scalars(Psych.parse_stream(text)).flat_map do |scalar|
+        last = scalar.end_column.zero? ? scalar.end_line - 1 : scalar.end_line
+        ((scalar.start_line + 1)..last).to_a
+      end
+    rescue Psych::SyntaxError
+      []
     end
 
-    def yaml_block_start?(line)
-      !line.lstrip.start_with?("#") && line.chomp.match?(YAML_BLOCK_SCALAR)
+    def yaml_block_scalars(node)
+      block = node.is_a?(Psych::Nodes::Scalar) && [ Psych::Nodes::Scalar::LITERAL, Psych::Nodes::Scalar::FOLDED ].include?(node.style)
+      (block ? [ node ] : []) + Array(node.children).flat_map { |child| yaml_block_scalars(child) }
     end
 
     def python_comments(text)
