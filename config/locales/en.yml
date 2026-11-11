@@ -89,7 +89,7 @@ en:
       page_title: "Log in"
       intro_html: "Daily dev exercises.<br>Enter your email to get a login code."
       email_label: "Email *"
-      email_placeholder: "you@company.com"
+      email_placeholder: "you@example.com"
       submit: "Send code"
     enter_code:
       page_title: "Enter your code"

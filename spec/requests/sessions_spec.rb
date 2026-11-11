@@ -83,6 +83,12 @@ RSpec.describe "Sessions", type: :request do
       expect(response.body).not_to include('name="name"')
     end
 
+    it "suggests no work address in the email field" do
+      get login_path
+
+      expect(response.body).to include('placeholder="you@example.com"')
+    end
+
     it "asks for no invite code and does not offer a trial while trials are paused" do
       get login_path
 
