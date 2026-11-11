@@ -17,7 +17,13 @@ Those per-endpoint caps and the job permit below apply to every
 account. `GenerateDailyExercisesJob` holds one Solid Queue concurrency permit per
 user and discards an overlapping enqueue, because every dashboard load with
 no set enqueues one and each would run a full billed generation before the
-unique index threw it away; the hourly batch passes no user and is not
-limited. These are starting values, not measured ones. All of them use
+unique index threw it away. The hourly batch generates nothing itself: it
+enqueues that same per-user job for each due user, so the permit covers a
+batch-started generation and a dashboard-started one alike, and whichever is
+enqueued second for a user is discarded before any provider call. The batch
+run itself passes no user and holds no permit, which costs nothing because
+it calls no provider. A discarded `perform_later` returns false and raises
+nothing, so the batch moves on to the next user. These are starting values,
+not measured ones. All of them use
 `LazyCacheStore`, so the test env's `:null_store` never trips them and a
 spec that exercises one swaps in a real store.

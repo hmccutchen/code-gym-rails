@@ -6,33 +6,50 @@ class GenerateDailyExercisesJob < ApplicationJob
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles::JUDGED_GENERATION_BUDGET.seconds
 
-  def perform(user_id: nil)
-    if user_id
-      # No hour gate here; active skips a user anonymized after the job was enqueued.
-      User.active.where(id: user_id).find_each do |user|
-        Time.use_zone(user.effective_time_zone) { generate_now(user) }
-      end
+  def perform(user_id: nil, remind: false)
+    if user_id.nil?
+      enqueue_due_users
+    elsif remind
+      batch_users.where(id: user_id).find_each { |user| in_zone_of(user) { generate_due_set(user) } }
     else
-      User.active.where.not(api_keys: nil).where(paused_generation_at: nil).find_each do |user|
-        Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
-      rescue StandardError => e
-        Rails.logger.error("Generation batch skipped user #{user.id}: #{e.class}: #{e.message}")
-      end
+      # No hour gate here; active skips a user anonymized after the job was enqueued.
+      User.active.where(id: user_id).find_each { |user| in_zone_of(user) { generate_now(user) } }
     end
   end
 
   private
 
-  def generate_if_due(user)
-    return unless Date.current.on_weekday?
-    return unless Time.current.hour >= 8
+  def batch_users = User.active.where.not(api_keys: nil).where(paused_generation_at: nil)
+
+  def in_zone_of(user, &block) = Time.use_zone(user.effective_time_zone, &block)
+
+  def enqueue_due_users
+    batch_users.find_each do |user|
+      in_zone_of(user) { enqueue_or_nudge(user) }
+    rescue StandardError => e
+      Rails.logger.error("Generation batch skipped user #{user.id}: #{e.class}: #{e.message}")
+    end
+  end
+
+  def due_now? = Date.current.on_weekday? && Time.current.hour >= 8
+
+  def enqueue_or_nudge(user)
+    return unless due_now?
 
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)
     else
-      generate_for(user)
-      remind(user)
+      # Solid Queue discards this, returning false, when the user already has a generation queued or running.
+      self.class.perform_later(user_id: user.id, remind: true)
     end
+  end
+
+  def generate_due_set(user)
+    return unless due_now?
+    return if DailyExercise.exists?(user: user, date: Date.current)
+
+    generate_for(user)
+    remind(user)
   end
 
   def nudge_if_due(user, exercise)
@@ -83,7 +100,6 @@ class GenerateDailyExercisesJob < ApplicationJob
   rescue ProviderError, SetupError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
     persist_failure(user) { user.record_generation_failure!(e) }
-    # Don't re-raise — one failure shouldn't block other users in the batch
   rescue ActiveRecord::RecordNotUnique
     Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
   rescue ActiveRecord::RecordInvalid => e

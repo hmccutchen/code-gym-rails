@@ -17,8 +17,18 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
   └→ enters their own Anthropic, Gemini or OpenAI API key (stored encrypted per-user;
      the key's prefix determines user.provider)
 
-8am weekdays (Solid Queue cron via config/recurring.yml):
-  GenerateDailyExercisesJob
+Every hour (Solid Queue cron via config/recurring.yml):
+  GenerateDailyExercisesJob with no user, the batch, calls no provider. For
+  each user at or past 8am on a weekday in their own zone:
+    today's set exists → SendPushReminderJob (kind: :nudge) when PushNudgePlan says so
+    no set yet         → GenerateDailyExercisesJob(user_id:, remind: true)
+  Solid Queue allows one generation job per user, queued or running, and
+  discards a second, so the batch and the dashboard never both generate
+  for one person.
+
+GenerateDailyExercisesJob(user_id:), from the batch or the dashboard:
+  a batch-started job (remind: true) first checks the set is still due, and
+  after a set is written enqueues SendPushReminderJob (the "ready" reminder)
     └→ AiService.for(user) → ClaudeService | GeminiService | OpenaiService
          reads: user.recent_performance (latest qualifying assessed answers)
                 user.recent_delivered_content (repetition-only notes)

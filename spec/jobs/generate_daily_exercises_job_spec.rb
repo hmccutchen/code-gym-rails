@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe GenerateDailyExercisesJob do
   include ActiveSupport::Testing::TimeHelpers
+  include ActiveJob::TestHelper
   include PracticeGenerationHelpers
 
   let(:user) { User.create!(email: "cronuser@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC") }
@@ -20,6 +21,11 @@ RSpec.describe GenerateDailyExercisesJob do
     svc = instance_double(ClaudeService)
     allow(svc).to receive(:generate_judged_exercise).and_raise(*[ error, message ].compact)
     allow(AiService).to receive(:for).with(u).and_return(svc)
+  end
+
+  def run_batch_and_its_jobs
+    described_class.new.perform
+    perform_enqueued_jobs(only: described_class)
   end
 
   it "discards one already-billed inactive draft after an explicit settings edit, without retrying" do
@@ -287,7 +293,7 @@ RSpec.describe GenerateDailyExercisesJob do
     stub_provider(problem_set: { "code_review" => { "question" => "q", "concept" => "n_plus_one" } }, dropped: [ "pattern" ])
 
     travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-      described_class.new.perform
+      run_batch_and_its_jobs
       exercise = DailyExercise.find_by(user: user, date: Date.current)
       expect(exercise.dropped_sections).to eq([ "pattern" ])
     end
@@ -350,7 +356,7 @@ RSpec.describe GenerateDailyExercisesJob do
     it "does not generate before 8am local" do
       stub_generation_for(pac)
       travel_to(Time.utc(2026, 7, 13, 14, 0)) do
-        described_class.new.perform
+        run_batch_and_its_jobs
         local_today = Time.use_zone("America/Los_Angeles") { Date.current }
         expect(DailyExercise.exists?(user: pac, date: local_today)).to be false
       end
@@ -359,7 +365,7 @@ RSpec.describe GenerateDailyExercisesJob do
     it "generates at/after 8am local on a weekday" do
       stub_generation_for(pac)
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        described_class.new.perform
+        run_batch_and_its_jobs
         local_today = Time.use_zone("America/Los_Angeles") { Date.current }
         expect(DailyExercise.exists?(user: pac, date: local_today)).to be true
       end
@@ -368,7 +374,7 @@ RSpec.describe GenerateDailyExercisesJob do
     it "does not generate on a local weekend" do
       stub_generation_for(pac)
       travel_to(Time.utc(2026, 7, 18, 17, 0)) do
-        described_class.new.perform
+        run_batch_and_its_jobs
         expect(DailyExercise.where(user: pac).count).to eq(0)
       end
     end
@@ -376,8 +382,8 @@ RSpec.describe GenerateDailyExercisesJob do
     it "creates exactly one exercise when the batch runs twice in the same hour" do
       stub_generation_for(pac)
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        described_class.new.perform
-        described_class.new.perform
+        run_batch_and_its_jobs
+        run_batch_and_its_jobs
         expect(DailyExercise.where(user: pac).count).to eq(1)
       end
     end
@@ -388,7 +394,7 @@ RSpec.describe GenerateDailyExercisesJob do
       stub_generation_for(alaska)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        described_class.new.perform
+        run_batch_and_its_jobs
 
         pac_local_today = Time.use_zone("America/Los_Angeles") { Date.current }
         expect(DailyExercise.exists?(user: pac, date: pac_local_today)).to be true
@@ -397,19 +403,62 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
 
-    it "logs any error one account raises and still generates for the users after it" do
+    it "logs any error one account raises and still enqueues the users after it" do
       broken = User.create!(email: "broken@example.com", provider: "anthropic",
                             api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
-      allow(AiService).to receive(:for).with(broken).and_raise(RuntimeError, "unexpected")
-      stub_generation_for(pac)
+      allow(described_class).to receive(:perform_later).and_call_original
+      allow(described_class).to receive(:perform_later).with(user_id: broken.id, remind: true).and_raise(RuntimeError, "unexpected")
       allow(Rails.logger).to receive(:error)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        expect { described_class.new.perform }.not_to raise_error
-        local_today = Time.use_zone("America/Los_Angeles") { Date.current }
-        expect(DailyExercise.exists?(user: pac, date: local_today)).to be true
+        expect { described_class.new.perform }.to have_enqueued_job(described_class).with(user_id: pac.id, remind: true).once
       end
       expect(Rails.logger).to have_received(:error).with("Generation batch skipped user #{broken.id}: RuntimeError: unexpected")
+    end
+
+    it "carries on when Solid Queue discards an enqueue for a user already in progress" do
+      busy = User.create!(email: "busy@example.com", provider: "anthropic",
+                          api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
+      allow(described_class).to receive(:perform_later).and_call_original
+      allow(described_class).to receive(:perform_later).with(user_id: busy.id, remind: true).and_return(false)
+      expect(Rails.logger).not_to receive(:error)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform }.to have_enqueued_job(described_class).with(user_id: pac.id, remind: true).once
+      end
+    end
+
+    it "enqueues one batch-started job for a due user and calls no provider itself" do
+      service = stub_generation_for(pac)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform }.to have_enqueued_job(described_class).with(user_id: pac.id, remind: true).once
+      end
+      expect(service).not_to have_received(:generate_judged_exercise)
+      expect(DailyExercise.where(user: pac).count).to eq(0)
+    end
+
+    it "enqueues nothing before 8am local or on a local weekend" do
+      pac
+
+      [ Time.utc(2026, 7, 13, 14, 0), Time.utc(2026, 7, 18, 17, 0) ].each do |moment|
+        travel_to(moment) { expect { described_class.new.perform }.not_to have_enqueued_job(described_class) }
+      end
+    end
+
+    it "enqueues nothing for a user who has today's set, and still checks whether a nudge is due" do
+      pac.update!(reminder_level: :ready_and_nudges)
+
+      travel_to(Time.utc(2026, 7, 13, 21, 0)) do
+        Time.use_zone(pac.effective_time_zone) do
+          DailyExercise.create!(user: pac, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                problem_set: { "code_review" => { "question" => "q" } })
+        end
+
+        expect { described_class.new.perform }
+          .to have_enqueued_job(SendPushReminderJob).with(user_id: pac.id, kind: :nudge)
+          .and have_enqueued_job(described_class).exactly(0).times
+      end
     end
 
     it "skips a user who has paused automatic generation" do
@@ -417,7 +466,7 @@ RSpec.describe GenerateDailyExercisesJob do
       pac.update!(paused_generation_at: Time.current)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        described_class.new.perform
+        run_batch_and_its_jobs
         local_today = Time.use_zone("America/Los_Angeles") { Date.current }
         expect(DailyExercise.exists?(user: pac, date: local_today)).to be false
       end
@@ -446,7 +495,7 @@ RSpec.describe GenerateDailyExercisesJob do
       stub_generation_for(pac)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        expect { described_class.new.perform }
+        expect { run_batch_and_its_jobs }
           .to have_enqueued_job(SendPushReminderJob).with(user_id: pac.id).once
       end
     end
@@ -455,10 +504,10 @@ RSpec.describe GenerateDailyExercisesJob do
     it "does not enqueue again on later runs the same day" do
       stub_generation_for(pac)
 
-      travel_to(Time.utc(2026, 7, 13, 15, 0)) { described_class.new.perform }
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) { run_batch_and_its_jobs }
 
       travel_to(Time.utc(2026, 7, 13, 16, 0)) do
-        expect { described_class.new.perform }.not_to have_enqueued_job(SendPushReminderJob)
+        expect { run_batch_and_its_jobs }.not_to have_enqueued_job(SendPushReminderJob)
       end
     end
 
@@ -476,8 +525,65 @@ RSpec.describe GenerateDailyExercisesJob do
       allow(AiService).to receive(:for).with(pac).and_return(svc)
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
-        expect { described_class.new.perform }.not_to have_enqueued_job(SendPushReminderJob)
+        expect { run_batch_and_its_jobs }.not_to have_enqueued_job(SendPushReminderJob)
       end
+    end
+
+    it "enqueues one for a batch-started job that generates the set" do
+      stub_generation_for(pac)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform(user_id: pac.id, remind: true) }
+          .to have_enqueued_job(SendPushReminderJob).with(user_id: pac.id).once
+      end
+    end
+
+    it "records a batch-started job's provider failure as today's and enqueues none" do
+      stub_provider_failure(ProviderError::RateLimitError, "rate limited", pac)
+      allow(Rails.logger).to receive(:error)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform(user_id: pac.id, remind: true) }.not_to have_enqueued_job(SendPushReminderJob)
+
+        expect(pac.reload).to have_attributes(last_generation_failure: "short_rate_limit", last_generation_error_date: Date.new(2026, 7, 13))
+      end
+    end
+  end
+
+  describe "a batch-started job that runs after its set stopped being due" do
+    let(:pac) { User.create!(email: "late@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles") }
+    let!(:service) { stub_provider(pac) }
+
+    def expect_nothing_generated
+      expect { described_class.new.perform(user_id: pac.id, remind: true) }.not_to have_enqueued_job(SendPushReminderJob)
+      expect(service).not_to have_received(:generate_judged_exercise)
+      expect(DailyExercise.where(user: pac).count).to eq(0)
+    end
+
+    it "generates nothing once midnight has moved the user into Saturday" do
+      travel_to(Time.utc(2026, 7, 18, 7, 30)) { expect_nothing_generated }
+    end
+
+    it "generates nothing before 8am in the user's zone" do
+      travel_to(Time.utc(2026, 7, 13, 14, 0)) { expect_nothing_generated }
+    end
+
+    it "generates nothing more when another job already wrote today's set" do
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        Time.use_zone(pac.effective_time_zone) do
+          DailyExercise.create!(user: pac, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                problem_set: { "code_review" => {} })
+        end
+
+        expect { described_class.new.perform(user_id: pac.id, remind: true) }.not_to have_enqueued_job(SendPushReminderJob)
+        expect(service).not_to have_received(:generate_judged_exercise)
+      end
+    end
+
+    it "generates nothing for a user who paused after the batch enqueued the job" do
+      pac.update!(paused_generation_at: Time.current)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) { expect_nothing_generated }
     end
   end
 
