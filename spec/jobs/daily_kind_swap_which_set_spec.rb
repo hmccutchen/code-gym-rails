@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Which set a daily kind swap first applies to" do
   include ActiveSupport::Testing::TimeHelpers
+  include ActiveJob::TestHelper
   include AuthHelpers
 
   let!(:user) { create_fake_provider_user }
@@ -14,10 +15,15 @@ RSpec.describe "Which set a daily kind swap first applies to" do
     expect(outcome.status).to eq(:saved)
   end
 
+  def run_batch_and_its_jobs
+    GenerateDailyExercisesJob.perform_now
+    perform_enqueued_jobs(only: GenerateDailyExercisesJob)
+  end
+
   def pair_of(exercise) = exercise.reload.plan_notes["daily_kinds"]
 
   it "leaves today's set untouched and plans the next weekday's set from the new pair" do
-    travel_to(wednesday) { GenerateDailyExercisesJob.perform_now }
+    travel_to(wednesday) { run_batch_and_its_jobs }
     today = user.daily_exercises.sole
     before = today.attributes.slice("problem_set", "plan_notes")
 
@@ -25,7 +31,7 @@ RSpec.describe "Which set a daily kind swap first applies to" do
 
     expect(today.reload.attributes.slice("problem_set", "plan_notes")).to eq(before)
     expect(pair_of(today)).to eq(default_pair)
-    travel_to(wednesday + 1.day) { GenerateDailyExercisesJob.perform_now }
+    travel_to(wednesday + 1.day) { run_batch_and_its_jobs }
     expect(pair_of(user.daily_exercises.find_by!(date: Date.new(2026, 10, 15)))).to eq(new_pair)
   end
 
@@ -51,7 +57,7 @@ RSpec.describe "Which set a daily kind swap first applies to" do
 
     travel_to(wednesday) do
       swap!
-      GenerateDailyExercisesJob.perform_now
+      run_batch_and_its_jobs
       expect(user.daily_exercises).to be_empty
 
       GenerateDailyExercisesJob.perform_now(user_id: user.id)
