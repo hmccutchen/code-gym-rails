@@ -1,5 +1,5 @@
 class GenerateDailyExercisesJob < ApplicationJob
-  queue_as :default
+  queue_as :provider_calls
 
   limits_concurrency key: ->(args = {}) { args[:user_id] },
                      group: ->(args = {}) { self.class.name if args[:user_id] },

@@ -17,7 +17,7 @@ RSpec.describe GenerateConceptReferenceJob do
   end
 
   def perform_next
-    SolidQueue::ReadyExecution.claim([ "default" ], 1, worker.id).sole.perform
+    SolidQueue::ReadyExecution.claim([ described_class.queue_name ], 1, worker.id).sole.perform
   end
 
   it "discards overlapping queued requests for the shared reference across users and refresh modes" do
