@@ -79,7 +79,7 @@ RSpec.describe "Sessions", type: :request do
     it "marks the email field as required and asks for no name" do
       get login_path
 
-      expect(response.body).to include("Work email *")
+      expect(response.body).to include("Email *")
       expect(response.body).not_to include('name="name"')
     end
 
@@ -177,7 +177,7 @@ RSpec.describe "Sessions", type: :request do
       expect(response).to redirect_to(login_path)
       get login_path
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Work email")
+      expect(response.body).to include("Email *")
     end
   end
 

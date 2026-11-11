@@ -45,7 +45,7 @@ module AuthHelpers
 
   def visit_as(user)
     visit login_path
-    fill_in "Work email *", with: user.email
+    fill_in "Email *", with: user.email
     click_button "Send code"
     return if user.reload.two_factor_enabled?
 
