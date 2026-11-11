@@ -50,6 +50,9 @@ class User < ApplicationRecord
 
   scope :active, -> { where(anonymized_at: nil) }
 
+  include Claimable
+  claim :generating, column: :generating_since, stale_after: CallProfiles::JUDGED_GENERATION_BUDGET.seconds
+
   enum :reminder_level, { none: 0, ready: 1, ready_and_nudges: 2 }, prefix: :reminders
 
   def push_reminders_enabled? = !reminders_none?

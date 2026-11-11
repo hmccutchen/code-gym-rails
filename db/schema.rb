@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_220648) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -450,6 +450,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_220648) do
     t.integer "second_factor_failures", default: 0, null: false
     t.datetime "second_factor_failures_since"
     t.datetime "sessions_valid_after"
+    t.datetime "generating_since"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
