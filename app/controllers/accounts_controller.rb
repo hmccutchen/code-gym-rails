@@ -2,6 +2,8 @@ class AccountsController < ApplicationController
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
+  PAUSE_NOTICES = { paused: "flash.accounts.generation_paused", kept: "flash.accounts.generation_kept_paused" }.freeze
+
   # GET /account
   def show
     now = Time.current.in_time_zone(current_user.effective_time_zone)
@@ -18,19 +20,16 @@ class AccountsController < ApplicationController
 
   # PATCH /account/toggle_generation
   def toggle_generation
-    redirect_to after_toggle_path, notice: resume_requested? ? resume_notice : pause_notice
+    if resume_requested?
+      held = current_user.resume_generation!
+      notice = held ? "flash.accounts.generation_resumed_with_held_set" : "flash.accounts.generation_resumed"
+    else
+      notice = PAUSE_NOTICES.fetch(current_user.pause_generation!(source: User::MANUAL_PAUSE))
+    end
+    redirect_to after_toggle_path, notice: t(notice)
   end
 
   private
-
-  PAUSE_NOTICES = { paused: "flash.accounts.generation_paused", kept: "flash.accounts.generation_kept_paused" }.freeze
-
-  def resume_notice
-    held = current_user.resume_generation!
-    t(held ? "flash.accounts.generation_resumed_with_held_set" : "flash.accounts.generation_resumed")
-  end
-
-  def pause_notice = t(PAUSE_NOTICES.fetch(current_user.pause_generation!(source: User::MANUAL_PAUSE)))
 
   # A fixed name, never a URL, so the form's return_to cannot send the browser off this site.
   def after_toggle_path = params[:return_to] == "dashboard" ? root_path : account_path
