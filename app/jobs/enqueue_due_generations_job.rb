@@ -5,8 +5,9 @@ class EnqueueDueGenerationsJob < ApplicationJob
   SCHEDULED_PRIORITY = 10
 
   def perform
+    fills_ran = !SchemaWait.migrations_pending?
     ScheduledGeneration.users.find_each do |user|
-      Time.use_zone(user.effective_time_zone) { enqueue_or_nudge(user) }
+      Time.use_zone(user.effective_time_zone) { enqueue_or_nudge(user, check_unopened: fills_ran) }
     rescue StandardError => e
       Rails.logger.error("Generation batch skipped user #{user.id}: #{e.class}: #{e.message}")
     end
@@ -14,12 +15,12 @@ class EnqueueDueGenerationsJob < ApplicationJob
 
   private
 
-  def enqueue_or_nudge(user)
+  def enqueue_or_nudge(user, check_unopened:)
     return unless ScheduledGeneration.due?(user)
 
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)
-    elsif UnopenedSets.pause?(user.daily_exercises.latest_openings, today: Date.current)
+    elsif check_unopened && UnopenedSets.pause?(user.daily_exercises.latest_openings, today: Date.current)
       pause_for_unopened_sets(user)
     else
       GenerateDailyExercisesJob.set(priority: SCHEDULED_PRIORITY).perform_later(user_id: user.id, scheduled: true)

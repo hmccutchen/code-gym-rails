@@ -49,6 +49,44 @@ RSpec.describe EnqueueDueGenerationsJob, "pausing an account whose sets go unope
     expect(pause_columns).to eq(paused_generation_at: thursday_morning, generation_pause_source: "automatic")
   end
 
+  describe "while a migration is pending, as when the worker starts before the web service has migrated" do
+    before { allow(SchemaWait).to receive(:migrations_pending?).and_return(true) }
+
+    it "pauses nobody and still enqueues the due user, since the opened_at fill may not have run" do
+      [ today - 3, today - 2, today - 1 ].each { |date| set_on(date) }
+
+      expect { run_hand_out }.to scheduled_job.once
+
+      expect(pause_columns).to eq(paused_generation_at: nil, generation_pause_source: nil)
+    end
+
+    it "still nudges about a set that is there" do
+      user.update!(reminder_level: :ready_and_nudges)
+      [ today - 3, today - 2, today - 1, today ].each { |date| set_on(date) }
+
+      expect { run_hand_out(at: thursday_morning + 3.hours) }
+        .to have_enqueued_job(SendPushReminderJob).with(user_id: user.id, kind: :nudge)
+    end
+
+    it "asks once for the whole run, however many users are due" do
+      User.create!(email: "second@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC")
+
+      run_hand_out
+
+      expect(SchemaWait).to have_received(:migrations_pending?).once
+    end
+  end
+
+  it "pauses as before once no migration is pending" do
+    allow(SchemaWait).to receive(:migrations_pending?).and_return(false)
+    [ today - 3, today - 2, today - 1 ].each { |date| set_on(date) }
+
+    expect { run_hand_out }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+    expect(user.reload).to be_generation_paused_automatically
+    expect(SchemaWait).to have_received(:migrations_pending?).once
+  end
+
   it "keeps generating when one of the last three sets was opened" do
     set_on(today - 3)
     set_on(today - 2, opened_at: Time.utc(2026, 11, 10, 15))
