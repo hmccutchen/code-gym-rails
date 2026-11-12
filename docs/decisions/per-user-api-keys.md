@@ -287,8 +287,9 @@ replaced but never deleted, short of deleting the account.
   provider, so nothing was removed." The posted name is never echoed.
 - **Removal is not rate-limited** and calls no provider.
 - **A generation already running finishes.** It holds the key in memory.
-  If it then fails, the failure is not recorded; see "A call that outlives
-  its key" below.
+  If it then fails, that key's failure is not recorded, and a daily
+  generation leaves a message that names no provider; see "A call that
+  outlives its key" below.
 - **Trials.** `User#on_trial?` is "has a trial and no key in use", so an
   account with an unfinished trial counts as on trial again once its key is
   gone. With `provider` nil there is no house key to resolve, so such a
@@ -326,13 +327,11 @@ no set was started with the new key.
   use. A job notes it before the call. When the call fails, the job reloads
   the account under the user row lock and writes through
   `User#report_call_failure(key_used)`, which runs the write only when
-  `key_in_use` is unchanged. Otherwise it writes nothing, so the account
-  ends with no failure from that call.
+  `key_in_use` is unchanged. Otherwise the old key's failure is never
+  written.
 - **What a call with a changed key clears.** Only a failure recorded
   against the call's own provider (`last_generation_failure_provider`
-  equal to the provider the call started with). That keeps the next
-  dashboard visit starting a set with the current key when the leftover
-  failure is the old provider's. A failure recorded against another
+  equal to the provider the call started with). A failure recorded against another
   provider stays: a newer attempt on the key that took over may have
   written it, and clearing it would erase that attempt's message and its
   recovery text. A message that names no provider ("Settings or another
@@ -361,21 +360,44 @@ no set was started with the new key.
   skipped.
 - **`GenerateDailyExercisesJob`** applies it inside `persist_failure`, after
   the claim check and the `set_today?` branch, to a provider or setup
-  failure and to the "every section failed its quality check" message. The
-  drafts that failed the check were written by a provider the account no
-  longer uses, the day has no set, and with nothing recorded the next
-  dashboard visit starts a set with the current key. Showing the message
-  would hold that back behind "Try again" for an attempt the person has
-  already moved on from.
-- **The "Settings or another set changed" message is still recorded
-  whatever the key.** It says nothing about a provider, and it is true of
-  the account as it stands.
-- **`RegenerateExerciseJob`** applies it to a provider or setup failure. It
-  releases the exercise's claim first and then takes the user lock by
-  itself, so the two locks are never nested. Its "today's set was kept"
-  messages are still recorded whatever the key: the person asked for a new
-  set and is looking at the old one, and the message is the only thing
-  that says why. Today's set exists, so no generation waits behind it.
+  failure and to the "every section failed its quality check" message.
+- **The daily job records a neutral message when the key changed.** The
+  day has no set, and a dashboard may be polling `GET /dashboard/status`
+  for one. Recording nothing left that page with no set, no failure and no
+  job: a visit after the key change had enqueued a second job, which
+  stopped because the first still held the generation claim, and the poll
+  answered "pending" until it gave up with "This is taking longer than
+  expected". So the job records
+  `GenerateDailyExercisesJob::SUPERSEDED_MESSAGE` ("Settings or another set
+  changed while this set was being prepared. Generate again when ready."),
+  the message it already uses when settings moved under a call. The poll
+  then answers "failed", the page reloads, and the person sees a true
+  sentence with "Try again". It names no provider, so it says nothing
+  about the old key, and saving or removing a key leaves it in place. It
+  replaces a failure left for the call's own provider. It is passed to
+  `User#report_call_failure` as `when_key_changed:`, so the rule keeps one
+  home; the job only supplies what to write.
+- **When the neutral message is not recorded.** A failure or message
+  already recorded today that is not the call's own provider's stays as it
+  is, since the poll already has an answer and a newer attempt may have
+  written it. An account left with no provider in use gets nothing either:
+  every page that requires a provider sends it to Setup, so no dashboard is
+  waiting, and a message would only sit in front of the first set after a
+  key is added. A call that started with no provider records nothing for
+  the same reason.
+- **The job does not enqueue a replacement.** Its own queue permit would
+  discard the new job. The status endpoint does not guess from the claim
+  either: a queued job holds no claim yet, and the page would reload in a
+  loop.
+- **`RegenerateExerciseJob`** applies the rule to a provider or setup
+  failure and stays silent when the key changed. It takes the user row
+  lock, releases the exercise's claim with its token inside that lock, and
+  reports only when the release took effect, so the order is user, then
+  exercise. Today's set exists, so once the claim is released the status
+  endpoint answers "ready" and the waiting page reloads onto the set;
+  nothing is left polling. Its "today's set was kept" messages are still
+  recorded whatever the key: the person asked for a new set and is looking
+  at the old one, and the message is the only thing that says why.
 - **A key changed after the failure was written.** Removing a key clears a
   failure recorded against the removed provider. Saving a key clears one
   too; see "Saving a key clears that provider's failure" below. Switching

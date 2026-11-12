@@ -233,7 +233,9 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       GenerateDailyExercisesJob.new.perform(user_id: user.id)
 
       expect(failures).to eq(0)
-      expect(user.reload.generation_failed_today?).to be(false)
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: nil,
+                                             last_generation_failure_provider: nil,
+                                             last_generation_error: GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
     end
 
     it "does not count the old provider's failure after a switch to another stored key during the call" do
@@ -261,15 +263,29 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
 
     def remove_key_in_use = User.find(user.id).tap { |fresh| fresh.remove_api_key(fresh.provider) }.save!
 
-    it "records no failure for a key removed during the call, so the dashboard starts a set with the key that took over" do
+    it "records the neutral message for a key removed during the call, names no provider and leaves the hold count" do
       user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
       provider_raising_after(bad_key) { remove_key_in_use }
 
       GenerateDailyExercisesJob.new.perform(user_id: user.id)
 
-      expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false, last_generation_failure: nil,
-                                             last_generation_failure_provider: nil)
-      expect(missing_set_state).to eq(:start_generation)
+      expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: true, last_generation_failure: nil,
+                                             last_generation_failure_provider: nil, generation_account_failures: 0,
+                                             last_generation_error: GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
+      expect(missing_set_state).to eq(:generation_failed)
+    end
+
+    it "replaces a failure left for the call's own provider with the neutral message" do
+      user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
+      provider_raising_after(bad_key) do
+        User.find(user.id).tap { |fresh| fresh.use_provider("openai") }.save!
+        User.find(user.id).record_generation_failure!(out_of_credit.tap { |e| e.provider = "anthropic" })
+      end
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      expect(user.reload).to have_attributes(last_generation_failure: nil, last_generation_failure_provider: nil,
+                                             last_generation_error: GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
     end
 
     it "leaves a failure a newer attempt recorded against the key that took over" do
@@ -296,13 +312,14 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       expect(missing_set_state).to eq(:start_generation)
     end
 
-    it "records no quality-check message for drafts written with a key removed during the call" do
+    it "records the neutral message, not the quality-check one, for drafts written with a key removed during the call" do
       user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
       provider_raising_after(ProviderError::AllSectionsRejectedError.new("every section failed its quality check")) { remove_key_in_use }
 
       GenerateDailyExercisesJob.new.perform(user_id: user.id)
 
-      expect(missing_set_state).to eq(:start_generation)
+      expect(user.reload.last_generation_error).to eq(GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
+      expect(missing_set_state).to eq(:generation_failed)
     end
 
     it "records the quality-check message when the key in use did not change" do

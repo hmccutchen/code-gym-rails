@@ -219,6 +219,43 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
     end
   end
 
+  describe "GET /dashboard/status after a call outlived its key" do
+    around { |example| travel_to(Time.utc(2026, 7, 13, 13, 0)) { example.run } }
+
+    def provider_raising_after(error)
+      service = instance_double(ClaudeService)
+      allow(service).to receive(:generate_judged_exercise) do |*|
+        yield
+        raise error
+      end
+      allow(AiService).to receive(:for).and_return(service)
+      allow(Rails.logger).to receive(:error)
+    end
+
+    it "answers failed with the neutral message, so the waiting page stops polling" do
+      login_as(user)
+      provider_raising_after(ProviderError::AuthenticationError.new("invalid x-api-key")) { delete setup_key_path("anthropic") }
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)).to eq("status" => "failed", "message" => GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
+    end
+
+    it "answers ready after a regeneration that outlived its key releases its claim, having recorded nothing" do
+      login_as(user)
+      DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago, language: "ruby_rails",
+                            problem_set: { "code_review" => { "question" => "old" } }, regenerating_since: Time.current)
+      provider_raising_after(ProviderError::AuthenticationError.new("invalid x-api-key")) { delete setup_key_path("anthropic") }
+
+      RegenerateExerciseJob.new.perform(user_id: user.id)
+      get dashboard_status_path
+
+      expect(JSON.parse(response.body)).to eq("status" => "ready")
+      expect(user.reload.generation_failed_today?).to be(false)
+    end
+  end
+
   describe "what each removal outcome says" do
     it "has a message for every outcome the model can return, and a confirmation for each that removes a key" do
       expect(ApiKeysController::KEY_REMOVAL_MESSAGES.keys).to match_array(User::KEY_REMOVAL_OUTCOMES)

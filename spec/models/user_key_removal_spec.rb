@@ -332,6 +332,67 @@ RSpec.describe User, "removing a stored key" do
       expect(user.reload.last_generation_error).to eq("Settings or another set changed while this set was being prepared.")
     end
 
+    describe "given what to do when the key changed" do
+      let(:neutral) { "Settings or another set changed." }
+
+      def report(account, key_used) = account.report_call_failure(key_used, when_key_changed: -> { account.record_generation_message!(neutral) }) { raise "the block ran" }
+
+      before { user.update!(key_saved_times: { "openai" => "2026-11-07T00:00:00Z" }) }
+
+      it "does it when no failure is recorded today, and when today's failure is the call's own provider's" do
+        key_used = user.key_in_use
+        user.use_provider("openai")
+        user.save!
+        report(user, key_used)
+        expect(user.reload).to have_attributes(last_generation_error: neutral, last_generation_failure_provider: nil)
+
+        user.record_generation_failure!(ProviderError::AuthenticationError.new("bad").tap { |e| e.provider = "anthropic" })
+        report(user, key_used)
+        expect(user.reload).to have_attributes(last_generation_error: neutral, last_generation_failure: nil)
+      end
+
+      it "leaves a failure recorded today against another provider, and records nothing" do
+        key_used = user.key_in_use
+        user.use_provider("openai")
+        user.save!
+        user.record_generation_failure!(bad_key)
+
+        report(user, key_used)
+
+        expect(user.reload).to have_attributes(last_generation_failure: "bad_key", last_generation_failure_provider: "openai",
+                                               last_generation_error: nil)
+      end
+
+      it "leaves a message recorded today that names no provider" do
+        key_used = user.key_in_use
+        user.use_provider("openai")
+        user.save!
+        user.record_generation_message!("An earlier message.")
+
+        report(user, key_used)
+
+        expect(user.reload.last_generation_error).to eq("An earlier message.")
+      end
+
+      it "records nothing once the account has no provider in use, since no dashboard can be waiting" do
+        user.update!(api_keys: keys.slice("anthropic"))
+        key_used = user.key_in_use
+        user.remove_api_key("anthropic")
+        user.save!
+
+        report(user, key_used)
+
+        expect(user.reload.generation_failed_today?).to be(false)
+      end
+
+      it "runs the block, not the fallback, while the key is unchanged" do
+        ran = []
+        user.report_call_failure(user.key_in_use, when_key_changed: -> { ran << :changed }) { ran << :same }
+
+        expect(ran).to eq([ :same ])
+      end
+    end
+
     it "records nothing for a call that started with no provider, and clears nothing" do
       keyless = User.create!(email: "keyless@example.com")
       key_used = keyless.key_in_use

@@ -235,8 +235,10 @@ The job also notes the provider and key it started with
 they are still the ones in use (`User#report_call_failure`). A key saved,
 switched or removed during the call has just set the count to zero, and the
 old key's failure says nothing about the new one, so nothing is counted and
-no failure message is written either
-(`docs/decisions/per-user-api-keys.md`, "A call that outlives its key").
+that failure is not written. The job records a message that names no
+provider in its place, so a dashboard waiting on the set is told to try
+again (`docs/decisions/per-user-api-keys.md`, "A call that outlives its
+key").
 `User#record_generation_success!` sets the count back to zero, and so does
 `User#store_api_key`, which `ApiKeysController#update` calls when it stores
 a key. Switching to another stored key (`User#use_provider`) resets it too,
