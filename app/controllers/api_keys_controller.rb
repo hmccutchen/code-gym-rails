@@ -9,7 +9,7 @@ class ApiKeysController < ApplicationController
   KEY_SAVES_PER_HOUR_BY_IP = 30
   RATE_LIMIT_STORE         = LazyCacheStore.new
 
-  # Each save with a key asks a provider about it, so both counts bound how many keys one person can test here.
+  # A checked save asks a provider about the key, so both counts bound how many keys one person can test here.
   rate_limit to: KEY_SAVES_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { key_saves_limited },
              store: RATE_LIMIT_STORE, name: "key_saves_by_account", only: :update, if: :key_pasted?
   rate_limit to: KEY_SAVES_PER_HOUR_BY_IP, within: 1.hour, with: -> { key_saves_limited },

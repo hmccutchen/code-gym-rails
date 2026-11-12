@@ -33,7 +33,8 @@ read it before changing that area.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
   A pasted key is checked through `AiService.check_key(provider_key, key)`,
   the one other way to a provider class, which applies the same
-  availability gate. `AiProvider.detect` first refuses a key that is not one
+  availability gate; `AiService.skip_key_check` passes that gate and calls no
+  provider. `AiProvider.detect` first refuses a key that is not one
   run of printable ASCII within `AiProvider::MAX_KEY_LENGTH`
   (`KEY_SHAPE`), the one home of that rule. The check is one GET to the
   provider's list-models endpoint (`MODELS_URL`, with the subclass's
@@ -98,8 +99,9 @@ read it before changing that area.
   before every other check. `/generate`, Learn prepare actions, the
   per-user generation claim and queue permit, and Setup's key saves
   (`ApiKeysController::KEY_SAVES_PER_HOUR` per account,
-  `KEY_SAVES_PER_HOUR_BY_IP` per address, since each save asks a provider
-  about a key) apply to all accounts. All use `LazyCacheStore`.
+  `KEY_SAVES_PER_HOUR_BY_IP` per address, since a checked save asks a
+  provider about a key; a save without checking counts too) apply to all
+  accounts. All use `LazyCacheStore`.
 - **The key hold** (`docs/decisions/pausing-generation.md`, "Holding the
   schedule for a key that keeps failing"): `User#record_generation_failure!`
   counts a failure classified as a kind in `KeyHold::KINDS` (bad key, out of
