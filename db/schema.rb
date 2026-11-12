@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -91,6 +91,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.jsonb "plan_notes", default: {}, null: false
+    t.datetime "opened_at"
     t.index ["user_id", "date"], name: "index_daily_exercises_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_exercises_on_user_id"
   end
@@ -451,6 +452,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
     t.datetime "second_factor_failures_since"
     t.datetime "sessions_valid_after"
     t.datetime "generating_since"
+    t.string "generation_pause_source"
+    t.integer "generation_account_failures", default: 0, null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
