@@ -65,7 +65,15 @@ provider, a call with no tokens of any kind costs zero, except a timeout:
 the provider may have run and billed part of the call before the read gave
 up, so its row stores a null cost (`ProviderError.leaves_tokens_unknown?`,
 true for `TimeoutError` alone). A network error stays at zero, since a
-refused or dropped connection rarely reached the provider. `model_routing_spec`
+refused or dropped connection rarely reached the provider. A reply whose
+usage block cannot be read is unknown too (#770): a count that is present but
+not a valid count, a `usage` field that is not an object, or cache counts
+larger than the input total they are part of. Each still reads as 0 so the
+row is written, but `UsageCounts` marks the counts unknown, the row stores a
+null cost, and a `[usage]` warning names the field. Pricing those zeros would
+record a cheaper call than the one billed. A count that is simply absent reads
+as 0 and marks nothing, since Gemini leaves out counts a call did not use.
+`model_routing_spec`
 fails when a Claude route has no price, or a zero input or output rate, so
 routing to a new Claude model means pricing it first. The
 figure is a list-price estimate: a free tier, credits or a discount on the

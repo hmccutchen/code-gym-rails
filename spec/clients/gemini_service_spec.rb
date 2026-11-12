@@ -628,4 +628,42 @@ RSpec.describe GeminiService do
       expect(ApiUsage.count).to eq(2)
     end
   end
+
+  describe "a reply whose token counts cannot all be read" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+    let(:counts) { { "total_input_tokens" => 9, "total_cached_tokens" => 4, "total_output_tokens" => 2, "total_thought_tokens" => 1 } }
+    let(:valid_reply) do
+      { "status" => "completed", "usage" => counts,
+        "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hello" } ] } ] }
+    end
+
+    it_behaves_like "a provider reading a reply leaf of any shape",
+                    count_paths: %w[total_input_tokens total_cached_tokens total_output_tokens total_thought_tokens].map { |field| [ "usage", field ] },
+                    other_paths: [ [ "usage" ], [ "steps" ], [ "steps", 0 ], [ "steps", 0, "content" ],
+                                   [ "steps", 0, "content", 0 ], [ "steps", 0, "content", 0, "text" ] ]
+
+    def logged_usage(usage)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+    end
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "floors the input count at zero and marks the counts unknown when the cached count is larger than the input count" do
+      result = logged_usage(counts.merge("total_cached_tokens" => 12))
+
+      expect(result).to include(input_tokens: 0, cache_read_tokens: 12, tokens_unknown: true)
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, cache_read_tokens: 12)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "GeminiService", "total_input_tokens")).once
+    end
+
+    it "keeps the counts known when the cached and thought counts are absent" do
+      result = logged_usage(counts.except("total_cached_tokens", "total_thought_tokens"))
+
+      expect(result).to include(input_tokens: 9, output_tokens: 2).and(satisfy { |reply| !reply.key?(:tokens_unknown) })
+      expect(Rails.logger).not_to have_received(:warn)
+    end
+  end
 end

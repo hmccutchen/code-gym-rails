@@ -706,4 +706,42 @@ RSpec.describe ClaudeService do
         .to change(ApiUsage, :count).by(1)
     end
   end
+
+  describe "a reply whose token counts cannot all be read" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+    let(:counts) { { "input_tokens" => 1_000, "output_tokens" => 100, "cache_read_input_tokens" => 10, "cache_creation_input_tokens" => 20 } }
+    let(:valid_reply) { { "content" => [ { "type" => "text", "text" => "hello" } ], "stop_reason" => "end_turn", "usage" => counts } }
+
+    it_behaves_like "a provider reading a reply leaf of any shape",
+                    count_paths: %w[input_tokens output_tokens cache_read_input_tokens cache_creation_input_tokens].map { |field| [ "usage", field ] },
+                    other_paths: [ [ "usage" ], [ "content" ], [ "content", 0 ], [ "content", 0, "text" ] ]
+
+    def logged_usage(usage)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+    end
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "stores a null cost when a count is present but not a valid count" do
+      logged_usage(counts.merge("cache_read_input_tokens" => -10))
+
+      expect(ApiUsage.last).to have_attributes(tokens_in: 1_000, cache_read_tokens: 0, cost_usd: nil)
+    end
+
+    it "stores a null cost when usage is not an object" do
+      logged_usage("unknown")
+
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, cost_usd: nil)
+    end
+
+    it "prices the call when its cache counts are absent or null" do
+      logged_usage(counts.except("cache_read_input_tokens").merge("cache_creation_input_tokens" => nil))
+
+      expect(ApiUsage.last.cost_usd).to be_positive
+      expect(Rails.logger).not_to have_received(:warn)
+    end
+  end
 end

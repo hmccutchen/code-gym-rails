@@ -81,7 +81,10 @@ read it before changing that area.
   input. `failure` comes from `AiService.failure_code_for`. `cost_usd` is
   priced at call time from the subclass's `PRICE_PER_MILLION`, for Anthropic
   keys only (`prices_usage?`); null means unknown, Gemini and OpenAI rows stay
-  null, and older rows stay null (no backfill). `model_routing_spec` fails on
+  null, and older rows stay null (no backfill). A timeout, or a reply whose
+  token counts `UsageCounts` could not read (present but malformed, or cache
+  counts above the input total), marks the counts unknown and stores null; an
+  absent count reads as 0. `model_routing_spec` fails on
   a Claude route with no price.
   The Account page sums `cost_usd` per provider through `ApiUsage.own_key_totals`, counts null rows as unpriced, and leaves the projection to `MonthlySpend`.
 - **How a cut-off reply is recognized**

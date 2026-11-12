@@ -19,3 +19,11 @@ Built from `AiService.retry_options`, retrying 429, 500, 502, 503 and 504.
 ## `#read_result`
 
 It joins only the text parts whose text is a string (`AiService#string_field`), so a part whose text is an object, a list or a number is left out of the reply instead of being written into it as Ruby text (#769).
+
+## `#read_usage`
+
+`total_input_tokens` includes the cached tokens, so the uncached input is the
+difference, through `UsageCounts#uncached`. A cached count larger than the
+input total floors the input at 0 and marks the counts unknown, as does any
+count present but malformed (`docs/code-notes/app/clients/usage_counts.md`).
+An absent cached or thought count is normal and reads as 0.

@@ -509,4 +509,39 @@ RSpec.describe OpenaiService do
         .to change(ApiUsage, :count).by(1)
     end
   end
+
+  describe "a reply whose token counts cannot all be read" do
+    let(:user) { create_user_with_key }
+    let(:counts) { { "input_tokens" => 10, "output_tokens" => 2, "input_tokens_details" => { "cached_tokens" => 3, "cache_write_tokens" => 2 } } }
+    let(:valid_reply) { reply(output: [ message({ "type" => "output_text", "text" => "hello" }) ], usage: counts) }
+
+    it_behaves_like "a provider reading a reply leaf of any shape",
+                    count_paths: [ [ "usage", "input_tokens" ], [ "usage", "output_tokens" ],
+                                   [ "usage", "input_tokens_details", "cached_tokens" ], [ "usage", "input_tokens_details", "cache_write_tokens" ] ],
+                    other_paths: [ [ "usage" ], [ "usage", "input_tokens_details" ], [ "output" ], [ "output", 0 ],
+                                   [ "output", 0, "content" ], [ "output", 0, "content", 0 ], [ "output", 0, "content", 0, "text" ] ]
+
+    def logged_usage(usage)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+    end
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "floors the input count at zero and marks the counts unknown when the cache counts add up to more than the input count" do
+      result = logged_usage(counts.merge("input_tokens_details" => { "cached_tokens" => 8, "cache_write_tokens" => 5 }))
+
+      expect(result).to include(input_tokens: 0, cache_read_tokens: 8, cache_write_tokens: 5, tokens_unknown: true)
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, cache_read_tokens: 8, cache_write_tokens: 5)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "OpenaiService", "input_tokens")).once
+    end
+
+    it "marks the counts unknown when input_tokens_details is not an object" do
+      expect(logged_usage(counts.merge("input_tokens_details" => "cached"))).to include(input_tokens: 10, tokens_unknown: true)
+    end
+
+    it "keeps the counts known when input_tokens_details is absent" do
+      expect(logged_usage(counts.except("input_tokens_details"))).to include(input_tokens: 10).and(satisfy { |reply| !reply.key?(:tokens_unknown) })
+    end
+  end
 end

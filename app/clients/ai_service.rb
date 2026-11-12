@@ -629,11 +629,6 @@ class AiService
     value if value.is_a?(String)
   end
 
-  def count_field(parent, key)
-    value = parent[key]
-    value.is_a?(Integer) && value.between?(0, ApiUsage.max_token_count) ? value : 0
-  end
-
   def self.daily_quota_reset_at(failed_at)
     failed_at + 1.day
   end
