@@ -86,7 +86,23 @@ is worded to be true of a 404 or a 429 as much as of a timeout.
   retry middleware.
 - **Any error inside the check is `:unanswered`.** `#check_key` rescues
   `StandardError`, the total timeout included, and logs the error's class
-  and never its message, since a message can quote a header.
+  and never its message, since a message can quote a header. A transport
+  failure (`Faraday::Error`, `Timeout::Error`) is logged at info. Any other
+  class is logged at error level: it is a bug in the check, and at info it
+  would save every key with the "couldn't be checked" warning unnoticed.
+- **A pasted key is trimmed at both ends before anything reads it.**
+  `ApiKeysController#pasted_key` removes leading and trailing characters in
+  Ruby's `[[:space:]]` class: space, tab, newline, carriage return, form
+  feed, vertical tab, and Unicode spaces and separators such as the
+  non-breaking space (U+00A0), which a copy from a web page can carry and
+  `String#strip` leaves in place. Nothing inside the key is removed, and
+  the shape rule is unchanged, so a space of any kind inside a key is still
+  refused. A zero-width space (U+200B) is not in that class and is refused
+  too.
+- **Only a posted language is written with the key.** The account is read
+  before the check, so writing its language back afterwards would undo a
+  change made in another tab meanwhile. Inside the lock the language is
+  assigned only when the form posted one.
 - **It does not go through `call_and_log`.** It has no prompt, purpose or
   `AiService::Request`, so it reads no trial allowance and no generation
   deadline. `ApiKeysController` does not declare `ProviderCallLimits`, so a
@@ -123,3 +139,12 @@ is worded to be true of a 404 or a 429 as much as of a timeout.
   (`spec/support/key_check_helpers.rb`), so no spec reaches a provider. A
   spec of the check itself is tagged `real_key_check` and swaps only the
   connection's adapter through `stub_key_check`.
+
+### Open items
+
+- `AiService.check_key` raises `SetupError` for an unavailable provider and
+  `ApiKeysController` has no `rescue_from` for it. No provider with a key
+  pattern is restricted today, so the path is unreachable from Setup; add
+  the rescue when one is.
+- A rejected key cannot be saved anyway. Whether Setup should offer that is
+  with the owner.

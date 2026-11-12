@@ -39,11 +39,14 @@ read it before changing that area.
   provider's list-models endpoint (`MODELS_URL`, with the subclass's
   `#auth_headers`), bounded as a whole by
   `CallProfiles::KEY_CHECK_TOTAL_SECONDS`, with no retry, outside
-  `call_and_log`, returning one of `AiService::KEY_CHECK_RESULTS` and
-  raising nothing. Only `:rejected` (a 401, or Gemini's 400
+  `call_and_log`. The instance `#check_key` returns one of
+  `AiService::KEY_CHECK_RESULTS` and raises nothing; the class method
+  raises `SetupError` for an unknown or unavailable provider, as
+  `AiService.for` does. Only `:rejected` (a 401, or Gemini's 400
   `API_KEY_INVALID`) blocks the save; a 403 and an unanswered check save
   with a warning that names no status code. It logs the result and an error
-  class, never a key, a provider body or an error message. A key that was
+  class, never a key, a provider body or an error message: a transport
+  failure at info, any other error class at error level. A key that was
   not saved leaves the key-hold count alone, and a saved one is merged under
   the user row lock.
 - **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging, and calls each prompt class (`app/prompts/*_prompt.rb`; `.claude/rules/patterns.md` says what one holds) for its text; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. `AiService#call(request)` is the template for the HTTP round trip; subclasses implement `request_body`, `read_result`, `raise_for_status` and `provider_name` behind it, plus `build_connection`, define the `API_URL` it posts to, and own which model each purpose routes to (see "Per-purpose model routing" below). Each call carries one `AiService::Request` built by `AiService.request_for` from the purpose's row in `CallProfiles::BY_PURPOSE` (see `.claude/rules/patterns.md`), the provider-neutral module that also holds the timeouts, retry counts and worst-case call times. Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. It is also where a model asks for a provider's own quota day (`.daily_quota_reset_at`), so no other model names a provider class; call timing is no provider's fact and is read from `CallProfiles`. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.

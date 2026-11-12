@@ -274,7 +274,10 @@ and the check holds a web thread. `Timeout` is safe here because the
 connection is made for this request and dropped after it.
 
 It returns a result and raises nothing: any `StandardError`, the timeout
-included, is `:unanswered`. `#key_check_result` reads a 2xx as
+included, is `:unanswered`. A `Faraday::Error` or `Timeout::Error` is the
+provider not answering and is logged at info; any other class is a bug in
+the check and is logged at error level, so it shows up in production logs
+while the person still gets their key saved. `#key_check_result` reads a 2xx as
 `:accepted`, the subclass's `#key_rejected?` as `:rejected` (a 401 here;
 `GeminiService` adds its 400 naming `API_KEY_INVALID`), a 403 as
 `:refused`, and everything else as `:unanswered`.
