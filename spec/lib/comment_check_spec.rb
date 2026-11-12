@@ -188,6 +188,22 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:yaml_comments, "nested: # example: |\n  a: 1 # real\n")).to eq([ "example: |", "real" ])
   end
 
+  it "reads a keyword used as a property or a $ name as an operand, so the slash after it is division" do
+    text = "const a = stats.in / 2; // first\nconst b = stats. in / 2; // second\nconst c = $return / 2; // third\n"
+
+    expect(comment_bodies(:js_comments, text)).to eq([ "first", "second", "third" ])
+  end
+
+  it "still reads a regex literal after a keyword that stands alone" do
+    expect(comment_bodies(:js_comments, "return /https?:\\/\\//.test(url) // real\n")).to eq([ "real" ])
+  end
+
+  it "skips a shell heredoc's body, quoted or not, and still counts comments after it" do
+    text = "#!/bin/sh\ncat <<'EOF'\n# generated one\n# generated two\nEOF\ncat <<-END\n\t# tab text\n\tEND\n# real\necho hi\n"
+
+    expect(comment_bodies(:shell_comments, text)).to eq([ "real" ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end

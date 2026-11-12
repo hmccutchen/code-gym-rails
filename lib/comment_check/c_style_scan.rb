@@ -4,7 +4,7 @@ module CommentCheck
   module CStyleScan
     QUOTES = [ "\"", "'", "`" ].freeze
     REGEX_PRECEDERS = "(,=:[!&|?{};+-*%<>~^".chars.freeze
-    REGEX_KEYWORDS = /\b(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)\z/
+    REGEX_KEYWORDS = /(?<![\w$])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)\z/
     LOOKBEHIND = 32
 
     module_function
@@ -50,7 +50,12 @@ module CommentCheck
       before = text[[ start - LOOKBEHIND, 0 ].max...start].rstrip
       return false if postfix_step?(text, start)
 
-      before.empty? || REGEX_PRECEDERS.include?(before[-1]) || before.match?(REGEX_KEYWORDS)
+      before.empty? || REGEX_PRECEDERS.include?(before[-1]) || regex_keyword?(before)
+    end
+
+    def regex_keyword?(before)
+      keyword = before.match(REGEX_KEYWORDS) or return false
+      !before[0...keyword.begin(0)].rstrip.end_with?(".")
     end
 
     def postfix_step?(text, start)

@@ -6,6 +6,7 @@ module CommentCheck
   module Scanners
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
+    SHELL_HEREDOC = /(?<!<)<<(?!<)(?<dash>-?)[ \t]*(?<quote>['"]?)(?<word>\w+)\k<quote>/
     SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function
@@ -64,7 +65,26 @@ module CommentCheck
     end
 
     def shell_comments(text)
-      LineScan.line_comments(text, "#", require_space: true).reject { |comment| shebang?(comment) }
+      LineScan.line_comments(without_heredoc_bodies(text), "#", require_space: true).reject { |comment| shebang?(comment) }
+    end
+
+    def without_heredoc_bodies(text)
+      delimiter = nil
+      text.lines.map do |line|
+        if delimiter
+          delimiter = nil if line.chomp.sub(delimiter[:indent], "") == delimiter[:word]
+          next line.gsub(/[^\n]/, " ")
+        end
+        delimiter = heredoc_delimiter(line)
+        line
+      end.join
+    end
+
+    def heredoc_delimiter(line)
+      return if line.lstrip.start_with?("#")
+
+      opener = line.match(SHELL_HEREDOC) or return
+      { word: opener[:word], indent: opener[:dash].empty? ? "" : /\A\t+/ }
     end
 
     def shebang?(comment)

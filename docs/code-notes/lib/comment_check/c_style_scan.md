@@ -6,7 +6,7 @@ A JavaScript regex literal can hold `//` or `/*`, as in `/https?:\/\//` or `/[/*
 
 When it meets a `/` outside a string and comment in JavaScript, it looks at what comes before it, ignoring whitespace:
 
-- **Read as a regex:** nothing at all (the start of the text), one of the punctuators `( , = : [ ! & | ? { } ; + - * % < > ~ ^`, or one of the keywords `return`, `typeof`, `instanceof`, `in`, `of`, `new`, `delete`, `void`, `throw`, `case`, `do`, `else`, `yield`, `await`.
+- **Read as a regex:** nothing at all (the start of the text), one of the punctuators `( , = : [ ! & | ? { } ; + - * % < > ~ ^`, or one of the keywords `return`, `typeof`, `instanceof`, `in`, `of`, `new`, `delete`, `void`, `throw`, `case`, `do`, `else`, `yield`, `await`. A keyword counts only when it stands alone: after a `.`, as in `stats.in / 2`, it is a property name, and in `$return` it is part of a name, so the `/` after either is division.
 - **Read as division:** anything else, which in practice is an identifier, a number, `)` or `]`. A `++` or `--` earlier on the same line also means division, as in `total++ / 2`, even though its last character is a punctuator. A regex that starts the next line after one, such as `count++` and then `/x/.test(name)`, is still read as a regex.
 
 A regex runs to the next `/` that is not escaped and not inside a `[...]` class. If the line ends first, the `/` was not a regex after all, and scanning carries on from the character after it.
