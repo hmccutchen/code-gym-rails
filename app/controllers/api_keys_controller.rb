@@ -34,7 +34,8 @@ class ApiKeysController < ApplicationController
     result = skip_check? ? AiService.skip_key_check(provider) : AiService.check_key(provider, pasted_key)
     return render_key_alert(key_rejected_text(provider), offer_unchecked_save: true) if result == :rejected
 
-    store_key(provider)
+    return redirect_to(login_path, alert: t("flash.application.login_required")) unless store_key(provider)
+
     redirect_to root_path, notice: t("flash.api_keys.#{SAVED_NOTICES.fetch(result)}", provider: AiProvider.label(provider))
   end
 
@@ -50,9 +51,11 @@ class ApiKeysController < ApplicationController
 
   def chosen_language = posted_language || current_user.language
 
-  # The check can take seconds, so the lock reloads the row and the merge reads a key saved from another tab meanwhile.
+  # The check can take seconds, so the lock reloads the row: another tab's key is merged, and a deleted account gets none.
   def store_key(provider)
     current_user.with_lock do
+      next false if current_user.anonymized?
+
       current_user.store_api_key(pasted_key, provider: provider)
       current_user.language = posted_language if posted_language
       current_user.save!

@@ -170,6 +170,55 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
     end
   end
 
+  describe "an account deleted while the save is in flight" do
+    before { user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-old" }, language: "ruby_rails") }
+
+    def expect_nothing_written_and_signed_out
+      row = User.find(user.id)
+      expect(row).to be_anonymized
+      expect(row.api_keys).to be_nil
+      expect(row.provider).to eq("anthropic")
+      expect(row.language).to eq("ruby_rails")
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.application.login_required"))
+      expect(flash[:notice].to_s).not_to match(/saved/i)
+    end
+
+    it "writes no key onto the anonymized row after a check that accepted it, and answers as to a signed-out browser" do
+      allow_any_instance_of(GeminiService).to receive(:check_key) do
+        User.find(user.id).anonymize!
+        :accepted
+      end
+
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345", language: "javascript" }
+
+      expect_nothing_written_and_signed_out
+    end
+
+    it "writes no key onto the anonymized row on the save-without-checking path either" do
+      allow(AiService).to receive(:skip_key_check) do
+        User.find(user.id).anonymize!
+        :skipped
+      end
+
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345", skip_check: "1", language: "javascript" }
+
+      expect_nothing_written_and_signed_out
+    end
+
+    it "treats the next request from that browser as signed out" do
+      allow_any_instance_of(GeminiService).to receive(:check_key) do
+        User.find(user.id).anonymize!
+        :accepted
+      end
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345" }
+
+      get setup_path
+
+      expect(response).to redirect_to(login_path)
+    end
+  end
+
   describe "a language changed in another tab while the check is running" do
     before do
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-old" })

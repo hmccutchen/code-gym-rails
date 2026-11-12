@@ -48,7 +48,8 @@ read it before changing that area.
   class, never a key, a provider body or an error message: a transport
   failure at info, any other error class at error level. A key that was
   not saved leaves the key-hold count alone, and a saved one is merged under
-  the user row lock. The form that follows a rejection, and only that one,
+  the user row lock, where an account deleted during the check gets no
+  key and the browser is sent to sign in. The form that follows a rejection, and only that one,
   offers "Save without checking": the same `PATCH /setup` with
   `skip_check=1` goes through `AiService.skip_key_check`, which calls no
   provider and logs `result=skipped`. Every other step still runs (save

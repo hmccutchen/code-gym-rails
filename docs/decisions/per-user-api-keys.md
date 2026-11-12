@@ -73,6 +73,17 @@ is worded to be true of a 404 or a 429 as much as of a timeout.
   JSON map written whole. `ApiKeysController#store_key` therefore merges
   inside `with_lock`, which reloads the row, so a key saved from another tab
   during the check is still in the map.
+- **A deleted account gets no key.** `User#anonymize!` clears `api_keys`,
+  and an account can be deleted from another browser while the check runs.
+  The store used to put the pasted key back on the anonymized row, where
+  nothing would ever clear it. Inside the lock, after the reload,
+  `#store_key` now writes nothing when the row is anonymized, and the
+  action answers as `require_login` does for a signed-out browser: a
+  redirect to `/login` with the sign-in alert, never "saved". The
+  save-without-checking path goes through the same method. No other write
+  in the controller has a slow step between its read and its save, and
+  `preferences_update` never assigns `api_keys`, so it cannot restore a
+  key.
 - **The whole check is bounded at 8 seconds, once**
   (`CallProfiles::KEY_CHECK_TOTAL_SECONDS`, the sum of
   `KEY_CHECK_OPEN_TIMEOUT`, 3, and `KEY_CHECK_READ_TIMEOUT`, 5). The two
