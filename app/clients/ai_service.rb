@@ -112,6 +112,16 @@ class AiService
     counts.sum { |rate, count| count * price.public_send(rate) } / 1_000_000
   end
 
+  KEY_CHECK_RESULTS = %i[accepted rejected refused unanswered].freeze
+
+  def check_key
+    response = key_check_connection.get(self.class::MODELS_URL)
+    key_check_result(response).tap { |result| log_key_check("result=#{result} status=#{response.status}") }
+  rescue Faraday::Error => e
+    log_key_check("result=unanswered error=#{e.class}")
+    :unanswered
+  end
+
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves, :schedule_context) do
     def initialize(solves: [], schedule_context: nil, **) = super
   end
@@ -379,7 +389,7 @@ class AiService
 
   def long_running?(request) = request.read_timeout > CallProfiles::READ_TIMEOUT
 
-  # Subclasses supply API_URL and the hooks below; build_connection returns a Faraday::Connection, read_result text, token and cache counts, model, truncated and refusal.
+  # Subclasses supply API_URL, MODELS_URL and the hooks below; build_connection returns a Faraday::Connection, read_result text, token and cache counts, model, truncated and refusal.
   def request_body(_request)
     raise NotImplementedError, "#{self.class} must implement #request_body"
   end
@@ -399,6 +409,30 @@ class AiService
   def build_connection
     raise NotImplementedError, "#{self.class} must implement #build_connection"
   end
+
+  def auth_headers
+    raise NotImplementedError, "#{self.class} must implement #auth_headers"
+  end
+
+  def key_check_connection
+    Faraday.new do |f|
+      f.options.open_timeout = CallProfiles::KEY_CHECK_OPEN_TIMEOUT
+      f.options.timeout      = CallProfiles::KEY_CHECK_READ_TIMEOUT
+      auth_headers.each { |name, value| f.headers[name] = value }
+      f.adapter :net_http
+    end
+  end
+
+  def key_check_result(response)
+    return :accepted if response.success?
+    return :rejected if key_rejected?(response)
+
+    response.status == 403 ? :refused : :unanswered
+  end
+
+  def key_rejected?(response) = response.status == 401
+
+  def log_key_check(outcome) = Rails.logger.info("[key_check] provider=#{self.class.provider_key} #{outcome}")
 
   def provider_connection(retry_options, headers)
     Faraday.new do |f|

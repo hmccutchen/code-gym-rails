@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/clients/claude_service.md
 class ClaudeService < AiService
   API_URL = "https://api.anthropic.com/v1/messages"
+  MODELS_URL = "https://api.anthropic.com/v1/models"
 
   def self.provider_key = "anthropic"
   def self.key_pattern = /\Ask-ant-/
@@ -133,5 +134,7 @@ class ClaudeService < AiService
     category.is_a?(String) ? category : "unspecified"
   end
 
-  def build_connection = provider_connection(RETRY_OPTIONS, "x-api-key" => @api_key, "anthropic-version" => "2023-06-01")
+  def auth_headers = { "x-api-key" => @api_key, "anthropic-version" => "2023-06-01" }
+
+  def build_connection = provider_connection(RETRY_OPTIONS, auth_headers)
 end
