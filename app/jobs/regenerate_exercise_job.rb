@@ -1,6 +1,6 @@
 # Design notes: docs/code-notes/app/jobs/regenerate_exercise_job.md
 class RegenerateExerciseJob < ApplicationJob
-  queue_as :default
+  queue_as :provider_calls
 
   def perform(user_id:)
     user = User.active.find_by(id: user_id)

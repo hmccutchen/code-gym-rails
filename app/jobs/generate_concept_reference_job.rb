@@ -1,5 +1,5 @@
 class GenerateConceptReferenceJob < ApplicationJob
-  queue_as :default
+  queue_as :provider_calls
 
   limits_concurrency key: ->(args) { "#{args.fetch(:language)}/#{args.fetch(:concept)}" },
                      to: 1, on_conflict: :discard,

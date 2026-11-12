@@ -94,13 +94,16 @@ nothing, since the launch re-subscribe already registers the endpoint. The
 old install's endpoint keeps receiving until Apple refuses it and
 `PushDelivery` prunes it.
 
-**Both reminders are enqueued by `GenerateDailyExercisesJob`'s cron branch,
-not scheduled on their own.** "It is this user's 8am on a weekday" already
+**Both reminders come from the hourly hand-out, `EnqueueDueGenerationsJob`,
+not from a schedule of their own.** "It is this user's 8am on a weekday" already
 has an owner and a second cron entry would be a second place for it to
 drift — and the tick is already hourly, so a nudge needs no new schedule.
-That branch's `exists?` check is therefore a fork rather than a gate: the
-tick that finds no set generates and sends `:ready`, and later ticks consult
-`PushNudgePlan` and may send `:nudge`. What stops the nudge repeating all
+The hand-out's check for today's set is therefore a fork rather than a gate: the
+tick that finds no set enqueues `GenerateDailyExercisesJob` with
+`scheduled: true`, which generates and then sends `:ready`, and later ticks
+consult `PushNudgePlan` and may send `:nudge`. A job the dashboard started is
+not `scheduled`, so it never sends `:ready`, and neither does a scheduled job
+that found another generation running or the set already written. What stops the nudge repeating all
 day is the user finishing the set, not the hour having passed once. The
 on-demand branch still enqueues neither — a user who triggered generation by
 opening the dashboard is already looking at the set.

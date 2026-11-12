@@ -114,7 +114,8 @@ RSpec.describe "Provider failures as users see them", type: :request do
       user
       stub_gemini(FAILURES["daily-quota 429"])
 
-      GenerateDailyExercisesJob.new.perform
+      EnqueueDueGenerationsJob.new.perform
+      perform_enqueued_jobs(only: GenerateDailyExercisesJob)
 
       expect(user.reload.last_generation_failure).to eq("daily_limit")
       expect(ApiUsage.last).to have_attributes(failure: "rate_limit", http_status: 429, quota_id: "GenerateRequestsPerDayPerProjectPerModel-FreeTier")

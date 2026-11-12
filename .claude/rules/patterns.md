@@ -132,7 +132,11 @@ says what a deviation from one requires.
   stale may now belong to another caller. The pseudocode critique claim is a
   key inside a JSON column, so it lives on `DailyResponse`
   (`#claim_pseudocode_critique!`) and keeps the same token rule under the row
-  lock. Anything that locks an exercise and its response goes through
+  lock. The generation claim on `User` (`generating_since`) is re-checked
+  that way before a failure is written; the set itself is guarded by its
+  date under the user lock in `PracticeGeneration.commit_new`, so a job whose
+  stale claim was taken over still lands its set when the day has none.
+  Anything that locks an exercise and its response goes through
   `DailyExercise#with_response_locked`.
   Mastery review and every manual drill command follow user → exercise
   when needed → response → mastery rows in ascending ID order, with paid

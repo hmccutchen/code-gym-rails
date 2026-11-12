@@ -1205,6 +1205,37 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "the generation claim" do
+    let(:user) { User.create!(email: "generating@example.com") }
+
+    it "is held from the moment it is taken until its token releases it" do
+      token = user.claim_generating!
+
+      expect(user.reload.generating_since).to eq(token)
+      expect(user).to be_generating
+      expect(User.find(user.id).claim_generating!).to be_nil
+
+      user.release_generating!(token)
+      expect(user.reload).not_to be_generating
+    end
+
+    it "goes stale once its window has passed, so a crashed worker's claim can be taken" do
+      user.update_column(:generating_since, (User::GENERATION_STALE_AFTER - 1.second).ago)
+      expect(user.reload.claim_generating!).to be_nil
+
+      user.update_column(:generating_since, (User::GENERATION_STALE_AFTER + 1.second).ago)
+      expect(user.reload.claim_generating!).to be_present
+    end
+
+    it "outlasts the provider calls by the write margin, so a worst-case job still holds it while it commits" do
+      expect(User::GENERATION_STALE_AFTER).to eq(CallProfiles::JUDGED_GENERATION_BUDGET.seconds + DailyExercise::WRITE_MARGIN)
+
+      user.update_column(:generating_since, (CallProfiles::JUDGED_GENERATION_BUDGET.seconds + 1.second).ago)
+      expect(user.reload).to be_generating
+      expect(user.claim_generating!).to be_nil
+    end
+  end
+
   describe "#paused_generation_at?" do
     it "is false when paused_generation_at is nil" do
       user = User.new(paused_generation_at: nil)

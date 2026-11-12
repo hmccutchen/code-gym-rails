@@ -99,6 +99,7 @@ classifies it as `setup`, whose wording points at Setup and never names the
 provider. Each boundary logs it at error level with the user's id, which is
 the only place it shows up, since the app reports to no error tracker.
 
-The hourly batch rescues any error per user, logs it with the user's id and
-moves on, so one broken account can't stop generation for the users after
-it.
+The hourly hand-out (`EnqueueDueGenerationsJob`) rescues any error per user,
+logs it with the user's id and moves on, so one broken account can't stop it
+enqueuing the users after it. Each user's generation then runs in a job of its own, where one
+failure has no other user to reach.

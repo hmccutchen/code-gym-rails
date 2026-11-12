@@ -70,7 +70,7 @@ read it before changing that area.
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
   declares `ProviderCallLimits`, one shared hourly and daily count that runs
   before every other check. `/generate`, Learn prepare actions and the
-  per-user generation job permit apply to all accounts. All use
+  per-user generation claim and queue permit apply to all accounts. All use
   `LazyCacheStore`.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
   Every provider call writes exactly one `ApiUsage` row through
@@ -107,8 +107,9 @@ read it before changing that area.
   is not a `ProviderError`. Every boundary that rescues a `ProviderError`
   rescues it too, and `ProviderFailure` classifies it as `setup`, worded
   as a problem with the account's setup and never as the provider's. It is
-  logged at error level with the user's id. The hourly batch also rescues
-  any error per user, so one account can't stop it.
+  logged at error level with the user's id. The hourly hand-out
+  (`EnqueueDueGenerationsJob`), which only enqueues, also rescues any error
+  per user, so one account can't stop it.
 - **What stays out of the logs**: `config/initializers/filter_parameter_logging.rb`
   filters what engineers write (`answers`, `message`, `question`,
   `pseudocode`, `prior_alternates`, the duck's `thread`), the login `code`

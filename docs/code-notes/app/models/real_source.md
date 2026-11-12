@@ -20,6 +20,11 @@ with the unified workload fold. Remaining entries keep their relative order and
 ids; no replacement was inserted into its position. Historical source ids
 remain readable and no longer participate in picking.
 
+`GenerateDailyExercisesJob#generate_if_due` retired when the hourly batch
+stopped generating sets itself. `#generate_under_claim`, which takes the
+user's generation claim around the part that still generates, was appended at
+the end of the list as a new entry.
+
 ## `.last_seen_for`
 
 A stored id is matched to the current excerpt by file name and method, ignoring the folder, so moving a source file between `app/` folders keeps its rotation history. That only works while file name plus method is unique across the pool, which a spec checks. An id that matches nothing comes back unchanged, and `pick` never asks about it. The reason is in `docs/decisions/folders-by-layer.md`.

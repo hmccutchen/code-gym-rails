@@ -866,6 +866,14 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(response.body).to include('class="spinner"')
       end
 
+      it "auto-enqueues a job of its own, at the default priority, while the user's scheduled job is still queued" do
+        GenerateDailyExercisesJob.set(priority: EnqueueDueGenerationsJob::SCHEDULED_PRIORITY).perform_later(user_id: user.id, scheduled: true)
+
+        expect { get root_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id).once
+        expect(enqueued_jobs.last[:priority]).to be_nil
+        expect(response.body).to include("Generating your personalized exercise set")
+      end
+
       it "wraps the placeholder in the dashboard-content id, which the generating poll reloads into" do
         get root_path
 
@@ -1641,6 +1649,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(attempts).to be_positive
         expect(attempts * interval).to be > CallProfiles::GENERATION_READ_TIMEOUT
         expect(attempts * interval).to be > CallProfiles::JUDGED_GENERATION_BUDGET
+        expect(attempts * interval).to be > User::GENERATION_STALE_AFTER.to_i
         expect(attempts * interval).to be > DailyExercise::REGENERATION_STALE_AFTER.to_i
       end
     end

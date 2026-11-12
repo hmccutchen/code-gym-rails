@@ -1,68 +1,48 @@
 class GenerateDailyExercisesJob < ApplicationJob
-  queue_as :default
+  queue_as :provider_calls
 
-  limits_concurrency key: ->(args = {}) { args[:user_id] },
+  # Keeps one request from being queued twice; a click and a scheduled job never share a key.
+  limits_concurrency key: ->(args = {}) { "#{args[:scheduled] ? 'scheduled' : 'click'}/#{args[:user_id]}" if args[:user_id] },
                      group: ->(args = {}) { self.class.name if args[:user_id] },
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles::JUDGED_GENERATION_BUDGET.seconds
 
-  def perform(user_id: nil)
-    if user_id
-      # No hour gate here; active skips a user anonymized after the job was enqueued.
-      User.active.where(id: user_id).find_each do |user|
-        Time.use_zone(user.effective_time_zone) { generate_now(user) }
-      end
-    else
-      User.active.where.not(api_keys: nil).where(paused_generation_at: nil).find_each do |user|
-        Time.use_zone(user.effective_time_zone) { generate_if_due(user) }
-      rescue StandardError => e
-        Rails.logger.error("Generation batch skipped user #{user.id}: #{e.class}: #{e.message}")
-      end
+  def perform(user_id: nil, scheduled: false)
+    # The release before EnqueueDueGenerationsJob ran the hourly hand-out as this class with no arguments.
+    return EnqueueDueGenerationsJob.perform_later if user_id.nil?
+
+    # Only a scheduled job re-checks pause and the hour; a click generates either way.
+    candidates = scheduled ? ScheduledGeneration.users : User.active
+    candidates.where(id: user_id).find_each do |user|
+      Time.use_zone(user.effective_time_zone) { generate_under_claim(user, scheduled: scheduled) }
     end
   end
 
   private
 
-  def generate_if_due(user)
-    return unless Date.current.on_weekday?
-    return unless Time.current.hour >= 8
+  def generate_under_claim(user, scheduled:)
+    return if scheduled && !ScheduledGeneration.due?(user)
 
-    if (exercise = DailyExercise.find_by(user: user, date: Date.current))
-      nudge_if_due(user, exercise)
-    else
-      generate_for(user)
-      remind(user)
+    claim = user.claim_generating!
+    return Rails.logger.info("Skipped generation for user #{user.id}: another generation holds the claim") unless claim
+
+    begin
+      generate_missing_set(user, claim, remind: scheduled)
+    ensure
+      user.release_generating!(claim)
     end
   end
 
-  def nudge_if_due(user, exercise)
-    return unless PushNudgePlan.possible?(level: user.reminder_level, hour: Time.current.hour)
+  def generate_missing_set(user, claim, remind:)
+    return if set_today?(user)
 
-    response = user.daily_responses.find_by(daily_exercise: exercise)
-
-    return unless PushNudgePlan.due?(
-      level:            user.reminder_level,
-      hour:             Time.current.hour,
-      submitted:        response&.submitted?,
-      last_activity_at: response&.updated_at
-    )
-
-    SendPushReminderJob.perform_later(user_id: user.id, kind: :nudge)
+    generate_for(user, claim)
+    SendPushReminderJob.perform_later(user_id: user.id) if remind && set_today?(user)
   end
 
-  # generate_for swallows failures, so whether a set exists is read from the row, not a return value.
-  def remind(user)
-    return unless DailyExercise.exists?(user: user, date: Date.current)
+  def set_today?(user) = DailyExercise.exists?(user: user, date: Date.current)
 
-    SendPushReminderJob.perform_later(user_id: user.id)
-  end
-
-  def generate_now(user)
-    return if DailyExercise.exists?(user: user, date: Date.current)
-    generate_for(user)
-  end
-
-  def generate_for(user)
+  def generate_for(user, claim)
     date     = Date.current
     language = user.language_for_today
     service  = AiService.for(user)
@@ -71,33 +51,34 @@ class GenerateDailyExercisesJob < ApplicationJob
 
     result = PracticeGeneration.commit_new(user, context: context, judged: judged, language: language, drafted_by: service)
     if result.status == :superseded
-      persist_failure(user) { user.record_generation_message!("Settings or another set changed while this set was being prepared. Generate again when ready.") }
+      persist_failure(user, claim) { user.record_generation_message!("Settings or another set changed while this set was being prepared. Generate again when ready.") }
       return
     end
     user.clear_generation_failure! if user.last_generation_error_date.present?
 
-    Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
+    Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
-    persist_failure(user) { user.record_generation_message!(e.message) }
+    persist_failure(user, claim) { user.record_generation_message!(e.message) }
   rescue ProviderError, SetupError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
-    persist_failure(user) { user.record_generation_failure!(e) }
-    # Don't re-raise — one failure shouldn't block other users in the batch
+    persist_failure(user, claim) { user.record_generation_failure!(e) }
   rescue ActiveRecord::RecordNotUnique
-    Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
+    Rails.logger.info(skipped_duplicate(user))
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
-    Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
+    Rails.logger.info(skipped_duplicate(user))
   end
 
-  # Two generations can race and the loser writes last, so with a set present, clear the error instead.
-  def persist_failure(user)
-    if DailyExercise.exists?(user: user, date: Date.current)
-      user.clear_generation_failure! if user.last_generation_error_date.present?
-      return
-    end
+  def skipped_duplicate(user) = "Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)"
 
-    yield
+  # A claim that went stale may be another job's by now, and that job writes the outcome.
+  def persist_failure(user, claim)
+    user.with_lock do
+      next unless user.generating_since == claim
+      next yield unless set_today?(user)
+
+      user.clear_generation_failure! if user.last_generation_error_date.present?
+    end
   end
 end

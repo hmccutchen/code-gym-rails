@@ -1,5 +1,5 @@
 class GenerateRecognitionGuideJob < ApplicationJob
-  queue_as :default
+  queue_as :provider_calls
 
   # The row is shared, so an overlapping job is discarded rather than billed twice.
   limits_concurrency key: ->(args) { "recognition_guide/#{args.fetch(:group_key)}" },

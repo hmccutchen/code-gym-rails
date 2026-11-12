@@ -15,8 +15,9 @@ behind it can no longer be running rather than after a number chosen here.
 
 ## Reaching the cap usually means a queued job
 
-The bulk actions and this per-concept job share the default queue against
-three worker threads, so a slow batch can leave this job still queued when the
+The bulk actions and this per-concept job share the `provider_calls` queue
+with set generation, against three worker threads, so a slow run of them can
+leave this job still queued when the
 budget runs out. That is the likeliest state when the cap is reached, rather
 than a dead job.
 

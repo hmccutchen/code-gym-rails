@@ -208,6 +208,37 @@ RSpec.describe "DailyExercises", type: :request do
 
       expect(response).to redirect_to(root_path)
     end
+
+    context "while the user's scheduled job is still queued" do
+      let(:user) { create_fake_provider_user }
+
+      def queue_scheduled_job
+        GenerateDailyExercisesJob.set(priority: EnqueueDueGenerationsJob::SCHEDULED_PRIORITY).perform_later(user_id: user.id, scheduled: true)
+      end
+
+      it "enqueues a job of its own at the default priority, which generates the set the dashboard is polling for" do
+        queue_scheduled_job
+
+        expect { post generate_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id).once
+        expect(enqueued_jobs.last[:priority]).to be_nil
+        GenerateDailyExercisesJob.perform_now(user_id: user.id)
+
+        get dashboard_status_path
+        expect(response.parsed_body).to eq("status" => "ready")
+      end
+
+      it "generates for a user who paused and then clicked generate anyway" do
+        queue_scheduled_job
+        user.update!(paused_generation_at: Time.current)
+
+        expect { post generate_path }.to have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id).once
+        perform_enqueued_jobs(only: GenerateDailyExercisesJob)
+
+        get dashboard_status_path
+        expect(response.parsed_body).to eq("status" => "ready")
+        expect(user.daily_exercises.count).to eq(1)
+      end
+    end
   end
 end
 

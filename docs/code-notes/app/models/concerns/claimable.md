@@ -2,7 +2,8 @@
 
 A claim is a timestamp column used as a lease on a paid provider call: a
 review on `DailyResponse#reviewing_since`, a regeneration on
-`DailyExercise#regenerating_since`. Each model states its column and how long
+`DailyExercise#regenerating_since`, a day's first generation on
+`User#generating_since`, fresh for `User::GENERATION_STALE_AFTER`. Each model states its column and how long
 a claim stays fresh, and this concern defines `#claim_<name>!`,
 `#release_<name>!` and `#<name>?` from that one statement, so the predicate
 and the claim query can't disagree about when a claim has gone stale.

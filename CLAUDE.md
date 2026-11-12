@@ -330,8 +330,9 @@ above; inspect actual final-commit CI results rather than assuming checks ran.
   app in its place once it is on, and stores their own
   Anthropic, Gemini or OpenAI key, encrypted; the key's prefix sets
   `user.provider`, and `AiService.for(user)` dispatches on it.
-- At 8am on weekdays the Solid Queue cron runs `GenerateDailyExercisesJob`,
-  which builds the day's set from the user's recent performance. A dashboard
+- At 8am on weekdays the Solid Queue cron runs `EnqueueDueGenerationsJob`,
+  which enqueues one `GenerateDailyExercisesJob` per due user; each builds
+  that user's set from their recent performance. A dashboard
   opened with no set generates one on demand and polls `GET /dashboard/status`.
 - A day holds 2-4 sections: `code_review` and `design_comparison` always planned, and
   `DaySize` and `SectionRotation` fill the rest. A fixed Daily sections
