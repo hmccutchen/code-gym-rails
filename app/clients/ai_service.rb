@@ -578,8 +578,13 @@ class AiService
     raise tagged(ProviderError::RefusalError.new("The provider declined this request (#{result[:refusal]})")) if result[:refusal]
     return unless result[:truncated] && !allow_truncated
 
-    raise tagged(ProviderError::TruncatedResponseError.new("Provider did not finish its reply " \
-                                                           "(#{result[:output_tokens].to_i} output tokens, thinking included)"))
+    raise tagged(ProviderError::TruncatedResponseError.new("Provider did not finish its reply (#{output_count_text(result)})"))
+  end
+
+  def output_count_text(result)
+    return "output token count unknown" if result[:tokens_unknown]
+
+    "#{result[:output_tokens].to_i} output tokens, thinking included"
   end
 
   def tagged(error) = error.tap { |e| e.provider = self.class.provider_key }

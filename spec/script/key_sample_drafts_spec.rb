@@ -390,6 +390,18 @@ RSpec.describe KeySampleDrafts do
       end
     end
 
+    describe ".worst_case_label" do
+      it "names a timeout as one" do
+        expect(described_class.worst_case_label("judge_section", { failure: "timeout", tokens_unknown: true }))
+          .to eq("judge_section, timed out: counted at its worst case")
+      end
+
+      it "names a reply whose token counts could not be read as that, not as a timeout" do
+        expect(described_class.worst_case_label("judge_section", { tokens_unknown: true }))
+          .to eq("judge_section, token counts unreadable: counted at its worst case")
+      end
+    end
+
     context "when a call times out" do
       let(:limit)    { 5.0 }
       let(:time_out) { "judge_section" }
