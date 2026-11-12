@@ -204,6 +204,16 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:shell_comments, text)).to eq([ "real" ])
   end
 
+  it "opens no heredoc for << inside quotes, a comment or arithmetic" do
+    text = "#!/bin/sh\necho \"usage: tool <<EOF\"\n# after quotes\necho ready # document <<EOF syntax\n# after comment\nvalue=$((1 << 2))\n# after arithmetic\n"
+
+    expect(comment_bodies(:shell_comments, text)).to eq([ "after quotes", "document <<EOF syntax", "after comment", "after arithmetic" ])
+  end
+
+  it "keeps comments after a heredoc that never closes" do
+    expect(comment_bodies(:shell_comments, "#!/bin/sh\ncat <<EOF\n# real\n")).to eq([ "real" ])
+  end
+
   it "skips file types it has no scanner for" do
     expect(messages("README.md", "# Heading\n\n# Another\n")).to be_empty
   end

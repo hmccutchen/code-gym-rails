@@ -69,22 +69,45 @@ module CommentCheck
     end
 
     def without_heredoc_bodies(text)
-      delimiter = nil
-      text.lines.map do |line|
-        if delimiter
-          delimiter = nil if line.chomp.sub(delimiter[:indent], "") == delimiter[:word]
-          next line.gsub(/[^\n]/, " ")
-        end
-        delimiter = heredoc_delimiter(line)
-        line
-      end.join
+      lines = text.lines
+      index = 0
+      while index < lines.length
+        opener = heredoc_opener(lines[index])
+        index += 1
+        close = opener && (index...lines.length).find { |at| lines[at].chomp.sub(opener[:indent], "") == opener[:word] }
+        next unless close
+
+        (index..close).each { |at| lines[at] = lines[at].gsub(/[^\n]/, " ") }
+        index = close + 1
+      end
+      lines.join
     end
 
-    def heredoc_delimiter(line)
-      return if line.lstrip.start_with?("#")
+    def heredoc_opener(line)
+      opener = line.to_enum(:scan, SHELL_HEREDOC).map { Regexp.last_match }.find { |match| shell_code_at?(line, match.begin(0)) }
+      opener && { word: opener[:word], indent: opener[:dash].empty? ? "" : /\A\t+/ }
+    end
 
-      opener = line.match(SHELL_HEREDOC) or return
-      { word: opener[:word], indent: opener[:dash].empty? ? "" : /\A\t+/ }
+    def shell_code_at?(line, position)
+      quote = nil
+      depth = 0
+      index = 0
+      while index < position
+        char = line[index]
+        step = 1
+        if quote
+          quote = nil if char == quote
+          step = 2 if quote == '"' && char == "\\"
+        elsif char == "\\" then step = 2
+        elsif char == "'" || char == '"' then quote = char
+        elsif char == "#" && (index.zero? || line[index - 1].match?(/\s/)) then return false
+        elsif line[index, 2] == "((" then depth += 1
+        elsif line[index, 2] == "))" then depth -= 1
+        end
+        step = 2 if %w[(( ))].include?(line[index, 2]) && quote.nil?
+        index += step
+      end
+      quote.nil? && depth <= 0
     end
 
     def shebang?(comment)
