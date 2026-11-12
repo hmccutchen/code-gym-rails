@@ -67,12 +67,25 @@ up, so its row stores a null cost (`ProviderError.leaves_tokens_unknown?`,
 true for `TimeoutError` alone). A network error stays at zero, since a
 refused or dropped connection rarely reached the provider. A reply whose
 usage block cannot be read is unknown too (#770): a count that is present but
-not a valid count, a `usage` field that is not an object, or cache counts
-larger than the input total they are part of. Each still reads as 0 so the
-row is written, but `UsageCounts` marks the counts unknown, the row stores a
-null cost, and a `[usage]` warning names the field. Pricing those zeros would
-record a cheaper call than the one billed. A count that is simply absent reads
-as 0 and marks nothing, since Gemini leaves out counts a call did not use.
+not a valid count, a `usage` field that is not an object, cache counts
+larger than the input total they are part of, or two counts that each fit a
+column but add up to more than the one column they share (Gemini's output and
+thought tokens). Each still reads as 0 so the row is written, but
+`UsageCounts` marks the counts unknown, the row stores a null cost, and a
+`[usage]` warning names the field. Pricing those zeros would record a cheaper
+call than the one billed.
+
+Whether a missing count is a problem depends on whether the provider always
+sends it. A required count is one every finished reply carries: the `usage`
+block itself and the input and output totals (Claude's and OpenAI's
+`input_tokens` and `output_tokens`, Gemini's `total_input_tokens` and
+`total_output_tokens`). A required count or usage block that is missing or
+JSON null marks the counts unknown, the same as a malformed one, because a
+row of zeros would claim the call was free. An optional count that is
+missing or null reads as 0 and marks nothing, since the providers leave out
+counts a call did not use: Claude's cache counts, Gemini's
+`total_cached_tokens` and `total_thought_tokens`, and OpenAI's
+`input_tokens_details` and the two counts inside it.
 `model_routing_spec`
 fails when a Claude route has no price, or a zero input or output rate, so
 routing to a new Claude model means pricing it first. The

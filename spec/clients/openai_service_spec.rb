@@ -481,18 +481,23 @@ RSpec.describe OpenaiService do
     end
 
     [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
-      it "keeps only the text parts that are strings and records one usage row when a part's text is #{text.inspect}" do
+      it "reads no text, records one usage row and leaves every caller an InvalidResponseError when any text part's text is #{text.inspect}" do
         allow(Rails.logger).to receive(:error)
         part = { "type" => "output_text", "text" => text }
         result = nil
         expect { result = logged_call(reply(output: [ message({ "type" => "output_text", "text" => "hello" }, part) ])) }
           .to change(ApiUsage, :count).by(1)
-        expect(result).to include(text: "hello")
 
-        alone = logged_call(reply(output: [ message(part) ]))
-        expect { service.send(:text_or_raise, alone, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
-        expect { service.send(:parse_json_object, alone[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+        expect(result).to include(text: nil)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, result[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
       end
+    end
+
+    it "keeps the text when a part whose type is not output_text carries a text that is not a string" do
+      output = [ message({ "type" => "output_text", "text" => "hello" }, { "type" => "summary_text", "text" => 7 }) ]
+
+      expect(logged_call(reply(output: output))).to include(text: "hello")
     end
 
     it "reads no text and records one usage row when a message's content is not a list" do
@@ -519,7 +524,8 @@ RSpec.describe OpenaiService do
                     count_paths: [ [ "usage", "input_tokens" ], [ "usage", "output_tokens" ],
                                    [ "usage", "input_tokens_details", "cached_tokens" ], [ "usage", "input_tokens_details", "cache_write_tokens" ] ],
                     other_paths: [ [ "usage" ], [ "usage", "input_tokens_details" ], [ "output" ], [ "output", 0 ],
-                                   [ "output", 0, "content" ], [ "output", 0, "content", 0 ], [ "output", 0, "content", 0, "text" ] ]
+                                   [ "output", 0, "content" ], [ "output", 0, "content", 0 ], [ "output", 0, "content", 0, "text" ] ],
+                    required_paths: [ [ "usage" ], [ "usage", "input_tokens" ], [ "usage", "output_tokens" ] ]
 
     def logged_usage(usage)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))

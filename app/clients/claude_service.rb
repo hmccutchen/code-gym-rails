@@ -65,10 +65,10 @@ class ClaudeService < AiService
 
   def read_usage(parsed, purpose)
     counts = UsageCounts.new(self.class)
-    usage = counts.object(parsed, "usage")
+    usage = counts.object(parsed, "usage", required: true)
     counts.mark(
-      input_tokens:       counts.count(usage, "input_tokens"),
-      output_tokens:      counts.count(usage, "output_tokens"),
+      input_tokens:       counts.count(usage, "input_tokens", required: true),
+      output_tokens:      counts.count(usage, "output_tokens", required: true),
       model:              routed_model(purpose),
       cache_read_tokens:  counts.count(usage, "cache_read_input_tokens"),
       cache_write_tokens: counts.count(usage, "cache_creation_input_tokens")

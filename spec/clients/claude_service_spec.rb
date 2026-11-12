@@ -716,7 +716,8 @@ RSpec.describe ClaudeService do
 
     it_behaves_like "a provider reading a reply leaf of any shape",
                     count_paths: %w[input_tokens output_tokens cache_read_input_tokens cache_creation_input_tokens].map { |field| [ "usage", field ] },
-                    other_paths: [ [ "usage" ], [ "content" ], [ "content", 0 ], [ "content", 0, "text" ] ]
+                    other_paths: [ [ "usage" ], [ "content" ], [ "content", 0 ], [ "content", 0, "text" ] ],
+                    required_paths: [ [ "usage" ], [ "usage", "input_tokens" ], [ "usage", "output_tokens" ] ]
 
     def logged_usage(usage)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
@@ -735,6 +736,24 @@ RSpec.describe ClaudeService do
       logged_usage("unknown")
 
       expect(ApiUsage.last).to have_attributes(tokens_in: 0, cost_usd: nil)
+    end
+
+    it "stores a null cost when the reply has no usage" do
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.except("usage").to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, tokens_out: 0, cost_usd: nil)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "ClaudeService", "usage is missing")).once
+    end
+
+    %w[input_tokens output_tokens].each do |field|
+      it "stores a null cost when #{field} is absent or null" do
+        logged_usage(counts.except(field))
+        logged_usage(counts.merge(field => nil))
+
+        expect(ApiUsage.last(2).map(&:cost_usd)).to eq([ nil, nil ])
+        expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "ClaudeService", "#{field} is missing")).twice
+      end
     end
 
     it "prices the call when its cache counts are absent or null" do

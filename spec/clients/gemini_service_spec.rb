@@ -585,11 +585,16 @@ RSpec.describe GeminiService do
       end
     end
 
-    it "still returns the reply when counts that each fit add up to more than a usage row holds" do
+    it "records one usage row with the counts marked unknown when counts that each fit add up to more than a usage row holds" do
+      allow(Rails.logger).to receive(:warn)
       largest = ApiUsage.max_token_count
       usage = counts.merge("total_output_tokens" => largest, "total_thought_tokens" => largest)
+      result = nil
 
-      expect(logged_reply(usage: usage)).to include(text: "hello")
+      expect { result = logged_reply(usage: usage) }.to change(ApiUsage, :count).by(1)
+      expect(result).to include(text: "hello", output_tokens: 0, tokens_unknown: true)
+      expect(ApiUsage.last).to have_attributes(tokens_in: 5, tokens_out: 0, cost_usd: nil)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "GeminiService", "total_output_tokens")).once
     end
 
     [ "hello", { "type" => "model_output" }, 7 ].each do |steps|
@@ -607,17 +612,22 @@ RSpec.describe GeminiService do
     end
 
     [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
-      it "keeps only the text parts that are strings and records one usage row when a part's text is #{text.inspect}" do
+      it "reads no text, records one usage row and leaves every caller an InvalidResponseError when any text part's text is #{text.inspect}" do
         allow(Rails.logger).to receive(:error)
         parts = [ { "type" => "text", "text" => "hello" }, { "type" => "text", "text" => text } ]
         result = nil
         expect { result = logged_reply(steps: [ text_step.merge("content" => parts) ]) }.to change(ApiUsage, :count).by(1)
-        expect(result).to include(text: "hello")
 
-        alone = logged_reply(steps: [ text_step.merge("content" => parts.drop(1)) ])
-        expect { service.send(:text_or_raise, alone, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
-        expect { service.send(:parse_json_object, alone[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+        expect(result).to include(text: nil)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, result[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
       end
+    end
+
+    it "keeps the text when a part whose type is not text carries a text that is not a string" do
+      parts = [ { "type" => "text", "text" => "hello" }, { "type" => "thought", "text" => 7 } ]
+
+      expect(logged_reply(steps: [ text_step.merge("content" => parts) ])).to include(text: "hello")
     end
 
     it "skips content parts that are not objects and reads no text from a content that is not a list" do
@@ -642,7 +652,8 @@ RSpec.describe GeminiService do
     it_behaves_like "a provider reading a reply leaf of any shape",
                     count_paths: %w[total_input_tokens total_cached_tokens total_output_tokens total_thought_tokens].map { |field| [ "usage", field ] },
                     other_paths: [ [ "usage" ], [ "steps" ], [ "steps", 0 ], [ "steps", 0, "content" ],
-                                   [ "steps", 0, "content", 0 ], [ "steps", 0, "content", 0, "text" ] ]
+                                   [ "steps", 0, "content", 0 ], [ "steps", 0, "content", 0, "text" ] ],
+                    required_paths: [ [ "usage" ], [ "usage", "total_input_tokens" ], [ "usage", "total_output_tokens" ] ]
 
     def logged_usage(usage)
       service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))

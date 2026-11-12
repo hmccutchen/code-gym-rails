@@ -89,7 +89,7 @@ class OpenaiService < AiService
 
     content = object_list(parsed, "output").select { |item| item["type"] == "message" }.flat_map { |item| object_list(item, "content") }
     usage.merge(
-      text:      content.select { |part| part["type"] == "output_text" }.filter_map { |part| string_field(part, "text") }.join,
+      text:      joined_text(content.select { |part| part["type"] == "output_text" }),
       truncated: parsed["status"] == "incomplete" && !filtered?(parsed),
       refusal:   refusal_category(parsed, content)
     )
@@ -97,14 +97,14 @@ class OpenaiService < AiService
 
   def read_usage(parsed, route)
     counts = UsageCounts.new(self.class)
-    usage = counts.object(parsed, "usage")
+    usage = counts.object(parsed, "usage", required: true)
     details = counts.object(usage, "input_tokens_details")
     cached_tokens = counts.count(details, "cached_tokens")
     cache_write_tokens = counts.count(details, "cache_write_tokens")
 
     counts.mark(
-      input_tokens:  counts.uncached(counts.count(usage, "input_tokens"), cached_tokens, cache_write_tokens, field: "input_tokens"),
-      output_tokens: counts.count(usage, "output_tokens"),
+      input_tokens:  counts.uncached(counts.count(usage, "input_tokens", required: true), cached_tokens, cache_write_tokens, field: "input_tokens"),
+      output_tokens: counts.count(usage, "output_tokens", required: true),
       model:         route[:model],
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: cache_write_tokens

@@ -315,9 +315,11 @@ smaller call, so the call's counts are also marked unknown and a Claude row
 stores a null cost (`docs/code-notes/app/clients/usage_counts.md`).
 
 Two counts that each fit can still add up to more than a column holds, such as
-Gemini's output and thought tokens. `#log_usage` therefore rescues
-`ActiveModel::RangeError` as well as `ActiveRecord::ActiveRecordError`: the
-row is lost and a warning logged, but the reply still reaches the caller.
+Gemini's output and thought tokens. `UsageCounts#sum` reads such a total as 0
+and marks the counts unknown, so the row is still written. `#log_usage` also
+rescues `ActiveModel::RangeError` as well as `ActiveRecord::ActiveRecordError`
+as a backstop: if a total ever reached it, the row would be lost and a warning
+logged, but the reply would still reach the caller.
 
 ## `#string_field`
 
@@ -330,8 +332,18 @@ fail, though. `#text_or_raise` returned the Ruby form of the value, such as
 `{"a" => 1}`, and the duck or a follow-up showed it as the reply, while Gemini
 and OpenAI joined a number or a list into the text beside the real parts. Now
 Claude reads no text from such a block, so the caller raises
-`InvalidResponseError` as for a reply with no text, and Gemini and OpenAI keep
-only the parts whose text is a string.
+`InvalidResponseError` as for a reply with no text.
+
+## `#joined_text`
+
+Gemini and OpenAI send a reply's text as a list of parts. `#joined_text`
+joins the text of the parts each provider picked as text, and returns nil when
+any one of them is not a string, so the caller raises `InvalidResponseError`
+as it does for Claude. Keeping the other parts would hand the caller a reply
+with a piece missing from the middle, which reads as whole and is not. A list
+with no text parts still joins to empty text. Elements that are not objects
+are dropped earlier, by `#object_list`, and a part of another type is never
+read, so neither makes the reply unreadable.
 
 ## `#log_raw_snippet`
 
