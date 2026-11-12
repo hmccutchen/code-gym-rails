@@ -7,13 +7,21 @@ module CommentCheck
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
     SHELL_HEREDOC = /(?<!<)<<(?!<)(?<dash>-?)[ \t]*(?<quote>['"]?)(?<word>\w+)\k<quote>/
+    DOCKERFILE_DIRECTIVE = /\A#[ \t]*[a-z][a-z-]*[ \t]*=/i
     SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function
 
     def for(path, text = nil)
       extension = File.extname(path)
-      extension.empty? ? for_shebang(text.to_s.lines.first.to_s) : for_extension(extension)
+      for_file_name(File.basename(path)) || (extension.empty? ? for_shebang(text.to_s.lines.first.to_s) : for_extension(extension))
+    end
+
+    def for_file_name(name)
+      case name
+      when "Dockerfile" then method(:dockerfile_comments)
+      when ".gitignore", ".dockerignore" then method(:ignore_file_comments)
+      end
     end
 
     def for_shebang(line)
@@ -52,6 +60,24 @@ module CommentCheck
     def yaml_block_scalars(node)
       block = node.is_a?(Psych::Nodes::Scalar) && [ Psych::Nodes::Scalar::LITERAL, Psych::Nodes::Scalar::FOLDED ].include?(node.style)
       (block ? [ node ] : []) + Array(node.children).flat_map { |child| yaml_block_scalars(child) }
+    end
+
+    def ignore_file_comments(text)
+      whole_line_comments(text, /\A#/)
+    end
+
+    def dockerfile_comments(text)
+      directives = text.lines.take_while { |line| line.match?(DOCKERFILE_DIRECTIVE) }.size
+      whole_line_comments(without_heredoc_bodies(text), /\A[ \t]*#/).reject { |comment| comment.first_line <= directives }
+    end
+
+    def whole_line_comments(text, opener)
+      offset = 0
+      text.lines.filter_map do |line|
+        start = offset
+        offset += line.length
+        Located.comment(text, start + line.index("#"), start + line.length, 0) if line.match?(opener)
+      end
     end
 
     def python_comments(text)

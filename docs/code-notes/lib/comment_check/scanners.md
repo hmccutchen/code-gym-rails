@@ -6,7 +6,16 @@
 
 - A `bash` or `sh` shebang (`#!/bin/bash -e`, `#!/usr/bin/env sh`) gets the shell scanner. It reads `#` comments that follow whitespace or start a line, so `$#` and `${#items[@]}` are not comments, and it ignores the shebang itself. A heredoc's body (`cat <<'EOF'` through `EOF`, quoted or not, and `<<-` with tab-indented lines) is text passed to a command, so the scanner blanks it, keeping line positions, before it looks for comments. A `<<` opens a heredoc only in shell code: not inside quotes (`echo "usage: tool <<EOF"`), not after a `#` that starts a comment, and not inside `((...))` arithmetic (`$((1 << 2))`). A heredoc whose delimiter line never appears is not blanked at all, so a false match can never hide the rest of a file.
 - A Ruby shebang gets no scanner. RuboCop already reads Ruby files, by extension or by the same shebang, and the house cops apply the comment rules there; reading them here too would report every offense twice. Ruby files with an extension are split the same way, since `.rb` has no entry in the extension table.
-- Anything else, including a file with no shebang (`Gemfile`, `Dockerfile`), gets no scanner.
+- Anything else, including a file with no shebang (`Gemfile`), gets no scanner.
+
+## Files picked by name
+
+`Scanners.for` checks the file's base name first, so a nested `app/.gitignore` counts as well as the root one. `File.extname(".gitignore")` is empty, which is why these files used to fall into the shebang path and get no scanner.
+
+- `.gitignore` and `.dockerignore` (`Scanners.ignore_file_comments`): a comment is a line whose first character is `#`. A `#` later in a line is part of the pattern, `\#` matches a literal hash, and an indented `#` is a pattern too. Git does not strip leading whitespace. Docker's reader does not strip it before the comment test either, as far as we know, so one rule serves both and, where unsure, errs toward counting fewer comments.
+- `Dockerfile` (`Scanners.dockerfile_comments`): a comment is a line that starts with `#`, after optional whitespace. A `#` in the middle of an instruction is an argument. The parser directives at the top (`# syntax=...`, `# check=...`, `# escape=...`) are tooling, like a shebang, and are not counted: the scanner skips the run of `# key=value` lines at the start of the file. The body of a `RUN <<EOF` heredoc is blanked first, using the same helper as the shell scanner. A file named `Dockerfile.something` gets no scanner, because the repository has none.
+
+Both use `Scanners.whole_line_comments`, which reports only comments that start a line, so every comment is an own-line comment and the attachment rule applies to it.
 
 `CommentCheck.checked_path?` opens only files with no extension, and reads only their first line, so deciding which files to check stays cheap on a full-repository run.
 

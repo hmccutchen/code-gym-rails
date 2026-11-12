@@ -133,6 +133,38 @@ RSpec.describe CommentCheck do
     )
   end
 
+  it "picks a hash-comment scanner for a Dockerfile, .gitignore and .dockerignore by file name, at any depth" do
+    scanners = %w[Dockerfile .gitignore .dockerignore app/.gitignore vendor/x/.dockerignore].map { described_class::Scanners.for(_1, "") }
+
+    expect(scanners.map(&:name)).to eq(%i[dockerfile_comments ignore_file_comments ignore_file_comments ignore_file_comments ignore_file_comments])
+    expect(described_class::Scanners.for("docs/Dockerfile.md", "")).to be_nil
+    expect(%w[Dockerfile .gitignore .dockerignore].map { described_class.checked_path?(_1) }).to all(be(true))
+  end
+
+  it "reads an ignore file comment only when the line starts with a hash" do
+    text = "# One\n/a#b\n  # indented is a pattern\n\\#escaped\n/c # part of the pattern\n"
+
+    expect(comment_bodies(:ignore_file_comments, text)).to eq([ "One" ])
+  end
+
+  it "reads a Dockerfile comment only at the start of a line, and skips parser directives" do
+    text = "# syntax=docker/dockerfile:1\n# check=error=true\n# escape=`\n# Real\nRUN echo # not a comment\n  # indented\nENV A=\"#b\"\n"
+
+    expect(comment_bodies(:dockerfile_comments, text)).to eq([ "Real", "indented" ])
+  end
+
+  it "treats a RUN heredoc body in a Dockerfile as content" do
+    text = "RUN <<EOF\n# in the script\nEOF\n# After\n"
+
+    expect(comment_bodies(:dockerfile_comments, text)).to eq([ "After" ])
+  end
+
+  it "reports offenses in a Dockerfile and an ignore file" do
+    expect(messages("Dockerfile", "FROM ruby\n# One\n\nRUN true\n")).to eq([ [ 2, "Put the comment directly above the code it discusses." ] ])
+    expect(messages(".gitignore", "# One\n# Two\n/log\n")).to include([ 2, "Keep each comment to a single line." ])
+    expect(messages(".dockerignore", (1..6).map { "# c#{_1}\n/a#{_1}\n" }.join)).to eq([ [ 11, "This file has 6 comments; the limit is 5." ] ])
+  end
+
   def comment_bodies(scanner, text) = described_class::Scanners.public_send(scanner, text).map(&:body)
 
   it "does not read a JavaScript regex literal as a comment" do

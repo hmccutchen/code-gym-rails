@@ -84,7 +84,9 @@ deadline or a "temporary" comment. The one exemption is a skill vendored under
 `bin/comment-check` scans that folder. CI enforces the first three, so a
 broken one fails the build: RuboCop in Ruby files, and `bin/comment-check` in
 ERB (including its `<script>` and `<style>` blocks), JavaScript, CSS, YAML,
-Python and shell scripts (read by their shebang). The cop names below are the
+Python, shell scripts (read by their shebang), the `Dockerfile`, `.gitignore`
+and `.dockerignore` (a comment there is a whole line starting with `#`). The
+cop names below are the
 Ruby side.
 
 - **Each comment is attached to the code it comments on.** It sits on the line
