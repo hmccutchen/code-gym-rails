@@ -15,7 +15,9 @@ class ApiKeysController < ApplicationController
   rate_limit to: KEY_SAVES_PER_HOUR_BY_IP, within: 1.hour, with: -> { key_saves_limited },
              store: RATE_LIMIT_STORE, name: "key_saves_by_ip", only: :update, if: :key_pasted?
 
-  SAVED_NOTICES = { accepted: "key_saved", refused: "key_saved_check_refused", unanswered: "key_saved_unchecked" }.freeze
+  SAVED_NOTICES = { accepted: "key_saved", refused: "key_saved_check_refused", unanswered: "key_saved_unchecked",
+                    skipped: "key_saved_without_check" }.freeze
+  SKIP_CHECK = "1"
 
   # GET /setup
   def edit
@@ -29,8 +31,8 @@ class ApiKeysController < ApplicationController
     provider = AiProvider.detect(pasted_key)
     return render_key_alert(t("flash.api_keys.unrecognized_key")) unless provider
 
-    result = AiService.check_key(provider, pasted_key)
-    return render_key_alert(key_rejected_text(provider)) if result == :rejected
+    result = skip_check? ? AiService.skip_key_check(provider) : AiService.check_key(provider, pasted_key)
+    return render_key_alert(key_rejected_text(provider), offer_unchecked_save: true) if result == :rejected
 
     store_key(provider)
     redirect_to root_path, notice: t("flash.api_keys.#{SAVED_NOTICES.fetch(result)}", provider: AiProvider.label(provider))
@@ -57,7 +59,10 @@ class ApiKeysController < ApplicationController
     end
   end
 
-  def render_key_alert(message, status: :unprocessable_content)
+  def skip_check? = params[:skip_check] == SKIP_CHECK
+
+  def render_key_alert(message, status: :unprocessable_content, offer_unchecked_save: false)
+    @offer_unchecked_save = offer_unchecked_save
     flash.now[:alert] = message
     render :edit, status: status
   end

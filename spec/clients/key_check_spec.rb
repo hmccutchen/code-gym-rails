@@ -203,6 +203,15 @@ RSpec.describe "checking a key with a provider", :real_key_check do
         .to raise_error(SetupError) { |error| expect(error.message).not_to include("SecretKeyValue") }
     end
 
+    it "has a skipped twin that asks no provider, applies the same gate and logs the skip" do
+      expect_any_instance_of(ClaudeService).not_to receive(:key_check_connection)
+
+      output = logged { expect(AiService.skip_key_check("anthropic")).to eq(:skipped) }
+
+      expect(output).to eq("[key_check] provider=anthropic result=skipped\n")
+      expect { AiService.skip_key_check("nobody") }.to raise_error(SetupError)
+    end
+
     it "answers for the fake provider in a local environment" do
       expect(AiService.check_key("fake", "fake-test-key")).to eq(:accepted)
     end

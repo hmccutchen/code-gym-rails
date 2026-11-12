@@ -57,6 +57,12 @@
       </div>
       <p class="card-note"><%= t("api_keys.edit.language_hint") %></p>
       <%= f.button t("api_keys.edit.save"), type: "submit", name: "commit", value: t("api_keys.edit.save"), class: "btn btn-primary btn-block" %>
+      <% if @offer_unchecked_save %>
+        <div class="unchecked-save">
+          <p class="card-note"><%= t("api_keys.edit.save_unchecked_hint") %></p>
+          <%= f.button t("api_keys.edit.save_unchecked"), type: "submit", name: "skip_check", value: ApiKeysController::SKIP_CHECK, class: "btn btn-ghost btn-block" %>
+        </div>
+      <% end %>
     <% end %>
   </section>
 

@@ -310,6 +310,141 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
     end
   end
 
+  describe "saving a rejected key without checking" do
+    let(:key) { "sk-ant-api03-PastedSecret" }
+    let(:button) { "button[type=submit][name=skip_check][value='1']" }
+    let(:hint) { "If you're sure the key is right, paste it again and save it without checking." }
+
+    def page = Nokogiri::HTML(response.body)
+
+    it "is offered on the form that follows a rejection, after the ordinary save, with nothing of the key kept" do
+      stub_key_check(ClaudeService, status: 401)
+
+      output = logged { patch setup_path, params: { api_key: key } }
+
+      form = page.at_css("form[action='#{setup_path}']")
+      expect(form.css("button[type=submit]").map { |b| b.text.strip }).to eq([ "Save", "Save without checking" ])
+      expect(form.at_css(button)["class"]).to eq("btn btn-ghost btn-block")
+      expect(form.at_css(".unchecked-save .card-note").text).to eq(hint)
+      expect(response.body).not_to include(key)
+      expect(form.css("input[type=hidden]").map { |input| input["name"] } - %w[_method authenticity_token]).to be_empty
+      expect(page.css("input").map { |input| input["value"].to_s }.join).not_to include("PastedSecret")
+      expect(page.at_css("input[name=api_key]")["value"]).to be_nil
+      expect(session.to_h.to_s).not_to include(key)
+      expect(response.headers["Set-Cookie"].to_s).not_to include(key)
+      expect(flash.to_h.to_s).not_to include(key)
+      expect(output).not_to include(key)
+    end
+
+    it "is not offered on a fresh Setup page" do
+      get setup_path
+
+      expect(page.at_css(button)).to be_nil
+      expect(response.body).not_to include(hint)
+    end
+
+    it "is not offered after an unrecognized format, with or without the parameter" do
+      [ {}, { skip_check: "1" } ].each do |extra|
+        patch setup_path, params: { api_key: "not-a-real-key", **extra }
+
+        expect(response.body).to include("We don&#39;t recognize this key format")
+        expect(page.at_css(button)).to be_nil
+      end
+    end
+
+    it "stores the key pasted again with the button, calling no provider and saying it was not checked" do
+      user.update!(generation_account_failures: KeyHold::AFTER)
+      requests = stub_key_check(ClaudeService, status: 401)
+      patch setup_path, params: { api_key: key }
+      expect(user.reload.api_keys).to be_nil
+
+      output = logged { patch setup_path, params: { api_key: "  #{key}\n", skip_check: "1", language: "javascript" } }
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq("Saved without checking. If your first set fails, check the key in your Claude account.")
+      expect(requests.size).to eq(1)
+      user.reload
+      expect(user.api_keys).to eq("anthropic" => key)
+      expect(user.provider).to eq("anthropic")
+      expect(user.language).to eq("javascript")
+      expect(user.generation_account_failures).to eq(0)
+      expect(output).to include("[key_check] provider=anthropic result=skipped\n")
+      expect(output).not_to include(key)
+      expect(output).not_to match(/\[key_check\].*status=/)
+    end
+
+    it "builds no connection at all for a skipped check" do
+      PASTED.each_value { |facts| expect_any_instance_of(facts[:service]).not_to receive(:key_check_connection) }
+
+      PASTED.each_value { |facts| patch setup_path, params: { api_key: facts[:key], skip_check: "1" } }
+
+      expect(user.reload.stored_providers).to match_array(PASTED.keys)
+    end
+
+    it "merges under the row lock as a checked save does" do
+      user.update!(provider: "openai", api_keys: { "openai" => "sk-proj-kept" })
+      requests = stub_key_check(ClaudeService)
+
+      patch setup_path, params: { api_key: key, skip_check: "1" }
+
+      expect(requests).to be_empty
+      expect(user.reload.api_keys).to eq("openai" => "sk-proj-kept", "anthropic" => key)
+    end
+
+    { "an embedded newline" => "sk-ant-api03-Pasted\nSecret", "a space inside" => "sk-ant-api03-Pasted Secret",
+      "too many characters" => "sk-ant-api03-#{'A' * 5_000}", "an unknown prefix" => "not-a-real-key" }.each do |name, bad|
+      it "still refuses a key with #{name}" do
+        patch setup_path, params: { api_key: bad, skip_check: "1" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include("We don&#39;t recognize this key format")
+        expect(user.reload.api_keys).to be_nil
+      end
+    end
+
+    it "treats a blank key field as a preferences-only save" do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing" })
+
+      output = logged { patch setup_path, params: { api_key: " ", skip_check: "1", language: "javascript" } }
+
+      expect(flash[:notice]).to eq(I18n.t("flash.api_keys.preferences_saved"))
+      expect(user.reload.api_keys).to eq("anthropic" => "sk-ant-existing")
+      expect(output).not_to include("[key_check]")
+    end
+
+    [ "true", "on", "yes", "0", "", "11", " 1", [ "1" ], { "a" => "1" } ].each do |value|
+      it "checks the key as usual when the parameter is #{value.inspect}" do
+        requests = stub_key_check(ClaudeService, status: 401)
+
+        patch setup_path, params: { api_key: key, skip_check: value }
+
+        expect(requests.size).to eq(1)
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(user.reload.api_keys).to be_nil
+      end
+    end
+
+    describe "past the limit on saving keys" do
+      before { allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new) }
+
+      it "is refused as a checked save is, and the limited form does not offer it" do
+        requests = stub_key_check(ClaudeService)
+
+        (ApiKeysController::KEY_SAVES_PER_HOUR + 1).times { |n| patch setup_path, params: { api_key: "#{key}#{n}", skip_check: "1" } }
+
+        expect(requests).to be_empty
+        expect(response).to have_http_status(:too_many_requests)
+        expect(page.at_css(button)).to be_nil
+        expect(user.reload.api_key).to eq("#{key}#{ApiKeysController::KEY_SAVES_PER_HOUR - 1}")
+      end
+    end
+
+    it "is an outcome of the controller's, not a result a check returns" do
+      expect(AiService::KEY_CHECK_RESULTS).not_to include(:skipped)
+      expect(ApiKeysController::SAVED_NOTICES.keys).to match_array(AiService::KEY_CHECK_RESULTS - [ :rejected ] + [ :skipped ])
+    end
+  end
+
   it "has a response for every result the check can return" do
     AiService::KEY_CHECK_RESULTS.each do |result|
       allow_any_instance_of(ClaudeService).to receive(:check_key).and_return(result)

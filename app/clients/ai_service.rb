@@ -115,12 +115,21 @@ class AiService
 
   KEY_CHECK_RESULTS = %i[accepted rejected refused unanswered].freeze
 
-  def self.check_key(provider_key, api_key)
+  def self.check_key(provider_key, api_key) = key_check_provider(provider_key).new(api_key).check_key
+
+  def self.skip_key_check(provider_key)
+    Rails.logger.info("#{key_check_tag(key_check_provider(provider_key))} result=skipped")
+    :skipped
+  end
+
+  def self.key_check_provider(provider_key)
     provider = AiProvider.find(provider_key)
     raise SetupError, "No usable AI provider named #{provider_key.inspect} to check a key with" unless provider&.available?
 
-    provider.new(api_key).check_key
+    provider
   end
+
+  def self.key_check_tag(provider) = "[key_check] provider=#{provider.provider_key}"
 
   def check_key
     response = Timeout.timeout(CallProfiles::KEY_CHECK_TOTAL_SECONDS) { key_check_connection.get(self.class::MODELS_URL) }
@@ -447,7 +456,7 @@ class AiService
   end
 
   def log_key_check(outcome, level = :info)
-    Rails.logger.public_send(level, "[key_check] provider=#{self.class.provider_key} #{outcome}")
+    Rails.logger.public_send(level, "#{AiService.key_check_tag(self.class)} #{outcome}")
   end
 
   def provider_connection(retry_options, headers)
