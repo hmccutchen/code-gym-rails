@@ -26,11 +26,24 @@ module GenerationPause
     end
   end
 
+  def pause_for_unopened_sets!
+    with_lock do
+      today = today_in_own_zone
+      due = !daily_exercises.for_date(today).exists? && UnopenedSets.pause?(daily_exercises.latest_openings, today: today)
+      due ? pause_generation!(source: AUTOMATIC_PAUSE) : :running
+    end
+  end
+
   def clear_generation_pause!
-    update!(paused_generation_at: nil, generation_pause_source: nil)
+    with_lock do
+      daily_exercises.acknowledge_unopened!(today: today_in_own_zone)
+      update!(paused_generation_at: nil, generation_pause_source: nil)
+    end
   end
 
   private
+
+  def today_in_own_zone = Time.current.in_time_zone(effective_time_zone).to_date
 
   # The pause time is User#held_exercise's floor, so a repeated pause changes the source at most.
   def keep_generation_paused(source)

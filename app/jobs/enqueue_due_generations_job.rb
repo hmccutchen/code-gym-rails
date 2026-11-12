@@ -6,6 +6,7 @@ class EnqueueDueGenerationsJob < ApplicationJob
 
   def perform
     fills_ran = !SchemaWait.migrations_pending?
+    Rails.logger.warn("Generation hand-out skipped the unopened-set pause check: a migration is pending") unless fills_ran
     ScheduledGeneration.users.find_each do |user|
       Time.use_zone(user.effective_time_zone) { enqueue_or_nudge(user, check_unopened: fills_ran) }
     rescue StandardError => e
@@ -28,7 +29,7 @@ class EnqueueDueGenerationsJob < ApplicationJob
   end
 
   def pause_for_unopened_sets(user)
-    return unless user.pause_generation!(source: User::AUTOMATIC_PAUSE) == :paused
+    return unless user.pause_for_unopened_sets! == :paused
 
     Rails.logger.info("Paused generation for user #{user.id}: the last #{UnopenedSets::PAUSE_AFTER} sets went unopened")
   end

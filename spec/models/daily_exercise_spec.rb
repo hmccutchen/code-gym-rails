@@ -268,6 +268,67 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe ".acknowledge_unopened!" do
+    let(:today) { Date.new(2026, 11, 12) }
+    let(:resumed_at) { Time.utc(2026, 11, 12, 15) }
+    let(:written) { Time.utc(2026, 11, 1, 13) }
+
+    def set_on(date, owner: user, **columns)
+      DailyExercise.create!(user: owner, date: date, problem_set: { "code_review" => {} }, generated_at: written,
+                            created_at: written, updated_at: written, **columns)
+    end
+
+    def with_response(set)
+      DailyResponse.create!(user: set.user, daily_exercise: set, date: set.date, answers: {})
+      set
+    end
+
+    it "stamps every set of the user that counts as unopened, and says how many" do
+      old = [ today - 9, today - 2, today - 1 ].map { |date| set_on(date) }
+
+      expect(user.daily_exercises.acknowledge_unopened!(today: today, at: resumed_at)).to eq(3)
+
+      expect(old.map { |set| set.reload.opened_at }).to eq([ resumed_at ] * 3)
+    end
+
+    it "leaves today's set, a set with a response row, a set already opened and another user's sets as they are" do
+      opened = Time.utc(2026, 11, 10, 9)
+      todays = set_on(today)
+      saved = with_response(set_on(today - 1))
+      seen = set_on(today - 2, opened_at: opened)
+      theirs = set_on(today - 1, owner: User.create!(email: "other-owner@example.com"))
+
+      expect(user.daily_exercises.acknowledge_unopened!(today: today, at: resumed_at)).to eq(0)
+
+      expect([ todays, saved, seen, theirs ].map { |set| set.reload.opened_at }).to eq([ nil, nil, opened, nil ])
+    end
+
+    it "writes one statement and leaves updated_at alone" do
+      sets = [ today - 2, today - 1 ].map { |date| set_on(date) }
+      queries = []
+      counting = ->(*, payload) { queries << payload[:sql] unless payload[:name] == "SCHEMA" || payload[:sql].match?(/SAVEPOINT/) }
+
+      ActiveSupport::Notifications.subscribed(counting, "sql.active_record") do
+        user.daily_exercises.acknowledge_unopened!(today: today, at: resumed_at)
+      end
+
+      expect(queries.size).to eq(1)
+      expect(sets.map { |set| set.reload.updated_at }).to eq([ written, written ])
+    end
+
+    it "stamps exactly the sets UnopenedSets calls unopened, so the stamp and the pause decision cannot drift apart" do
+      sets = [ set_on(today), set_on(today - 1), with_response(set_on(today - 2)), set_on(today - 3, opened_at: written),
+               with_response(set_on(today - 4, opened_at: written)), set_on(today - 5) ]
+      counted = user.daily_exercises.latest_openings(sets.size).select { |entry| UnopenedSets.unopened?(entry, today: today) }
+
+      user.daily_exercises.acknowledge_unopened!(today: today, at: resumed_at)
+
+      stamped = sets.select { |set| set.reload.opened_at == resumed_at }
+      expect(stamped.map(&:date)).to match_array(counted.map(&:date))
+      expect(stamped.map(&:date)).to contain_exactly(today - 1, today - 5)
+    end
+  end
+
   describe "#mark_opened!" do
     let(:generated) { Time.utc(2026, 11, 10, 13) }
     let(:set) do

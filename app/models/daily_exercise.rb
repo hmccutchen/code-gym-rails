@@ -31,6 +31,10 @@ class DailyExercise < ApplicationRecord
   validates :language, inclusion: { in: LANGUAGES }
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
+  # The same rule as UnopenedSets.unopened?, in SQL; daily_exercise_spec holds the two equal.
+  scope :unopened_before, ->(today) { where(opened_at: nil, date: ...today).where.missing(:daily_response) }
+
+  def self.acknowledge_unopened!(today:, at: Time.current) = unopened_before(today).update_all(opened_at: at)
 
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
