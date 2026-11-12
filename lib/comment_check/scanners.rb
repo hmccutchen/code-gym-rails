@@ -98,20 +98,22 @@ module CommentCheck
       lines = text.lines
       index = 0
       while index < lines.length
-        opener = heredoc_opener(lines[index])
+        openers = heredoc_openers(lines[index])
         index += 1
-        close = opener && (index...lines.length).find { |at| lines[at].chomp.sub(opener[:indent], "") == opener[:word] }
-        next unless close
+        openers.each do |opener|
+          close = (index...lines.length).find { |at| lines[at].chomp.sub(opener[:indent], "") == opener[:word] }
+          break unless close
 
-        (index..close).each { |at| lines[at] = lines[at].gsub(/[^\n]/, " ") }
-        index = close + 1
+          (index..close).each { |at| lines[at] = lines[at].gsub(/[^\n]/, " ") }
+          index = close + 1
+        end
       end
       lines.join
     end
 
-    def heredoc_opener(line)
-      opener = line.to_enum(:scan, SHELL_HEREDOC).map { Regexp.last_match }.find { |match| shell_code_at?(line, match.begin(0)) }
-      opener && { word: opener[:word], indent: opener[:dash].empty? ? "" : /\A\t+/ }
+    def heredoc_openers(line)
+      line.to_enum(:scan, SHELL_HEREDOC).map { Regexp.last_match }.select { |match| shell_code_at?(line, match.begin(0)) }
+          .map { |match| { word: match[:word], indent: match[:dash].empty? ? "" : /\A\t+/ } }
     end
 
     def shell_code_at?(line, position)

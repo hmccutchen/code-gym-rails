@@ -165,6 +165,12 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:dockerfile_comments, text)).to eq([ "After" ])
   end
 
+  it "treats every heredoc body a Dockerfile instruction opens as content" do
+    text = "RUN <<FIRST cat && <<SECOND cat\n# first body\nFIRST\n# second body\nSECOND\n# After\n"
+
+    expect(comment_bodies(:dockerfile_comments, text)).to eq([ "After" ])
+  end
+
   it "reports offenses in a Dockerfile and an ignore file" do
     expect(messages("Dockerfile", "FROM ruby\n# One\n\nRUN true\n")).to eq([ [ 2, "Put the comment directly above the code it discusses." ] ])
     expect(messages(".gitignore", "# One\n# Two\n/log\n")).to include([ 2, "Keep each comment to a single line." ])
@@ -246,6 +252,12 @@ RSpec.describe CommentCheck do
     text = "#!/bin/sh\necho \"usage: tool <<EOF\"\n# after quotes\necho ready # document <<EOF syntax\n# after comment\nvalue=$((1 << 2))\n# after arithmetic\n"
 
     expect(comment_bodies(:shell_comments, text)).to eq([ "after quotes", "document <<EOF syntax", "after comment", "after arithmetic" ])
+  end
+
+  it "skips the body of every heredoc one shell line opens" do
+    text = "#!/bin/sh\ncat <<ONE <<'TWO'\n# one\nONE\n# two\nTWO\n# real\necho hi\n"
+
+    expect(comment_bodies(:shell_comments, text)).to eq([ "real" ])
   end
 
   it "keeps comments after a heredoc that never closes" do
