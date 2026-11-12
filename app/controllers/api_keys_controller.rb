@@ -66,6 +66,7 @@ class ApiKeysController < ApplicationController
 
   def render_key_alert(message, status: :unprocessable_content, offer_unchecked_save: false)
     @offer_unchecked_save = offer_unchecked_save
+    @key_error = message
     flash.now[:alert] = message
     render :edit, status: status
   end

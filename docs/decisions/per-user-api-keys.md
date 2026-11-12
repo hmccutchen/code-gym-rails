@@ -159,6 +159,10 @@ rejection it gave a made-up one. A check that wrongly rejected a working
 key would lock a paying person out of Setup with no way round it, so a
 rejection is never final.
 
+- **Where the person sees it.** The rejection is shown in the page alert
+  and again directly above the key field, which takes focus on that render,
+  so the browser brings the field, Save and the offer below into view
+  without a script (`docs/code-notes/app/views/api_keys/edit.html.md`).
 - **What the person sees.** The form that follows a rejection keeps its
   Save button and adds, below it, the line "If you're sure the key is right,
   paste it again and save it without checking." and a second button, "Save

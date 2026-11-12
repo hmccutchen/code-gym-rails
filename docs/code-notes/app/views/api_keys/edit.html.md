@@ -17,6 +17,27 @@ A key the provider rejected re-renders this page without saving anything,
 and the person's language choice should still be there when they correct
 the key. The key field stays empty, since a key is never echoed.
 
+## The message at the key field
+
+When a save is refused because of the key (a rejection, an unrecognized
+format, the save limit, or no key at all), the controller sets
+`@key_error`, and the sentence is shown twice: in the page alert at the
+top, as every failure on this page is, and again directly above the key
+field (`#api-key-error`, the same `flash alert` classes). At phone width
+the field sits about 1,200 px below the top alert when the key guide is
+showing, so the top alert alone left the person to scroll and hunt for the
+field and for "Save without checking". The two copies are never on one
+phone screen.
+
+On that render the field carries `autofocus`, which moves focus to it and
+makes the browser scroll it into view with no script, as the login code
+form does. It is `aria-invalid` and `aria-describedby` the copy beside it,
+not the top alert, so a screen reader hears the sentence once with the
+field. A fresh Setup page has none of the three attributes. In a 390 by 844
+viewport the first screen after a rejection shows the sentence, the field,
+Save and the "save it without checking" line; the second button's top edge
+is at the bottom of the screen.
+
 ## "Save without checking"
 
 Rendered only when the controller set `@offer_unchecked_save`, which it

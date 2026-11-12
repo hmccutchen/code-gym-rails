@@ -359,6 +359,73 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
     end
   end
 
+  describe "where a refused save says so" do
+    let(:key) { "sk-ant-api03-PastedSecret" }
+
+    def page = Nokogiri::HTML(response.body)
+    def field = page.at_css("form[action='#{setup_path}'] input[name=api_key]")
+
+    def expect_message_at_the_field(sentence)
+      error = page.at_css("form[action='#{setup_path}'] .form-field #api-key-error")
+      expect(error.text).to eq(sentence)
+      expect(error["class"]).to eq("flash alert")
+      expect(field["aria-invalid"]).to eq("true")
+      expect(field["aria-describedby"]).to eq("api-key-error")
+      expect(field.has_attribute?("autofocus")).to be(true)
+      expect(field["value"]).to be_nil
+      expect(page.at_css("#flash-alert").text).to eq(sentence)
+      expect(page.css("[autofocus]").size).to eq(1)
+    end
+
+    it "repeats a rejection beside the key field, marks the field invalid and focuses it" do
+      stub_key_check(ClaudeService, status: 401)
+
+      patch setup_path, params: { api_key: key }
+
+      expect_message_at_the_field("Claude didn't accept your API key, so it wasn't saved.")
+    end
+
+    it "puts the message before the field and keeps Save, then Save without checking, after it" do
+      stub_key_check(ClaudeService, status: 401)
+
+      patch setup_path, params: { api_key: key }
+
+      order = page.at_css("form[action='#{setup_path}']").css("#api-key-error, input[name=api_key], button[type=submit]")
+      expect(order.map { |node| node["id"] == "api-key-error" ? "error" : node["name"] }).to eq(%w[error api_key commit skip_check])
+      expect(page.at_css("button[name=commit] + .unchecked-save button[name=skip_check]")).to be_present
+    end
+
+    it "does the same for an unrecognized format" do
+      patch setup_path, params: { api_key: "not-a-real-key" }
+
+      expect_message_at_the_field(I18n.t("flash.api_keys.unrecognized_key"))
+    end
+
+    it "does the same when no key is stored yet and none was pasted" do
+      patch setup_path, params: { api_key: "", language: "javascript" }
+
+      expect_message_at_the_field(I18n.t("flash.application.api_key_needed"))
+    end
+
+    it "does the same past the limit on saving keys" do
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      stub_key_check(ClaudeService)
+
+      (ApiKeysController::KEY_SAVES_PER_HOUR + 1).times { patch setup_path, params: { api_key: key } }
+
+      expect_message_at_the_field(I18n.t("flash.api_keys.key_saves_limited"))
+    end
+
+    it "leaves a fresh Setup page with no message at the field, no invalid mark and no autofocus" do
+      get setup_path
+
+      expect(page.at_css("#api-key-error")).to be_nil
+      expect(field.has_attribute?("aria-invalid")).to be(false)
+      expect(field.has_attribute?("aria-describedby")).to be(false)
+      expect(page.css("[autofocus]")).to be_empty
+    end
+  end
+
   describe "saving a rejected key without checking" do
     let(:key) { "sk-ant-api03-PastedSecret" }
     let(:button) { "button[type=submit][name=skip_check][value='1']" }
