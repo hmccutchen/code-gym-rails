@@ -18,7 +18,7 @@ gem "pagy", "~> 43.8"
 gem "rouge", "~> 5.1"
 
 # RealSource slices excerpts with Prism; declared because irb's transitive dependency on it could vanish.
-gem "prism", "~> 1.9"
+gem "prism", "~> 2.1"
 
 # Needed in production: CodeFormat::Ruby re-indents provider-written Ruby with its Layout cops.
 gem "rubocop", require: false
