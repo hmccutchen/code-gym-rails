@@ -624,9 +624,14 @@ class AiService
     value.is_a?(Array) ? value.grep(Hash) : []
   end
 
-  def count_field(parent, key)
+  def string_field(parent, key)
     value = parent[key]
-    value.is_a?(Integer) && value.between?(0, ApiUsage.max_token_count) ? value : 0
+    value if value.is_a?(String)
+  end
+
+  def joined_text(parts)
+    texts = parts.map { |part| string_field(part, "text") }
+    texts.join if texts.all?
   end
 
   def self.daily_quota_reset_at(failed_at)

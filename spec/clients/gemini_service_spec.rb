@@ -585,11 +585,16 @@ RSpec.describe GeminiService do
       end
     end
 
-    it "still returns the reply when counts that each fit add up to more than a usage row holds" do
+    it "records one usage row with the counts marked unknown when counts that each fit add up to more than a usage row holds" do
+      allow(Rails.logger).to receive(:warn)
       largest = ApiUsage.max_token_count
       usage = counts.merge("total_output_tokens" => largest, "total_thought_tokens" => largest)
+      result = nil
 
-      expect(logged_reply(usage: usage)).to include(text: "hello")
+      expect { result = logged_reply(usage: usage) }.to change(ApiUsage, :count).by(1)
+      expect(result).to include(text: "hello", output_tokens: 0, tokens_unknown: true)
+      expect(ApiUsage.last).to have_attributes(tokens_in: 5, tokens_out: 0, cost_usd: nil)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "GeminiService", "total_output_tokens")).once
     end
 
     [ "hello", { "type" => "model_output" }, 7 ].each do |steps|
@@ -606,12 +611,70 @@ RSpec.describe GeminiService do
         .to change(ApiUsage, :count).by(1)
     end
 
+    [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
+      it "reads no text, records one usage row and leaves every caller an InvalidResponseError when any text part's text is #{text.inspect}" do
+        allow(Rails.logger).to receive(:error)
+        parts = [ { "type" => "text", "text" => "hello" }, { "type" => "text", "text" => text } ]
+        result = nil
+        expect { result = logged_reply(steps: [ text_step.merge("content" => parts) ]) }.to change(ApiUsage, :count).by(1)
+
+        expect(result).to include(text: nil)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, result[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
+    it "keeps the text when a part whose type is not text carries a text that is not a string" do
+      parts = [ { "type" => "text", "text" => "hello" }, { "type" => "thought", "text" => 7 } ]
+
+      expect(logged_reply(steps: [ text_step.merge("content" => parts) ])).to include(text: "hello")
+    end
+
     it "skips content parts that are not objects and reads no text from a content that is not a list" do
       parts = [ 1, "text", { "type" => "text", "text" => "hello" } ]
 
       expect(logged_reply(steps: [ text_step.merge("content" => parts) ])).to include(text: "hello")
       expect(logged_reply(steps: [ text_step.merge("content" => { "type" => "text", "text" => "hello" }) ])).to include(text: "")
       expect(ApiUsage.count).to eq(2)
+    end
+  end
+
+  describe "a reply whose token counts cannot all be read" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+    let(:counts) { { "total_input_tokens" => 9, "total_cached_tokens" => 4, "total_output_tokens" => 2, "total_thought_tokens" => 1 } }
+    let(:valid_reply) do
+      { "status" => "completed", "usage" => counts,
+        "steps" => [ { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hello" } ] } ] }
+    end
+
+    it_behaves_like "a provider reading a reply leaf of any shape",
+                    count_paths: %w[total_input_tokens total_cached_tokens total_output_tokens total_thought_tokens].map { |field| [ "usage", field ] },
+                    other_paths: [ [ "usage" ], [ "steps" ], [ "steps", 0 ], [ "steps", 0, "content" ],
+                                   [ "steps", 0, "content", 0 ], [ "steps", 0, "content", 0, "text" ] ],
+                    required_paths: [ [ "usage" ], [ "usage", "total_input_tokens" ], [ "usage", "total_output_tokens" ] ]
+
+    def logged_usage(usage)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+    end
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "floors the input count at zero and marks the counts unknown when the cached count is larger than the input count" do
+      result = logged_usage(counts.merge("total_cached_tokens" => 12))
+
+      expect(result).to include(input_tokens: 0, cache_read_tokens: 12, tokens_unknown: true)
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, cache_read_tokens: 12)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "GeminiService", "total_input_tokens")).once
+    end
+
+    it "keeps the counts known when the cached and thought counts are absent" do
+      result = logged_usage(counts.except("total_cached_tokens", "total_thought_tokens"))
+
+      expect(result).to include(input_tokens: 9, output_tokens: 2).and(satisfy { |reply| !reply.key?(:tokens_unknown) })
+      expect(Rails.logger).not_to have_received(:warn)
     end
   end
 end

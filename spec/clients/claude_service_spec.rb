@@ -690,9 +690,77 @@ RSpec.describe ClaudeService do
       end
     end
 
+    [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
+      it "reads no text, records one usage row and leaves every caller an InvalidResponseError when the text is #{text.inspect}" do
+        allow(Rails.logger).to receive(:error)
+        result = nil
+        expect { result = logged_reply(content: [ { "type" => "text", "text" => text } ]) }.to change(ApiUsage, :count).by(1)
+
+        expect { service.send(:text_or_raise, result, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, result[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
     it "skips content blocks that are not objects and records one usage row" do
       expect { expect(logged_reply(content: [ 1, "text", nil ] + text_content)).to include(text: "hello") }
         .to change(ApiUsage, :count).by(1)
+    end
+  end
+
+  describe "a reply whose token counts cannot all be read" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+    let(:counts) { { "input_tokens" => 1_000, "output_tokens" => 100, "cache_read_input_tokens" => 10, "cache_creation_input_tokens" => 20 } }
+    let(:valid_reply) { { "content" => [ { "type" => "text", "text" => "hello" } ], "stop_reason" => "end_turn", "usage" => counts } }
+
+    it_behaves_like "a provider reading a reply leaf of any shape",
+                    count_paths: %w[input_tokens output_tokens cache_read_input_tokens cache_creation_input_tokens].map { |field| [ "usage", field ] },
+                    other_paths: [ [ "usage" ], [ "content" ], [ "content", 0 ], [ "content", 0, "text" ] ],
+                    required_paths: [ [ "usage" ], [ "usage", "input_tokens" ], [ "usage", "output_tokens" ] ]
+
+    def logged_usage(usage)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+    end
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "stores a null cost when a count is present but not a valid count" do
+      logged_usage(counts.merge("cache_read_input_tokens" => -10))
+
+      expect(ApiUsage.last).to have_attributes(tokens_in: 1_000, cache_read_tokens: 0, cost_usd: nil)
+    end
+
+    it "stores a null cost when usage is not an object" do
+      logged_usage("unknown")
+
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, cost_usd: nil)
+    end
+
+    it "stores a null cost when the reply has no usage" do
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.except("usage").to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, tokens_out: 0, cost_usd: nil)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "ClaudeService", "usage is missing")).once
+    end
+
+    %w[input_tokens output_tokens].each do |field|
+      it "stores a null cost when #{field} is absent or null" do
+        logged_usage(counts.except(field))
+        logged_usage(counts.merge(field => nil))
+
+        expect(ApiUsage.last(2).map(&:cost_usd)).to eq([ nil, nil ])
+        expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "ClaudeService", "#{field} is missing")).twice
+      end
+    end
+
+    it "prices the call when its cache counts are absent or null" do
+      logged_usage(counts.except("cache_read_input_tokens").merge("cache_creation_input_tokens" => nil))
+
+      expect(ApiUsage.last.cost_usd).to be_positive
+      expect(Rails.logger).not_to have_received(:warn)
     end
   end
 end

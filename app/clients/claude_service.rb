@@ -53,20 +53,26 @@ class ClaudeService < AiService
   end
 
   def read_result(parsed, request)
-    usage = object_field(parsed, "usage")
     # A leading thinking block means the text block is not reliably content[0].
     text_block = object_list(parsed, "content").find { |block| block["type"] == "text" }
 
-    {
-      text:          text_block&.dig("text"),
-      input_tokens:  count_field(usage, "input_tokens"),
-      output_tokens: count_field(usage, "output_tokens"),
-      model:         routed_model(request.purpose),
-      cache_read_tokens:  count_field(usage, "cache_read_input_tokens"),
-      cache_write_tokens: count_field(usage, "cache_creation_input_tokens"),
-      truncated:     parsed["stop_reason"] == "max_tokens",
-      refusal:       refusal_category(parsed)
-    }
+    read_usage(parsed, request.purpose).merge(
+      text:      text_block && string_field(text_block, "text"),
+      truncated: parsed["stop_reason"] == "max_tokens",
+      refusal:   refusal_category(parsed)
+    )
+  end
+
+  def read_usage(parsed, purpose)
+    counts = UsageCounts.new(self.class)
+    usage = counts.object(parsed, "usage", required: true)
+    counts.mark(
+      input_tokens:       counts.count(usage, "input_tokens", required: true),
+      output_tokens:      counts.count(usage, "output_tokens", required: true),
+      model:              routed_model(purpose),
+      cache_read_tokens:  counts.count(usage, "cache_read_input_tokens"),
+      cache_write_tokens: counts.count(usage, "cache_creation_input_tokens")
+    )
   end
 
   SPEND_LIMIT_MESSAGE = /\A(You have reached your specified|Your credit balance)/

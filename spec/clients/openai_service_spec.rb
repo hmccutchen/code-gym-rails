@@ -480,6 +480,26 @@ RSpec.describe OpenaiService do
         .to change(ApiUsage, :count).by(1)
     end
 
+    [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
+      it "reads no text, records one usage row and leaves every caller an InvalidResponseError when any text part's text is #{text.inspect}" do
+        allow(Rails.logger).to receive(:error)
+        part = { "type" => "output_text", "text" => text }
+        result = nil
+        expect { result = logged_call(reply(output: [ message({ "type" => "output_text", "text" => "hello" }, part) ])) }
+          .to change(ApiUsage, :count).by(1)
+
+        expect(result).to include(text: nil)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, result[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
+    it "keeps the text when a part whose type is not output_text carries a text that is not a string" do
+      output = [ message({ "type" => "output_text", "text" => "hello" }, { "type" => "summary_text", "text" => 7 }) ]
+
+      expect(logged_call(reply(output: output))).to include(text: "hello")
+    end
+
     it "reads no text and records one usage row when a message's content is not a list" do
       output = [ { "type" => "message", "content" => { "type" => "output_text", "text" => "hello" } } ]
 
@@ -492,6 +512,42 @@ RSpec.describe OpenaiService do
 
       expect { expect { logged_call(response) }.to raise_error(ProviderError::TruncatedResponseError) }
         .to change(ApiUsage, :count).by(1)
+    end
+  end
+
+  describe "a reply whose token counts cannot all be read" do
+    let(:user) { create_user_with_key }
+    let(:counts) { { "input_tokens" => 10, "output_tokens" => 2, "input_tokens_details" => { "cached_tokens" => 3, "cache_write_tokens" => 2 } } }
+    let(:valid_reply) { reply(output: [ message({ "type" => "output_text", "text" => "hello" }) ], usage: counts) }
+
+    it_behaves_like "a provider reading a reply leaf of any shape",
+                    count_paths: [ [ "usage", "input_tokens" ], [ "usage", "output_tokens" ],
+                                   [ "usage", "input_tokens_details", "cached_tokens" ], [ "usage", "input_tokens_details", "cache_write_tokens" ] ],
+                    other_paths: [ [ "usage" ], [ "usage", "input_tokens_details" ], [ "output" ], [ "output", 0 ],
+                                   [ "output", 0, "content" ], [ "output", 0, "content", 0 ], [ "output", 0, "content", 0, "text" ] ],
+                    required_paths: [ [ "usage" ], [ "usage", "input_tokens" ], [ "usage", "output_tokens" ] ]
+
+    def logged_usage(usage)
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, valid_reply.merge("usage" => usage).to_json ] ]))
+      service.send(:call_and_log, user, AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true))
+    end
+
+    before { allow(Rails.logger).to receive(:warn) }
+
+    it "floors the input count at zero and marks the counts unknown when the cache counts add up to more than the input count" do
+      result = logged_usage(counts.merge("input_tokens_details" => { "cached_tokens" => 8, "cache_write_tokens" => 5 }))
+
+      expect(result).to include(input_tokens: 0, cache_read_tokens: 8, cache_write_tokens: 5, tokens_unknown: true)
+      expect(ApiUsage.last).to have_attributes(tokens_in: 0, cache_read_tokens: 8, cache_write_tokens: 5)
+      expect(Rails.logger).to have_received(:warn).with(a_string_including("[usage]", "OpenaiService", "input_tokens")).once
+    end
+
+    it "marks the counts unknown when input_tokens_details is not an object" do
+      expect(logged_usage(counts.merge("input_tokens_details" => "cached"))).to include(input_tokens: 10, tokens_unknown: true)
+    end
+
+    it "keeps the counts known when input_tokens_details is absent" do
+      expect(logged_usage(counts.except("input_tokens_details"))).to include(input_tokens: 10).and(satisfy { |reply| !reply.key?(:tokens_unknown) })
     end
   end
 end

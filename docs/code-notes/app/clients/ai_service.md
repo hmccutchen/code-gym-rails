@@ -275,15 +275,17 @@ too. Reading the message with `dig` raised `TypeError`, which escaped
 
 Returns the named field when it is a JSON object and an empty hash otherwise.
 `#error_envelope` and each provider's `read_result` read nested reply fields
-through it (`usage`, OpenAI's `input_tokens_details` and
-`incomplete_details`, Claude's `stop_details`), because `dig` or `[]` on a
+through it (OpenAI's `incomplete_details`, Claude's `stop_details`), because `dig` or `[]` on a
 string a provider sent in place of an object raises `TypeError` or
 `NoMethodError`. Neither is a `ProviderError`, so the call escaped
 `call_and_log` without its usage row. Each field is optional, so an unreadable
 one reads as absent: no cache counts, no content-filter reason, no refusal
-category.
+category. The `usage` object and OpenAI's `input_tokens_details` follow the
+same rule through `UsageCounts#object`, which also marks the call's token
+counts unknown when the field is present and is not an object
+(`docs/code-notes/app/clients/usage_counts.md`).
 
-## `#object_list` and `#count_field`
+## `#object_list` and token counts
 
 The same rule for the two other shapes a reply field takes (#761).
 `#object_list` returns the Hash elements of a field that is a JSON array, and
@@ -296,9 +298,10 @@ as for any reply, and the caller's `#text_or_raise` or `#parse_json_object`
 raises `ProviderError::InvalidResponseError`, as it already did for a reply
 with no text.
 
-`#count_field` returns a token count only when it is a JSON integer from 0 to
-`ApiUsage.max_token_count`, and 0 otherwise, the same as a missing count.
-Every token count each `read_result` reads goes through it, so the result hash
+A token count reads as itself only when it is a JSON integer from 0 to
+`ApiUsage.max_token_count`, and as 0 otherwise, the same as a missing count.
+Every token count each provider reads goes through `UsageCounts#count`, which
+replaced `#count_field` (#770), so the result hash
 always carries integers and the `.to_i` calls in `#log_usage`, `.cost_usd` and
 `#raise_for_reply!` never see a hash or array. A numeric string or a float
 also reads as 0: the providers document integer counts, so either shape is as
@@ -306,12 +309,41 @@ malformed as a hash, and guessing at it would put a made-up number in a usage
 row. The upper bound is the largest number the usage columns hold, read from
 the schema by `ApiUsage.max_token_count`. A larger count raised
 `ActiveModel::RangeError` while the row was saved, and a negative one stored a
-negative count and inflated the input count it was subtracted from.
+negative count and inflated the input count it was subtracted from. Reading a
+present but malformed count as 0 still leaves a row that looks like a real,
+smaller call, so the call's counts are also marked unknown and a Claude row
+stores a null cost (`docs/code-notes/app/clients/usage_counts.md`).
 
 Two counts that each fit can still add up to more than a column holds, such as
-Gemini's output and thought tokens. `#log_usage` therefore rescues
-`ActiveModel::RangeError` as well as `ActiveRecord::ActiveRecordError`: the
-row is lost and a warning logged, but the reply still reaches the caller.
+Gemini's output and thought tokens. `UsageCounts#sum` reads such a total as 0
+and marks the counts unknown, so the row is still written. `#log_usage` also
+rescues `ActiveModel::RangeError` as well as `ActiveRecord::ActiveRecordError`
+as a backstop: if a total ever reached it, the row would be lost and a warning
+logged, but the reply would still reach the caller.
+
+## `#string_field`
+
+Returns the named field when it is a JSON string and nil otherwise (#769).
+Claude's text block and each Gemini and OpenAI text part are read through it.
+Before, a text that was an object, a list or a number did not raise: the
+callers turn the text into a string first, so `#parse_json_object` already
+raised `ProviderError::InvalidResponseError` for it. Prose callers did not
+fail, though. `#text_or_raise` returned the Ruby form of the value, such as
+`{"a" => 1}`, and the duck or a follow-up showed it as the reply, while Gemini
+and OpenAI joined a number or a list into the text beside the real parts. Now
+Claude reads no text from such a block, so the caller raises
+`InvalidResponseError` as for a reply with no text.
+
+## `#joined_text`
+
+Gemini and OpenAI send a reply's text as a list of parts. `#joined_text`
+joins the text of the parts each provider picked as text, and returns nil when
+any one of them is not a string, so the caller raises `InvalidResponseError`
+as it does for Claude. Keeping the other parts would hand the caller a reply
+with a piece missing from the middle, which reads as whole and is not. A list
+with no text parts still joins to empty text. Elements that are not objects
+are dropped earlier, by `#object_list`, and a part of another type is never
+read, so neither makes the reply unreadable.
 
 ## `#log_raw_snippet`
 
@@ -345,7 +377,9 @@ On a priced provider, a result with no tokens of any kind costs zero whatever
 its model, so a call that failed before a reply is never left unknown. A
 timeout is the exception: `failed_call_result` carries `tokens_unknown` from
 `ProviderError.leaves_tokens_unknown?`, and the cost stays null with no warning,
-since a gap the error explains is not a missing price. `Price`
+since a gap the error explains is not a missing price. A reply whose token
+counts could not be read carries the same mark from `UsageCounts#mark`, which
+logs its own warning (`docs/code-notes/app/clients/usage_counts.md`). `Price`
 turns each rate into a `BigDecimal` through `to_s` when the table is built, so
 `0.2` stays two tenths rather than a float's nearest value, and a missing or
 negative rate raises at boot rather than on a call.

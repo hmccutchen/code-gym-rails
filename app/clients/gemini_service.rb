@@ -39,12 +39,12 @@ class GeminiService < AiService
   end
 
   def read_result(parsed, request)
-    usage  = read_usage(object_field(parsed, "usage"), request.purpose)
+    usage  = read_usage(parsed, request.purpose)
     status = parsed["status"]
     return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
 
-    text_parts = model_output_parts(parsed).select { |c| c["type"] == "text" }.map { |c| c["text"] }
-    usage.merge(text: text_parts.join, truncated: parsed["status"] == "incomplete")
+    text_parts = model_output_parts(parsed).select { |c| c["type"] == "text" }
+    usage.merge(text: joined_text(text_parts), truncated: parsed["status"] == "incomplete")
   end
 
   def model_output_parts(parsed)
@@ -52,15 +52,18 @@ class GeminiService < AiService
     model_output ? object_list(model_output, "content") : []
   end
 
-  def read_usage(usage, purpose)
-    cached_tokens = count_field(usage, "total_cached_tokens")
-    {
-      input_tokens:       count_field(usage, "total_input_tokens") - cached_tokens,
-      output_tokens:      count_field(usage, "total_output_tokens") + count_field(usage, "total_thought_tokens"),
+  def read_usage(parsed, purpose)
+    counts = UsageCounts.new(self.class)
+    usage = counts.object(parsed, "usage", required: true)
+    cached_tokens = counts.count(usage, "total_cached_tokens")
+    counts.mark(
+      input_tokens:       counts.uncached(counts.count(usage, "total_input_tokens", required: true), cached_tokens, field: "total_input_tokens"),
+      output_tokens:      counts.sum(counts.count(usage, "total_output_tokens", required: true), counts.count(usage, "total_thought_tokens"),
+                                     field: "total_output_tokens"),
       model:              routed_model(purpose),
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: 0
-    }
+    )
   end
 
   # An invalid key arrives as a 400 with API_KEY_INVALID; never log these bodies, since they can echo the key.
