@@ -23,6 +23,14 @@ partial renders on Settings only.
 - The card notes in both disclosures hold to `65ch`.
 - Below 900px nothing changes: a centered 480px column from 600px.
 
+## `.saved-keys`
+
+The list of stored keys under Save. Each row is a wrapping flex line: the
+provider's name, the "In use" tag, and the Remove form pushed to the right
+with `margin-left: auto`. At a narrow width or with large text the form
+wraps under the name instead of running past the card. The button is 44px
+tall, the touch target the Learn page's small buttons use.
+
 ## `.form-field .card-note a`
 
 The key hint links to each provider's console, and each link text is one

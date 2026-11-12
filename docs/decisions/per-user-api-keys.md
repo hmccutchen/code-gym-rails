@@ -65,7 +65,7 @@ is worded to be true of a 404 or a 429 as much as of a timeout.
   key is wrong" stores the key and says what was not confirmed.
 - **A key that was not saved changes nothing.** The stored keys, the
   provider in use and `users.generation_account_failures` stay as they were;
-  only `User#store_api_key` resets the key-hold count. The form comes back
+  a failed save never resets the key-hold count. The form comes back
   with the language the person chose still selected, and the key field
   empty, since a key is never echoed.
 - **The key is stored under the user row lock.** The account is loaded
@@ -200,6 +200,83 @@ rejection is never final.
 - **It is logged so the two paths can be counted:**
   `[key_check] provider=<key> result=skipped`, with no key and no status.
   `AiService` writes it, so the line's format has one home.
+
+## A stored key can be removed
+
+Decided by the owner on 2026-11-12. Before this, a stored key could be
+replaced but never deleted, short of deleting the account.
+
+- **Where.** Setup's Connection card lists each stored provider under
+  "Saved keys", marks the one in use, and gives each a button named for it
+  ("Remove Claude key"). The key itself is never rendered.
+- **The request.** `DELETE /setup/keys/:provider`, a plain form post, goes to
+  `ApiKeysController#destroy`. The browser asks for confirmation first
+  through the `loading-form` controller, as account deletion does.
+- **What is deleted.** `User#remove_api_key` takes the provider's entry out
+  of `api_keys` and out of `key_saved_times`. Nothing else about the account
+  changes: sets, reviews and usage rows stay, and a review keeps naming the
+  provider that wrote it.
+- **Removing the last key** leaves `api_keys` NULL and `provider` nil, which
+  is the state of an account that never added a key. Every page but Setup
+  and Account already redirects such an account to Setup
+  (`ApplicationController#require_provider`), and
+  `ScheduledGeneration.users` already leaves it out, so neither needed a
+  change. `provider` is cleared and not left naming the removed key's
+  provider, so the Account page and a failure message cannot name a provider
+  the account no longer has a key for.
+- **Removing the key in use while others are stored** switches `provider`
+  to the most recently saved of the keys that remain
+  (`User#provider_after_removing`). A key with no recorded save time ranks
+  behind every key that has one, and so does a time that cannot be read.
+  Ties go in `AiProvider.keys` order. Removing a key that is not in use
+  leaves `provider` alone.
+- **Save times are a column of their own.** `users.key_saved_times` maps a
+  provider to the ISO 8601 time its key was saved. The alternative was to
+  read the order of the `api_keys` map, which today happens to be insertion
+  order. A column states the fact; an ordering is something a refactor of
+  how the map is merged or serialized could break without any spec
+  noticing. It also leaves the encrypted map's shape and its validator as
+  they were, so code from before this release reads and writes the map
+  unchanged during a deploy or a rollback. `User#store_api_key` and
+  `#remove_api_key` assign `api_keys` and `key_saved_times` together
+  through one private method, which also drops a time for a provider with
+  no stored key, so the two cannot drift. A key saved before the column
+  existed has no time.
+- **The key-hold count goes back to zero** on any removal, as it does when a
+  key is saved (`docs/decisions/pausing-generation.md`).
+- **Under the user row lock.** The keys are one encrypted map written whole,
+  so `ApiKeysController#remove_key` removes inside `with_lock`, which
+  reloads the row: a key saved in another tab meanwhile stays. An
+  anonymized account gets no write and the browser is sent to sign in, as
+  with a save.
+- **A provider with no stored key is refused**, an unknown name included:
+  the account is unchanged and Setup says "There is no saved key for that
+  provider, so nothing was removed." The posted name is never echoed.
+- **Removal is not rate-limited** and calls no provider.
+- **A generation already running finishes.** It holds the key in memory.
+  If it then fails, `GenerateDailyExercisesJob#key_in_use` sees the key
+  changed and does not count the failure toward the hold.
+- **Trials.** `User#on_trial?` is "has a trial and no key in use", so an
+  account with an unfinished trial counts as on trial again once its key is
+  gone. With `provider` nil there is no house key to resolve, so such a
+  trial is not active until the account has a provider again. Trials are
+  off for this release; a spec pins `on_trial?` and nothing else was
+  designed for the case.
+- **What the person is told**, by `ApiKeysController#destroy` from
+  `User#remove_api_key`'s outcome:
+
+| Outcome | Notice |
+|---|---|
+| `:removed` | "Your %{provider} key was removed." |
+| `:switched` | "Your %{provider} key was removed. %{in_use} is now the provider in use." |
+| `:last_removed` | "Your %{provider} key was removed. New sets stop until you add a key." |
+
+  The confirmation before it uses the same three cases, read from
+  `User#key_removal_outcome`, so it names the provider that would take over
+  or says that sets stop. Providers are named by `AiProvider.label`, as the
+  "Provider in use" choice beside the list names them.
+- The setup failure's next step for an own-key account now ends "If they
+  look right, remove the key and add it again."
 
 ### Open items
 

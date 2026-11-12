@@ -64,6 +64,20 @@ does nothing when the name is the provider already in use, because Setup
 posts the current provider with every preferences save.
 `docs/decisions/pausing-generation.md` has the rule.
 
+`#remove_api_key` goes through `#put_key_in_use` too, with the provider
+`#provider_after_removing` names: the one already in use when another key
+was removed, the most recently saved of the rest when the key in use was,
+or nil when none is left. So every removal resets the count.
+`#key_removal_outcome` names what a removal would do without doing it;
+Setup words its confirmation from it and the controller words its notice
+from the same value once the removal has run. `#store_api_key` and
+`#remove_api_key` assign `api_keys` and `key_saved_times` through
+`#write_keys`, which keeps a time only for a provider with a stored key.
+`#key_saved_time` reads a missing or unreadable time as nil, and
+`nil.to_f` is 0, so such a key sorts behind every dated one.
+`docs/decisions/per-user-api-keys.md` ("A stored key can be removed") has
+the rules.
+
 ## `#carry_held_set_forward!`
 
 The read of `held_exercise` before the lock only avoids taking a lock when
@@ -210,4 +224,5 @@ it returns true.
 ## `#provider_has_a_stored_key`
 
 It skips an account with no keys map, since anonymized and trial accounts can
-name a provider while holding no keys.
+name a provider while holding no keys. An account that removed its last key
+holds no provider either.

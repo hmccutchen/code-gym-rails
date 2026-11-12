@@ -1,0 +1,20 @@
+<%# Design notes: docs/code-notes/app/views/api_keys/_saved_keys.html.md %>
+<div class="saved-keys" id="saved-keys">
+  <h3 id="saved-keys-heading"><%= t("api_keys.edit.saved_keys.heading") %></h3>
+  <ul aria-labelledby="saved-keys-heading">
+    <% current_user.stored_providers.each do |provider| %>
+      <% label = AiProvider.label(provider) %>
+      <% confirm = t("api_keys.edit.saved_keys.confirm.#{current_user.key_removal_outcome(provider)}",
+                     provider: label, in_use: AiProvider.label(current_user.provider_after_removing(provider))) %>
+      <li>
+        <span class="saved-key-name"><%= label %></span>
+        <% if provider == current_user.provider %>
+          <span class="card-tag"><%= t("api_keys.edit.saved_keys.in_use") %></span>
+        <% end %>
+        <%= button_to t("api_keys.edit.saved_keys.remove", provider: label), setup_key_path(provider), method: :delete,
+              class: "btn btn-ghost", disabled: true,
+              form: { data: loading_form_data(confirm_message: confirm) } %>
+      </li>
+    <% end %>
+  </ul>
+</div>

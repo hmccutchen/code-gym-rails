@@ -237,7 +237,8 @@ failure says nothing about the new one.
 `User#record_generation_success!` sets the count back to zero, and so does
 `User#store_api_key`, which `ApiKeysController#update` calls when it stores
 a key. Switching to another stored key (`User#use_provider`) resets it too,
-because the count describes one provider's key. Saving other preferences
+because the count describes one provider's key. Removing a stored key
+(`User#remove_api_key`) resets it as well, whichever key is removed. Saving other preferences
 with the provider unchanged leaves it alone. Pressing "Try again" clears the failure message and leaves the count.
 
 **What stops.** `ScheduledGeneration.users`, the single authority for which

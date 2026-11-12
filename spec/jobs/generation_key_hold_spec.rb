@@ -244,6 +244,15 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       expect(failures).to eq(0)
     end
 
+    it "does not count a failure against an account whose key was removed during the call" do
+      provider_raising_after(bad_key) { User.find(user.id).tap { |fresh| fresh.remove_api_key(fresh.provider) }.save! }
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      expect(failures).to eq(0)
+      expect(user.reload).to have_attributes(api_keys: nil, generation_failed_today?: true)
+    end
+
     it "still counts a failure when the key in use did not change" do
       provider_raising_after(bad_key) { User.find(user.id).update!(language: "javascript") }
 

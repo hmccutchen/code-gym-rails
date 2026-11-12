@@ -24,6 +24,13 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
        └→ the rejection form also offers "Save without checking": the key
           pasted again with skip_check=1 is stored with no provider call
           (AiService.skip_key_check), after the same limit and format rules
+       └→ Setup lists each stored key with a Remove button; after a
+          confirmation, ApiKeysController#destroy (DELETE /setup/keys/:provider)
+          removes that key under the user row lock (User#remove_api_key) and
+          returns to Setup. Removing the key in use switches to the most
+          recently saved key that remains; removing the last one leaves no
+          provider, so every page but Setup and Account sends the browser to
+          Setup and the hourly hand-out skips the account
 
 Every hour (Solid Queue cron via config/recurring.yml):
   EnqueueDueGenerationsJob, the hand-out, calls no provider. For each user

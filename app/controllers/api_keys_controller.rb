@@ -39,6 +39,16 @@ class ApiKeysController < ApplicationController
     redirect_to root_path, notice: t("flash.api_keys.#{SAVED_NOTICES.fetch(result)}", provider: AiProvider.label(provider))
   end
 
+  # DELETE /setup/keys/:provider
+  def destroy
+    removed = AiProvider.label(params[:provider])
+    outcome = remove_key(params[:provider])
+    return redirect_to(login_path, alert: t("flash.application.login_required")) unless outcome
+    return redirect_to(setup_path, alert: t("flash.api_keys.key_removed.not_stored")) if outcome == :not_stored
+
+    redirect_to setup_path, notice: t("flash.api_keys.key_removed.#{outcome}", provider: removed, in_use: current_user.provider_label)
+  end
+
   private
 
   EDGE_WHITESPACE = /\A[[:space:]]+|[[:space:]]+\z/
@@ -59,6 +69,14 @@ class ApiKeysController < ApplicationController
       current_user.store_api_key(pasted_key, provider: provider)
       current_user.language = posted_language if posted_language
       current_user.save!
+    end
+  end
+
+  def remove_key(provider)
+    current_user.with_lock do
+      next false if current_user.anonymized?
+
+      current_user.remove_api_key(provider).tap { current_user.save! }
     end
   end
 

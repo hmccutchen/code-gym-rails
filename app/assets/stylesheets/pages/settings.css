@@ -1,6 +1,14 @@
 :where(#exercise-mix, #display-preferences) p:not(.card-note) { color: var(--muted); margin-bottom: 2rem; }
 .form-field { margin-bottom: 1rem; }
 .unchecked-save { margin-top: 1rem; }
+.saved-keys { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.saved-keys h3 { font-size: .9rem; margin-bottom: .4rem; }
+.saved-keys ul { list-style: none; padding: 0; margin: 0; }
+.saved-keys li { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; }
+.saved-keys li + li { margin-top: .5rem; }
+.saved-keys .saved-key-name { font-weight: 600; }
+.saved-keys form { margin-left: auto; }
+.saved-keys .btn { display: inline-flex; align-items: center; min-height: 44px; }
 .form-field .flash { margin-bottom: .75rem; }
 .form-field .card-note a { overflow-wrap: anywhere; }
 :is(.form-field, .settings-fields) label:not(:where(.switch-row)):not(:where(.mix-level)) { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }

@@ -213,6 +213,7 @@ class User < ApplicationRecord
       update!(
         email:                            "deleted-user-#{id}@anonymized.local",
         api_keys:                         nil,
+        key_saved_times:                  {},
         login_code_sent_at:               nil,
         login_code_digest:                nil,
         login_code_attempts:              0,
@@ -263,8 +264,34 @@ class User < ApplicationRecord
   end
 
   def store_api_key(key, provider:)
-    self.api_keys = api_keys.to_h.merge(provider => key)
+    write_keys(api_keys.to_h.merge(provider => key), key_saved_times.merge(provider => Time.current.utc.iso8601(6)))
     put_key_in_use(provider)
+  end
+
+  KEY_REMOVAL_OUTCOMES = %i[not_stored removed switched last_removed].freeze
+
+  def key_removal_outcome(name)
+    return :not_stored unless stored_providers.include?(name)
+    return :removed unless name == provider
+
+    stored_providers.one? ? :last_removed : :switched
+  end
+
+  def provider_after_removing(name)
+    return provider unless name == provider
+
+    remaining = stored_providers - [ name ]
+    remaining.each_with_index.min_by { |stored, index| [ -key_saved_time(stored).to_f, index ] }&.first
+  end
+
+  def remove_api_key(name)
+    outcome = key_removal_outcome(name)
+    return outcome if outcome == :not_stored
+
+    successor = provider_after_removing(name)
+    write_keys(api_keys.except(name), key_saved_times)
+    put_key_in_use(successor)
+    outcome
   end
 
   def use_provider(name)
@@ -467,6 +494,16 @@ class User < ApplicationRecord
   def put_key_in_use(name)
     self.provider = name
     self.generation_account_failures = 0
+  end
+
+  def write_keys(keys, saved_times)
+    assign_attributes(api_keys: keys, key_saved_times: saved_times.slice(*keys.keys))
+  end
+
+  def key_saved_time(name)
+    Time.iso8601(key_saved_times[name].to_s)
+  rescue ArgumentError
+    nil
   end
 
   def write_generation_status!(columns)

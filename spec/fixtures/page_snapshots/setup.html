@@ -578,7 +578,18 @@
       </div>
       <p class="card-note">Choose the language your daily exercise sets are generated in. &quot;Mixed&quot; alternates between Ruby/Rails and JavaScript one full day at a time.</p>
       <button name="commit" type="submit" value="Save" class="btn btn-primary btn-block">Save</button>
-</form>  </section>
+</form>    <div class="saved-keys" id="saved-keys">
+  <h3 id="saved-keys-heading">Saved keys</h3>
+  <ul aria-labelledby="saved-keys-heading">
+      <li>
+        <span class="saved-key-name">Claude</span>
+          <span class="card-tag">In use</span>
+        <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-confirm-message-value="Remove your Claude key? It is your only key, so new sets stop until you add one." class="button_to" method="post" action="/setup/keys/anthropic"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button class="btn btn-ghost" disabled="disabled" type="submit">Remove Claude key</button></form>
+      </li>
+  </ul>
+</div>
+
+  </section>
 
   <section class="card">
     <h2>Your day</h2>

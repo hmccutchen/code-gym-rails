@@ -29,7 +29,17 @@ read it before changing that area.
   keeps one encrypted key per provider in `users.api_keys`; a key's prefix
   picks its provider, and `user.provider` names the one in use, so
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
-  `User#api_key` and `User#stored_providers`; no keys stores NULL.
+  `User#remove_api_key`, `User#api_key` and `User#stored_providers`; no keys
+  stores NULL. Setup removes one stored key at a time
+  (`DELETE /setup/keys/:provider`, under the user row lock, nothing written
+  for an anonymized account). `#remove_api_key` returns one of
+  `User::KEY_REMOVAL_OUTCOMES`, which the action maps to its message. The
+  key in use, once removed, hands over to the most recently saved key that
+  remains (`users.key_saved_times`, written with `api_keys` in one
+  assignment; no recorded time ranks last, ties go in `AiProvider.keys`
+  order). Removing the last key leaves `api_keys` NULL and `provider` nil,
+  the state of an account that never added a key. The page never shows a
+  key.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
   A pasted key is checked through `AiService.check_key(provider_key, key)`,
   the one other way to a provider class, which applies the same
@@ -112,8 +122,9 @@ read it before changing that area.
   so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
   (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read
   it and neither names the other for this rule. A generation the user starts
-  still runs. `#record_generation_success!`, `#store_api_key` and
-  `#use_provider`, when it changes the provider, set the count back to zero;
+  still runs. `#record_generation_success!`, `#store_api_key`,
+  `#remove_api_key` and `#use_provider`, when it changes the provider, set
+  the count back to zero;
   no other failure kind, and no regeneration failure, changes it. The hold is not a pause: it writes no
   pause column and shows no pause line.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
