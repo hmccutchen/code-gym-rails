@@ -77,6 +77,18 @@ RSpec.describe "Resuming ends the run of unopened sets", type: :request do
     expect(user.reload.paused_generation_at).to be_nil
   end
 
+  it "stamps nothing when a stale tab posts Resume to an account that is running, so its run still counts" do
+    sets = [ today - 3, today - 2, today - 1 ].map { |date| set_on(date) }
+    travel_to(thursday_morning - 1.hour) do
+      login_as(user)
+      patch toggle_generation_account_path, params: { paused: "0" }
+    end
+
+    expect(sets.map { |set| set.reload.opened_at }).to eq([ nil, nil, nil ])
+    expect { hand_out(at: thursday_morning) }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+    expect(user.reload).to be_generation_paused_automatically
+  end
+
   it "acknowledges nothing when the user chooses Keep it paused" do
     paused_by_the_hand_out
     travel_to(thursday_morning + 10.minutes) do

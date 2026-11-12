@@ -36,7 +36,7 @@ module GenerationPause
 
   def clear_generation_pause!
     with_lock do
-      daily_exercises.acknowledge_unopened!(today: today_in_own_zone)
+      daily_exercises.acknowledge_unopened!(today: today_in_own_zone) if paused_generation_at?
       update!(paused_generation_at: nil, generation_pause_source: nil)
     end
   end

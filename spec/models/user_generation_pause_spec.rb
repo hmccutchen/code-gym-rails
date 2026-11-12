@@ -116,6 +116,27 @@ RSpec.describe User, "pausing generation and who paused it" do
       expect(stored[:generation_pause_source]).to eq("automatic")
     end
 
+    it "stamps nothing when the account is not paused, and still clears a source left behind" do
+      sets = [ today - 3, today - 2, today - 1 ].map { |date| set_on(date) }
+      user.update_columns(generation_pause_source: "automatic")
+
+      travel_to(resumed_at) { user.resume_generation! }
+
+      expect(sets.map { |set| set.reload.opened_at }).to eq([ nil, nil, nil ])
+      expect(stored).to eq(paused_generation_at: nil, generation_pause_source: nil)
+    end
+
+    it "decides from the stored row, so a copy loaded while paused stamps nothing once another request has resumed" do
+      travel_to(resumed_at - 2.hours) { user.pause_generation!(source: "automatic") }
+      stale = User.find(user.id)
+      travel_to(resumed_at - 1.hour) { user.resume_generation! }
+      later = set_on(today - 1)
+
+      travel_to(resumed_at) { stale.resume_generation! }
+
+      expect(later.reload.opened_at).to be_nil
+    end
+
     it "acknowledges nothing on a pause, a repeated pause or Keep it paused" do
       sets = [ today - 3, today - 2, today - 1 ].map { |date| set_on(date) }
 
