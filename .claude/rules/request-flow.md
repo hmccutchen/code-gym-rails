@@ -18,17 +18,23 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
      the key's prefix determines user.provider)
 
 Every hour (Solid Queue cron via config/recurring.yml):
-  GenerateDailyExercisesJob with no user, the batch, calls no provider. For
-  each user at or past 8am on a weekday in their own zone:
+  EnqueueDueGenerationsJob, the hand-out, calls no provider. For each user
+  ScheduledGeneration.users holds, at or past 8am on a weekday in their own
+  zone (ScheduledGeneration.due_now?):
     today's set exists → SendPushReminderJob (kind: :nudge) when PushNudgePlan says so
-    no set yet         → GenerateDailyExercisesJob(user_id:, remind: true)
-  Solid Queue allows one generation job per user, queued or running, and
-  discards a second, so the batch and the dashboard never both generate
-  for one person.
+    no set yet         → GenerateDailyExercisesJob(user_id:, scheduled: true),
+                         at EnqueueDueGenerationsJob::SCHEDULED_PRIORITY, so a
+                         job a person is waiting on runs first
 
-GenerateDailyExercisesJob(user_id:), from the batch or the dashboard:
-  a batch-started job (remind: true) first checks the set is still due, and
-  after a set is written enqueues SendPushReminderJob (the "ready" reminder)
+GenerateDailyExercisesJob(user_id:), from the hand-out or the dashboard:
+  a scheduled job first checks the user is still due (the same two
+  ScheduledGeneration answers); a dashboard job skips that check
+  takes the user's generation claim (users.generating_since) when it starts
+  running, or logs one line and stops when another generation holds it; the
+  claim is released when the job ends, whatever the outcome
+  stops when today's set already exists
+  a scheduled job that wrote a set enqueues SendPushReminderJob (the "ready"
+  reminder)
     └→ AiService.for(user) → ClaudeService | GeminiService | OpenaiService
          reads: user.recent_performance (latest qualifying assessed answers)
                 user.recent_delivered_content (repetition-only notes)
