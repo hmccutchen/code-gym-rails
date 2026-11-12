@@ -1,0 +1,121 @@
+require "rails_helper"
+
+RSpec.describe EnqueueDueGenerationsJob, "pausing an account whose sets go unopened" do
+  include ActiveJob::TestHelper
+
+  let(:thursday_morning) { Time.utc(2026, 11, 12, 13, 0) }
+  let(:today) { Date.new(2026, 11, 12) }
+  let!(:user) do
+    User.create!(email: "away@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC")
+  end
+
+  def set_on(date, account: user, opened_at: nil)
+    DailyExercise.create!(user: account, date: date, generated_at: date.in_time_zone("UTC") + 13.hours, opened_at: opened_at,
+                          problem_set: { "code_review" => { "question" => "q" } })
+  end
+
+  def run_hand_out(at: thursday_morning) = travel_to(at) { described_class.new.perform }
+
+  def scheduled_job = have_enqueued_job(GenerateDailyExercisesJob).with(user_id: user.id, scheduled: true)
+
+  def pause_columns = user.reload.slice(:paused_generation_at, :generation_pause_source).symbolize_keys
+
+  it "pauses the account as automatic after three unopened sets, enqueues nothing and calls no provider" do
+    [ today - 3, today - 2, today - 1 ].each { |date| set_on(date) }
+    expect(AiService).not_to receive(:for)
+
+    expect { run_hand_out }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+    expect(pause_columns).to eq(paused_generation_at: thursday_morning, generation_pause_source: "automatic")
+  end
+
+  it "logs one line naming the user" do
+    [ today - 3, today - 2, today - 1 ].each { |date| set_on(date) }
+    lines = []
+    allow(Rails.logger).to receive(:info) { |line| lines << line }
+
+    run_hand_out
+
+    expect(lines.grep(/unopened/)).to eq([ "Paused generation for user #{user.id}: the last 3 sets went unopened" ])
+  end
+
+  it "skips the account on every later run, without moving the pause" do
+    [ today - 3, today - 2, today - 1 ].each { |date| set_on(date) }
+    run_hand_out
+
+    expect { run_hand_out(at: thursday_morning + 1.hour) }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+    expect { run_hand_out(at: thursday_morning + 1.day) }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+    expect(pause_columns).to eq(paused_generation_at: thursday_morning, generation_pause_source: "automatic")
+  end
+
+  it "keeps generating when one of the last three sets was opened" do
+    set_on(today - 3)
+    set_on(today - 2, opened_at: Time.utc(2026, 11, 10, 15))
+    set_on(today - 1)
+
+    expect { run_hand_out }.to scheduled_job.once
+    expect(pause_columns).to eq(paused_generation_at: nil, generation_pause_source: nil)
+  end
+
+  it "keeps generating when one of the last three sets has a response row, opened or not" do
+    set_on(today - 3)
+    set_on(today - 2)
+    saved = set_on(today - 1)
+    DailyResponse.create!(user: user, daily_exercise: saved, date: saved.date, answers: {})
+
+    expect { run_hand_out }.to scheduled_job.once
+    expect(user.reload.paused_generation_at).to be_nil
+  end
+
+  it "pauses across a day whose generation failed, which neither counts nor resets" do
+    [ today - 5, today - 3, today - 1 ].each { |date| set_on(date) }
+
+    expect { run_hand_out }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+    expect(user.reload).to be_generation_paused_automatically
+  end
+
+  it "pauses across a weekend, which neither counts nor resets" do
+    monday_morning = Time.utc(2026, 11, 9, 13, 0)
+    [ Date.new(2026, 11, 4), Date.new(2026, 11, 5), Date.new(2026, 11, 6) ].each { |date| set_on(date) }
+
+    expect { run_hand_out(at: monday_morning) }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+    expect(user.reload).to be_generation_paused_automatically
+  end
+
+  it "never pauses an account with two sets" do
+    [ today - 2, today - 1 ].each { |date| set_on(date) }
+
+    expect { run_hand_out }.to scheduled_job.once
+    expect(user.reload.paused_generation_at).to be_nil
+  end
+
+  it "reads the user's sets only, and each set's day in the user's own zone" do
+    other = User.create!(email: "other@example.com", time_zone: "UTC")
+    [ today - 3, today - 2, today - 1 ].each { |date| set_on(date, account: other) }
+    auckland = User.create!(email: "nz@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" },
+                            time_zone: "Pacific/Auckland")
+    [ today - 2, today - 1, today ].each { |date| set_on(date, account: auckland) }
+
+    run_hand_out(at: Time.utc(2026, 11, 12, 20, 0))
+
+    expect(user.reload.paused_generation_at).to be_nil
+    expect(auckland.reload).to be_generation_paused_automatically
+  end
+
+  it "does not ask before the user's set is due, so an early run pauses nobody" do
+    [ today - 3, today - 2, today - 1 ].each { |date| set_on(date) }
+
+    run_hand_out(at: Time.utc(2026, 11, 12, 6, 0))
+
+    expect(user.reload.paused_generation_at).to be_nil
+  end
+
+  it "still nudges, and does not pause, when today's set is already there" do
+    [ today - 3, today - 2, today - 1, today ].each { |date| set_on(date) }
+
+    expect { run_hand_out }.not_to have_enqueued_job(GenerateDailyExercisesJob)
+
+    expect(user.reload.paused_generation_at).to be_nil
+  end
+end

@@ -36,6 +36,12 @@ class DailyExercise < ApplicationRecord
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
   end
 
+  def self.latest_openings(limit = UnopenedSets::PAUSE_AFTER)
+    left_joins(:daily_response).order(date: :desc).limit(limit)
+      .pluck(:date, :opened_at, "daily_responses.id")
+      .map { |date, opened_at, response_id| UnopenedSets::Entry.new(date: date, opened: opened_at.present?, saved: response_id.present?) }
+  end
+
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end

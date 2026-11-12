@@ -19,9 +19,17 @@ class EnqueueDueGenerationsJob < ApplicationJob
 
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)
+    elsif UnopenedSets.pause?(user.daily_exercises.latest_openings, today: Date.current)
+      pause_for_unopened_sets(user)
     else
       GenerateDailyExercisesJob.set(priority: SCHEDULED_PRIORITY).perform_later(user_id: user.id, scheduled: true)
     end
+  end
+
+  def pause_for_unopened_sets(user)
+    return unless user.pause_generation!(source: User::AUTOMATIC_PAUSE) == :paused
+
+    Rails.logger.info("Paused generation for user #{user.id}: the last #{UnopenedSets::PAUSE_AFTER} sets went unopened")
   end
 
   def nudge_if_due(user, exercise)

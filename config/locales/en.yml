@@ -188,6 +188,7 @@ en:
       generation_resumed_with_held_set: "Automatic daily generation resumed. The set you had waiting is on your dashboard."
       generation_resumed: "Automatic daily generation resumed."
       generation_paused: "Automatic daily generation paused."
+      generation_kept_paused: "Automatic generation stays paused."
     api_keys:
       unrecognized_key: "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
       key_saved: "API key saved. You're all set!"
@@ -361,6 +362,10 @@ en:
     generation_failed:
       title: "Couldn't generate today's exercises."
       try_again: "Try again"
+    automatic_pause:
+      message: "Generation paused after three sets in a row went unopened, so your key isn't spent on sets you don't see."
+      resume: "Resume"
+      keep_paused: "Keep it paused"
     paused_empty:
       message: "Automatic generation is paused, so today's set wasn't created. You can still generate one whenever you want it."
       resume: "Resume automatic generation"
@@ -910,6 +915,7 @@ en:
       title: "Account"
       log_out: "Log out"
       paused: "Automatic generation is paused (since %{date})."
+      paused_automatically: "Automatic generation paused on %{date}, after three sets in a row went unopened."
       resume: "Resume automatic generation"
       active: "Automatic generation is active."
       pause: "Pause automatic generation"

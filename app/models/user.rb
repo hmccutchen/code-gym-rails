@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
   include SignedInSessions
+  include GenerationPause
 
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
@@ -172,15 +173,11 @@ class User < ApplicationRecord
                             variant: ProviderFailureText.variant_for(self)).full
   end
 
-  def paused_generation_at?
-    paused_generation_at.present?
-  end
-
   def resume_generation!
     Time.use_zone(effective_time_zone) do
       with_lock do
         recovered = recover_held_set
-        update!(paused_generation_at: nil)
+        update!(paused_generation_at: nil, generation_pause_source: nil)
         recovered
       end
     end

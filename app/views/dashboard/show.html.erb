@@ -16,6 +16,9 @@
   <% if @trial_status %>
     <%= render "dashboard/trial_banner", status: @trial_status %>
   <% end %>
+  <% if current_user.generation_paused_automatically? %>
+    <%= render "dashboard/automatic_pause" %>
+  <% end %>
   <div id="dashboard-content">
     <% case @content_state %>
     <% when :trial_ended %>

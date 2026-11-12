@@ -32,6 +32,8 @@ html:has(.progress-sticky) {
 .flash.regeneration-failed { margin-bottom: 1.5rem; }
 .auto-saved { font-size: .8rem; color: var(--muted); }
 .trial-banner.hint { margin: -1rem 0 1.5rem; }
+.automatic-pause { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin-bottom: 1.5rem; }
+.automatic-pause p { flex: 1 1 18rem; margin: 0; }
 
 .today-state { text-align: center; padding: 3rem; }
 .today-state .spinner { margin-bottom: 1rem; }
@@ -46,7 +48,7 @@ html:has(.progress-sticky) {
 
 @media (max-width: 599.98px) {
   .today-page .page-header, .today-page .progress-sticky, .today-page .section, .today-page .flash.regeneration-failed { margin-bottom: 16px; }
-  .today-page .trial-banner.hint { margin: 0 0 16px; }
+  .today-page .trial-banner.hint, .today-page .automatic-pause { margin: 0 0 16px; }
 
   #submit-row { gap: 4px; }
   #submit-row #submit-answers { width: 100%; min-height: 48px; }
