@@ -17,7 +17,8 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
   └→ enters their own Anthropic, Gemini or OpenAI API key (stored encrypted per-user;
      the key's prefix determines user.provider)
        └→ ApiKeysController#update asks that provider's list-models endpoint
-          about the key first (AiService#check_key, one free GET, no retry):
+          about the key first (AiService.check_key, one free GET, no retry,
+          8 seconds at most; a badly shaped key never gets that far):
           a rejected key is not stored and the form says so; an accepted one
           is stored; a 403 or no answer stores it with a warning
 

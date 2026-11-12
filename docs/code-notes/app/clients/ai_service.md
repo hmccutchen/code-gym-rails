@@ -253,21 +253,31 @@ reasoning within an allowance. A Faraday timeout becomes `TimeoutError` and
 any other Faraday error `NetworkError`, both naming the provider.
 `FakeService` overrides `#call` itself, since it makes no HTTP request.
 
-## `#check_key`
+## `.check_key` and `#check_key`
 
 A second template, for Setup's key check
 (`docs/decisions/per-user-api-keys.md`, "A key is checked when it is
-saved"). It makes one GET to the subclass's `MODELS_URL` on a connection of
+saved"). `.check_key(provider_key, key)` is how a caller reaches it: it
+finds the provider in the registry and refuses one that is not available,
+the gate `.for` applies, so Setup has one way in and names no subclass. A
+pasted key belongs to no user yet, which is why it does not go through
+`.for`. The instance method makes one GET to the subclass's `MODELS_URL` on a connection of
 its own (`#key_check_connection`): the subclass's `#auth_headers`, the short
 `CallProfiles::KEY_CHECK_*` timeouts, and no retry middleware, since a
 person is waiting on the page. It shares nothing with `#call` or
 `call_and_log` on purpose: there is no prompt, purpose or `Request`, it
 reads no trial allowance, and it writes no usage row.
 
-It returns a result and raises nothing. `#key_check_result` reads a 2xx as
+The GET runs inside `Timeout.timeout(CallProfiles::KEY_CHECK_TOTAL_SECONDS)`.
+Faraday's timeouts bound the connect and each read, never the whole reply,
+and the check holds a web thread. `Timeout` is safe here because the
+connection is made for this request and dropped after it.
+
+It returns a result and raises nothing: any `StandardError`, the timeout
+included, is `:unanswered`. `#key_check_result` reads a 2xx as
 `:accepted`, the subclass's `#key_rejected?` as `:rejected` (a 401 here;
 `GeminiService` adds its 400 naming `API_KEY_INVALID`), a 403 as
-`:refused`, and everything else as `:unanswered`, a Faraday error included.
+`:refused`, and everything else as `:unanswered`.
 A 403 is kept apart from a rejection here, unlike in
 `#raise_if_key_rejected`, because Setup stores the key after one.
 

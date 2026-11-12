@@ -19,10 +19,15 @@ Setup's key check is one of those surfaces, `key_save`, though it rescues
 nothing: `AiService#check_key` returns `:rejected` and
 `ApiKeysController` words it as a `bad_key` on that surface, always in the
 `own_key` variant, since the key in question is the one the person pasted.
-The sentence is the same one a failed generation shows, ending "so it
-wasn't saved." Its next step still reads "Check the key in Setup." on the
-Setup page itself; the sentence was reused whole so a bad key has one
-wording.
+It shows `ProviderFailureText#title` alone: the sentence a failed
+generation opens with, ending "so it wasn't saved." The next step, "Check
+the key in Setup.", is left off, because the person is on Setup with the
+field in front of them. The table has a per-surface entry only for the
+outcome and for what is still there, none for the next step, so the
+surface omits it; every other surface keeps it. The two warnings a saved
+key can carry (`flash.api_keys.key_saved_check_refused` and
+`key_saved_unchecked`) follow the same rule: no status code, and no guess
+at the cause.
 
 **Page scripts show only the app's own words.** A fetch that fails can
 reject with the browser's text ("Failed to fetch"), land on an HTML error

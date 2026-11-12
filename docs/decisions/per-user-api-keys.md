@@ -6,8 +6,24 @@ Each user provides their own Anthropic, Gemini or OpenAI key, and can keep one f
 
 Before this, Setup accepted any key whose prefix matched a provider, and a
 mistyped or revoked key was found only when the first generation failed.
-`PATCH /setup` now asks the provider about a pasted key before storing it
-(`AiService#check_key`, mapped to a response in `ApiKeysController#update`).
+`PATCH /setup` now asks the provider about a pasted key before storing it.
+`ApiKeysController#update` calls `AiService.check_key(provider_key, key)`,
+which applies the availability gate `AiService.for` applies and runs the
+provider's `#check_key`, and the action maps the result to a response. The
+controller names no client class.
+
+**A pasted key must be one run of printable ASCII**, at most
+`AiProvider::MAX_KEY_LENGTH` (512) characters, with no space, tab, newline
+or other control character (`AiProvider::KEY_SHAPE`). `AiProvider.detect`
+applies it before any `key_pattern`, so it is the one place the rule lives:
+the patterns anchor only a key's start, and a key travels in an HTTP
+header. Before the rule, `"sk-ant-abc\nX-Evil: 1"` was detected as an
+Anthropic key, and Net::HTTP raised an `ArgumentError` whose message quoted
+it into the log. A key that fails gets the "We don't recognize this key
+format" alert, no provider is called, and nothing is stored. `User` does not
+validate the shape of stored keys, only that each is a non-blank string
+under a known provider, so a key the old code stored in a bad shape cannot
+fail an unrelated save; it would still fail at its first provider call.
 
 The check is one GET to the provider's list-models endpoint, which spends no
 tokens and uses none of Gemini's free-tier requests:
@@ -26,9 +42,13 @@ Gemini answered 400 with `API_KEY_INVALID`.
 | Provider's answer | Result | Key saved | What the person sees |
 |---|---|---|---|
 | 2xx | `:accepted` | yes | "API key saved. You're all set!" |
-| 401, or Gemini's 400 naming `API_KEY_INVALID` | `:rejected` | no | the bad-key sentence, on the Setup form |
-| 403 | `:refused` | yes | saved, with a warning that the provider refused the check |
-| no answer, a timeout, 429, 5xx, anything else | `:unanswered` | yes | saved, with a warning that the key hasn't been checked |
+| 401, or Gemini's 400 naming `API_KEY_INVALID` | `:rejected` | no | "%{provider} didn't accept your API key, so it wasn't saved.", on the Setup form |
+| 403 | `:refused` | yes | "Saved, but %{provider} wouldn't let the key be checked. If your first set fails, check the key in your %{provider} account." |
+| no answer, a timeout, 429, 5xx, anything else | `:unanswered` | yes | "Saved, but the key couldn't be checked with %{provider}. If your first set fails, check the key." |
+
+Neither warning names a status code or guesses a cause, under the rule in
+`docs/decisions/what-a-person-is-told-when-a-provider-fails.md`. The second
+is worded to be true of a 404 or a 429 as much as of a timeout.
 
 - **An empty balance is not detected.** A list-models call succeeds on an
   account with no credit. Catching that needs a call that generates
@@ -48,10 +68,25 @@ Gemini answered 400 with `API_KEY_INVALID`.
   only `User#store_api_key` resets the key-hold count. The form comes back
   with the language the person chose still selected, and the key field
   empty, since a key is never echoed.
-- **The check waits 3 seconds to connect and 5 for the reply, once**
-  (`CallProfiles::KEY_CHECK_OPEN_TIMEOUT`, `KEY_CHECK_READ_TIMEOUT`). It
-  runs inside the request, so its connection has no retry middleware and
-  the page waits 8 seconds at most.
+- **The key is stored under the user row lock.** The account is loaded
+  before the check, which can take seconds, and the keys are one encrypted
+  JSON map written whole. `ApiKeysController#store_key` therefore merges
+  inside `with_lock`, which reloads the row, so a key saved from another tab
+  during the check is still in the map.
+- **The whole check is bounded at 8 seconds, once**
+  (`CallProfiles::KEY_CHECK_TOTAL_SECONDS`, the sum of
+  `KEY_CHECK_OPEN_TIMEOUT`, 3, and `KEY_CHECK_READ_TIMEOUT`, 5). The two
+  Faraday timeouts alone do not bound it: Net::HTTP's read timeout starts
+  again on every read, so a server sending a byte every few seconds held a
+  client for 45 seconds in review, on a web server with three threads.
+  `#check_key` wraps the GET in `Timeout.timeout` with the total, and a
+  local server dripping one byte a second was cut off at 8.0 seconds. The
+  connection is built for this one request and dropped afterwards, so an
+  interrupted read leaves no shared state behind. The connection has no
+  retry middleware.
+- **Any error inside the check is `:unanswered`.** `#check_key` rescues
+  `StandardError`, the total timeout included, and logs the error's class
+  and never its message, since a message can quote a header.
 - **It does not go through `call_and_log`.** It has no prompt, purpose or
   `AiService::Request`, so it reads no trial allowance and no generation
   deadline. `ApiKeysController` does not declare `ProviderCallLimits`, so a
@@ -80,7 +115,7 @@ Gemini answered 400 with `API_KEY_INVALID`.
 - **Saving a key is rate-limited**, since the check lets someone test keys
   they did not create: `ApiKeysController::KEY_SAVES_PER_HOUR` (10) per
   account and `KEY_SAVES_PER_HOUR_BY_IP` (30) per address, counted on every
-  save that carries a key, for every account. A preferences-only save is
+  save that carries a key, a badly shaped one included, for every account. A preferences-only save is
   not counted. Past either, the form comes back with a 429 and no provider
   is called. Like the other caps these are starting values, not measured
   ones.

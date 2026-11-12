@@ -31,15 +31,21 @@ read it before changing that area.
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
   `User#api_key` and `User#stored_providers`; no keys stores NULL.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
-  Setup checks a pasted key before storing it: `AiService#check_key` makes
-  one GET to the provider's list-models endpoint (`MODELS_URL`, with the
-  subclass's `#auth_headers`), with a short timeout and no retry, outside
-  `call_and_log`, and returns one of `AiService::KEY_CHECK_RESULTS`. Only
-  `:rejected` (a 401, or Gemini's 400 `API_KEY_INVALID`) blocks the save; a
-  403 and an unanswered check save with a warning. It writes no usage row,
-  logs no key and no provider body, and a key that was not saved leaves the
-  key-hold count alone. `ApiKeysController` limits saves that carry a key
-  per account and per address.
+  A pasted key is checked through `AiService.check_key(provider_key, key)`,
+  the one other way to a provider class, which applies the same
+  availability gate. `AiProvider.detect` first refuses a key that is not one
+  run of printable ASCII within `AiProvider::MAX_KEY_LENGTH`
+  (`KEY_SHAPE`), the one home of that rule. The check is one GET to the
+  provider's list-models endpoint (`MODELS_URL`, with the subclass's
+  `#auth_headers`), bounded as a whole by
+  `CallProfiles::KEY_CHECK_TOTAL_SECONDS`, with no retry, outside
+  `call_and_log`, returning one of `AiService::KEY_CHECK_RESULTS` and
+  raising nothing. Only `:rejected` (a 401, or Gemini's 400
+  `API_KEY_INVALID`) blocks the save; a 403 and an unanswered check save
+  with a warning that names no status code. It logs the result and an error
+  class, never a key, a provider body or an error message. A key that was
+  not saved leaves the key-hold count alone, and a saved one is merged under
+  the user row lock.
 - **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging, and calls each prompt class (`app/prompts/*_prompt.rb`; `.claude/rules/patterns.md` says what one holds) for its text; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. `AiService#call(request)` is the template for the HTTP round trip; subclasses implement `request_body`, `read_result`, `raise_for_status` and `provider_name` behind it, plus `build_connection`, define the `API_URL` it posts to, and own which model each purpose routes to (see "Per-purpose model routing" below). Each call carries one `AiService::Request` built by `AiService.request_for` from the purpose's row in `CallProfiles::BY_PURPOSE` (see `.claude/rules/patterns.md`), the provider-neutral module that also holds the timeouts, retry counts and worst-case call times. Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. It is also where a model asks for a provider's own quota day (`.daily_quota_reset_at`), so no other model names a provider class; call timing is no provider's fact and is read from `CallProfiles`. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**
   (`docs/decisions/per-purpose-model-routing.md`): Each provider routes a call
@@ -80,9 +86,11 @@ read it before changing that area.
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
   declares `ProviderCallLimits`, one shared hourly and daily count that runs
-  before every other check. `/generate`, Learn prepare actions and the
-  per-user generation claim and queue permit apply to all accounts. All use
-  `LazyCacheStore`.
+  before every other check. `/generate`, Learn prepare actions, the
+  per-user generation claim and queue permit, and Setup's key saves
+  (`ApiKeysController::KEY_SAVES_PER_HOUR` per account,
+  `KEY_SAVES_PER_HOUR_BY_IP` per address, since each save asks a provider
+  about a key) apply to all accounts. All use `LazyCacheStore`.
 - **The key hold** (`docs/decisions/pausing-generation.md`, "Holding the
   schedule for a key that keeps failing"): `User#record_generation_failure!`
   counts a failure classified as a kind in `KeyHold::KINDS` (bad key, out of

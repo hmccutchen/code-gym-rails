@@ -1,6 +1,7 @@
 # What a usage row records
 
-every provider call writes one `ApiUsage`
+every provider call that goes through `AiService#call_and_log`, which is
+every call that sends a prompt, writes one `ApiUsage`
 row through `AiService#log_usage`, and that row now carries enough to price
 it. `model` is the model `#call` routed to (`MODEL_FOR_PURPOSE` /
 `DEFAULT_ROUTE`), so it matches those tables and any price list keyed the
@@ -78,6 +79,6 @@ as zero. The weekday projection is not computed there: `MonthlySpend` decides
 the month's total and the projection (`docs/code-notes/app/models/monthly_spend.md`).
 
 **Setup's key check writes no row.** `AiService#check_key` is the one
-provider request outside `call_and_log`: a free list-models GET with no
+provider request outside `call_and_log`, and so the one exception: a free list-models GET with no
 purpose, model or tokens. `docs/decisions/per-user-api-keys.md` says which
 counts a row for it would distort.
