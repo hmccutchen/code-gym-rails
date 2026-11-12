@@ -3,6 +3,8 @@ module ScheduledGeneration
 
   def self.users = User.active.where.not(api_keys: nil).where(paused_generation_at: nil)
 
-  # Reads the clock in Time.zone, so the caller sets the user's zone first.
-  def self.due_now? = Date.current.on_weekday? && Time.current.hour >= START_HOUR
+  def self.due?(user, at: Time.current)
+    local = at.in_time_zone(user.effective_time_zone)
+    local.on_weekday? && local.hour >= START_HOUR
+  end
 end

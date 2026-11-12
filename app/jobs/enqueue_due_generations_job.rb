@@ -15,7 +15,7 @@ class EnqueueDueGenerationsJob < ApplicationJob
   private
 
   def enqueue_or_nudge(user)
-    return unless ScheduledGeneration.due_now?
+    return unless ScheduledGeneration.due?(user)
 
     if (exercise = DailyExercise.find_by(user: user, date: Date.current))
       nudge_if_due(user, exercise)

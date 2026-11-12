@@ -2,7 +2,7 @@ production:
   generate_daily_exercises:
     class: EnqueueDueGenerationsJob
     schedule: "0 * * * *"   # The five-nudge cap and PushNudgePlan's quiet period depend on this staying hourly
-    description: "Generate personalized daily Code Gym exercises for all users"
+    description: "Enqueue a generation job for each user whose set is due, and the afternoon nudges"
   sweep_duck_threads:
     class: SweepDuckThreadsJob
     schedule: "17 3 * * *"
@@ -12,4 +12,4 @@ development:
   generate_daily_exercises:
     class: EnqueueDueGenerationsJob
     schedule: "*/5 * * * *"
-    description: "Generate personalized daily Code Gym exercises for all users"
+    description: "Enqueue a generation job for each user whose set is due, and the afternoon nudges"

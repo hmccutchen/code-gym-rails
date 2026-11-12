@@ -13,8 +13,12 @@ per-page cap still applies; the shared count runs before every other check,
 so a request those checks refuse still counts. `/generate` allows
 `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
 prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
-Those per-endpoint caps and the generation claim below apply to every
-account. `GenerateDailyExercisesJob` takes a claim on its user
+These caps are starting values, not measured ones. All of them use
+`LazyCacheStore`, so the test env's `:null_store` never trips them and a
+spec that exercises one swaps in a real store.
+
+The `/generate` and Learn prepare caps and the generation claim and permit
+below apply to every account. `GenerateDailyExercisesJob` takes a claim on its user
 (`users.generating_since`, declared with `Claimable`) when it starts running
 and releases it when it ends, because every dashboard load with no set
 enqueues a job and each would run a full billed generation before the unique
@@ -23,8 +27,14 @@ before any provider call, and a job that takes it stops when today's set is
 already there. The hourly hand-out (`EnqueueDueGenerationsJob`) generates
 nothing itself: it enqueues that same per-user job for each due user, so the
 claim covers a scheduled generation and a dashboard-started one alike. The
-claim goes stale after `CallProfiles::JUDGED_GENERATION_BUDGET` seconds, so a
-worker that died mid-call blocks its user for that long and no longer.
+claim goes stale after `User::GENERATION_STALE_AFTER`, so a worker that died
+mid-call blocks its user for that long and no longer. That window is
+`CallProfiles::JUDGED_GENERATION_BUDGET` plus `DailyExercise::WRITE_MARGIN`.
+The budget counts provider calls only, while the capture before them and the
+ingest, formatting and commit after them also run under the claim, so without
+the margin a worst-case job would find its own claim stale just as it wrote.
+The dashboard's poll limit reads the same constant. The permit keeps the
+bare budget as its duration.
 
 The job also holds a Solid Queue concurrency permit (`limits_concurrency`
 with `on_conflict: :discard`), and the two have separate roles. The permit
@@ -53,7 +63,7 @@ What a job writes after its paid call is checked again under the user row
 lock. `PracticeGeneration.commit_new` writes the set only when the day has
 none, whoever holds the claim by then, since a finished set is worth keeping
 either way. A failure is written only while the job still holds its own
-claim: one that overran the budget and was taken over leaves the outcome to
+claim: one that overran its window and was taken over leaves the outcome to
 the job that took it.
 
 Two sequences can still bill a second attempt on a day the first one failed,
@@ -62,6 +72,4 @@ and a scheduled job for one user are both queued, the first to run fails, and
 the other then generates. Or a click's job waits in the queue past its
 permit's expiry, a later dashboard load queues a duplicate, the first fails,
 and the duplicate generates. Both are retries one after the other, never two
-calls at once. These are starting values, not measured ones. All of them use
-`LazyCacheStore`, so the test env's `:null_store` never trips them and a
-spec that exercises one swaps in a real store.
+calls at once.

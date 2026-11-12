@@ -1219,12 +1219,20 @@ RSpec.describe User, type: :model do
       expect(user.reload).not_to be_generating
     end
 
-    it "goes stale once the judged generation budget has passed, so a crashed worker's claim can be taken" do
-      user.update_column(:generating_since, (CallProfiles::JUDGED_GENERATION_BUDGET.seconds - 1.minute).ago)
+    it "goes stale once its window has passed, so a crashed worker's claim can be taken" do
+      user.update_column(:generating_since, (User::GENERATION_STALE_AFTER - 1.second).ago)
       expect(user.reload.claim_generating!).to be_nil
 
-      user.update_column(:generating_since, (CallProfiles::JUDGED_GENERATION_BUDGET.seconds + 1.minute).ago)
+      user.update_column(:generating_since, (User::GENERATION_STALE_AFTER + 1.second).ago)
       expect(user.reload.claim_generating!).to be_present
+    end
+
+    it "outlasts the provider calls by the write margin, so a worst-case job still holds it while it commits" do
+      expect(User::GENERATION_STALE_AFTER).to eq(CallProfiles::JUDGED_GENERATION_BUDGET.seconds + DailyExercise::WRITE_MARGIN)
+
+      user.update_column(:generating_since, (CallProfiles::JUDGED_GENERATION_BUDGET.seconds + 1.second).ago)
+      expect(user.reload).to be_generating
+      expect(user.claim_generating!).to be_nil
     end
   end
 

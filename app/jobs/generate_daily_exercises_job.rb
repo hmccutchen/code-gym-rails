@@ -21,7 +21,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   private
 
   def generate_under_claim(user, scheduled:)
-    return if scheduled && !ScheduledGeneration.due_now?
+    return if scheduled && !ScheduledGeneration.due?(user)
 
     claim = user.claim_generating!
     return Rails.logger.info("Skipped generation for user #{user.id}: another generation holds the claim") unless claim
@@ -56,7 +56,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     end
     user.clear_generation_failure! if user.last_generation_error_date.present?
 
-    Rails.logger.info("Generated exercise for user #{user.id} on #{Date.current}")
+    Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
     persist_failure(user, claim) { user.record_generation_message!(e.message) }
@@ -64,11 +64,13 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
     persist_failure(user, claim) { user.record_generation_failure!(e) }
   rescue ActiveRecord::RecordNotUnique
-    Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
+    Rails.logger.info(skipped_duplicate(user))
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
-    Rails.logger.info("Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)")
+    Rails.logger.info(skipped_duplicate(user))
   end
+
+  def skipped_duplicate(user) = "Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)"
 
   # A claim that went stale may be another job's by now, and that job writes the outcome.
   def persist_failure(user, claim)

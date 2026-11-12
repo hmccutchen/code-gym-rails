@@ -20,7 +20,7 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
 Every hour (Solid Queue cron via config/recurring.yml):
   EnqueueDueGenerationsJob, the hand-out, calls no provider. For each user
   ScheduledGeneration.users holds, at or past 8am on a weekday in their own
-  zone (ScheduledGeneration.due_now?):
+  zone (ScheduledGeneration.due?):
     today's set exists → SendPushReminderJob (kind: :nudge) when PushNudgePlan says so
     no set yet         → GenerateDailyExercisesJob(user_id:, scheduled: true),
                          at EnqueueDueGenerationsJob::SCHEDULED_PRIORITY, so a

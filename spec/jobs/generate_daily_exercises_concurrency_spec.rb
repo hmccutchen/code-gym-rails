@@ -7,6 +7,7 @@ RSpec.describe GenerateDailyExercisesJob do
 
   let(:weekday_morning) { Time.utc(2026, 7, 13, 15, 0) }
   let(:budget) { CallProfiles::JUDGED_GENERATION_BUDGET.seconds }
+  let(:claim_window) { User::GENERATION_STALE_AFTER }
 
   def create_user(name, **attributes)
     User.create!(email: "#{name}-#{SecureRandom.hex(4)}@example.com", provider: "anthropic",
@@ -76,14 +77,14 @@ RSpec.describe GenerateDailyExercisesJob do
       expect(other.daily_exercises.count).to eq(1)
     end
 
-    it "holds until the judged generation budget has passed, then lets a job take a crashed worker's claim" do
+    it "holds until the claim window has passed, then lets a job take a crashed worker's claim" do
       held_by_another_job(user)
 
-      travel budget - 1.minute
+      travel claim_window - 1.second
       described_class.perform_now(user_id: user.id)
       expect(calls).to eq([])
 
-      travel 2.minutes
+      travel 2.seconds
       described_class.perform_now(user_id: user.id)
       expect(calls).to eq([ user.id ])
       expect(user.reload.generating_since).to be_nil
@@ -149,12 +150,12 @@ RSpec.describe GenerateDailyExercisesJob do
       expect(user.reload.generating_since).to be_nil
     end
 
-    # A job that overran the budget can find its claim taken over; its failure would sit above the newer job's set.
+    # A job that overran its window can find its claim taken over; its failure would sit above the newer job's set.
     it "writes no failure and leaves the newer claim alone when its own claim was taken over mid-call" do
       takeover = nil
       service = instance_double(ClaudeService)
       allow(service).to receive(:generate_judged_exercise) do |caller, **|
-        travel budget + 1.minute
+        travel claim_window + 1.second
         takeover = held_by_another_job(caller)
         raise ProviderError, "boom"
       end
@@ -165,6 +166,51 @@ RSpec.describe GenerateDailyExercisesJob do
 
       expect(takeover).to be_present
       expect(user.reload).to have_attributes(generating_since: takeover, last_generation_error_date: nil)
+    end
+  end
+
+  describe "what a job logs and writes when its commit is not the first" do
+    let(:user) { create_user("late") }
+
+    around { |example| travel_to(weekday_morning) { example.run } }
+
+    it "still lands its set when its claim was taken over mid-call and the day has none" do
+      takeover = nil
+      stub_provider(user) do |caller|
+        travel claim_window + 1.second
+        takeover = held_by_another_job(caller)
+      end
+
+      described_class.perform_now(user_id: user.id)
+
+      expect(takeover).to be_present
+      expect(user.daily_exercises.count).to eq(1)
+      expect(user.reload).to have_attributes(generating_since: takeover, last_generation_error_date: nil)
+    end
+
+    it "logs a duplicate as skipped, never as generated, when another job wrote the set during the call" do
+      stub_provider(user) do |caller|
+        DailyExercise.create!(user: caller, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                              problem_set: { "code_review" => {} })
+      end
+      lines = []
+      allow(Rails.logger).to receive(:info) { |line| lines << line }
+
+      described_class.perform_now(user_id: user.id)
+
+      expect(lines.grep(/exercise|generation/i))
+        .to eq([ "Skipped duplicate generation for user #{user.id} on 2026-07-13 (already generated concurrently)" ])
+      expect(user.daily_exercises.count).to eq(1)
+    end
+
+    it "logs a set it wrote itself as generated" do
+      stub_provider(user)
+      lines = []
+      allow(Rails.logger).to receive(:info) { |line| lines << line }
+
+      described_class.perform_now(user_id: user.id)
+
+      expect(lines.grep(/exercise|generation/i)).to eq([ "Generated exercise for user #{user.id} on 2026-07-13" ])
     end
   end
 

@@ -1649,6 +1649,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
         expect(attempts).to be_positive
         expect(attempts * interval).to be > CallProfiles::GENERATION_READ_TIMEOUT
         expect(attempts * interval).to be > CallProfiles::JUDGED_GENERATION_BUDGET
+        expect(attempts * interval).to be > User::GENERATION_STALE_AFTER.to_i
         expect(attempts * interval).to be > DailyExercise::REGENERATION_STALE_AFTER.to_i
       end
     end

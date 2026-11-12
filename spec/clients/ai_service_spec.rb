@@ -37,12 +37,13 @@ RSpec.describe AiService do
         .to be >= stages.sum { |timeout| CallProfiles.worst_case_call_seconds(timeout) }
     end
 
-    it "keeps a judged generation shorter than the interval between batch ticks, so the batch never bills a second generation for the same day" do
+    it "keeps a generation's claim window shorter than the interval between hand-out ticks, so the next tick never finds a live job's claim stale" do
       require "fugit"
       schedule = YAML.load_file(Rails.root.join("config/recurring.yml"))
                      .fetch("production").fetch("generate_daily_exercises").fetch("schedule")
 
-      expect(CallProfiles::JUDGED_GENERATION_BUDGET).to be < Fugit::Cron.parse(schedule).rough_frequency
+      expect(CallProfiles::JUDGED_GENERATION_BUDGET.seconds).to be < User::GENERATION_STALE_AFTER
+      expect(User::GENERATION_STALE_AFTER.to_i).to be < Fugit::Cron.parse(schedule).rough_frequency
     end
 
     it "keeps the provider budget below the review claim window" do
