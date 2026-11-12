@@ -172,9 +172,11 @@ class User < ApplicationRecord
   def key_in_use = [ provider, api_key ]
 
   def report_call_failure(key_used)
+    provider_used = key_used.first
+    return if provider_used.nil?
     return yield if key_in_use == key_used
 
-    clear_generation_failure! if last_generation_error_date.present?
+    clear_generation_failure! if last_generation_failure_provider == provider_used
   end
 
   def clear_generation_failure!

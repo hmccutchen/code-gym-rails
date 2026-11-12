@@ -59,7 +59,11 @@ alone, because "Try again" calls it before any provider has answered.
 `#report_call_failure` is the one place that decides whether a failed
 call's outcome is written: only while `#key_in_use` still equals what the
 job noted before the call. The caller holds the row lock, which is what
-makes the comparison current. `docs/decisions/per-user-api-keys.md` ("A
+makes the comparison current. A changed key clears only a failure whose
+`last_generation_failure_provider` is the call's own provider, so another
+provider's failure and a provider-less message survive. A nil provider in
+what the job noted means the call started with no key at all, and nothing
+is written or cleared for it. `docs/decisions/per-user-api-keys.md` ("A
 call that outlives its key") has the rule.
 
 `#store_api_key` and `#use_provider` both put a key in use through the

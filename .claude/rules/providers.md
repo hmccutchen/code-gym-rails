@@ -31,8 +31,9 @@ read it before changing that area.
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
   `User#remove_api_key`, `User#api_key` and `User#stored_providers`; no keys
   stores NULL. Setup removes one stored key at a time
-  (`DELETE /setup/keys/:provider`, under the user row lock, nothing written
-  for an anonymized account). `#remove_api_key` returns one of
+  (`DELETE /setup/keys/:provider`). The key save, the removal and the
+  preferences save all write through `ApiKeysController#with_account_locked`:
+  the user row lock, and nothing written for an anonymized account. `#remove_api_key` returns one of
   `User::KEY_REMOVAL_OUTCOMES`, which the action maps to its message. The
   key in use, once removed, hands over to the most recently saved key that
   remains (`users.key_saved_times`, written with `api_keys` in one
@@ -124,7 +125,8 @@ read it before changing that area.
   at all, in that job and in `RegenerateExerciseJob`: both note
   `User#key_in_use` before the call and write through
   `User#report_call_failure` under the user row lock, the one home of that
-  rule, which also clears a failure left today. At
+  rule. It clears only a failure recorded against the call's own provider,
+  and a call that started with no provider records and clears nothing. At
   `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,
   so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
   (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read

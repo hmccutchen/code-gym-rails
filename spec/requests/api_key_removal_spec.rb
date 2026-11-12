@@ -203,6 +203,21 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
       expect(user.reload).to have_attributes(provider: "anthropic", api_keys: keys.slice("anthropic"), language: "ruby_rails")
     end
 
+    it "writes nothing for an account deleted in another browser, with no provider posted, and sends this one to sign in" do
+      login_as(user)
+      allow_any_instance_of(User).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+        User.find(original.receiver.id).update_columns(anonymized_at: Time.current, api_keys: nil)
+        original.call(*args, &block)
+      end
+
+      patch setup_path, params: { api_key: "", language: "javascript" }
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.application.login_required"))
+      expect(flash[:notice]).not_to eq(I18n.t("flash.api_keys.preferences_saved"))
+      expect(user.reload.language).to eq("ruby_rails")
+    end
+
     it "still switches to a provider whose key is stored" do
       login_as(user)
 

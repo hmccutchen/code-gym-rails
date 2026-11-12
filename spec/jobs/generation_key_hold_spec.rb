@@ -272,15 +272,27 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       expect(missing_set_state).to eq(:start_generation)
     end
 
-    it "clears a failure another attempt left today when the call's key was removed" do
+    it "leaves a failure a newer attempt recorded against the key that took over" do
       user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
       provider_raising_after(bad_key) do
         remove_key_in_use
-        User.find(user.id).record_generation_message!("An earlier attempt's message.")
+        User.find(user.id).record_generation_failure!(out_of_credit)
       end
 
       GenerateDailyExercisesJob.new.perform(user_id: user.id)
 
+      expect(user.reload).to have_attributes(last_generation_failure: "out_of_credit", last_generation_failure_provider: "openai")
+      expect(missing_set_state).to eq(:generation_failed)
+    end
+
+    it "records nothing for a job that starts after the last key was removed, so a key added later starts a set" do
+      remove_key_in_use
+      allow(Rails.logger).to receive(:error)
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      expect(user.reload.generation_failed_today?).to be(false)
+      User.find(user.id).tap { |fresh| fresh.store_api_key("sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq", provider: "openai") }.save!
       expect(missing_set_state).to eq(:start_generation)
     end
 

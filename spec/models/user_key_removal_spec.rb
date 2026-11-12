@@ -234,14 +234,13 @@ RSpec.describe User, "removing a stored key" do
       expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
     end
 
-    it "skips the block once the key was removed, replaced or switched, and clears a failure left today" do
-      changes = [ ->(account) { account.remove_api_key("anthropic") },
-                  ->(account) { account.store_api_key("sk-ant-new", provider: "anthropic") },
+    it "skips the block once the key was removed, replaced or switched, and clears the call's own provider's failure" do
+      changes = [ ->(account) { account.store_api_key("sk-ant-new", provider: "anthropic") },
                   ->(account) { account.use_provider("openai") } ]
       changes.each do |change|
         account = User.create!(email: "#{SecureRandom.hex(4)}@example.com", provider: "anthropic", api_keys: keys)
         key_used = account.key_in_use
-        account.record_generation_message!("left earlier today")
+        account.record_generation_failure!(bad_key)
         change.call(account)
         account.save!
 
@@ -249,6 +248,52 @@ RSpec.describe User, "removing a stored key" do
 
         expect(account.reload.generation_failed_today?).to be(false)
       end
+    end
+
+    it "leaves a failure a newer attempt recorded against another provider, with its recovery text" do
+      user.update!(key_saved_times: { "openai" => "2026-11-07T00:00:00Z" })
+      key_used = user.key_in_use
+      user.remove_api_key("anthropic")
+      user.save!
+      user.record_generation_failure!(bad_key)
+      expect(user.last_generation_failure_provider).to eq("openai")
+
+      user.report_call_failure(key_used) { raise "the block ran" }
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key",
+                                             last_generation_failure_provider: "openai")
+      expect(user.generation_failure_message(surface: :generation)).to include("GPT didn't accept your API key")
+    end
+
+    it "leaves a message that names no provider, since nothing ties it to the call" do
+      key_used = user.key_in_use
+      user.use_provider("openai")
+      user.save!
+      user.record_generation_message!("Settings or another set changed while this set was being prepared.")
+
+      user.report_call_failure(key_used) { raise "the block ran" }
+
+      expect(user.reload.last_generation_error).to eq("Settings or another set changed while this set was being prepared.")
+    end
+
+    it "records nothing for a call that started with no provider, and clears nothing" do
+      keyless = User.create!(email: "keyless@example.com")
+      key_used = keyless.key_in_use
+      expect(key_used).to eq([ nil, nil ])
+
+      keyless.report_call_failure(key_used) { raise "the block ran" }
+
+      expect(keyless.reload.generation_failed_today?).to be(false)
+    end
+
+    it "still records a failure for a trial account, which has a provider and no key of its own" do
+      trial = User.create!(email: "trial@example.com", provider: "anthropic", trial_started_at: 1.day.ago, trial_ends_at: 5.days.from_now)
+      key_used = trial.key_in_use
+      expect(key_used).to eq([ "anthropic", nil ])
+
+      trial.report_call_failure(key_used) { trial.record_generation_failure!(bad_key) }
+
+      expect(trial.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
     end
   end
 

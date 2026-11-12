@@ -16,6 +16,9 @@ or switched during the call is not recorded
 (`docs/decisions/per-user-api-keys.md`, "A call that outlives its key").
 `#release` has already released the exercise's claim by then, so the user
 lock is taken alone. The "set was kept" messages do not go through it.
+The job does not check that its claim is still its own before reporting,
+so the rule in `User#report_call_failure` is what keeps it from erasing a
+newer attempt's failure on another provider.
 
 ## `#generate`
 

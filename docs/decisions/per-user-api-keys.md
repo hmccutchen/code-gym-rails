@@ -263,13 +263,20 @@ replaced but never deleted, short of deleting the account.
   the "Provider in use" choice against the account as loaded. A Remove in
   one tab followed by that choice from a page loaded earlier would then
   put a removed provider in use. `ApiKeysController#save_preferences` now
-  reads `stored_providers` inside `with_lock`, and a provider with no
+  reads `stored_providers` inside the lock, and a provider with no
   stored key saves nothing and returns to Setup with "That provider has no
   saved key, so nothing was changed." That replaces the earlier behaviour,
   which ignored such a choice and reported "No changes made."
   `User#provider_has_a_stored_key` still skips an account with no keys
   map: a trial account names a provider while holding no keys
   (`User#start_trial!`), and so does an anonymized one.
+- **Every write in the controller that follows a reload goes through
+  `#with_account_locked`**: the key save, the removal and the preferences
+  save. It takes the row lock and writes nothing for an account deleted in
+  another browser since the request began, and each action then sends the
+  browser to sign in. Before this the preferences save had the lock
+  without that check, so a language-only save landed on an anonymized row
+  and reported success.
 - **Under the user row lock.** The keys are one encrypted map written whole,
   so `ApiKeysController#remove_key` removes inside `with_lock`, which
   reloads the row: a key saved in another tab meanwhile stays. An
@@ -319,8 +326,31 @@ no set was started with the new key.
   use. A job notes it before the call. When the call fails, the job reloads
   the account under the user row lock and writes through
   `User#report_call_failure(key_used)`, which runs the write only when
-  `key_in_use` is unchanged. Otherwise it writes nothing and clears a
-  failure recorded today, so the account ends with none from that call.
+  `key_in_use` is unchanged. Otherwise it writes nothing, so the account
+  ends with no failure from that call.
+- **What a call with a changed key clears.** Only a failure recorded
+  against the call's own provider (`last_generation_failure_provider`
+  equal to the provider the call started with). That keeps the next
+  dashboard visit starting a set with the current key when the leftover
+  failure is the old provider's. A failure recorded against another
+  provider stays: a newer attempt on the key that took over may have
+  written it, and clearing it would erase that attempt's message and its
+  recovery text. A message that names no provider ("Settings or another
+  set changed", "today's set was kept") stays too. Nothing ties it to the
+  call that is reporting, and each such message is about the set or the
+  settings and is still true. One case is not told apart: when a key is
+  replaced by another key for the same provider, a failure a newer attempt
+  recorded on the new key carries the same provider and is cleared. The
+  daily job's claim check prevents that there; the regeneration job
+  reports without checking that its claim is still its own.
+- **A call that started with no provider records nothing and clears
+  nothing.** A job queued before the last key was removed starts with
+  `key_in_use` of `[nil, nil]`, `AiService.for` raises `SetupError`, and
+  the two values still compare equal. Recording that would leave a setup
+  failure on the account, and a key added afterwards would find it ahead
+  of starting a generation. A trial account has a provider and no key of
+  its own, so its failures are still recorded; only a nil provider is
+  skipped.
 - **`GenerateDailyExercisesJob`** applies it inside `persist_failure`, after
   the claim check and the `set_today?` branch, to a provider or setup
   failure and to the "every section failed its quality check" message. The

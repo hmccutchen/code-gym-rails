@@ -87,6 +87,31 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
     end
 
+    it "leaves a failure a newer attempt recorded against the key that took over, with its recovery text" do
+      claimed_exercise
+      provider_raising_after(ProviderError::TimeoutError.new("slow")) do
+        remove_key_in_use
+        User.find(user.id).record_generation_failure!(ProviderError::AuthenticationError.new("401 invalid key"))
+      end
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload).to have_attributes(last_generation_failure: "bad_key", last_generation_failure_provider: "openai")
+      expect(user.generation_failure_message(surface: :regeneration)).to include("GPT didn't accept your API key")
+    end
+
+    it "records nothing for a job that starts after the last key was removed" do
+      exercise = claimed_exercise
+      user.update!(api_keys: user.api_keys.slice("anthropic"))
+      remove_key_in_use
+      allow(Rails.logger).to receive(:error)
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload).to have_attributes(provider: nil, generation_failed_today?: false)
+      expect(exercise.reload.regenerating_since).to be_nil
+    end
+
     it "records no setup failure for a key removed during the call" do
       claimed_exercise
       provider_raising_after(SetupError.new("unsupported language")) { remove_key_in_use }

@@ -65,11 +65,13 @@ class ApiKeysController < ApplicationController
 
   def chosen_language = posted_language || current_user.language
 
-  # The check can take seconds, so the lock reloads the row: another tab's key is merged, and a deleted account gets none.
-  def store_key(provider)
-    current_user.with_lock do
-      next false if current_user.anonymized?
+  # The check can take seconds, so the lock reloads the row: another tab's change is seen, and a deleted account gets no write.
+  def with_account_locked
+    current_user.with_lock { current_user.anonymized? ? false : yield }
+  end
 
+  def store_key(provider)
+    with_account_locked do
       current_user.store_api_key(pasted_key, provider: provider)
       current_user.language = posted_language if posted_language
       current_user.save!
@@ -77,11 +79,7 @@ class ApiKeysController < ApplicationController
   end
 
   def remove_key(provider)
-    current_user.with_lock do
-      next false if current_user.anonymized?
-
-      current_user.remove_api_key(provider).tap { current_user.save! }
-    end
+    with_account_locked { current_user.remove_api_key(provider).tap { current_user.save! } }
   end
 
   def skip_check? = params[:skip_check] == SKIP_CHECK
@@ -123,14 +121,14 @@ class ApiKeysController < ApplicationController
     return render_key_alert(t("flash.application.api_key_needed")) unless current_user.api_key_present?
 
     outcome = save_preferences(posted_language, params[:provider].presence)
+    return redirect_to(login_path, alert: t("flash.application.login_required")) unless outcome
     return redirect_to(setup_path, alert: t("flash.api_keys.provider_not_stored")) if outcome == :provider_not_stored
 
     redirect_to root_path, notice: t(PREFERENCE_NOTICES.fetch(outcome))
   end
 
-  # The lock reloads the row, so a provider whose key another tab removed since this page loaded is refused.
   def save_preferences(language, provider)
-    current_user.with_lock do
+    with_account_locked do
       next :provider_not_stored if provider && !current_user.stored_providers.include?(provider)
       next :unchanged unless language || provider
 
