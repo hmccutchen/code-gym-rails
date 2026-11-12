@@ -298,6 +298,17 @@ RSpec.describe DailyExercise, type: :model do
       expect(set.reload.opened_at).to eq(first)
     end
 
+    it "writes with one statement and reads nothing back" do
+      set
+      queries = []
+      counting = ->(*, payload) { queries << payload[:sql] unless payload[:name] == "SCHEMA" || payload[:sql].match?(/SAVEPOINT/) }
+
+      ActiveSupport::Notifications.subscribed(counting, "sql.active_record") { 2.times { set.mark_opened! } }
+
+      expect(queries.size).to eq(1)
+      expect(queries.first).to match(/\AUPDATE "daily_exercises" SET "opened_at"/)
+    end
+
     it "runs no callback and no validation" do
       set.problem_set = nil
 

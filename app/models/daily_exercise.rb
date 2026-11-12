@@ -91,8 +91,9 @@ class DailyExercise < ApplicationRecord
   def mark_opened!
     return if opened_at.present?
 
-    self.class.where(id: id, opened_at: nil).update_all(opened_at: Time.current)
-    self.opened_at = self.class.where(id: id).pick(:opened_at)
+    now = Time.current
+    self.class.where(id: id, opened_at: nil).update_all(opened_at: now)
+    self.opened_at = now
     clear_attribute_changes([ :opened_at ])
   end
 
