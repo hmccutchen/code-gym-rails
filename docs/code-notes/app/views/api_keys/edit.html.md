@@ -17,6 +17,18 @@ A key the provider rejected re-renders this page without saving anything,
 and the person's language choice should still be there when they correct
 the key. The key field stays empty, since a key is never echoed.
 
+## "Save without checking"
+
+Rendered only when the controller set `@offer_unchecked_save`, which it
+does on the render that follows a rejected key. It sits after Save inside
+the same form, so the key field, the provider choice and the language go
+with either button, and Save stays the form's default submit. Its value is
+`ApiKeysController::SKIP_CHECK`, so the view and the strict read cannot
+disagree. `.unchecked-save` (`pages/settings.css`) gives the note and the
+full-width ghost button a gap below Save; the two buttons stack, as the
+secondary actions on Account do, so nothing sits side by side at phone
+width.
+
 ## Muted paragraphs: `:where(...) p:not(.card-note)`
 
 The disclosures still hold paragraphs written as bare `<p>` that need the old

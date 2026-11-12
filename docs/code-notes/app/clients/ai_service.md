@@ -289,6 +289,16 @@ class. It never writes the response body or the error's message: a bad-key
 body can quote the key, as OpenAI's does. `FakeService` overrides
 `#check_key` to answer `:accepted` with no connection.
 
+## `.skip_key_check`
+
+What Setup calls in place of `.check_key` when a person saves a rejected
+key without checking. It makes no request. It still looks the provider up
+through `.key_check_provider`, so the availability gate holds on both
+paths, and it writes the `result=skipped` line through `.key_check_tag`,
+which the instance's `#log_key_check` also uses, so the `[key_check]`
+prefix is written in one place. It returns `:skipped`, which is not in
+`KEY_CHECK_RESULTS`: that list is what a check can answer.
+
 ## `#parse_provider_envelope`
 
 Callers rescue `ProviderError`, so a body that is not a JSON object (an HTML

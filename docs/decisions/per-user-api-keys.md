@@ -140,11 +140,55 @@ is worded to be true of a 404 or a 429 as much as of a timeout.
   spec of the check itself is tagged `real_key_check` and swaps only the
   connection's adapter through `stub_key_check`.
 
+### A rejected key can be saved without checking
+
+Decided by the owner on 2026-11-12. When this shipped, no check had been
+seen to succeed with a real key: each endpoint was confirmed only by the
+rejection it gave a made-up one. A check that wrongly rejected a working
+key would lock a paying person out of Setup with no way round it, so a
+rejection is never final.
+
+- **What the person sees.** The form that follows a rejection keeps its
+  Save button and adds, below it, the line "If you're sure the key is right,
+  paste it again and save it without checking." and a second button, "Save
+  without checking". The key field is empty, as on every render: the
+  rejected key is not put in the page, a hidden field, the session, a cookie
+  or the flash, so the person pastes it again. Both buttons are plain form
+  submits and need no script; Save is first in the form, so Enter still
+  runs the checked save.
+- **The server decides when it is offered.** `ApiKeysController` sets it on
+  the render that follows `:rejected` and nowhere else: a fresh Setup page,
+  an unrecognized-format response and a rate-limited response do not carry
+  the button.
+- **What the button does.** It posts the same `PATCH /setup` with
+  `skip_check=1`. Only that exact value turns the skip on
+  (`ApiKeysController::SKIP_CHECK`). The controller then asks
+  `AiService.skip_key_check` where it would have asked `.check_key`, and
+  everything else runs as for a checked save.
+- **What is skipped:** the request to the provider, and nothing else.
+- **What is not skipped:** the limit on key saves, the edge trimming, the
+  shape rule, the prefix detection and the provider availability gate, each
+  with the message it gives a checked save; the store under the row lock,
+  which resets the key-hold count as any stored key does; and the rule that
+  a blank key field is a preferences-only save.
+- **The parameter is accepted whenever it is posted.** No session state
+  remembers the rejection. That is no weaker than Setup was before the
+  check existed, when every well-formed key was stored unchecked, and the
+  save limit bounds it the same way.
+- **The notice says it was not checked:** "Saved without checking. If your
+  first set fails, check the key in your %{provider} account."
+- **`:skipped` is the controller's outcome, not a check result.**
+  `AiService::KEY_CHECK_RESULTS` stays the four answers a check can give,
+  and `.skip_key_check` returns `:skipped` beside them. The action still has
+  one mapping from outcome to response, `SAVED_NOTICES`, which raises on an
+  outcome it does not hold.
+- **It is logged so the two paths can be counted:**
+  `[key_check] provider=<key> result=skipped`, with no key and no status.
+  `AiService` writes it, so the line's format has one home.
+
 ### Open items
 
-- `AiService.check_key` raises `SetupError` for an unavailable provider and
-  `ApiKeysController` has no `rescue_from` for it. No provider with a key
-  pattern is restricted today, so the path is unreachable from Setup; add
-  the rescue when one is.
-- A rejected key cannot be saved anyway. Whether Setup should offer that is
-  with the owner.
+- `AiService.check_key` and `.skip_key_check` raise `SetupError` for an
+  unavailable provider and `ApiKeysController` has no `rescue_from` for it.
+  No provider with a key pattern is restricted today, so the path is
+  unreachable from Setup; add the rescue when one is.

@@ -21,6 +21,9 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
           8 seconds at most; a badly shaped key never gets that far):
           a rejected key is not stored and the form says so; an accepted one
           is stored; a 403 or no answer stores it with a warning
+       └→ the rejection form also offers "Save without checking": the key
+          pasted again with skip_check=1 is stored with no provider call
+          (AiService.skip_key_check), after the same limit and format rules
 
 Every hour (Solid Queue cron via config/recurring.yml):
   EnqueueDueGenerationsJob, the hand-out, calls no provider. For each user
