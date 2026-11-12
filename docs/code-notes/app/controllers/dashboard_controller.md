@@ -17,7 +17,9 @@ button back in, so the user can still ask for a set.
 
 `#show` calls `DailyExercise#mark_opened!` on the set it is about to render,
 after the regenerating check has returned, so a set behind the spinner is
-not stamped. The write is one guarded `UPDATE` on a GET. It records that the
+not stamped. The write is one guarded `UPDATE` on a GET, with no read back:
+when another request stamped the set first, this copy holds its own time in
+memory, a moment later than the stored one, and nothing on the page reads it. It records that the
 page was shown, which is the fact the pause rule needs, and `#load_todays_set`
 already writes on this action when it carries a held set forward.
 

@@ -216,10 +216,12 @@ read it before changing that area.
   a source, `manual` or `automatic` (`GenerationPause`): the hourly hand-out
   pauses an account as `automatic` when `UnopenedSets` (pure) says its last
   `PAUSE_AFTER` sets ended their day unopened and unsaved, and sends no
-  notice. `paused_generation_at` is the authority: a pause with no source
+  notice. It skips that check while a migration is pending
+  (`SchemaWait.migrations_pending?`), since the `opened_at` fill may not have
+  run. `paused_generation_at` is the authority: a pause with no source
   reads as manual, a source with no pause time is ignored, and no validation
-  ties the two columns. `User#pause_generation!` and `#resume_generation!`
-  are the only writers. `PATCH /account/toggle_generation` is the one pause
+  ties the two columns. `User#pause_generation!` and
+  `#clear_generation_pause!` are the only writers, both in the concern. `PATCH /account/toggle_generation` is the one pause
   action; the Account buttons and the dashboard's automatic-pause line
   (Resume, Keep it paused) post the state they want, and it returns to the
   dashboard only for the fixed name `return_to=dashboard`, never a URL. The

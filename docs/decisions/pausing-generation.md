@@ -43,7 +43,18 @@ before it would enqueue a scheduled generation, so only for a due account
 with no set today. On yes it pauses the account with source `automatic`,
 enqueues nothing and logs one line with the user id.
 `ScheduledGeneration.users` already leaves paused accounts out, so later
-runs skip it. A set the user asks for from the dashboard is shown to them
+runs skip it.
+
+**Not while a migration is pending.** Railway starts the worker while the
+web service's pre-deploy step is still migrating, and the worker waits only
+for a schema (`.claude/rules/deployment.md`). The first hand-out after a
+deploy could therefore read sets that `RepeatUnopenedSetPauseFills` had not
+stamped yet, and pause every active account with three of them. So the
+hand-out asks `SchemaWait.migrations_pending?` once per run and skips the
+pause check, and nothing else, while the answer is yes. Generation and
+nudges still run. The check compares the migration files with the versions
+the database has recorded. It does not use Rails' `needs_migration?`, which
+raises on a migration dated after the clock. A set the user asks for from the dashboard is shown to them
 when it lands, which stamps it, so it resets the run.
 
 **Recording that a set was opened.** `DailyExercise#mark_opened!` writes
@@ -62,7 +73,9 @@ Without those fills every earlier set would read as unopened.
 **Who paused.** `users.generation_pause_source` holds `manual` or
 `automatic` (`User::GENERATION_PAUSE_SOURCES`), and is empty while generation
 runs. `User#pause_generation!(source:)` is the one writer of a pause, and
-`#resume_generation!` clears the source together with the pause time.
+`#clear_generation_pause!` clears the source together with the pause time;
+`#resume_generation!` calls it. Both writers are in the `GenerationPause`
+concern, so the pair of columns is written in one file.
 
 **The pause time is the authority.** The spec first asked for a validation
 that refused a source without a pause time, or a pause time without a
@@ -128,9 +141,11 @@ failures create no set, so the pause rule never reaches such an account.
 
 **The rule.** After two generation failures in a row that the provider
 classified as a bad key or as out of credit, the schedule stops covering the
-account. The two can be one of each. The kinds are
-`ScheduledGeneration::KEY_HOLD_KINDS` and the count is
-`ScheduledGeneration::KEY_HOLD_AFTER`.
+account. The two can be one of each. `KeyHold`, a pure object, owns the rule:
+the kinds are `KeyHold::KINDS`, the count is `KeyHold::AFTER`, and
+`.counts?(kind)` and `.held?(count)` answer from plain values. `User` and
+`ScheduledGeneration` both read it, so neither names the other for this
+rule.
 
 **Why two and not one.** A provider can reject a good key once during an
 incident. Two in a row is a real answer.
@@ -146,10 +161,14 @@ only while the job still holds its claim and the day has no set, so a job
 whose claim was taken over cannot count a failure the newer job will report.
 `User#record_generation_success!` sets the count back to zero, and so does
 `User#store_api_key`, which `ApiKeysController#update` calls when it stores
-a key. Pressing "Try again" clears the failure message and leaves the count.
+a key. Switching to another stored key (`User#use_provider`) resets it too,
+because the count describes one provider's key. Saving other preferences
+with the provider unchanged leaves it alone. Pressing "Try again" clears the failure message and leaves the count.
 
 **What stops.** `ScheduledGeneration.users`, the single authority for which
-accounts the schedule covers, leaves out an account at or past the count. So
+accounts the schedule covers, leaves out an account at or past the count.
+That list also decides who gets the afternoon nudge, since the hand-out
+sends it to the same accounts. So
 the hand-out enqueues nothing for it, and a scheduled job already in the
 queue checks again and does nothing.
 
@@ -182,4 +201,3 @@ provider balance. The user's next visit makes the one call that finds out.
 - An account that is both paused and held, and resumes with a held set
   carried forward, has today's set and a count still at the hold. It gets no
   nudge that day. Its next successful generation clears the count.
-- Switching to another stored provider's key leaves the count as it is.

@@ -15,7 +15,7 @@ paths:
   - "app/jobs/{generate_daily_exercises_job,generate_concept_reference_job}.rb"
   - "app/views/dashboard/_generation_failed.html.erb"
   - "app/services/response_review.rb"
-  - "app/models/scheduled_generation.rb"
+  - "app/models/{scheduled_generation,key_hold}.rb"
   - "app/jobs/{enqueue_due_generations_job,regenerate_exercise_job}.rb"
 ---
 
@@ -76,15 +76,16 @@ read it before changing that area.
   `LazyCacheStore`.
 - **The key hold** (`docs/decisions/pausing-generation.md`, "Holding the
   schedule for a key that keeps failing"): `User#record_generation_failure!`
-  counts a failure classified as a kind in
-  `ScheduledGeneration::KEY_HOLD_KINDS` (bad key, out of credit) in
-  `users.generation_account_failures`, and only inside
+  counts a failure classified as a kind in `KeyHold::KINDS` (bad key, out of
+  credit) in `users.generation_account_failures`, and only inside
   `GenerateDailyExercisesJob#persist_failure`'s claim-guarded write. At
-  `KEY_HOLD_AFTER` in a row `ScheduledGeneration.users` drops the account,
-  so the hand-out and any queued scheduled job stop calling its key. A
-  generation the user starts still runs. `#record_generation_success!` and
-  `#store_api_key` set the count back to zero; no other failure kind, and no
-  regeneration failure, changes it. The hold is not a pause: it writes no
+  `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,
+  so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
+  (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read
+  it and neither names the other for this rule. A generation the user starts
+  still runs. `#record_generation_success!`, `#store_api_key` and
+  `#use_provider`, when it changes the provider, set the count back to zero;
+  no other failure kind, and no regeneration failure, changes it. The hold is not a pause: it writes no
   pause column and shows no pause line.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
   Every provider call writes exactly one `ApiUsage` row through

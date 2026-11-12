@@ -25,6 +25,15 @@ generation committing at the same moment cannot deadlock.
 columns, so the filled values change nothing for it, and the rows the fills
 touched cannot be told apart from rows the app wrote afterwards.
 
+## The hand-out waits for it
+
+The worker can start before the web service's pre-deploy step has run this
+migration. `EnqueueDueGenerationsJob` therefore skips its unopened-set check
+while `SchemaWait.migrations_pending?`, so a hand-out that runs first cannot
+read sets this fill has not stamped and pause their accounts. It skips the
+check for any pending migration, not only this one, because the question
+costs one query per run and the answer is the same shape every deploy.
+
 ## What it does not cover
 
 Web and worker deploy separately, so for a short time after this migration

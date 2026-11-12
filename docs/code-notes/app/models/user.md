@@ -48,13 +48,20 @@ loses nothing. The specs that pin this write an invalid value with
 `update_columns` first.
 
 `#record_generation_failure!` also raises `generation_account_failures` for
-a kind in `ScheduledGeneration::KEY_HOLD_KINDS`, with `increment!`, which
+a kind `KeyHold.counts?`, with `increment!`, which
 adds in SQL, so a copy of the user loaded before another failure still adds
 one to the stored count. `RegenerateExerciseJob` passes
 `counts_toward_key_hold: false`. `#record_generation_success!` resets the
 count with a guarded `UPDATE` for the same reason: the job's copy of the
 user can predate the failures. `#clear_generation_failure!` leaves the count
 alone, because "Try again" calls it before any provider has answered.
+
+`#store_api_key` and `#use_provider` both put a key in use through the
+private `#put_key_in_use`, the one place `provider` is assigned for a key
+choice, and it sets the count back to zero: the count describes one
+provider's key, so it does not follow the account to another. `#use_provider`
+does nothing when the name is the provider already in use, because Setup
+posts the current provider with every preferences save.
 `docs/decisions/pausing-generation.md` has the rule.
 
 ## `#carry_held_set_forward!`
