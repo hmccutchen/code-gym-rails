@@ -208,4 +208,48 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       expect(failures).to eq(0)
     end
   end
+
+  describe "a key that changes while a generation is calling the provider" do
+    def provider_raising_after(error)
+      service = instance_double(ClaudeService)
+      allow(service).to receive(:generate_judged_exercise) do |*|
+        yield
+        raise error
+      end
+      allow(AiService).to receive(:for).with(user).and_return(service)
+      allow(Rails.logger).to receive(:error)
+    end
+
+    def replace_key = User.find(user.id).tap { |fresh| fresh.store_api_key("sk-ant-replacement", provider: "anthropic") }.save!
+
+    def switch_provider
+      User.find(user.id).tap { |fresh| fresh.update!(api_keys: fresh.api_keys.merge("gemini" => "AIza-test")) }
+      User.find(user.id).tap { |fresh| fresh.use_provider("gemini") }.save!
+    end
+
+    it "does not count the old key's failure against a key saved during the call" do
+      provider_raising_after(bad_key) { replace_key }
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      expect(failures).to eq(0)
+      expect(user.reload.generation_failed_today?).to be(true)
+    end
+
+    it "does not count the old provider's failure after a switch to another stored key during the call" do
+      provider_raising_after(out_of_credit) { switch_provider }
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      expect(failures).to eq(0)
+    end
+
+    it "still counts a failure when the key in use did not change" do
+      provider_raising_after(bad_key) { User.find(user.id).update!(language: "javascript") }
+
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      expect(failures).to eq(1)
+    end
+  end
 end

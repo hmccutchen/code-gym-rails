@@ -78,7 +78,8 @@ read it before changing that area.
   schedule for a key that keeps failing"): `User#record_generation_failure!`
   counts a failure classified as a kind in `KeyHold::KINDS` (bad key, out of
   credit) in `users.generation_account_failures`, and only inside
-  `GenerateDailyExercisesJob#persist_failure`'s claim-guarded write. At
+  `GenerateDailyExercisesJob#persist_failure`'s claim-guarded write, and
+  only when the provider and key the job started with are still in use. At
   `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,
   so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
   (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read

@@ -230,6 +230,10 @@ whatever it stands at.
 `GenerateDailyExercisesJob` calls that inside `persist_failure`, which writes
 only while the job still holds its claim and the day has no set, so a job
 whose claim was taken over cannot count a failure the newer job will report.
+The job also notes the provider and key it started with, and under that same
+lock counts the failure only when they are still the ones in use. A key saved
+or switched during the call has just set the count to zero, and the old key's
+failure says nothing about the new one.
 `User#record_generation_success!` sets the count back to zero, and so does
 `User#store_api_key`, which `ApiKeysController#update` calls when it stores
 a key. Switching to another stored key (`User#use_provider`) resets it too,
