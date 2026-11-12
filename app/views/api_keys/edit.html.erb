@@ -50,9 +50,9 @@
       <% language_options = User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] } %>
       <div class="value-row" data-controller="value-row">
         <%= f.label :language, t("api_keys.edit.language_label") %>
-        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= language_options.rassoc(current_user.language)&.first %></span>
+        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= language_options.rassoc(chosen_language)&.first %></span>
         <%= f.select :language, language_options,
-              { selected: current_user.language },
+              { selected: chosen_language },
               data: { action: "change->value-row#show" } %>
       </div>
       <p class="card-note"><%= t("api_keys.edit.language_hint") %></p>

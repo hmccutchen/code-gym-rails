@@ -1,7 +1,7 @@
 # Inputs are only kind, provider label, surface and times, so no provider text, status code or key can reach a person.
 class ProviderFailureText
   VARIANTS = %w[own_key trial].freeze
-  SURFACES = %i[generation regeneration review review_partial duck follow_up alternate critique reference].freeze
+  SURFACES = %i[generation regeneration review review_partial duck follow_up alternate critique reference key_save].freeze
 
   attr_reader :kind
 
