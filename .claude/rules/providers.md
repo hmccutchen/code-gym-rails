@@ -70,7 +70,7 @@ read it before changing that area.
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
   declares `ProviderCallLimits`, one shared hourly and daily count that runs
   before every other check. `/generate`, Learn prepare actions and the
-  per-user generation claim apply to all accounts. All use
+  per-user generation claim and queue permit apply to all accounts. All use
   `LazyCacheStore`.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
   Every provider call writes exactly one `ApiUsage` row through

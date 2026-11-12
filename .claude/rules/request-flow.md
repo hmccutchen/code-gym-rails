@@ -29,6 +29,9 @@ Every hour (Solid Queue cron via config/recurring.yml):
 GenerateDailyExercisesJob(user_id:), from the hand-out or the dashboard:
   a scheduled job first checks the user is still due (the same two
   ScheduledGeneration answers); a dashboard job skips that check
+  Solid Queue discards a second click job for a user while one is queued
+  or running, and likewise a second scheduled job; a click and a scheduled
+  job never discard each other
   takes the user's generation claim (users.generating_since) when it starts
   running, or logs one line and stops when another generation holds it; the
   claim is released when the job ends, whatever the outcome

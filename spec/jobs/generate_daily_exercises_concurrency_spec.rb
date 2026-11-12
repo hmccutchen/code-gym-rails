@@ -193,11 +193,123 @@ RSpec.describe GenerateDailyExercisesJob do
 
     def arguments_of(job) = job.arguments.fetch("arguments").first.except("_aj_ruby2_keywords")
 
-    it "uses no Solid Queue concurrency limit, so the claim alone decides" do
-      expect(described_class.new(user_id: user.id).concurrency_limited?).to be(false)
+    def enqueue(**arguments) = described_class.perform_later(**arguments)
+
+    def enqueue_scheduled(account = user) = enqueue(user_id: account.id, scheduled: true)
+
+    it "discards a second click for a user while the first click's job is queued, without raising" do
+      enqueue(user_id: user.id)
+      second = described_class.new(user_id: user.id)
+
+      expect { SolidQueue::Job.enqueue(second) }.not_to change { queued.count }
+      expect(second.successfully_enqueued?).to be(false)
+      expect(SolidQueue::BlockedExecution.count).to eq(0)
+    end
+
+    it "discards a second click for a user while the first click's job is running" do
+      added_mid_call = nil
+      stub_provider(user) do
+        before = queued.count
+        enqueue(user_id: user.id)
+        added_mid_call = queued.count - before
+      end
+
+      enqueue(user_id: user.id)
+      perform_every_job
+
+      expect(added_mid_call).to eq(0)
+      expect(user.daily_exercises.count).to eq(1)
+    end
+
+    it "discards a second scheduled job for a user while one is queued, so two hand-out runs leave one" do
+      user
+
+      expect { 2.times { EnqueueDueGenerationsJob.perform_now } }.to change { queued.count }.by(1)
+      expect(SolidQueue::BlockedExecution.count).to eq(0)
+    end
+
+    it "discards a second scheduled job for a user while one is running" do
+      added_mid_call = nil
+      stub_provider(user) do
+        before = queued.count
+        EnqueueDueGenerationsJob.perform_now
+        added_mid_call = queued.count - before
+      end
+
+      enqueue_scheduled
+      perform_every_job
+
+      expect(added_mid_call).to eq(0)
+    end
+
+    it "keeps a click when the user's scheduled job is queued, and a scheduled job when a click is queued" do
+      enqueue_scheduled
+      expect { enqueue(user_id: user.id) }.to change { queued.count }.by(1)
+
+      other = create_user("other")
+      enqueue(user_id: other.id)
+      expect { enqueue_scheduled(other) }.to change { queued.count }.by(1)
+    end
+
+    it "keeps a click made while the user's scheduled job is running, and the claim stops it calling a provider" do
+      added_mid_call = nil
+      calls = stub_provider(user) do
+        before = queued.count
+        enqueue(user_id: user.id)
+        added_mid_call = queued.count - before
+        perform_next_job
+      end
+
+      enqueue_scheduled
+      perform_every_job
+
+      expect(added_mid_call).to eq(1)
+      expect(calls).to eq([ user.id ])
+      expect(SolidQueue::FailedExecution.count).to eq(0)
+    end
+
+    it "lets different users queue the same kind of job" do
+      other = create_user("other")
+      enqueue(user_id: user.id)
+      enqueue_scheduled
+
+      expect { enqueue(user_id: other.id) }.to change { queued.count }.by(1)
+      expect { enqueue_scheduled(other) }.to change { queued.count }.by(1)
+    end
+
+    it "holds each permit for the judged generation budget" do
+      expect(described_class.concurrency_duration).to be >= budget
+      expect(described_class.new(user_id: user.id).concurrency_key).not_to eq(described_class.new(user_id: user.id, scheduled: true).concurrency_key)
+    end
+
+    # The permit counts from the enqueue and the claim from the start of the run, so the claim outlasts it.
+    it "lets a duplicate be queued once the permit has expired, and the claim stops it calling a provider" do
+      added_after_expiry = nil
+      calls = stub_provider(user) do
+        travel budget - 5.minutes
+        SolidQueue::Dispatcher::ConcurrencyMaintenance.new(1, 100).send(:expire_semaphores)
+        before = queued.count
+        enqueue(user_id: user.id)
+        added_after_expiry = queued.count - before
+        perform_next_job
+      end
+
+      enqueue(user_id: user.id)
+      travel 10.minutes
+      perform_every_job
+
+      expect(added_after_expiry).to eq(1)
+      expect(calls).to eq([ user.id ])
+      expect(user.daily_exercises.count).to eq(1)
+    end
+
+    it "never limits a no-argument job left by the release before the hand-out job" do
+      expect(described_class.new.concurrency_limited?).to be(false)
+      expect { 2.times { enqueue } }.to change { queued.count }.by(2)
+    end
+
+    it "puts no limit on the hand-out job itself" do
       expect(EnqueueDueGenerationsJob.new.concurrency_limited?).to be(false)
-      expect { 2.times { described_class.perform_later(user_id: user.id) } }.to change { queued.count }.by(2)
-      expect(SolidQueue::Semaphore.count).to eq(0)
     end
 
     it "runs a dashboard click ahead of the scheduled job queued before it, and the click generates" do
@@ -238,10 +350,10 @@ RSpec.describe GenerateDailyExercisesJob do
       expect(SolidQueue::FailedExecution.count).to eq(0)
     end
 
-    it "makes one provider call when two hand-out runs enqueue the same user" do
+    it "makes one provider call when two hand-out runs find the same user due" do
       calls = stub_provider(user)
 
-      expect { 2.times { EnqueueDueGenerationsJob.perform_now } }.to change { queued.count }.by(2)
+      expect { 2.times { EnqueueDueGenerationsJob.perform_now } }.to change { queued.count }.by(1)
       perform_every_job
 
       expect(calls).to eq([ user.id ])

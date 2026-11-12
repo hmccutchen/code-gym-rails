@@ -1,6 +1,12 @@
 class GenerateDailyExercisesJob < ApplicationJob
   queue_as :provider_calls
 
+  # Keeps one request from being queued twice; a click and a scheduled job never share a key.
+  limits_concurrency key: ->(args = {}) { "#{args[:scheduled] ? 'scheduled' : 'click'}/#{args[:user_id]}" if args[:user_id] },
+                     group: ->(args = {}) { self.class.name if args[:user_id] },
+                     to: 1, on_conflict: :discard,
+                     duration: CallProfiles::JUDGED_GENERATION_BUDGET.seconds
+
   def perform(user_id: nil, scheduled: false)
     # The release before EnqueueDueGenerationsJob ran the hourly hand-out as this class with no arguments.
     return EnqueueDueGenerationsJob.perform_later if user_id.nil?

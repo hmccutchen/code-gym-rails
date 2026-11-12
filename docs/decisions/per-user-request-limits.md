@@ -26,18 +26,28 @@ claim covers a scheduled generation and a dashboard-started one alike. The
 claim goes stale after `CallProfiles::JUDGED_GENERATION_BUDGET` seconds, so a
 worker that died mid-call blocks its user for that long and no longer.
 
-The claim replaced a Solid Queue concurrency permit (`limits_concurrency`
-with `on_conflict: :discard`). Solid Queue takes that permit when a job is
-enqueued, which went wrong in three ways once scheduled jobs waited in a
-queue. The permit expired a budget after the enqueue even with the job still
+The job also holds a Solid Queue concurrency permit (`limits_concurrency`
+with `on_conflict: :discard`), and the two have separate roles. The permit
+keeps the same request from being queued twice: its key is `click/<user id>`
+for a dashboard job and `scheduled/<user id>` for a hand-out job, so a second
+click is discarded while the first click's job is queued or running, a second
+hand-out run leaves one scheduled job, and neither kind ever discards the
+other. The claim decides which running job may generate.
+
+One permit per user once did both jobs, and Solid Queue takes a permit when a
+job is enqueued, which went wrong in three ways once scheduled jobs waited in
+a queue. The permit expired a budget after the enqueue even with the job still
 waiting, and a second job could then be enqueued and both could bill. A
 dashboard click was discarded while the scheduled job was only queued, so the
 person waited for their place in the morning queue. And a paused user's
 "generate anyway" was discarded in favour of a scheduled job that then saw the
 pause and did nothing, leaving the dashboard polling for the whole budget. A
-claim taken when the job runs has none of these: a click always gets a job
-of its own, which runs ahead of the scheduled ones
-(`EnqueueDueGenerationsJob::SCHEDULED_PRIORITY`).
+claim taken when the job runs, beside a permit a click does not share with a
+scheduled job, has none of these: an expired permit only lets a duplicate be
+queued, which the claim then stops, and a click always gets a job of its
+own, which runs ahead of the scheduled ones
+(`EnqueueDueGenerationsJob::SCHEDULED_PRIORITY`). A discarded `perform_later`
+returns false and raises nothing, so the hand-out moves on to the next user.
 
 What a job writes after its paid call is checked again under the user row
 lock. `PracticeGeneration.commit_new` writes the set only when the day has
@@ -46,9 +56,12 @@ either way. A failure is written only while the job still holds its own
 claim: one that overran the budget and was taken over leaves the outcome to
 the job that took it.
 
-A duplicate job is no longer discarded, so it waits in the queue and then
-stops at the claim or at the existing set. One case costs more than it did:
-a duplicate that starts after the first job failed finds no claim and no
-set, and generates again. These are starting values, not measured ones. All of them use
+Two sequences can still bill a second attempt on a day the first one failed,
+because a job that starts after a failure finds no claim and no set. A click
+and a scheduled job for one user are both queued, the first to run fails, and
+the other then generates. Or a click's job waits in the queue past its
+permit's expiry, a later dashboard load queues a duplicate, the first fails,
+and the duplicate generates. Both are retries one after the other, never two
+calls at once. These are starting values, not measured ones. All of them use
 `LazyCacheStore`, so the test env's `:null_store` never trips them and a
 spec that exercises one swaps in a real store.

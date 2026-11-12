@@ -40,7 +40,7 @@ RSpec.describe EnqueueDueGenerationsJob do
       expect(Rails.logger).to have_received(:error).with("Generation batch skipped user #{broken.id}: RuntimeError: unexpected")
     end
 
-    it "carries on when the queue does not accept one user's job" do
+    it "carries on quietly when Solid Queue discards one user's job, which makes perform_later return false" do
       refused = User.create!(email: "busy@example.com", provider: "anthropic",
                              api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "America/Los_Angeles")
       stub_enqueue_for(refused) { false }
@@ -69,7 +69,7 @@ RSpec.describe EnqueueDueGenerationsJob do
       expect(described_class::SCHEDULED_PRIORITY).to be > (GenerateDailyExercisesJob.new(user_id: pac.id).priority || 0)
     end
 
-    it "enqueues another scheduled job for a user whose generation is running, which the claim then stops" do
+    it "enqueues a scheduled job for a user whose dashboard generation is running, which the claim then stops" do
       pac.claim_generating!
 
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
