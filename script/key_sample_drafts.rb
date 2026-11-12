@@ -46,7 +46,7 @@ class KeySampleDrafts
   end
 
   def self.worst_case_label(purpose, result)
-    reason = result[:failure] == "timeout" ? "timed out" : "token counts unreadable"
+    reason = result[:failure] == ProviderError::TimeoutError.failure_code ? "timed out" : "token counts unreadable"
     "#{purpose}, #{reason}: counted at its worst case"
   end
 

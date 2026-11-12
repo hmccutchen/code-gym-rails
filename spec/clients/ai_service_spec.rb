@@ -452,10 +452,16 @@ RSpec.describe AiService do
     end
 
     it "says the output count is unknown when the reply's token counts could not be read" do
-      reply = { truncated: true, tokens_unknown: true, output_tokens: 0 }
+      unreadable_counts = Class.new(double_class) do
+        private
 
-      expect { service.send(:raise_for_reply!, reply, false) }
-        .to raise_error(ProviderError::TruncatedResponseError, /did not finish its reply \(output token count unknown\)/i)
+        def call(request) = super.merge(tokens_unknown: true, output_tokens: 0)
+      end
+      svc = unreadable_counts.new(canned_text: '{"code_review": {"correct": ["half a sen', truncated: true)
+
+      expect {
+        svc.generate_judged_exercise(user).problem_set
+      }.to raise_error(ProviderError::TruncatedResponseError, /did not finish its reply \(output token count unknown\)/i)
     end
 
     it "records usage before raising on a prose entry point too" do

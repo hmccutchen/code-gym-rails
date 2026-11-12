@@ -374,9 +374,10 @@ since the gap is deliberate.
 ## `#output_count_text`
 
 A cut-off reply's error reports how many output tokens it used. When the
-reply's token counts are unknown (`tokens_unknown`, from a timeout or a usage
-block `UsageCounts` could not read), the count in the result is a fallback 0,
-so the message says the count is unknown instead of reporting 0 (#773).
+reply's usage block could not be read, `UsageCounts` marks its counts unknown
+(`tokens_unknown`) and the count in the result is a fallback 0, so the message
+says the count is unknown instead of reporting 0 (#773). A timeout never
+reaches this message: it raises `TimeoutError` from `#call` first.
 
 ## `.cost_usd`
 
