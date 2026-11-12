@@ -174,6 +174,51 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
     end
   end
 
+  describe "PATCH /setup with a key, after a failure today" do
+    include ActiveJob::TestHelper
+
+    around { |example| travel_to(Time.utc(2026, 7, 13, 13, 0)) { example.run } }
+
+    def fail_on_claude
+      user.record_generation_failure!(ProviderError::AuthenticationError.new("invalid x-api-key"))
+      login_as(user)
+      get root_path
+      expect(page_text).to include("Claude didn't accept your API key")
+    end
+
+    { "a checked save" => {}, "a save without checking" => { skip_check: ApiKeysController::SKIP_CHECK } }.each do |name, extra|
+      it "starts a set after #{name} of a new key for the provider that failed" do
+        fail_on_claude
+
+        patch setup_path, params: { api_key: "sk-ant-api03-working", **extra }
+        follow_redirect!
+
+        expect(page_text).to include("Generating your personalized exercise set")
+        expect(page_text).not_to include("didn't accept your API key")
+        expect(user.reload).to have_attributes(generation_failed_today?: false, api_key: "sk-ant-api03-working")
+      end
+
+      it "starts a set after #{name} of a key for another provider, which takes over" do
+        fail_on_claude
+
+        patch setup_path, params: { api_key: "AIzaSyExampleKey12345", **extra }
+        follow_redirect!
+
+        expect(page_text).to include("Generating your personalized exercise set")
+        expect(user.reload).to have_attributes(provider: "gemini", generation_failed_today?: false)
+      end
+    end
+
+    it "keeps the failure when the key is rejected and nothing is saved" do
+      fail_on_claude
+      allow_any_instance_of(AiService).to receive(:check_key).and_return(:rejected)
+
+      patch setup_path, params: { api_key: "sk-ant-api03-wrong" }
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
+    end
+  end
+
   describe "what each removal outcome says" do
     it "has a message for every outcome the model can return, and a confirmation for each that removes a key" do
       expect(ApiKeysController::KEY_REMOVAL_MESSAGES.keys).to match_array(User::KEY_REMOVAL_OUTCOMES)

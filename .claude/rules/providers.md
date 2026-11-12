@@ -126,7 +126,11 @@ read it before changing that area.
   `User#key_in_use` before the call and write through
   `User#report_call_failure` under the user row lock, the one home of that
   rule. It clears only a failure recorded against the call's own provider,
-  and a call that started with no provider records and clears nothing. At
+  and a call that started with no provider records and clears nothing. A
+  regeneration also reports only while the exercise's claim is still its
+  own, checked under the user row lock. `#store_api_key` clears a failure
+  recorded against the provider saved or the one it switches away from, and
+  `#remove_api_key` one recorded against the provider removed. At
   `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,
   so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
   (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read

@@ -24,3 +24,10 @@ against the row it reloads, only equals it once both are rounded the same.
 Clears the claim only while it still holds the caller's token. A call that
 overran the window may find its claim taken over, and clearing that would
 let a third call start while the second is still running.
+
+## What `release_<name>!` returns
+
+True when the row still held the caller's token and the claim was cleared,
+false when the claim had gone stale and been retaken or was already
+released. `RegenerateExerciseJob#release` reads it to decide whether the
+failure is still its own to report.

@@ -7,18 +7,19 @@ user, exercise and response locks before anything is written. A
 superseded or blocked set writes nothing, so the transaction ends without a
 rollback.
 
-## `#record_provider_failure`
+## `#release` and `#record_provider_failure`
+
+`#release` takes the user row lock, releases the exercise's claim with this
+job's token, and runs its block only when that release took effect. A claim
+that went stale and was retaken belongs to a newer attempt, which writes
+the outcome, so this job then records nothing and clears nothing. The lock
+order is user, then exercise, and the lock reloads the account.
 
 A regeneration notes `User#key_in_use` before the call. A provider or setup
-failure is written through `User#report_call_failure` under the user row
-lock, which reloads the account, so a failure from a key removed, replaced
-or switched during the call is not recorded
-(`docs/decisions/per-user-api-keys.md`, "A call that outlives its key").
-`#release` has already released the exercise's claim by then, so the user
-lock is taken alone. The "set was kept" messages do not go through it.
-The job does not check that its claim is still its own before reporting,
-so the rule in `User#report_call_failure` is what keeps it from erasing a
-newer attempt's failure on another provider.
+failure is written through `User#report_call_failure` inside that lock, so
+a failure from a key removed, replaced or switched during the call is not
+recorded (`docs/decisions/per-user-api-keys.md`, "A call that outlives its
+key"). The "set was kept" messages do not go through that method.
 
 ## `#generate`
 

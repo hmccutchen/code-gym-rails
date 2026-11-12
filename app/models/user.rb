@@ -274,6 +274,7 @@ class User < ApplicationRecord
   end
 
   def store_api_key(key, provider:)
+    forget_generation_failure_from(provider, self.provider)
     write_keys(api_keys.to_h.merge(provider => key), key_saved_times.merge(provider => Time.current.utc.iso8601(6)))
     put_key_in_use(provider)
   end
@@ -301,7 +302,7 @@ class User < ApplicationRecord
     successor = provider_after_removing(name)
     write_keys(api_keys.except(name), key_saved_times)
     use_provider(successor)
-    forget_generation_failure if last_generation_failure_provider == name
+    forget_generation_failure_from(name)
     outcome
   end
 
@@ -507,7 +508,9 @@ class User < ApplicationRecord
     self.generation_account_failures = 0
   end
 
-  def forget_generation_failure
+  def forget_generation_failure_from(*providers)
+    return unless last_generation_failure_provider.present? && providers.include?(last_generation_failure_provider)
+
     assign_attributes(last_generation_error_date: nil, **NO_GENERATION_FAILURE)
   end
 

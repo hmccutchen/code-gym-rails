@@ -32,6 +32,62 @@ RSpec.describe User, "removing a stored key" do
     end
   end
 
+  describe "#store_api_key and a failure recorded earlier" do
+    def rate_limited_on(provider) = ProviderError::RateLimitError.new("slow down", http_status: 429).tap { |e| e.provider = provider }
+
+    it "clears a failure recorded against the provider whose key is saved, in the same save" do
+      user.record_generation_failure!(bad_key)
+      user.reload
+
+      user.store_api_key("sk-ant-working", provider: "anthropic")
+      expect(User.find(user.id).generation_failed_today?).to be(true)
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: false, last_generation_failure: nil,
+                                             last_generation_failure_provider: nil, last_generation_failed_at: nil)
+    end
+
+    it "clears a failure recorded against the provider the save switches away from" do
+      user.record_generation_failure!(bad_key)
+      user.reload
+
+      user.store_api_key("sk-proj-working", provider: "openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false, last_generation_failure: nil)
+    end
+
+    it "keeps a failure recorded against a provider that is neither saved nor the one the save switches away from" do
+      user.record_generation_failure!(rate_limited_on("gemini"))
+      user.reload
+
+      user.store_api_key("sk-proj-working", provider: "openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure_provider: "gemini")
+    end
+
+    it "keeps a message that names no provider" do
+      user.record_generation_message!("Settings or another set changed while this set was being prepared.")
+      user.reload
+
+      user.store_api_key("sk-ant-working", provider: "anthropic")
+      user.save!
+
+      expect(user.reload.last_generation_error).to eq("Settings or another set changed while this set was being prepared.")
+    end
+
+    it "clears nothing on a first key for an account with a provider-less message and no provider" do
+      fresh = User.create!(email: "fresh-message@example.com")
+      fresh.record_generation_message!("left earlier")
+
+      fresh.store_api_key("sk-ant-one", provider: "anthropic")
+      fresh.save!
+
+      expect(fresh.reload.last_generation_error).to eq("left earlier")
+    end
+  end
+
   describe "#remove_api_key" do
     it "deletes the provider's key and its save time, and keeps the others" do
       user.update!(key_saved_times: { "anthropic" => "2026-11-01T00:00:00Z", "gemini" => "2026-11-02T00:00:00Z" })

@@ -338,11 +338,19 @@ no set was started with the new key.
   recovery text. A message that names no provider ("Settings or another
   set changed", "today's set was kept") stays too. Nothing ties it to the
   call that is reporting, and each such message is about the set or the
-  settings and is still true. One case is not told apart: when a key is
-  replaced by another key for the same provider, a failure a newer attempt
-  recorded on the new key carries the same provider and is cleared. The
-  daily job's claim check prevents that there; the regeneration job
-  reports without checking that its claim is still its own.
+  settings and is still true.
+- **A regeneration reports only while its claim is its own.** With a key
+  replaced by another key for the same provider, the provider alone cannot
+  tell an old call's failure from one a newer attempt recorded on the new
+  key. `RegenerateExerciseJob#release` therefore takes the user row lock,
+  releases the exercise's claim with its own token, and writes or clears
+  only when that release took effect (`Claimable`'s `release_<name>!` now
+  returns whether it did). A regeneration whose claim went stale and was
+  retaken records nothing and clears nothing, for a provider failure and
+  for its "set was kept" and "unusable set" messages alike; the attempt
+  that holds the claim writes the outcome. This is the rule
+  `GenerateDailyExercisesJob#persist_failure` already followed. The lock
+  order is user, then exercise.
 - **A call that started with no provider records nothing and clears
   nothing.** A job queued before the last key was removed starts with
   `key_in_use` of `[nil, nil]`, `AiService.for` raises `SetupError`, and
@@ -368,9 +376,34 @@ no set was started with the new key.
   messages are still recorded whatever the key: the person asked for a new
   set and is looking at the old one, and the message is the only thing
   that says why. Today's set exists, so no generation waits behind it.
-- **A key changed after the failure was written** leaves the failure in
-  place, apart from a removal, which clears a failure recorded against the
-  removed provider.
+- **A key changed after the failure was written.** Removing a key clears a
+  failure recorded against the removed provider. Saving a key clears one
+  too; see "Saving a key clears that provider's failure" below. Switching
+  between stored keys with the "Provider in use" choice leaves the failure
+  in place.
+
+## Saving a key clears that provider's failure
+
+Decided by the owner on 2026-11-12 (#780). After "Claude didn't accept your
+API key", a person who pasted a working Claude key still landed on the
+failure card, because a failure today ranks ahead of starting a generation
+and `User#store_api_key` touched no failure column.
+
+- **The saved provider's failure is cleared**, as an assignment in the same
+  save as the key (`User#forget_generation_failure_from`, which
+  `#remove_api_key` uses too). The checked save and the save without
+  checking both go through `#store_api_key`, so both end on a dashboard
+  that starts a set. A key that is rejected is not saved and clears
+  nothing.
+- **So is a failure recorded against the provider the save switches away
+  from.** A saved key always becomes the key in use. With Claude failed and
+  a GPT key pasted, the Claude failure would describe a provider the
+  account has just stopped using and would still hold back the first set
+  on the new key. The person's intent is the same as when they replace the
+  failed key: the problem is dealt with, start a set.
+- **Anything else stays**: a failure recorded against a provider that is
+  neither the one saved nor the one that was in use, and a message that
+  names no provider.
 
 ### Open items
 

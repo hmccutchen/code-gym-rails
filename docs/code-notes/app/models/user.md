@@ -79,9 +79,12 @@ posts the current provider with every preferences save.
 the key in use was removed, or nil when none is left. So the count resets
 only when the removal changes the provider in use, and removing another
 key leaves it. It also assigns the failure columns back to empty when
-`last_generation_failure_provider` is the removed provider, as part of the
-caller's save and not with `#clear_generation_failure!`, which writes at
-once with `update_columns` and would land outside that save.
+`last_generation_failure_provider` is the removed provider
+(`#forget_generation_failure_from`), as part of the caller's save and not
+with `#clear_generation_failure!`, which writes at once with
+`update_columns` and would land outside that save. `#store_api_key` calls
+the same method with the provider saved and the provider in use before the
+save, read before `#put_key_in_use` changes it.
 `#key_removal_outcome` names what a removal would do without doing it;
 Setup words its confirmation from it and the controller words its notice
 from the same value once the removal has run. `#store_api_key` and

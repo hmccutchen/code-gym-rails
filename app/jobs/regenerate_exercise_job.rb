@@ -62,15 +62,12 @@ class RegenerateExerciseJob < ApplicationJob
   end
 
   def record_provider_failure(user, error, key_used)
-    user.with_lock do
-      user.report_call_failure(key_used) { user.record_generation_failure!(error, counts_toward_key_hold: false) }
-    end
+    user.report_call_failure(key_used) { user.record_generation_failure!(error, counts_toward_key_hold: false) }
   end
 
   # regenerated_at stays untouched so a failed attempt doesn't use up the day's one regeneration.
   def release(user, exercise, claim, error)
     Rails.logger.error("Failed to regenerate exercise for user #{user.id}: #{error.message}")
-    exercise&.release_regenerating!(claim)
-    yield
+    user.with_lock { yield if exercise&.release_regenerating!(claim) }
   end
 end

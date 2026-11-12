@@ -112,6 +112,46 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       expect(exercise.reload.regenerating_since).to be_nil
     end
 
+    def swap_key_and_retake_claim(exercise)
+      User.find(user.id).tap { |fresh| fresh.store_api_key("sk-ant-replacement", provider: "anthropic") }.save!
+      exercise.update_columns(regenerating_since: exercise.regenerating_since + 90.seconds)
+    end
+
+    it "records and clears nothing once its claim was retaken, after a swap to another key for the same provider" do
+      exercise = claimed_exercise
+      provider_raising_after(ProviderError::TimeoutError.new("slow")) do
+        swap_key_and_retake_claim(exercise)
+        User.find(user.id).record_generation_failure!(ProviderError::AuthenticationError.new("401 invalid key"))
+      end
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload).to have_attributes(last_generation_failure: "bad_key", last_generation_failure_provider: "anthropic")
+      expect(exercise.reload.regenerating_since).to be_present
+    end
+
+    it "records nothing once its claim was retaken, though the key in use never changed" do
+      exercise = claimed_exercise
+      provider_raising_after(ProviderError::TimeoutError.new("slow")) do
+        exercise.update_columns(regenerating_since: exercise.regenerating_since + 90.seconds)
+      end
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload.generation_failed_today?).to be(false)
+    end
+
+    it "records no quality-check message once its claim was retaken" do
+      exercise = claimed_exercise
+      provider_raising_after(ProviderError::AllSectionsRejectedError.new("all rejected")) do
+        exercise.update_columns(regenerating_since: exercise.regenerating_since + 90.seconds)
+      end
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload.generation_failed_today?).to be(false)
+    end
+
     it "records no setup failure for a key removed during the call" do
       claimed_exercise
       provider_raising_after(SetupError.new("unsupported language")) { remove_key_in_use }
