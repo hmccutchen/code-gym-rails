@@ -118,6 +118,29 @@ RSpec.describe "checking a key with a provider", :real_key_check do
         expect(output).not_to include("boom")
       end
 
+      it "logs a transport failure at info and an unexpected error class at error level" do
+        levels = Hash.new { |hash, level| hash[level] = [] }
+        %i[info error].each { |level| allow(Rails.logger).to receive(level) { |message| levels[level] << message } }
+
+        [ Faraday::ConnectionFailed, Timeout::Error, NoMethodError ].each do |error|
+          stub_key_check(service_class, error: error)
+          expect(service.check_key).to eq(:unanswered)
+        end
+
+        prefix = "[key_check] provider=#{service_class.provider_key} result=unanswered error="
+        expect(levels[:info].grep(/key_check/)).to eq([ "#{prefix}Faraday::ConnectionFailed", "#{prefix}Timeout::Error" ])
+        expect(levels[:error].grep(/key_check/)).to eq([ "#{prefix}NoMethodError" ])
+      end
+
+      it "logs an error raised while reading the reply at error level too" do
+        stub_key_check(service_class)
+        allow(service).to receive(:key_check_result).and_raise(NoMethodError, "undefined method for secret")
+        allow(Rails.logger).to receive(:error)
+
+        expect(service.check_key).to eq(:unanswered)
+        expect(Rails.logger).to have_received(:error).with("[key_check] provider=#{service_class.provider_key} result=unanswered error=NoMethodError")
+      end
+
       it "gives up once the whole check has run past its total bound, however the reply arrives" do
         stub_const("CallProfiles::KEY_CHECK_TOTAL_SECONDS", 0.05)
         stub_key_check(service_class, delay: 1)

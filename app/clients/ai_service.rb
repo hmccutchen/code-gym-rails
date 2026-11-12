@@ -125,9 +125,10 @@ class AiService
   def check_key
     response = Timeout.timeout(CallProfiles::KEY_CHECK_TOTAL_SECONDS) { key_check_connection.get(self.class::MODELS_URL) }
     key_check_result(response).tap { |result| log_key_check("result=#{result} status=#{response.status}") }
+  rescue Faraday::Error, Timeout::Error => e
+    key_check_unanswered(e, :info)
   rescue StandardError => e
-    log_key_check("result=unanswered error=#{e.class}")
-    :unanswered
+    key_check_unanswered(e, :error)
   end
 
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves, :schedule_context) do
@@ -440,7 +441,14 @@ class AiService
 
   def key_rejected?(response) = response.status == 401
 
-  def log_key_check(outcome) = Rails.logger.info("[key_check] provider=#{self.class.provider_key} #{outcome}")
+  def key_check_unanswered(error, level)
+    log_key_check("result=unanswered error=#{error.class}", level)
+    :unanswered
+  end
+
+  def log_key_check(outcome, level = :info)
+    Rails.logger.public_send(level, "[key_check] provider=#{self.class.provider_key} #{outcome}")
+  end
 
   def provider_connection(retry_options, headers)
     Faraday.new do |f|
