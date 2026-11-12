@@ -25,7 +25,7 @@ class KeySampleDrafts
       call = { purpose: purpose, tokens_in: result[:input_tokens].to_i, tokens_out: result[:output_tokens].to_i,
                cache_read: result[:cache_read_tokens].to_i, cache_write: result[:cache_write_tokens].to_i }
       call.merge(cost: result[:tokens_unknown] ? @call_bound : KeySampleDrafts.call_cost(call, routed_model(purpose))).tap do |entry|
-        cap&.record(entry[:cost].to_f, result[:tokens_unknown] ? "#{purpose}, timed out: counted at its worst case" : purpose)
+        cap&.record(entry[:cost].to_f, result[:tokens_unknown] ? KeySampleDrafts.worst_case_label(purpose, result) : purpose)
       end
     end
     Class.new(logged) do
@@ -43,6 +43,11 @@ class KeySampleDrafts
       end
       private :route_for, :call_and_log
     end.new(api_key)
+  end
+
+  def self.worst_case_label(purpose, result)
+    reason = result[:failure] == ProviderError::TimeoutError.failure_code ? "timed out" : "token counts unreadable"
+    "#{purpose}, #{reason}: counted at its worst case"
   end
 
   def self.call_cost(call, model)

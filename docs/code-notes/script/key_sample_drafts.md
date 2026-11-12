@@ -132,3 +132,11 @@ adds `registry_id` and `purpose` beside the key-sheet fields, which
 but `code_review`, and everything else about the run (the read-only
 transaction, the output path outside the repository, `--max-cost` and the
 plan-only mode) is unchanged.
+
+## `.worst_case_label`
+
+A call whose token counts are unknown is charged to the spend cap at its
+worst case, since the provider may have billed it. Two things mark counts
+unknown: a timeout, and a reply whose usage block `UsageCounts` could not
+read (#770). The cap's line names which one it was, so an unreadable reply
+is never reported as a timeout (#773).

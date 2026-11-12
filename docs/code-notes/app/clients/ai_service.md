@@ -371,6 +371,14 @@ call the row records has already happened. A provider whose `prices_usage?` is
 false, every provider but Claude for now, writes a null cost and no warning,
 since the gap is deliberate.
 
+## `#output_count_text`
+
+A cut-off reply's error reports how many output tokens it used. When the
+reply's usage block could not be read, `UsageCounts` marks its counts unknown
+(`tokens_unknown`) and the count in the result is a fallback 0, so the message
+says the count is unknown instead of reporting 0 (#773). A timeout never
+reaches this message: it raises `TimeoutError` from `#call` first.
+
 ## `.cost_usd`
 
 On a priced provider, a result with no tokens of any kind costs zero whatever
