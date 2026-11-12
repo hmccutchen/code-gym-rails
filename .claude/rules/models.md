@@ -52,8 +52,9 @@ reads and writes each column:
   the authority, so no validation ties the two columns.
 - `generation_account_failures`: raised by `User#record_generation_failure!`
   for a kind in `KeyHold::KINDS`, set to zero by
-  `#record_generation_success!`, `#store_api_key`, `#remove_api_key` and
-  `#use_provider`. Read by
+  `#record_generation_success!` and `#store_api_key`, and by
+  `#remove_api_key` and `#use_provider` when they change the provider in
+  use. Read by
   `ScheduledGeneration.users`.
 
 `docs/decisions/pausing-generation.md` has the rules.

@@ -238,7 +238,8 @@ failure says nothing about the new one.
 `User#store_api_key`, which `ApiKeysController#update` calls when it stores
 a key. Switching to another stored key (`User#use_provider`) resets it too,
 because the count describes one provider's key. Removing a stored key
-(`User#remove_api_key`) resets it as well, whichever key is removed. Saving other preferences
+(`User#remove_api_key`) resets it only when that changes the provider in
+use; removing a key that is not in use leaves the count and the hold. Saving other preferences
 with the provider unchanged leaves it alone. Pressing "Try again" clears the failure message and leaves the count.
 
 **What stops.** `ScheduledGeneration.users`, the single authority for which

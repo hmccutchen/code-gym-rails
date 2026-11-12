@@ -18,6 +18,10 @@ class ApiKeysController < ApplicationController
   SAVED_NOTICES = { accepted: "key_saved", refused: "key_saved_check_refused", unanswered: "key_saved_unchecked",
                     skipped: "key_saved_without_check" }.freeze
   SKIP_CHECK = "1"
+  KEY_REMOVAL_MESSAGES = { not_stored: "flash.api_keys.key_removed.not_stored", removed: "flash.api_keys.key_removed.removed",
+                           switched: "flash.api_keys.key_removed.switched",
+                           last_removed: "flash.api_keys.key_removed.last_removed" }.freeze
+  PREFERENCE_NOTICES = { unchanged: "flash.api_keys.no_changes", saved: "flash.api_keys.preferences_saved" }.freeze
 
   # GET /setup
   def edit
@@ -44,9 +48,9 @@ class ApiKeysController < ApplicationController
     removed = AiProvider.label(params[:provider])
     outcome = remove_key(params[:provider])
     return redirect_to(login_path, alert: t("flash.application.login_required")) unless outcome
-    return redirect_to(setup_path, alert: t("flash.api_keys.key_removed.not_stored")) if outcome == :not_stored
 
-    redirect_to setup_path, notice: t("flash.api_keys.key_removed.#{outcome}", provider: removed, in_use: current_user.provider_label)
+    message = t(KEY_REMOVAL_MESSAGES.fetch(outcome), provider: removed, in_use: current_user.provider_label)
+    redirect_to setup_path, (outcome == :not_stored ? :alert : :notice) => message
   end
 
   private
@@ -118,13 +122,22 @@ class ApiKeysController < ApplicationController
   def preferences_update
     return render_key_alert(t("flash.application.api_key_needed")) unless current_user.api_key_present?
 
-    language = posted_language
-    provider = params[:provider] if current_user.stored_providers.include?(params[:provider])
-    return redirect_to root_path, notice: t("flash.api_keys.no_changes") unless language || provider
+    outcome = save_preferences(posted_language, params[:provider].presence)
+    return redirect_to(setup_path, alert: t("flash.api_keys.provider_not_stored")) if outcome == :provider_not_stored
 
-    current_user.language = language if language
-    current_user.use_provider(provider) if provider
-    current_user.save!
-    redirect_to root_path, notice: t("flash.api_keys.preferences_saved")
+    redirect_to root_path, notice: t(PREFERENCE_NOTICES.fetch(outcome))
+  end
+
+  # The lock reloads the row, so a provider whose key another tab removed since this page loaded is refused.
+  def save_preferences(language, provider)
+    current_user.with_lock do
+      next :provider_not_stored if provider && !current_user.stored_providers.include?(provider)
+      next :unchanged unless language || provider
+
+      current_user.language = language if language
+      current_user.use_provider(provider) if provider
+      current_user.save!
+      :saved
+    end
   end
 end

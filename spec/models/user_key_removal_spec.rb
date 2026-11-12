@@ -127,15 +127,62 @@ RSpec.describe User, "removing a stored key" do
       expect(ScheduledGeneration.users).not_to include(user)
     end
 
-    it "sets the key-hold count back to zero, whichever key is removed" do
+    it "leaves the key-hold count and the hold alone when the key removed is not the one in use" do
       2.times { user.record_generation_failure!(bad_key) }
       user.reload
 
       user.remove_api_key("openai")
       user.save!
 
+      expect(user.reload.generation_account_failures).to eq(KeyHold::AFTER)
+      expect(ScheduledGeneration.users).not_to include(user)
+    end
+
+    it "sets the key-hold count back to zero when the key in use is removed and another takes over" do
+      2.times { user.record_generation_failure!(bad_key) }
+      user.reload
+
+      user.remove_api_key("anthropic")
+      user.save!
+
       expect(user.reload.generation_account_failures).to eq(0)
       expect(ScheduledGeneration.users).to include(user)
+    end
+
+    it "sets the key-hold count back to zero when the last key is removed" do
+      user.update!(api_keys: { "anthropic" => "sk-ant-one" })
+      2.times { user.record_generation_failure!(bad_key) }
+      user.reload
+
+      user.remove_api_key("anthropic")
+      user.save!
+
+      expect(user.reload.generation_account_failures).to eq(0)
+    end
+
+    it "clears a generation failure recorded against the removed provider, in the same save" do
+      user.record_generation_failure!(bad_key)
+      user.reload
+      expect(user).to have_attributes(generation_failed_today?: true, last_generation_failure_provider: "anthropic")
+
+      user.remove_api_key("anthropic")
+      expect(User.find(user.id).generation_failed_today?).to be(true)
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: false, last_generation_error_date: nil,
+                                             last_generation_failure: nil, last_generation_failure_provider: nil,
+                                             last_generation_failed_at: nil, last_generation_retry_after: nil)
+    end
+
+    it "keeps a generation failure recorded against another provider" do
+      user.record_generation_failure!(bad_key)
+      user.reload
+
+      user.remove_api_key("openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key",
+                                             last_generation_failure_provider: "anthropic")
     end
 
     it "changes nothing for a provider with no stored key, an unknown provider or no name" do

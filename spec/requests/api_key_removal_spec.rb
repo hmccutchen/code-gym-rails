@@ -97,13 +97,27 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it "sets the key-hold count back to zero" do
+    it "sets the key-hold count back to zero when the key in use is removed, and leaves it for any other key" do
       user.update!(generation_account_failures: KeyHold::AFTER)
       login_as(user)
 
       delete setup_key_path("openai")
+      expect(user.reload.generation_account_failures).to eq(KeyHold::AFTER)
 
+      delete setup_key_path("anthropic")
       expect(user.reload.generation_account_failures).to eq(0)
+    end
+
+    it "takes the removed key's failure off the dashboard once the app has switched keys" do
+      user.record_generation_failure!(ProviderError::AuthenticationError.new("invalid x-api-key"))
+      login_as(user)
+      get root_path
+      expect(page_text).to include("Claude didn't accept your API key")
+
+      delete setup_key_path("anthropic")
+      get root_path
+
+      expect(page_text).not_to include("didn't accept your API key")
     end
 
     it "refuses a provider with no stored key, an unknown one and the fake one, and changes nothing" do
@@ -157,6 +171,46 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
       (ApiKeysController::KEY_SAVES_PER_HOUR + 1).times { delete setup_key_path("mistral") }
 
       expect(response).to redirect_to(setup_path)
+    end
+  end
+
+  describe "what each removal outcome says" do
+    it "has a message for every outcome the model can return, and a confirmation for each that removes a key" do
+      expect(ApiKeysController::KEY_REMOVAL_MESSAGES.keys).to match_array(User::KEY_REMOVAL_OUTCOMES)
+      ApiKeysController::KEY_REMOVAL_MESSAGES.each_value { |key| expect(I18n.exists?(key)).to be(true), "no text at #{key}" }
+      (User::KEY_REMOVAL_OUTCOMES - [ :not_stored ]).each do |outcome|
+        expect(I18n.exists?("api_keys.edit.saved_keys.confirm.#{outcome}")).to be(true), "no confirmation for #{outcome}"
+      end
+    end
+  end
+
+  describe "PATCH /setup with a provider choice" do
+    def remove_in_another_tab(name)
+      allow_any_instance_of(User).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+        User.find(original.receiver.id).tap { |other_tab| other_tab.remove_api_key(name) }.save!
+        original.call(*args, &block)
+      end
+    end
+
+    it "refuses a provider whose key was removed in another tab after this page loaded, and saves nothing" do
+      login_as(user)
+      remove_in_another_tab("openai")
+
+      patch setup_path, params: { api_key: "", provider: "openai", language: "javascript" }
+
+      expect(response).to redirect_to(setup_path)
+      expect(flash[:alert]).to eq("That provider has no saved key, so nothing was changed.")
+      expect(user.reload).to have_attributes(provider: "anthropic", api_keys: keys.slice("anthropic"), language: "ruby_rails")
+    end
+
+    it "still switches to a provider whose key is stored" do
+      login_as(user)
+
+      patch setup_path, params: { api_key: "", provider: "openai" }
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq(I18n.t("flash.api_keys.preferences_saved"))
+      expect(user.reload.provider).to eq("openai")
     end
   end
 end

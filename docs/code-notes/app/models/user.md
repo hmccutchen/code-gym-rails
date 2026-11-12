@@ -64,10 +64,14 @@ does nothing when the name is the provider already in use, because Setup
 posts the current provider with every preferences save.
 `docs/decisions/pausing-generation.md` has the rule.
 
-`#remove_api_key` goes through `#put_key_in_use` too, with the provider
-`#provider_after_removing` names: the one already in use when another key
-was removed, the most recently saved of the rest when the key in use was,
-or nil when none is left. So every removal resets the count.
+`#remove_api_key` calls `#use_provider` with the provider
+`#provider_after_removing` names: the most recently saved of the rest when
+the key in use was removed, or nil when none is left. So the count resets
+only when the removal changes the provider in use, and removing another
+key leaves it. It also assigns the failure columns back to empty when
+`last_generation_failure_provider` is the removed provider, as part of the
+caller's save and not with `#clear_generation_failure!`, which writes at
+once with `update_columns` and would land outside that save.
 `#key_removal_outcome` names what a removal would do without doing it;
 Setup words its confirmation from it and the controller words its notice
 from the same value once the removal has run. `#store_api_key` and

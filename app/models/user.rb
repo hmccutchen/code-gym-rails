@@ -290,7 +290,8 @@ class User < ApplicationRecord
 
     successor = provider_after_removing(name)
     write_keys(api_keys.except(name), key_saved_times)
-    put_key_in_use(successor)
+    use_provider(successor)
+    forget_generation_failure if last_generation_failure_provider == name
     outcome
   end
 
@@ -494,6 +495,10 @@ class User < ApplicationRecord
   def put_key_in_use(name)
     self.provider = name
     self.generation_account_failures = 0
+  end
+
+  def forget_generation_failure
+    assign_attributes(last_generation_error_date: nil, **NO_GENERATION_FAILURE)
   end
 
   def write_keys(keys, saved_times)

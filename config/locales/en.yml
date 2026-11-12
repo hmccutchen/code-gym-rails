@@ -201,6 +201,7 @@ en:
         switched: "Your %{provider} key was removed. %{in_use} is now the provider in use."
         last_removed: "Your %{provider} key was removed. New sets stop until you add a key."
         not_stored: "There is no saved key for that provider, so nothing was removed."
+      provider_not_stored: "That provider has no saved key, so nothing was changed."
       no_changes: "No changes made."
       preferences_saved: "Preferences saved!"
     daily_exercises:

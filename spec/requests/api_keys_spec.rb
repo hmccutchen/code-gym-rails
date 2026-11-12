@@ -154,14 +154,14 @@ RSpec.describe "ApiKeys", type: :request do
       expect(user.api_keys["anthropic"]).to eq("sk-ant-existing")
     end
 
-    it "ignores a provider choice with no saved key" do
+    it "refuses a provider choice with no saved key" do
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing" })
       login_as(user)
 
       patch setup_path, params: { api_key: "", provider: "openai" }
 
-      expect(response).to redirect_to(root_path)
-      expect(flash[:notice]).to eq(I18n.t("flash.api_keys.no_changes"))
+      expect(response).to redirect_to(setup_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.api_keys.provider_not_stored"))
       expect(user.reload.provider).to eq("anthropic")
     end
 

@@ -217,9 +217,11 @@ replaced but never deleted, short of deleting the account.
   changes: sets, reviews and usage rows stay, and a review keeps naming the
   provider that wrote it.
 - **Removing the last key** leaves `api_keys` NULL and `provider` nil, which
-  is the state of an account that never added a key. Every page but Setup
-  and Account already redirects such an account to Setup
-  (`ApplicationController#require_provider`), and
+  is the state of an account that never added a key. Every page that
+  requires a provider already redirects such an account to Setup
+  (`ApplicationController#require_provider`; Setup, Account, Welcome and
+  the sign-in, authenticator, trial, profile and push-subscription
+  controllers skip that check), and
   `ScheduledGeneration.users` already leaves it out, so neither needed a
   change. `provider` is cleared and not left naming the removed key's
   provider, so the Account page and a failure message cannot name a provider
@@ -240,10 +242,34 @@ replaced but never deleted, short of deleting the account.
   unchanged during a deploy or a rollback. `User#store_api_key` and
   `#remove_api_key` assign `api_keys` and `key_saved_times` together
   through one private method, which also drops a time for a provider with
-  no stored key, so the two cannot drift. A key saved before the column
-  existed has no time.
-- **The key-hold count goes back to zero** on any removal, as it does when a
-  key is saved (`docs/decisions/pausing-generation.md`).
+  no stored key, so writes by this code cannot leave the two disagreeing.
+  After a rollback, older code replaces a key without touching
+  `key_saved_times`, so a time can be older than its key. The only effect
+  is that a later removal may hand over to a different key than the newest
+  one. A key saved before the column existed has no time.
+- **The key-hold count goes back to zero only when the removal changes the
+  provider in use**: the key in use was removed, the last key included.
+  Removing a key that is not in use leaves the count and the hold alone,
+  because the count describes the key in use. `User#use_provider` follows
+  the same rule (`docs/decisions/pausing-generation.md`).
+- **A failure recorded against the removed provider is cleared in the same
+  save.** `users.last_generation_failure_provider` names the provider a
+  failed generation ran on. Left in place, the dashboard would go on
+  showing "Claude didn't accept your API key" after the app had switched to
+  another key, and `MissingSetState` puts a failure today ahead of starting
+  a generation. A failure recorded against another provider stays.
+- **A provider choice is re-checked under the row lock.** Before keys could
+  be removed, a stored provider stayed stored, so `PATCH /setup` checked
+  the "Provider in use" choice against the account as loaded. A Remove in
+  one tab followed by that choice from a page loaded earlier would then
+  put a removed provider in use. `ApiKeysController#save_preferences` now
+  reads `stored_providers` inside `with_lock`, and a provider with no
+  stored key saves nothing and returns to Setup with "That provider has no
+  saved key, so nothing was changed." That replaces the earlier behaviour,
+  which ignored such a choice and reported "No changes made."
+  `User#provider_has_a_stored_key` still skips an account with no keys
+  map: a trial account names a provider while holding no keys
+  (`User#start_trial!`), and so does an anonymized one.
 - **Under the user row lock.** The keys are one encrypted map written whole,
   so `ApiKeysController#remove_key` removes inside `with_lock`, which
   reloads the row: a key saved in another tab meanwhile stays. An
@@ -263,7 +289,8 @@ replaced but never deleted, short of deleting the account.
   off for this release; a spec pins `on_trial?` and nothing else was
   designed for the case.
 - **What the person is told**, by `ApiKeysController#destroy` from
-  `User#remove_api_key`'s outcome:
+  `User#remove_api_key`'s outcome through `KEY_REMOVAL_MESSAGES`, which
+  raises on an outcome it does not hold:
 
 | Outcome | Notice |
 |---|---|
