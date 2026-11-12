@@ -36,7 +36,7 @@ Every hour (Solid Queue cron via config/recurring.yml):
                          SchemaWait.migrations_pending?, read once per run
                          and logged as a warning when it skips
     no set yet         → GenerateDailyExercisesJob(user_id:, scheduled: true),
-                         at EnqueueDueGenerationsJob::SCHEDULED_PRIORITY, so a
+                         at JobPriority::SCHEDULED, so a
                          job a person is waiting on runs first
   So a later hourly run picks up a missing set only while the account is
   neither paused nor held. A held account's next set comes from a generation

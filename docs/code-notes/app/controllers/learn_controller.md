@@ -5,20 +5,20 @@
 The limit counts presses, not jobs. Each press queues one billed job per
 missing concept, so a single press can cost many provider calls.
 
-## `BULK_PRIORITY`
+## `#bulk`
 
 One press of `#prepare` or `#prepare_ladders` can queue about 90 jobs on
 `provider_calls`, the queue the day's sets run on. At the default priority 0
 they ran ahead of a dashboard click made after the press and ahead of every
-scheduled set. The bulk loops enqueue at `BULK_PRIORITY` (5), so a click
-(0) runs first and a scheduled set
-(`EnqueueDueGenerationsJob::SCHEDULED_PRIORITY`, 10) still waits behind
-them: a person pressed the button and may be watching the list fill in,
-while nobody is waiting on a scheduled set at that moment. `#prepare_concept`
-stays at 0, because its page polls for that one write-up, and so does the
-write-up `ResponsesController#enqueue_concept_references` queues for a
-concept just submitted. `learn_spec` holds the ordering, whatever the
-numbers are.
+scheduled set. The three bulk enqueues go through `#bulk`, which sets
+`JobPriority::BULK`, so a click (`JobPriority::CLICK`) runs first and a
+scheduled set (`JobPriority::SCHEDULED`) still waits behind them: a person
+pressed the button and may be watching the list fill in, while nobody is
+waiting on a scheduled set at that moment. `#prepare_concept` sets no
+priority, because its page polls for that one write-up, and neither does
+the write-up `ResponsesController#enqueue_concept_references` queues for a
+concept just submitted. `job_priority_spec` holds the ordering, whatever
+the numbers are.
 
 ## `AWAITING`
 

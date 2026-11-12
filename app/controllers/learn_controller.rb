@@ -5,9 +5,6 @@ class LearnController < ApplicationController
 
   PREPARE_PER_HOUR = 10
 
-  # Behind a click's 0 and ahead of EnqueueDueGenerationsJob::SCHEDULED_PRIORITY; Solid Queue runs lower numbers first.
-  BULK_PRIORITY = 5
-
   rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
              store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ],
              unless: :own_key?
@@ -76,11 +73,11 @@ class LearnController < ApplicationController
     references = references_by_key
 
     ungenerated_concepts(references).each do |concept, bucket|
-      GenerateConceptReferenceJob.set(priority: BULK_PRIORITY).perform_later(concept: concept, language: bucket, user_id: current_user.id)
+      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id)
     end
 
     missing_recognition_guides.each do |group_key|
-      GenerateRecognitionGuideJob.set(priority: BULK_PRIORITY).perform_later(group_key: group_key, user_id: current_user.id)
+      bulk(GenerateRecognitionGuideJob).perform_later(group_key: group_key, user_id: current_user.id)
     end
 
     redirect_to learn_path, notice: t("learn.preparing")
@@ -91,13 +88,15 @@ class LearnController < ApplicationController
     gaps = current_user.prepares_ladders? ? LadderCoverage.for(current_user).gaps : []
 
     gaps.each do |concept, bucket|
-      GenerateConceptReferenceJob.set(priority: BULK_PRIORITY).perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
+      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
     end
 
     redirect_to setup_path(anchor: "exercise-mix"), notice: t("exercise_mix.ladders_preparing", count: gaps.size)
   end
 
   private
+
+  def bulk(job) = job.set(priority: JobPriority::BULK)
 
   def write_up_failure(concept, bucket)
     failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)

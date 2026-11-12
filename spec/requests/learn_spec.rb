@@ -659,7 +659,7 @@ RSpec.describe "Learn", type: :request do
     it "enqueues at a click's priority, since a person is waiting on it" do
       post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
-      expect(provider_jobs.map { |job| job["priority"] }).to eq([ nil ])
+      expect(provider_jobs.map { |job| job["priority"] || JobPriority::CLICK }).to eq([ JobPriority::CLICK ])
     end
   end
 
@@ -668,24 +668,17 @@ RSpec.describe "Learn", type: :request do
 
     let(:bulk_priorities) { provider_jobs.map { |job| job["priority"] }.uniq }
 
-    it "sits strictly between a click's priority and a scheduled set's" do
-      click = GenerateConceptReferenceJob.new.priority || 0
-
-      expect(LearnController::BULK_PRIORITY).to be > click
-      expect(LearnController::BULK_PRIORITY).to be < EnqueueDueGenerationsJob::SCHEDULED_PRIORITY
-    end
-
     it "gives every write-up and guide job of POST /learn/prepare that priority" do
       post prepare_learn_path
 
       expect(provider_jobs.map { |job| job["job_class"] }.uniq).to contain_exactly("GenerateConceptReferenceJob", "GenerateRecognitionGuideJob")
-      expect(bulk_priorities).to eq([ LearnController::BULK_PRIORITY ])
+      expect(bulk_priorities).to eq([ JobPriority::BULK ])
     end
 
     it "gives every job of POST /learn/prepare_ladders that priority" do
       post prepare_learn_ladders_path
 
-      expect(bulk_priorities).to eq([ LearnController::BULK_PRIORITY ])
+      expect(bulk_priorities).to eq([ JobPriority::BULK ])
     end
   end
 

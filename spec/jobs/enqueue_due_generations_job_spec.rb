@@ -18,7 +18,7 @@ RSpec.describe EnqueueDueGenerationsJob do
     def scheduled_job_for(account) = have_enqueued_job(GenerateDailyExercisesJob).with(user_id: account.id, scheduled: true)
 
     def stub_enqueue_for(account, &outcome)
-      configured = GenerateDailyExercisesJob.set(priority: described_class::SCHEDULED_PRIORITY)
+      configured = GenerateDailyExercisesJob.set(priority: JobPriority::SCHEDULED)
       allow(GenerateDailyExercisesJob).to receive(:set).and_return(configured)
       allow(configured).to receive(:perform_later).and_call_original
       allow(configured).to receive(:perform_later).with(user_id: account.id, scheduled: true, &outcome)
@@ -64,9 +64,9 @@ RSpec.describe EnqueueDueGenerationsJob do
     it "enqueues the scheduled job on the provider queue, behind any job a person is waiting on" do
       travel_to(Time.utc(2026, 7, 13, 15, 0)) do
         expect { described_class.new.perform }
-          .to scheduled_job_for(pac).on_queue("provider_calls").at_priority(described_class::SCHEDULED_PRIORITY)
+          .to scheduled_job_for(pac).on_queue("provider_calls").at_priority(JobPriority::SCHEDULED)
       end
-      expect(described_class::SCHEDULED_PRIORITY).to be > (GenerateDailyExercisesJob.new(user_id: pac.id).priority || 0)
+      expect(JobPriority::SCHEDULED).to be > (GenerateDailyExercisesJob.new(user_id: pac.id).priority || 0)
     end
 
     it "enqueues a scheduled job for a user whose dashboard generation is running, which the claim then stops" do

@@ -14,10 +14,11 @@ so a request those checks refuse still counts. `/generate` allows
 `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
 prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
 A bulk press (`prepare`, `prepare_ladders`) enqueues its jobs at
-`LearnController::BULK_PRIORITY` (5): behind a dashboard click and the
-single-concept write-up a person waits on (both 0), and ahead of scheduled
-sets (`EnqueueDueGenerationsJob::SCHEDULED_PRIORITY`, 10). One press can
+`JobPriority::BULK` (5): behind a dashboard click and the single-concept
+write-up a person waits on (`JobPriority::CLICK`, 0, the default), and
+ahead of scheduled sets (`JobPriority::SCHEDULED`, 10). One press can
 queue about 90 jobs, and at 0 they held up a click made after it.
+`JobPriority` is the one place the three numbers live.
 These caps are starting values, not measured ones. All of them use
 `LazyCacheStore`, so the test env's `:null_store` never trips them and a
 spec that exercises one swaps in a real store.
@@ -61,7 +62,7 @@ claim taken when the job runs, beside a permit a click does not share with a
 scheduled job, has none of these: an expired permit only lets a duplicate be
 queued, which the claim then stops, and a click always gets a job of its
 own, which runs ahead of the scheduled ones
-(`EnqueueDueGenerationsJob::SCHEDULED_PRIORITY`). A discarded `perform_later`
+(`JobPriority::SCHEDULED`). A discarded `perform_later`
 returns false and raises nothing, so the hand-out moves on to the next user.
 
 What a job writes after its paid call is checked again under the user row

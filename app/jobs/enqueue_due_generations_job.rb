@@ -1,9 +1,6 @@
 class EnqueueDueGenerationsJob < ApplicationJob
   queue_as :default
 
-  # Solid Queue runs lower numbers first, so a set a person is waiting on, at the default 0, goes ahead.
-  SCHEDULED_PRIORITY = 10
-
   def perform
     fills_ran = !SchemaWait.migrations_pending?
     Rails.logger.warn("Generation hand-out skipped the unopened-set pause check: a migration is pending") unless fills_ran
@@ -24,7 +21,7 @@ class EnqueueDueGenerationsJob < ApplicationJob
     elsif check_unopened && UnopenedSets.pause?(user.daily_exercises.latest_openings, today: Date.current)
       pause_for_unopened_sets(user)
     else
-      GenerateDailyExercisesJob.set(priority: SCHEDULED_PRIORITY).perform_later(user_id: user.id, scheduled: true)
+      GenerateDailyExercisesJob.set(priority: JobPriority::SCHEDULED).perform_later(user_id: user.id, scheduled: true)
     end
   end
 
