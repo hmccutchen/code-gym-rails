@@ -15,6 +15,10 @@ signed-in user instead of loading the user again and building a second one.
 When generation is paused, the paused state renders the manual generate
 button back in, so the user can still ask for a set.
 
+`opened_at` is also written when generation resumes
+(`docs/decisions/pausing-generation.md`, "Resume ends the run"); this action
+is the write that means the set was shown.
+
 `#show` calls `DailyExercise#mark_opened!` on the set it is about to render,
 after the regenerating check has returned, so a set behind the spinner is
 not stamped. The write is one guarded `UPDATE` on a GET, with no read back:

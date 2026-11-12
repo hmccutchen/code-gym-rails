@@ -221,13 +221,20 @@ read it before changing that area.
   run. `paused_generation_at` is the authority: a pause with no source
   reads as manual, a source with no pause time is ignored, and no validation
   ties the two columns. `User#pause_generation!` and
-  `#clear_generation_pause!` are the only writers, both in the concern. `PATCH /account/toggle_generation` is the one pause
+  `#clear_generation_pause!` are the only writers, both in the concern; the
+  hand-out pauses through `#pause_for_unopened_sets!`, which decides again
+  under the user row lock. `PATCH /account/toggle_generation` is the one pause
   action; the Account buttons and the dashboard's automatic-pause line
   (Resume, Keep it paused) post the state they want, and it returns to the
   dashboard only for the fixed name `return_to=dashboard`, never a URL. The
-  line is drawn outside `MissingSetState`. `DailyExercise#mark_opened!`
-  stamps `opened_at` once, when the dashboard shows a finished set to its
-  owner. The key hold is a separate rule
+  line is drawn outside `MissingSetState`. `opened_at` means first shown on the
+  dashboard, or acknowledged by resuming generation:
+  `DailyExercise#mark_opened!` stamps it once when the dashboard shows a
+  finished set to its owner, and every resume stamps the sets that count as
+  unopened (`DailyExercise.acknowledge_unopened!`, in the transaction that
+  clears the pause), so a resume gives three fresh chances. "Keep it paused"
+  acknowledges nothing. `DailyExercise.unopened_before` and
+  `UnopenedSets.unopened?` are one rule, held equal by a spec. The key hold is a separate rule
   (`.claude/rules/providers.md`). A held unsubmitted set and its draft response move to
   today (`User#carry_held_set_forward!`, `#recover_held_set`) under
   `DailyExercise#with_response_locked`, clearing both regeneration columns; a

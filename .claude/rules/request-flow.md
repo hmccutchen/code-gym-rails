@@ -25,10 +25,12 @@ Every hour (Solid Queue cron via config/recurring.yml):
   (ScheduledGeneration.due?):
     today's set exists → SendPushReminderJob (kind: :nudge) when PushNudgePlan says so
     no set yet, and the last three sets went unopened (UnopenedSets.pause?)
-                       → User#pause_generation!(source: "automatic"); nothing
-                         is enqueued, and later runs skip the paused account.
-                         Not asked while SchemaWait.migrations_pending?,
-                         read once per run
+                       → User#pause_for_unopened_sets!, which decides again
+                         under the user row lock and pauses as "automatic";
+                         nothing is enqueued, and later runs skip the paused
+                         account. Not asked while
+                         SchemaWait.migrations_pending?, read once per run
+                         and logged as a warning when it skips
     no set yet         → GenerateDailyExercisesJob(user_id:, scheduled: true),
                          at EnqueueDueGenerationsJob::SCHEDULED_PRIORITY, so a
                          job a person is waiting on runs first
@@ -126,7 +128,8 @@ User interacts:
   └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
        the account in place while preserving all exercise/response/usage history
   └→ AccountsController#toggle_generation → pauses as manual, or resumes, by
-       the state the button posts; a repeated pause keeps the pause time and
+       the state the button posts; a resume also stamps opened_at on the
+       sets that count as unopened, so the run of three starts again; a repeated pause keeps the pause time and
        makes an automatic pause manual. Returns to the Account page, or to
        the dashboard for return_to=dashboard
 
