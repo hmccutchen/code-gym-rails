@@ -7,7 +7,7 @@ RSpec.describe "The key hold on the pages and in Setup", type: :request do
   let(:monday_noon) { Time.utc(2026, 7, 13, 12) }
 
   def hold!(account = user)
-    account.update_columns(generation_account_failures: ScheduledGeneration::KEY_HOLD_AFTER)
+    account.update_columns(generation_account_failures: KeyHold::AFTER)
   end
 
   describe "PATCH /setup" do
@@ -36,7 +36,27 @@ RSpec.describe "The key hold on the pages and in Setup", type: :request do
 
       patch setup_path, params: { api_key: "", language: "javascript" }
 
-      expect(user.reload).to have_attributes(language: "javascript", generation_account_failures: ScheduledGeneration::KEY_HOLD_AFTER)
+      expect(user.reload).to have_attributes(language: "javascript", generation_account_failures: KeyHold::AFTER)
+    end
+
+    it "lifts the hold when the account switches to another stored key, so the schedule covers it again" do
+      user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
+      hold!
+      login_as(user)
+
+      patch setup_path, params: { api_key: "", provider: "openai" }
+
+      expect(user.reload).to have_attributes(provider: "openai", generation_account_failures: 0)
+      expect(ScheduledGeneration.users).to include(user)
+    end
+
+    it "keeps the hold when the form posts the provider already in use with another preference" do
+      hold!
+      login_as(user)
+
+      patch setup_path, params: { api_key: "", provider: "anthropic", language: "javascript" }
+
+      expect(user.reload).to have_attributes(language: "javascript", generation_account_failures: KeyHold::AFTER)
     end
 
     it "keeps the hold when the key is not one Setup recognizes" do
@@ -46,7 +66,7 @@ RSpec.describe "The key hold on the pages and in Setup", type: :request do
       patch setup_path, params: { api_key: "not-a-key" }
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(user.reload.generation_account_failures).to eq(ScheduledGeneration::KEY_HOLD_AFTER)
+      expect(user.reload.generation_account_failures).to eq(KeyHold::AFTER)
     end
   end
 

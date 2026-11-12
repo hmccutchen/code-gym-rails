@@ -116,17 +116,17 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
   describe "a scheduled job already queued when the hold begins" do
     it "re-checks and calls no provider" do
       calls = provider_raising(bad_key)
-      user.update_columns(generation_account_failures: ScheduledGeneration::KEY_HOLD_AFTER)
+      user.update_columns(generation_account_failures: KeyHold::AFTER)
 
       GenerateDailyExercisesJob.perform_now(user_id: user.id, scheduled: true)
 
       expect(calls).to be_empty
-      expect(failures).to eq(ScheduledGeneration::KEY_HOLD_AFTER)
+      expect(failures).to eq(KeyHold::AFTER)
     end
   end
 
   describe "a generation the user starts while held" do
-    before { user.update_columns(generation_account_failures: ScheduledGeneration::KEY_HOLD_AFTER) }
+    before { user.update_columns(generation_account_failures: KeyHold::AFTER) }
 
     it "still runs, and lifts the hold when it succeeds" do
       calls = provider_succeeding
@@ -152,7 +152,7 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       GenerateDailyExercisesJob.perform_now(user_id: user.id)
 
       expect(calls.size).to eq(1)
-      expect(failures).to be >= ScheduledGeneration::KEY_HOLD_AFTER
+      expect(failures).to be >= KeyHold::AFTER
       expect(user.reload.generation_failure_message(surface: :generation))
         .to eq("Claude didn't accept your API key, so nothing was generated. Check the key in Setup.")
     end

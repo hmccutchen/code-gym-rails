@@ -18,15 +18,15 @@ RSpec.describe ScheduledGeneration do
     end
 
     it "holds an account one account failure short of the hold, and drops it at the hold and past it" do
-      short = account("short", generation_account_failures: described_class::KEY_HOLD_AFTER - 1)
-      account("held", generation_account_failures: described_class::KEY_HOLD_AFTER)
-      account("long-held", generation_account_failures: described_class::KEY_HOLD_AFTER + 5)
+      short = account("short", generation_account_failures: KeyHold::AFTER - 1)
+      account("held", generation_account_failures: KeyHold::AFTER)
+      account("long-held", generation_account_failures: KeyHold::AFTER + 5)
 
       expect(described_class.users).to contain_exactly(short)
     end
 
-    it "holds after two failures" do
-      expect(described_class::KEY_HOLD_AFTER).to eq(2)
+    it "names neither the kinds nor the count itself, which KeyHold owns" do
+      expect(described_class.constants).not_to include(:KEY_HOLD_KINDS, :KEY_HOLD_AFTER)
     end
   end
 

@@ -9,12 +9,6 @@ RSpec.describe User, "counting generation failures the provider blamed on the ac
 
   def out_of_credit = ProviderError::BillingError.new("credit balance is too low")
 
-  it "names the kinds that count and the count that holds, each once" do
-    expect(ScheduledGeneration::KEY_HOLD_KINDS).to eq(%w[bad_key out_of_credit])
-    expect(ScheduledGeneration::KEY_HOLD_AFTER).to eq(2)
-    expect(ProviderFailure::KINDS).to include(*ScheduledGeneration::KEY_HOLD_KINDS)
-  end
-
   describe "#record_generation_failure!" do
     it "raises the count by one for a rejected key" do
       user.record_generation_failure!(bad_key)
@@ -33,7 +27,7 @@ RSpec.describe User, "counting generation failures the provider blamed on the ac
       user.record_generation_failure!(bad_key)
       user.record_generation_failure!(out_of_credit)
 
-      expect(failures).to eq(ScheduledGeneration::KEY_HOLD_AFTER)
+      expect(failures).to eq(KeyHold::AFTER)
     end
 
     it "adds to the stored count, though this copy was loaded before another failure was written" do
@@ -63,7 +57,7 @@ RSpec.describe User, "counting generation failures the provider blamed on the ac
         user.record_generation_failure!(error.call)
 
         expect(failures).to eq(1)
-        expect(ScheduledGeneration::KEY_HOLD_KINDS).not_to include(user.last_generation_failure)
+        expect(KeyHold::KINDS).not_to include(user.last_generation_failure)
       end
     end
 
@@ -131,6 +125,29 @@ RSpec.describe User, "counting generation failures the provider blamed on the ac
       user.save!
 
       expect(failures).to eq(0)
+    end
+  end
+
+  describe "#use_provider" do
+    before do
+      user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
+      2.times { user.record_generation_failure!(bad_key) }
+      user.reload
+    end
+
+    it "sets the count back to zero when the account switches to another stored key" do
+      user.use_provider("openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(provider: "openai", generation_account_failures: 0)
+      expect(ScheduledGeneration.users).to include(user)
+    end
+
+    it "leaves the count alone when the provider named is the one already in use" do
+      user.use_provider("anthropic")
+      user.save!
+
+      expect(failures).to eq(2)
     end
   end
 

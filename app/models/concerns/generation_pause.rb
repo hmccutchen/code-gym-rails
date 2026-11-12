@@ -26,6 +26,10 @@ module GenerationPause
     end
   end
 
+  def clear_generation_pause!
+    update!(paused_generation_at: nil, generation_pause_source: nil)
+  end
+
   private
 
   # The pause time is User#held_exercise's floor, so a repeated pause changes the source at most.

@@ -155,7 +155,7 @@ class User < ApplicationRecord
                              last_generation_failure: kind,
                              last_generation_failure_provider: error.try(:provider) || provider,
                              last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
-    increment!(:generation_account_failures) if counts_toward_key_hold && ScheduledGeneration.key_hold_kind?(kind)
+    increment!(:generation_account_failures) if counts_toward_key_hold && KeyHold.counts?(kind)
   end
 
   def record_generation_success!
@@ -186,7 +186,7 @@ class User < ApplicationRecord
     Time.use_zone(effective_time_zone) do
       with_lock do
         recovered = recover_held_set
-        update!(paused_generation_at: nil, generation_pause_source: nil)
+        clear_generation_pause!
         recovered
       end
     end
@@ -264,9 +264,18 @@ class User < ApplicationRecord
 
   def store_api_key(key, provider:)
     self.api_keys = api_keys.to_h.merge(provider => key)
-    self.provider = provider
+    put_key_in_use(provider)
+  end
+
+  def use_provider(name)
+    put_key_in_use(name) unless name == provider
+  end
+
+  def put_key_in_use(name)
+    self.provider = name
     self.generation_account_failures = 0
   end
+  private :put_key_in_use
 
   def suggests_level_moves? = level_suggestions?
 

@@ -51,7 +51,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
 
     it "goes back to zero when a regeneration succeeds, since a generation the user started worked" do
       claimed_exercise
-      user.update_columns(generation_account_failures: ScheduledGeneration::KEY_HOLD_AFTER)
+      user.update_columns(generation_account_failures: KeyHold::AFTER)
       stub_provider({ "code_review" => { "question" => "new" } })
 
       described_class.new.perform(user_id: user.id)

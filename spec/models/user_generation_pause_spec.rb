@@ -49,11 +49,32 @@ RSpec.describe User, "pausing generation and who paused it" do
     end
   end
 
-  describe "#resume_generation!" do
-    it "clears the pause time and the source together" do
+  describe "#clear_generation_pause!" do
+    it "clears the pause time and the source in one write" do
       user.pause_generation!(source: "automatic")
 
+      user.clear_generation_pause!
+
+      expect(stored).to eq(paused_generation_at: nil, generation_pause_source: nil)
+    end
+
+    it "clears a source left with no pause time" do
+      user.update_columns(paused_generation_at: nil, generation_pause_source: "automatic")
+
+      user.clear_generation_pause!
+
+      expect(stored).to eq(paused_generation_at: nil, generation_pause_source: nil)
+    end
+  end
+
+  describe "#resume_generation!" do
+    it "clears the pause time and the source together, through the concern's one clearing method" do
+      user.pause_generation!(source: "automatic")
+      allow(user).to receive(:clear_generation_pause!).and_call_original
+
       user.resume_generation!
+
+      expect(user).to have_received(:clear_generation_pause!).once
 
       expect(stored).to eq(paused_generation_at: nil, generation_pause_source: nil)
     end

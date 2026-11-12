@@ -57,12 +57,13 @@ class ApiKeysController < ApplicationController
       return
     end
 
-    attrs = {}
-    attrs[:language] = params[:language] if User::LANGUAGES.include?(params[:language])
-    attrs[:provider] = params[:provider] if current_user.stored_providers.include?(params[:provider])
-    return redirect_to root_path, notice: t("flash.api_keys.no_changes") if attrs.empty?
+    language = params[:language] if User::LANGUAGES.include?(params[:language])
+    provider = params[:provider] if current_user.stored_providers.include?(params[:provider])
+    return redirect_to root_path, notice: t("flash.api_keys.no_changes") unless language || provider
 
-    current_user.update!(attrs)
+    current_user.language = language if language
+    current_user.use_provider(provider) if provider
+    current_user.save!
     redirect_to root_path, notice: t("flash.api_keys.preferences_saved")
   end
 end
