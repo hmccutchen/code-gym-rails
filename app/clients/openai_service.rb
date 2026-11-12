@@ -89,7 +89,7 @@ class OpenaiService < AiService
 
     content = object_list(parsed, "output").select { |item| item["type"] == "message" }.flat_map { |item| object_list(item, "content") }
     usage.merge(
-      text:      content.select { |part| part["type"] == "output_text" }.map { |part| part["text"] }.join,
+      text:      content.select { |part| part["type"] == "output_text" }.filter_map { |part| string_field(part, "text") }.join,
       truncated: parsed["status"] == "incomplete" && !filtered?(parsed),
       refusal:   refusal_category(parsed, content)
     )

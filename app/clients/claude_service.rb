@@ -58,7 +58,7 @@ class ClaudeService < AiService
     text_block = object_list(parsed, "content").find { |block| block["type"] == "text" }
 
     {
-      text:          text_block&.dig("text"),
+      text:          text_block && string_field(text_block, "text"),
       input_tokens:  count_field(usage, "input_tokens"),
       output_tokens: count_field(usage, "output_tokens"),
       model:         routed_model(request.purpose),

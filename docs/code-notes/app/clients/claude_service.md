@@ -8,7 +8,7 @@ When the request carries `max_tokens`, thinking is turned off. A tight cap is sh
 
 A refusal is returned as data in the result hash rather than raised here. That lets `call_and_log` write the usage row first, because a refused request still charges its input tokens.
 
-It reads `content` through `AiService#object_list` and every token count through `AiService#count_field`, so a field of the wrong shape reads as missing instead of raising before the usage row is written (`docs/code-notes/app/clients/ai_service.md`).
+It reads `content` through `AiService#object_list`, the text block's text through `AiService#string_field` and every token count through `AiService#count_field`, so a field of the wrong shape reads as missing instead of raising before the usage row is written (`docs/code-notes/app/clients/ai_service.md`).
 
 ## `RETRY_OPTIONS`
 

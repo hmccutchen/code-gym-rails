@@ -624,6 +624,11 @@ class AiService
     value.is_a?(Array) ? value.grep(Hash) : []
   end
 
+  def string_field(parent, key)
+    value = parent[key]
+    value if value.is_a?(String)
+  end
+
   def count_field(parent, key)
     value = parent[key]
     value.is_a?(Integer) && value.between?(0, ApiUsage.max_token_count) ? value : 0

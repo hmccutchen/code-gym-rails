@@ -15,3 +15,7 @@ Gemini states the wait two ways. `RetryInfo.retryDelay` in the error body is a d
 ## `RETRY_OPTIONS`
 
 Built from `AiService.retry_options`, retrying 429, 500, 502, 503 and 504.
+
+## `#read_result`
+
+It joins only the text parts whose text is a string (`AiService#string_field`), so a part whose text is an object, a list or a number is left out of the reply instead of being written into it as Ruby text (#769).

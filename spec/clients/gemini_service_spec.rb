@@ -606,6 +606,20 @@ RSpec.describe GeminiService do
         .to change(ApiUsage, :count).by(1)
     end
 
+    [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
+      it "keeps only the text parts that are strings and records one usage row when a part's text is #{text.inspect}" do
+        allow(Rails.logger).to receive(:error)
+        parts = [ { "type" => "text", "text" => "hello" }, { "type" => "text", "text" => text } ]
+        result = nil
+        expect { result = logged_reply(steps: [ text_step.merge("content" => parts) ]) }.to change(ApiUsage, :count).by(1)
+        expect(result).to include(text: "hello")
+
+        alone = logged_reply(steps: [ text_step.merge("content" => parts.drop(1)) ])
+        expect { service.send(:text_or_raise, alone, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, alone[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
     it "skips content parts that are not objects and reads no text from a content that is not a list" do
       parts = [ 1, "text", { "type" => "text", "text" => "hello" } ]
 

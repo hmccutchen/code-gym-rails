@@ -313,6 +313,20 @@ Gemini's output and thought tokens. `#log_usage` therefore rescues
 `ActiveModel::RangeError` as well as `ActiveRecord::ActiveRecordError`: the
 row is lost and a warning logged, but the reply still reaches the caller.
 
+## `#string_field`
+
+Returns the named field when it is a JSON string and nil otherwise (#769).
+Claude's text block and each Gemini and OpenAI text part are read through it.
+Before, a text that was an object, a list or a number did not raise: the
+callers turn the text into a string first, so `#parse_json_object` already
+raised `ProviderError::InvalidResponseError` for it. Prose callers did not
+fail, though. `#text_or_raise` returned the Ruby form of the value, such as
+`{"a" => 1}`, and the duck or a follow-up showed it as the reply, while Gemini
+and OpenAI joined a number or a list into the text beside the real parts. Now
+Claude reads no text from such a block, so the caller raises
+`InvalidResponseError` as for a reply with no text, and Gemini and OpenAI keep
+only the parts whose text is a string.
+
 ## `#log_raw_snippet`
 
 Raw output is logged instead of put in an exception message, which would reach

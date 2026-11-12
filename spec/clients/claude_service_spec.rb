@@ -690,6 +690,17 @@ RSpec.describe ClaudeService do
       end
     end
 
+    [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
+      it "reads no text, records one usage row and leaves every caller an InvalidResponseError when the text is #{text.inspect}" do
+        allow(Rails.logger).to receive(:error)
+        result = nil
+        expect { result = logged_reply(content: [ { "type" => "text", "text" => text } ]) }.to change(ApiUsage, :count).by(1)
+
+        expect { service.send(:text_or_raise, result, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, result[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
     it "skips content blocks that are not objects and records one usage row" do
       expect { expect(logged_reply(content: [ 1, "text", nil ] + text_content)).to include(text: "hello") }
         .to change(ApiUsage, :count).by(1)

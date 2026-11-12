@@ -480,6 +480,21 @@ RSpec.describe OpenaiService do
         .to change(ApiUsage, :count).by(1)
     end
 
+    [ { "a" => 1 }, [ 1, 2 ], 7 ].each do |text|
+      it "keeps only the text parts that are strings and records one usage row when a part's text is #{text.inspect}" do
+        allow(Rails.logger).to receive(:error)
+        part = { "type" => "output_text", "text" => text }
+        result = nil
+        expect { result = logged_call(reply(output: [ message({ "type" => "output_text", "text" => "hello" }, part) ])) }
+          .to change(ApiUsage, :count).by(1)
+        expect(result).to include(text: "hello")
+
+        alone = logged_call(reply(output: [ message(part) ]))
+        expect { service.send(:text_or_raise, alone, subject: "duck response") }.to raise_error(ProviderError::InvalidResponseError)
+        expect { service.send(:parse_json_object, alone[:text], subject: "verdict") }.to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
     it "reads no text and records one usage row when a message's content is not a list" do
       output = [ { "type" => "message", "content" => { "type" => "output_text", "text" => "hello" } } ]
 

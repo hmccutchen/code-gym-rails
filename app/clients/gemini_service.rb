@@ -43,7 +43,7 @@ class GeminiService < AiService
     status = parsed["status"]
     return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
 
-    text_parts = model_output_parts(parsed).select { |c| c["type"] == "text" }.map { |c| c["text"] }
+    text_parts = model_output_parts(parsed).select { |c| c["type"] == "text" }.filter_map { |c| string_field(c, "text") }
     usage.merge(text: text_parts.join, truncated: parsed["status"] == "incomplete")
   end
 
