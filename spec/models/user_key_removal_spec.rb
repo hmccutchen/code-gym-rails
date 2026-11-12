@@ -88,6 +88,72 @@ RSpec.describe User, "removing a stored key" do
     end
   end
 
+  describe "#use_provider and a failure recorded earlier" do
+    def rate_limited_on(provider) = ProviderError::RateLimitError.new("slow down", http_status: 429, retry_after: 120).tap { |e| e.provider = provider }
+
+    it "clears a failure recorded against the provider it switches away from, in the same save" do
+      user.record_generation_failure!(bad_key)
+      user.reload
+
+      user.use_provider("openai")
+      expect(User.find(user.id).generation_failed_today?).to be(true)
+      user.save!
+
+      expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false, last_generation_failure: nil,
+                                             last_generation_failure_provider: nil, last_generation_failed_at: nil)
+    end
+
+    it "clears a rate-limit failure and its wait for the provider left behind" do
+      user.record_generation_failure!(rate_limited_on("anthropic"))
+      user.reload
+
+      user.use_provider("openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: false, last_generation_retry_after: nil)
+    end
+
+    it "changes nothing when the provider named is the one already in use" do
+      user.record_generation_failure!(bad_key)
+      user.reload
+
+      user.use_provider("anthropic")
+
+      expect(user.changed?).to be(false)
+      expect(user).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
+    end
+
+    it "keeps a failure recorded against a third provider" do
+      user.record_generation_failure!(rate_limited_on("gemini"))
+      user.reload
+
+      user.use_provider("openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure_provider: "gemini")
+    end
+
+    it "keeps a failure recorded against the provider it switches to" do
+      user.record_generation_failure!(rate_limited_on("openai"))
+      user.reload
+
+      user.use_provider("openai")
+      user.save!
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure_provider: "openai")
+    end
+
+    it "keeps a message that names no provider" do
+      user.record_generation_message!("Settings or another set changed while this set was being prepared.")
+      user.reload
+
+      user.use_provider("openai")
+      user.save!
+
+      expect(user.reload.last_generation_error).to eq("Settings or another set changed while this set was being prepared.")
+    end
+  end
+
   describe "#remove_api_key" do
     it "deletes the provider's key and its save time, and keeps the others" do
       user.update!(key_saved_times: { "anthropic" => "2026-11-01T00:00:00Z", "gemini" => "2026-11-02T00:00:00Z" })

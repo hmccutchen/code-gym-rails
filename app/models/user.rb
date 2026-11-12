@@ -310,7 +310,10 @@ class User < ApplicationRecord
   end
 
   def use_provider(name)
-    put_key_in_use(name) unless name == provider
+    return if name == provider
+
+    forget_generation_failure_from(provider)
+    put_key_in_use(name)
   end
 
   def suggests_level_moves? = level_suggestions?

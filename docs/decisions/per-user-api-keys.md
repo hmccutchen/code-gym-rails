@@ -400,9 +400,9 @@ no set was started with the new key.
   at the old one, and the message is the only thing that says why.
 - **A key changed after the failure was written.** Removing a key clears a
   failure recorded against the removed provider. Saving a key clears one
-  too; see "Saving a key clears that provider's failure" below. Switching
-  between stored keys with the "Provider in use" choice leaves the failure
-  in place.
+  too, and so does switching between stored keys; see "Saving a key
+  clears that provider's failure" and "Switching providers clears the old
+  provider's failure" below.
 
 ## Saving a key clears that provider's failure
 
@@ -426,6 +426,36 @@ and `User#store_api_key` touched no failure column.
 - **Anything else stays**: a failure recorded against a provider that is
   neither the one saved nor the one that was in use, and a message that
   names no provider.
+
+## Switching providers clears the old provider's failure
+
+Decided by the owner on 2026-11-12. After "Claude didn't accept your API
+key", a person who chose their stored GPT key under "Provider in use" still
+saw the Claude card, and a failure today ranks ahead of starting a
+generation, so no set started on the key they had just chosen.
+
+- **A switch that changes the provider clears a failure recorded against
+  the provider it leaves**, in the same save, through the method the key
+  save and the removal use (`User#forget_generation_failure_from`, called
+  from `User#use_provider`).
+- **A rate-limit wait goes with it.** "Claude is limiting requests, try
+  again in about 2 minutes" says nothing about a call to GPT, and the next
+  set runs on GPT. The cost is that the person is no longer told when
+  Claude would answer again; they would see that only by switching back
+  and trying.
+- **A choice of the provider already in use changes nothing.** Setup posts
+  the current provider with every preferences save, and that must not
+  clear a failure the person has done nothing about.
+- **Anything else stays**: a failure recorded against a third provider, one
+  recorded against the provider being switched to, and a message that
+  names no provider.
+- **The failure line still names the provider that was tried.** A failure
+  stores its provider, and `User#generation_failure_message` words the
+  line from that and not from the provider in use when it is read
+  (`docs/decisions/what-a-person-is-told-when-a-provider-fails.md`). That
+  still matters wherever a failure outlives a change of provider: the
+  third-provider case above, and an account whose provider was changed
+  without going through the model's key methods.
 
 ### Open items
 

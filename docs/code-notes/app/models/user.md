@@ -75,7 +75,10 @@ private `#put_key_in_use`, the one place `provider` is assigned for a key
 choice, and it sets the count back to zero: the count describes one
 provider's key, so it does not follow the account to another. `#use_provider`
 does nothing when the name is the provider already in use, because Setup
-posts the current provider with every preferences save.
+posts the current provider with every preferences save. When the provider
+does change it first forgets a failure recorded against the provider it
+leaves (`#forget_generation_failure_from`), read before `#put_key_in_use`
+assigns the new one.
 `docs/decisions/pausing-generation.md` has the rule.
 
 `#remove_api_key` calls `#use_provider` with the provider

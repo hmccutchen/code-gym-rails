@@ -300,6 +300,34 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
       expect(user.reload.language).to eq("ruby_rails")
     end
 
+    context "after a failure today on the provider in use" do
+      around { |example| travel_to(Time.utc(2026, 7, 13, 13, 0)) { example.run } }
+
+      before do
+        user.record_generation_failure!(ProviderError::AuthenticationError.new("invalid x-api-key"))
+        login_as(user)
+        get root_path
+        expect(page_text).to include("Claude didn't accept your API key")
+      end
+
+      it "starts a set after a switch to another stored key" do
+        patch setup_path, params: { api_key: "", provider: "openai" }
+        follow_redirect!
+
+        expect(page_text).to include("Generating your personalized exercise set")
+        expect(page_text).not_to include("didn't accept your API key")
+        expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false)
+      end
+
+      it "keeps the failure when the choice posted is the provider already in use" do
+        patch setup_path, params: { api_key: "", provider: "anthropic", language: "javascript" }
+        follow_redirect!
+
+        expect(page_text).to include("Claude didn't accept your API key")
+        expect(user.reload).to have_attributes(provider: "anthropic", language: "javascript", last_generation_failure: "bad_key")
+      end
+    end
+
     it "still switches to a provider whose key is stored" do
       login_as(user)
 
