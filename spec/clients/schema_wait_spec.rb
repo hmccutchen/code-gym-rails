@@ -56,6 +56,23 @@ RSpec.describe SchemaWait do
       expect(described_class.migrations_pending?).to be(true)
     end
 
+    it "counts as pending, and logs a warning naming the error, when the answer cannot be read" do
+      allow(ActiveRecord::Base).to receive(:connection_pool).and_raise(ActiveRecord::ConnectionNotEstablished, "no route")
+      lines = []
+      allow(Rails.logger).to receive(:warn) { |line| lines << line }
+
+      expect(described_class.migrations_pending?).to be(true)
+      expect(lines).to eq([ "[schema_wait] could not tell whether a migration is pending (ActiveRecord::ConnectionNotEstablished); counting it as pending" ])
+    end
+
+    it "counts as pending when the migration folder cannot be read" do
+      allow(Dir).to receive(:[]).and_raise(Errno::EACCES)
+      allow(Rails.logger).to receive(:warn)
+
+      expect(described_class.migrations_pending?).to be(true)
+      expect(Rails.logger).to have_received(:warn).with(/Errno::EACCES/)
+    end
+
     it "agrees with Rails' own answer" do
       expect(described_class.migrations_pending?).to eq(ActiveRecord::Base.connection_pool.migration_context.needs_migration?)
     end
