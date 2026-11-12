@@ -30,12 +30,12 @@ class RegenerateExerciseJob < ApplicationJob
     end
     return keep_reviewed_set(user, exercise, kept_for, claim) if kept_for
 
-    user.clear_generation_failure! if user.last_generation_error_date.present?
+    user.record_generation_success!
     Rails.logger.info("Regenerated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     release(user, exercise, claim, e) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }
   rescue ProviderError, SetupError => e
-    release(user, exercise, claim, e) { user.record_generation_failure!(e) }
+    release(user, exercise, claim, e) { user.record_generation_failure!(e, counts_toward_key_hold: false) }
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end

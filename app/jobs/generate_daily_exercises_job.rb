@@ -54,7 +54,7 @@ class GenerateDailyExercisesJob < ApplicationJob
       persist_failure(user, claim) { user.record_generation_message!("Settings or another set changed while this set was being prepared. Generate again when ready.") }
       return
     end
-    user.clear_generation_failure! if user.last_generation_error_date.present?
+    user.record_generation_success!
 
     Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e

@@ -149,11 +149,20 @@ class User < ApplicationRecord
   NO_GENERATION_FAILURE = { last_generation_failure: nil, last_generation_failure_provider: nil,
                             last_generation_failed_at: nil, last_generation_retry_after: nil }.freeze
 
-  def record_generation_failure!(error)
+  def record_generation_failure!(error, counts_toward_key_hold: true)
+    kind = ProviderFailure.classify(error)
     write_generation_status!(last_generation_error_date: Date.current, last_generation_error: nil,
-                             last_generation_failure: ProviderFailure.classify(error),
+                             last_generation_failure: kind,
                              last_generation_failure_provider: error.try(:provider) || provider,
                              last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
+    increment!(:generation_account_failures) if counts_toward_key_hold && ScheduledGeneration.key_hold_kind?(kind)
+  end
+
+  def record_generation_success!
+    clear_generation_failure! if last_generation_error_date.present?
+    self.class.where(id: id).where.not(generation_account_failures: 0).update_all(generation_account_failures: 0)
+    self.generation_account_failures = 0
+    clear_attribute_changes([ :generation_account_failures ])
   end
 
   def record_generation_message!(message)
@@ -256,6 +265,7 @@ class User < ApplicationRecord
   def store_api_key(key, provider:)
     self.api_keys = api_keys.to_h.merge(provider => key)
     self.provider = provider
+    self.generation_account_failures = 0
   end
 
   def suggests_level_moves? = level_suggestions?
