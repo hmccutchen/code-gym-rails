@@ -109,6 +109,32 @@ RSpec.describe "checking a key with a provider", :real_key_check do
         expect(output).not_to include("boom")
       end
 
+      it "reads an error it has no rule for as unanswered, logging its class and never its message" do
+        stub_key_check(service_class, error: ArgumentError)
+
+        output = logged { expect(service.check_key).to eq(:unanswered) }
+
+        expect(output).to include("[key_check] provider=#{service_class.provider_key} result=unanswered error=ArgumentError")
+        expect(output).not_to include("boom")
+      end
+
+      it "gives up once the whole check has run past its total bound, however the reply arrives" do
+        stub_const("CallProfiles::KEY_CHECK_TOTAL_SECONDS", 0.05)
+        stub_key_check(service_class, delay: 1)
+
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        output = logged { expect(service.check_key).to eq(:unanswered) }
+
+        expect(Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).to be < 0.9
+        expect(output).to match(/\[key_check\] provider=#{service_class.provider_key} result=unanswered error=\S*Timeout/)
+      end
+
+      it "is reached through AiService.check_key by its provider key" do
+        stub_key_check(service_class, status: 403)
+
+        expect(AiService.check_key(service_class.provider_key, facts[:key])).to eq(:refused)
+      end
+
       it "writes no usage row" do
         stub_key_check(service_class)
 
@@ -117,8 +143,9 @@ RSpec.describe "checking a key with a provider", :real_key_check do
     end
   end
 
-  it "keeps the check's worst case well under a page's patience" do
-    expect(CallProfiles::KEY_CHECK_OPEN_TIMEOUT + CallProfiles::KEY_CHECK_READ_TIMEOUT).to be <= 10
+  it "bounds the whole check by its connect and read timeouts together, well under a page's patience" do
+    expect(CallProfiles::KEY_CHECK_TOTAL_SECONDS).to eq(CallProfiles::KEY_CHECK_OPEN_TIMEOUT + CallProfiles::KEY_CHECK_READ_TIMEOUT)
+    expect(CallProfiles::KEY_CHECK_TOTAL_SECONDS).to be <= 10
     expect(CallProfiles::KEY_CHECK_READ_TIMEOUT).to be < CallProfiles::READ_TIMEOUT
   end
 
@@ -135,6 +162,27 @@ RSpec.describe "checking a key with a provider", :real_key_check do
     stub_key_check(GeminiService, status: 400, body: { error: { status: "INVALID_ARGUMENT" } }.to_json)
 
     expect(GeminiService.new("AIzaSecretKeyValue").check_key).to eq(:unanswered)
+  end
+
+  describe "AiService.check_key" do
+    it "applies the gate AiService.for applies, refusing the fake provider outside a local environment" do
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+
+      expect { AiService.check_key("fake", "fake-test-key") }.to raise_error(SetupError, /fake/)
+    end
+
+    it "refuses a provider key the registry does not hold" do
+      expect { AiService.check_key("nobody", "sk-ant-api03-SecretKeyValue") }.to raise_error(SetupError)
+    end
+
+    it "names neither the key nor its length in the error it raises" do
+      expect { AiService.check_key("nobody", "sk-ant-api03-SecretKeyValue") }
+        .to raise_error(SetupError) { |error| expect(error.message).not_to include("SecretKeyValue") }
+    end
+
+    it "answers for the fake provider in a local environment" do
+      expect(AiService.check_key("fake", "fake-test-key")).to eq(:accepted)
+    end
   end
 
   it "answers for the fake provider without building a connection" do

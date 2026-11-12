@@ -1,4 +1,5 @@
 require "json"
+require "timeout"
 require "faraday"
 require "faraday/retry"
 
@@ -114,10 +115,17 @@ class AiService
 
   KEY_CHECK_RESULTS = %i[accepted rejected refused unanswered].freeze
 
+  def self.check_key(provider_key, api_key)
+    provider = AiProvider.find(provider_key)
+    raise SetupError, "No usable AI provider named #{provider_key.inspect} to check a key with" unless provider&.available?
+
+    provider.new(api_key).check_key
+  end
+
   def check_key
-    response = key_check_connection.get(self.class::MODELS_URL)
+    response = Timeout.timeout(CallProfiles::KEY_CHECK_TOTAL_SECONDS) { key_check_connection.get(self.class::MODELS_URL) }
     key_check_result(response).tap { |result| log_key_check("result=#{result} status=#{response.status}") }
-  rescue Faraday::Error => e
+  rescue StandardError => e
     log_key_check("result=unanswered error=#{e.class}")
     :unanswered
   end
