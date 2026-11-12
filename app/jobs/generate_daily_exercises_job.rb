@@ -7,6 +7,8 @@ class GenerateDailyExercisesJob < ApplicationJob
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles::JUDGED_GENERATION_BUDGET.seconds
 
+  SUPERSEDED_MESSAGE = "Settings or another set changed while this set was being prepared. Generate again when ready.".freeze
+
   def perform(user_id: nil, scheduled: false)
     # The release before EnqueueDueGenerationsJob ran the hourly hand-out as this class with no arguments.
     return EnqueueDueGenerationsJob.perform_later if user_id.nil?
@@ -43,7 +45,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   def set_today?(user) = DailyExercise.exists?(user: user, date: Date.current)
 
   def generate_for(user, claim)
-    key_used = key_in_use(user)
+    key_used = user.key_in_use
     date     = Date.current
     language = user.language_for_today
     service  = AiService.for(user)
@@ -52,7 +54,7 @@ class GenerateDailyExercisesJob < ApplicationJob
 
     result = PracticeGeneration.commit_new(user, context: context, judged: judged, language: language, drafted_by: service)
     if result.status == :superseded
-      persist_failure(user, claim) { user.record_generation_message!("Settings or another set changed while this set was being prepared. Generate again when ready.") }
+      persist_failure(user, claim) { user.record_generation_message!(SUPERSEDED_MESSAGE) }
       return
     end
     user.record_generation_success!
@@ -60,10 +62,10 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, claim) { user.record_generation_message!(e.message) }
+    persist_failure(user, claim) { report_failure(user, key_used) { user.record_generation_message!(e.message) } }
   rescue ProviderError, SetupError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
-    persist_failure(user, claim) { user.record_generation_failure!(e, counts_toward_key_hold: key_in_use(user) == key_used) }
+    persist_failure(user, claim) { report_failure(user, key_used) { user.record_generation_failure!(e) } }
   rescue ActiveRecord::RecordNotUnique
     Rails.logger.info(skipped_duplicate(user))
   rescue ActiveRecord::RecordInvalid => e
@@ -71,7 +73,10 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.info(skipped_duplicate(user))
   end
 
-  def key_in_use(user) = [ user.provider, user.api_key ]
+  # A page may be polling for this set, so a call whose key changed still ends in a failure the poll can report.
+  def report_failure(user, key_used, &)
+    user.report_call_failure(key_used, when_key_changed: -> { user.record_generation_message!(SUPERSEDED_MESSAGE) }, &)
+  end
 
   def skipped_duplicate(user) = "Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)"
 

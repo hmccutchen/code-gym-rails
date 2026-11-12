@@ -20,6 +20,7 @@ Rails.application.routes.draw do
 
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
+  delete "setup/keys/:provider", to: "api_keys#destroy", as: :setup_key
 
   get  "trial/start", to: "trials#new", as: :new_trial
   post "trial/start", to: "trials#start", as: :start_trial

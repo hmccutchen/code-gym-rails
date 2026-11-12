@@ -65,7 +65,7 @@ is worded to be true of a 404 or a 429 as much as of a timeout.
   key is wrong" stores the key and says what was not confirmed.
 - **A key that was not saved changes nothing.** The stored keys, the
   provider in use and `users.generation_account_failures` stay as they were;
-  only `User#store_api_key` resets the key-hold count. The form comes back
+  a failed save never resets the key-hold count. The form comes back
   with the language the person chose still selected, and the key field
   empty, since a key is never echoed.
 - **The key is stored under the user row lock.** The account is loaded
@@ -200,6 +200,232 @@ rejection is never final.
 - **It is logged so the two paths can be counted:**
   `[key_check] provider=<key> result=skipped`, with no key and no status.
   `AiService` writes it, so the line's format has one home.
+
+## A stored key can be removed
+
+Decided by the owner on 2026-11-12. Before this, a stored key could be
+replaced but never deleted, short of deleting the account.
+
+- **Where.** Setup's Connection card lists each stored provider under
+  "Saved keys", marks the one in use, and gives each a button named for it
+  ("Remove Claude key"). The key itself is never rendered.
+- **The request.** `DELETE /setup/keys/:provider`, a plain form post, goes to
+  `ApiKeysController#destroy`. The browser asks for confirmation first
+  through the `loading-form` controller, as account deletion does.
+- **What is deleted.** `User#remove_api_key` takes the provider's entry out
+  of `api_keys` and out of `key_saved_times`. Nothing else about the account
+  changes: sets, reviews and usage rows stay, and a review keeps naming the
+  provider that wrote it.
+- **Removing the last key** leaves `api_keys` NULL and `provider` nil, which
+  is the state of an account that never added a key. Every page that
+  requires a provider already redirects such an account to Setup
+  (`ApplicationController#require_provider`; Setup, Account, Welcome and
+  the sign-in, authenticator, trial, profile and push-subscription
+  controllers skip that check), and
+  `ScheduledGeneration.users` already leaves it out, so neither needed a
+  change. `provider` is cleared and not left naming the removed key's
+  provider, so the Account page and a failure message cannot name a provider
+  the account no longer has a key for.
+- **Removing the key in use while others are stored** switches `provider`
+  to the most recently saved of the keys that remain
+  (`User#provider_after_removing`). A key with no recorded save time ranks
+  behind every key that has one, and so does a time that cannot be read.
+  Ties go in `AiProvider.keys` order. Removing a key that is not in use
+  leaves `provider` alone.
+- **Save times are a column of their own.** `users.key_saved_times` maps a
+  provider to the ISO 8601 time its key was saved. The alternative was to
+  read the order of the `api_keys` map, which today happens to be insertion
+  order. A column states the fact; an ordering is something a refactor of
+  how the map is merged or serialized could break without any spec
+  noticing. It also leaves the encrypted map's shape and its validator as
+  they were, so code from before this release reads and writes the map
+  unchanged during a deploy or a rollback. `User#store_api_key` and
+  `#remove_api_key` assign `api_keys` and `key_saved_times` together
+  through one private method, which also drops a time for a provider with
+  no stored key, so writes by this code cannot leave the two disagreeing.
+  After a rollback, older code replaces a key without touching
+  `key_saved_times`, so a time can be older than its key. The only effect
+  is that a later removal may hand over to a different key than the newest
+  one. A key saved before the column existed has no time.
+- **The key-hold count goes back to zero only when the removal changes the
+  provider in use**: the key in use was removed, the last key included.
+  Removing a key that is not in use leaves the count and the hold alone,
+  because the count describes the key in use. `User#use_provider` follows
+  the same rule (`docs/decisions/pausing-generation.md`).
+- **A failure recorded against the removed provider is cleared in the same
+  save.** `users.last_generation_failure_provider` names the provider a
+  failed generation ran on. Left in place, the dashboard would go on
+  showing "Claude didn't accept your API key" after the app had switched to
+  another key, and `MissingSetState` puts a failure today ahead of starting
+  a generation. A failure recorded against another provider stays.
+- **A provider choice is re-checked under the row lock.** Before keys could
+  be removed, a stored provider stayed stored, so `PATCH /setup` checked
+  the "Provider in use" choice against the account as loaded. A Remove in
+  one tab followed by that choice from a page loaded earlier would then
+  put a removed provider in use. `ApiKeysController#save_preferences` now
+  reads `stored_providers` inside the lock, and a provider with no
+  stored key saves nothing and returns to Setup with "That provider has no
+  saved key, so nothing was changed." That replaces the earlier behaviour,
+  which ignored such a choice and reported "No changes made."
+  `User#provider_has_a_stored_key` still skips an account with no keys
+  map: a trial account names a provider while holding no keys
+  (`User#start_trial!`), and so does an anonymized one.
+- **Every write in the controller that follows a reload goes through
+  `#with_account_locked`**: the key save, the removal and the preferences
+  save. It takes the row lock and writes nothing for an account deleted in
+  another browser since the request began, and each action then sends the
+  browser to sign in. Before this the preferences save had the lock
+  without that check, so a language-only save landed on an anonymized row
+  and reported success.
+- **Under the user row lock.** The keys are one encrypted map written whole,
+  so `ApiKeysController#remove_key` removes inside `with_lock`, which
+  reloads the row: a key saved in another tab meanwhile stays. An
+  anonymized account gets no write and the browser is sent to sign in, as
+  with a save.
+- **A provider with no stored key is refused**, an unknown name included:
+  the account is unchanged and Setup says "There is no saved key for that
+  provider, so nothing was removed." The posted name is never echoed.
+- **Removal is not rate-limited** and calls no provider.
+- **A generation already running finishes.** It holds the key in memory.
+  If it then fails, that key's failure is not recorded, and a daily
+  generation leaves a message that names no provider; see "A call that
+  outlives its key" below.
+- **Trials.** `User#on_trial?` is "has a trial and no key in use", so an
+  account with an unfinished trial counts as on trial again once its key is
+  gone. With `provider` nil there is no house key to resolve, so such a
+  trial is not active until the account has a provider again. Trials are
+  off for this release; a spec pins `on_trial?` and nothing else was
+  designed for the case.
+- **What the person is told**, by `ApiKeysController#destroy` from
+  `User#remove_api_key`'s outcome through `KEY_REMOVAL_MESSAGES`, which
+  raises on an outcome it does not hold:
+
+| Outcome | Notice |
+|---|---|
+| `:removed` | "Your %{provider} key was removed." |
+| `:switched` | "Your %{provider} key was removed. %{in_use} is now the provider in use." |
+| `:last_removed` | "Your %{provider} key was removed. New sets stop until you add a key." |
+
+  The confirmation before it uses the same three cases, read from
+  `User#key_removal_outcome`, so it names the provider that would take over
+  or says that sets stop. Providers are named by `AiProvider.label`, as the
+  "Provider in use" choice beside the list names them.
+- The setup failure's next step for an own-key account now ends "If they
+  look right, remove the key and add it again."
+
+## A call that outlives its key
+
+A generation holds its key in memory for the whole call, which can run for
+minutes. The person can remove, replace or switch the key meanwhile. The
+jobs used to write the old key's failure anyway and only left it out of the
+key-hold count. The dashboard then showed "Claude didn't accept your API
+key" to an account that had already moved to another key, and
+`MissingSetState` puts a failure today ahead of starting a generation, so
+no set was started with the new key.
+
+- **The rule has one home.** `User#key_in_use` is the provider and key in
+  use. A job notes it before the call. When the call fails, the job reloads
+  the account under the user row lock and writes through
+  `User#report_call_failure(key_used)`, which runs the write only when
+  `key_in_use` is unchanged. Otherwise the old key's failure is never
+  written.
+- **What a call with a changed key clears.** Only a failure recorded
+  against the call's own provider (`last_generation_failure_provider`
+  equal to the provider the call started with). A failure recorded against another
+  provider stays: a newer attempt on the key that took over may have
+  written it, and clearing it would erase that attempt's message and its
+  recovery text. A message that names no provider ("Settings or another
+  set changed", "today's set was kept") stays too. Nothing ties it to the
+  call that is reporting, and each such message is about the set or the
+  settings and is still true.
+- **A regeneration reports only while its claim is its own.** With a key
+  replaced by another key for the same provider, the provider alone cannot
+  tell an old call's failure from one a newer attempt recorded on the new
+  key. `RegenerateExerciseJob#release` therefore takes the user row lock,
+  releases the exercise's claim with its own token, and writes or clears
+  only when that release took effect (`Claimable`'s `release_<name>!` now
+  returns whether it did). A regeneration whose claim went stale and was
+  retaken records nothing and clears nothing, for a provider failure and
+  for its "set was kept" and "unusable set" messages alike; the attempt
+  that holds the claim writes the outcome. This is the rule
+  `GenerateDailyExercisesJob#persist_failure` already followed. The lock
+  order is user, then exercise.
+- **A call that started with no provider records nothing and clears
+  nothing.** A job queued before the last key was removed starts with
+  `key_in_use` of `[nil, nil]`, `AiService.for` raises `SetupError`, and
+  the two values still compare equal. Recording that would leave a setup
+  failure on the account, and a key added afterwards would find it ahead
+  of starting a generation. A trial account has a provider and no key of
+  its own, so its failures are still recorded; only a nil provider is
+  skipped.
+- **`GenerateDailyExercisesJob`** applies it inside `persist_failure`, after
+  the claim check and the `set_today?` branch, to a provider or setup
+  failure and to the "every section failed its quality check" message.
+- **The daily job records a neutral message when the key changed.** The
+  day has no set, and a dashboard may be polling `GET /dashboard/status`
+  for one. Recording nothing left that page with no set, no failure and no
+  job: a visit after the key change had enqueued a second job, which
+  stopped because the first still held the generation claim, and the poll
+  answered "pending" until it gave up with "This is taking longer than
+  expected". So the job records
+  `GenerateDailyExercisesJob::SUPERSEDED_MESSAGE` ("Settings or another set
+  changed while this set was being prepared. Generate again when ready."),
+  the message it already uses when settings moved under a call. The poll
+  then answers "failed", the page reloads, and the person sees a true
+  sentence with "Try again". It names no provider, so it says nothing
+  about the old key, and saving or removing a key leaves it in place. It
+  replaces a failure left for the call's own provider. It is passed to
+  `User#report_call_failure` as `when_key_changed:`, so the rule keeps one
+  home; the job only supplies what to write.
+- **When the neutral message is not recorded.** A failure or message
+  already recorded today that is not the call's own provider's stays as it
+  is, since the poll already has an answer and a newer attempt may have
+  written it. An account left with no provider in use gets nothing either:
+  every page that requires a provider sends it to Setup, so no dashboard is
+  waiting, and a message would only sit in front of the first set after a
+  key is added. A call that started with no provider records nothing for
+  the same reason.
+- **The job does not enqueue a replacement.** Its own queue permit would
+  discard the new job. The status endpoint does not guess from the claim
+  either: a queued job holds no claim yet, and the page would reload in a
+  loop.
+- **`RegenerateExerciseJob`** applies the rule to a provider or setup
+  failure and stays silent when the key changed. It takes the user row
+  lock, releases the exercise's claim with its token inside that lock, and
+  reports only when the release took effect, so the order is user, then
+  exercise. Today's set exists, so once the claim is released the status
+  endpoint answers "ready" and the waiting page reloads onto the set;
+  nothing is left polling. Its "today's set was kept" messages are still
+  recorded whatever the key: the person asked for a new set and is looking
+  at the old one, and the message is the only thing that says why.
+- **A key changed after the failure was written.** Removing a key clears a
+  failure recorded against the removed provider. Saving a key clears one
+  too; see "Saving a key clears that provider's failure" below. Switching
+  between stored keys with the "Provider in use" choice leaves the failure
+  in place.
+
+## Saving a key clears that provider's failure
+
+Decided by the owner on 2026-11-12 (#780). After "Claude didn't accept your
+API key", a person who pasted a working Claude key still landed on the
+failure card, because a failure today ranks ahead of starting a generation
+and `User#store_api_key` touched no failure column.
+
+- **The saved provider's failure is cleared**, as an assignment in the same
+  save as the key (`User#forget_generation_failure_from`, which
+  `#remove_api_key` uses too). The checked save and the save without
+  checking both go through `#store_api_key`, so both end on a dashboard
+  that starts a set. A key that is rejected is not saved and clears
+  nothing.
+- **So is a failure recorded against the provider the save switches away
+  from.** A saved key always becomes the key in use. With Claude failed and
+  a GPT key pasted, the Claude failure would describe a provider the
+  account has just stopped using and would still hold back the first set
+  on the new key. The person's intent is the same as when they replace the
+  failed key: the problem is dealt with, start a set.
+- **Anything else stays**: a failure recorded against a provider that is
+  neither the one saved nor the one that was in use, and a message that
+  names no provider.
 
 ### Open items
 

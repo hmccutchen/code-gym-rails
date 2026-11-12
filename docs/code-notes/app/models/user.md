@@ -56,6 +56,20 @@ count with a guarded `UPDATE` for the same reason: the job's copy of the
 user can predate the failures. `#clear_generation_failure!` leaves the count
 alone, because "Try again" calls it before any provider has answered.
 
+`#report_call_failure` is the one place that decides whether a failed
+call's outcome is written: only while `#key_in_use` still equals what the
+job noted before the call. The caller holds the row lock, which is what
+makes the comparison current. A changed key clears only a failure whose
+`last_generation_failure_provider` is the call's own provider, so another
+provider's failure and a provider-less message survive.
+`when_key_changed:` is what the daily job wants written in that case. It
+runs only when the account still has a provider in use and today holds no
+failure but the call's own provider's; otherwise the method falls back to
+the clear above. A nil provider in
+what the job noted means the call started with no key at all, and nothing
+is written or cleared for it. `docs/decisions/per-user-api-keys.md` ("A
+call that outlives its key") has the rule.
+
 `#store_api_key` and `#use_provider` both put a key in use through the
 private `#put_key_in_use`, the one place `provider` is assigned for a key
 choice, and it sets the count back to zero: the count describes one
@@ -63,6 +77,27 @@ provider's key, so it does not follow the account to another. `#use_provider`
 does nothing when the name is the provider already in use, because Setup
 posts the current provider with every preferences save.
 `docs/decisions/pausing-generation.md` has the rule.
+
+`#remove_api_key` calls `#use_provider` with the provider
+`#provider_after_removing` names: the most recently saved of the rest when
+the key in use was removed, or nil when none is left. So the count resets
+only when the removal changes the provider in use, and removing another
+key leaves it. It also assigns the failure columns back to empty when
+`last_generation_failure_provider` is the removed provider
+(`#forget_generation_failure_from`), as part of the caller's save and not
+with `#clear_generation_failure!`, which writes at once with
+`update_columns` and would land outside that save. `#store_api_key` calls
+the same method with the provider saved and the provider in use before the
+save, read before `#put_key_in_use` changes it.
+`#key_removal_outcome` names what a removal would do without doing it;
+Setup words its confirmation from it and the controller words its notice
+from the same value once the removal has run. `#store_api_key` and
+`#remove_api_key` assign `api_keys` and `key_saved_times` through
+`#write_keys`, which keeps a time only for a provider with a stored key.
+`#key_saved_time` reads a missing or unreadable time as nil, and
+`nil.to_f` is 0, so such a key sorts behind every dated one.
+`docs/decisions/per-user-api-keys.md` ("A stored key can be removed") has
+the rules.
 
 ## `#carry_held_set_forward!`
 
@@ -210,4 +245,5 @@ it returns true.
 ## `#provider_has_a_stored_key`
 
 It skips an account with no keys map, since anonymized and trial accounts can
-name a provider while holding no keys.
+name a provider while holding no keys. An account that removed its last key
+holds no provider either.

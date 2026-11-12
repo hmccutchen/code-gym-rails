@@ -196,6 +196,12 @@ en:
       key_saved_unchecked: "Saved, but the key couldn't be checked with %{provider}. If your first set fails, check the key."
       key_saved_without_check: "Saved without checking. If your first set fails, check the key in your %{provider} account."
       key_saves_limited: "You've saved a key several times in the last hour. Try again later."
+      key_removed:
+        removed: "Your %{provider} key was removed."
+        switched: "Your %{provider} key was removed. %{in_use} is now the provider in use."
+        last_removed: "Your %{provider} key was removed. New sets stop until you add a key."
+        not_stored: "There is no saved key for that provider, so nothing was removed."
+      provider_not_stored: "That provider has no saved key, so nothing was changed."
       no_changes: "No changes made."
       preferences_saved: "Preferences saved!"
     daily_exercises:
@@ -293,7 +299,7 @@ en:
     setup:
       own_key:
         title: "Your account's setup has a problem Coding Gym can't work around, so %{outcome}."
-        next: "Check your provider, API key and language in Setup."
+        next: "Check your provider, API key and language in Setup. If they look right, remove the key and add it again."
       trial:
         title: "Your account's setup has a problem Coding Gym can't work around, so %{outcome}."
         next: "Tell the person who runs Coding Gym."
@@ -1003,6 +1009,14 @@ en:
       saved_keys_hint: "A key replaces the one saved for its provider and switches to it. Keys for other providers stay saved."
       provider_legend: "Provider in use"
       provider_hint: "Switch between the keys you've saved. To add another provider, paste its key above."
+      saved_keys:
+        heading: "Saved keys"
+        in_use: "In use"
+        remove: "Remove %{provider} key"
+        confirm:
+          removed: "Remove your %{provider} key? You can add it again later."
+          switched: "Remove your %{provider} key? Coding Gym will switch to your %{in_use} key."
+          last_removed: "Remove your %{provider} key? It is your only key, so new sets stop until you add one."
       language_label: "Exercise language"
       language_options:
         ruby_rails: "Ruby / Rails (default)"

@@ -29,7 +29,21 @@ read it before changing that area.
   keeps one encrypted key per provider in `users.api_keys`; a key's prefix
   picks its provider, and `user.provider` names the one in use, so
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
-  `User#api_key` and `User#stored_providers`; no keys stores NULL.
+  `User#remove_api_key`, `User#api_key` and `User#stored_providers`; no keys
+  stores NULL. Setup removes one stored key at a time
+  (`DELETE /setup/keys/:provider`). The key save, the removal and the
+  preferences save all write through `ApiKeysController#with_account_locked`:
+  the user row lock, and nothing written for an anonymized account. `#remove_api_key` returns one of
+  `User::KEY_REMOVAL_OUTCOMES`, which the action maps to its message. The
+  key in use, once removed, hands over to the most recently saved key that
+  remains (`users.key_saved_times`, written with `api_keys` in one
+  assignment; no recorded time ranks last, ties go in `AiProvider.keys`
+  order). Removing the last key leaves `api_keys` NULL and `provider` nil,
+  the state of an account that never added a key. A generation failure
+  recorded against the removed provider is cleared in the same save. The
+  page never shows a key. A "Provider in use" choice is checked against
+  `stored_providers` under the row lock too, so a key removed in another
+  tab cannot be put in use.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
   A pasted key is checked through `AiService.check_key(provider_key, key)`,
   the one other way to a provider class, which applies the same
@@ -106,14 +120,29 @@ read it before changing that area.
   schedule for a key that keeps failing"): `User#record_generation_failure!`
   counts a failure classified as a kind in `KeyHold::KINDS` (bad key, out of
   credit) in `users.generation_account_failures`, and only inside
-  `GenerateDailyExercisesJob#persist_failure`'s claim-guarded write, and
-  only when the provider and key the job started with are still in use. At
+  `GenerateDailyExercisesJob#persist_failure`'s claim-guarded write. A call
+  whose provider and key are no longer the ones in use never records that
+  key's failure, in that job and in `RegenerateExerciseJob`: both note
+  `User#key_in_use` before the call and write through
+  `User#report_call_failure` under the user row lock, the one home of that
+  rule. It clears only a failure recorded against the call's own provider,
+  and a call that started with no provider records and clears nothing. The
+  daily job passes `when_key_changed:` so a changed key ends in
+  `SUPERSEDED_MESSAGE`, which names no provider: a dashboard polling for
+  the set must get "failed", never "pending" with no job left. The
+  regeneration stays silent there, since its set exists and status answers
+  "ready". A
+  regeneration also reports only while the exercise's claim is still its
+  own, checked under the user row lock. `#store_api_key` clears a failure
+  recorded against the provider saved or the one it switches away from, and
+  `#remove_api_key` one recorded against the provider removed. At
   `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,
   so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
   (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read
   it and neither names the other for this rule. A generation the user starts
-  still runs. `#record_generation_success!`, `#store_api_key` and
-  `#use_provider`, when it changes the provider, set the count back to zero;
+  still runs. `#record_generation_success!` and `#store_api_key` set the
+  count back to zero, and so do `#remove_api_key` and `#use_provider` when
+  they change the provider in use;
   no other failure kind, and no regeneration failure, changes it. The hold is not a pause: it writes no
   pause column and shows no pause line.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):

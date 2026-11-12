@@ -50,6 +50,12 @@ full-width ghost button a gap below Save; the two buttons stack, as the
 secondary actions on Account do, so nothing sits side by side at phone
 width.
 
+## Saved keys
+
+`api_keys/_saved_keys` renders after the form, inside the Connection card
+and only for an account with a stored key. Its notes are in
+`docs/code-notes/app/views/api_keys/_saved_keys.html.md`.
+
 ## Muted paragraphs: `:where(...) p:not(.card-note)`
 
 The disclosures still hold paragraphs written as bare `<p>` that need the old

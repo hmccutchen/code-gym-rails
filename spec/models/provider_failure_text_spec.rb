@@ -84,7 +84,7 @@ RSpec.describe ProviderFailureText, type: :model do
     )
     expect(text("setup", surface: :generation).full).to eq(
       "Your account's setup has a problem Coding Gym can't work around, so nothing was generated. " \
-      "Check your provider, API key and language in Setup."
+      "Check your provider, API key and language in Setup. If they look right, remove the key and add it again."
     )
   end
 

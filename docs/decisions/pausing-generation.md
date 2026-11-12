@@ -230,14 +230,21 @@ whatever it stands at.
 `GenerateDailyExercisesJob` calls that inside `persist_failure`, which writes
 only while the job still holds its claim and the day has no set, so a job
 whose claim was taken over cannot count a failure the newer job will report.
-The job also notes the provider and key it started with, and under that same
-lock counts the failure only when they are still the ones in use. A key saved
-or switched during the call has just set the count to zero, and the old key's
-failure says nothing about the new one.
+The job also notes the provider and key it started with
+(`User#key_in_use`), and under that same lock records the failure only when
+they are still the ones in use (`User#report_call_failure`). A key saved,
+switched or removed during the call has just set the count to zero, and the
+old key's failure says nothing about the new one, so nothing is counted and
+that failure is not written. The job records a message that names no
+provider in its place, so a dashboard waiting on the set is told to try
+again (`docs/decisions/per-user-api-keys.md`, "A call that outlives its
+key").
 `User#record_generation_success!` sets the count back to zero, and so does
 `User#store_api_key`, which `ApiKeysController#update` calls when it stores
 a key. Switching to another stored key (`User#use_provider`) resets it too,
-because the count describes one provider's key. Saving other preferences
+because the count describes one provider's key. Removing a stored key
+(`User#remove_api_key`) resets it only when that changes the provider in
+use; removing a key that is not in use leaves the count and the hold. Saving other preferences
 with the provider unchanged leaves it alone. Pressing "Try again" clears the failure message and leaves the count.
 
 **What stops.** `ScheduledGeneration.users`, the single authority for which

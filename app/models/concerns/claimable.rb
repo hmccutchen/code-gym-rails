@@ -29,6 +29,7 @@ module Claimable
   def release_claim(column, token)
     released = self.class.where(id: id, column => token).update_all(column => nil) == 1
     write_claim(column, nil) if released
+    released
   end
 
   def write_claim(column, value)

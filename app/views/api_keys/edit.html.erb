@@ -68,6 +68,7 @@
         </div>
       <% end %>
     <% end %>
+    <%= render "api_keys/saved_keys" if current_user.stored_providers.any? %>
   </section>
 
   <section class="card">

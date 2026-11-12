@@ -169,6 +169,19 @@ class User < ApplicationRecord
     write_generation_status!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
   end
 
+  def key_in_use = [ provider, api_key ]
+
+  def report_call_failure(key_used, when_key_changed: nil)
+    provider_used = key_used.first
+    return if provider_used.nil?
+    return yield if key_in_use == key_used
+
+    own_failure = last_generation_failure_provider == provider_used
+    return when_key_changed.call if when_key_changed && provider.present? && (own_failure || !generation_failed_today?)
+
+    clear_generation_failure! if own_failure
+  end
+
   def clear_generation_failure!
     write_generation_status!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
   end
@@ -213,6 +226,7 @@ class User < ApplicationRecord
       update!(
         email:                            "deleted-user-#{id}@anonymized.local",
         api_keys:                         nil,
+        key_saved_times:                  {},
         login_code_sent_at:               nil,
         login_code_digest:                nil,
         login_code_attempts:              0,
@@ -263,8 +277,36 @@ class User < ApplicationRecord
   end
 
   def store_api_key(key, provider:)
-    self.api_keys = api_keys.to_h.merge(provider => key)
+    forget_generation_failure_from(provider, self.provider)
+    write_keys(api_keys.to_h.merge(provider => key), key_saved_times.merge(provider => Time.current.utc.iso8601(6)))
     put_key_in_use(provider)
+  end
+
+  KEY_REMOVAL_OUTCOMES = %i[not_stored removed switched last_removed].freeze
+
+  def key_removal_outcome(name)
+    return :not_stored unless stored_providers.include?(name)
+    return :removed unless name == provider
+
+    stored_providers.one? ? :last_removed : :switched
+  end
+
+  def provider_after_removing(name)
+    return provider unless name == provider
+
+    remaining = stored_providers - [ name ]
+    remaining.each_with_index.min_by { |stored, index| [ -key_saved_time(stored).to_f, index ] }&.first
+  end
+
+  def remove_api_key(name)
+    outcome = key_removal_outcome(name)
+    return outcome if outcome == :not_stored
+
+    successor = provider_after_removing(name)
+    write_keys(api_keys.except(name), key_saved_times)
+    use_provider(successor)
+    forget_generation_failure_from(name)
+    outcome
   end
 
   def use_provider(name)
@@ -467,6 +509,22 @@ class User < ApplicationRecord
   def put_key_in_use(name)
     self.provider = name
     self.generation_account_failures = 0
+  end
+
+  def forget_generation_failure_from(*providers)
+    return unless last_generation_failure_provider.present? && providers.include?(last_generation_failure_provider)
+
+    assign_attributes(last_generation_error_date: nil, **NO_GENERATION_FAILURE)
+  end
+
+  def write_keys(keys, saved_times)
+    assign_attributes(api_keys: keys, key_saved_times: saved_times.slice(*keys.keys))
+  end
+
+  def key_saved_time(name)
+    Time.iso8601(key_saved_times[name].to_s)
+  rescue ArgumentError
+    nil
   end
 
   def write_generation_status!(columns)
