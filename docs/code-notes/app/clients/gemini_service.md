@@ -11,3 +11,7 @@ On Gemini, thinking shares the output cap, and Gemini 3 Flash cannot turn thinki
 ## `#retry_delay_from`
 
 Gemini states the wait two ways. `RetryInfo.retryDelay` in the error body is a duration string such as `"39s"`, while the `retry-after` header is whole seconds. The method reads the body's duration first, rounds it up, and falls back to the header.
+
+## `RETRY_OPTIONS`
+
+Built from `AiService.retry_options`, retrying 429, 500, 502, 503 and 504.

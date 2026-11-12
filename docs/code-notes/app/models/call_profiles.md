@@ -36,8 +36,8 @@ also makes a timeout final instead of retried and billed again.
 
 ## `RETRY_MAX` and its neighbours
 
-Every provider's `RETRY_OPTIONS` share this policy, so the timeout budgets read
-one number.
+Every provider's `RETRY_OPTIONS` is built from `AiService::BASE_RETRY_OPTIONS`,
+which reads this policy, so the timeout budgets read one number.
 
 ## `.call_budget_seconds`
 

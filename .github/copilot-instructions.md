@@ -155,7 +155,8 @@ The comment rules in CLAUDE.md's Code Style section are never waived outside a
 skill vendored under `.claude/skills/`: each
 comment is one line, attached to the code directly below it (or trailing it),
 and a file holds at most 5. RuboCop enforces those three in Ruby
-files and `bin/comment-check` in ERB, JavaScript, CSS, YAML and Python. Business
+files and `bin/comment-check` in ERB, JavaScript, CSS, YAML, Python and shell
+scripts. Business
 decisions belong in CLAUDE.md, `.claude/rules/` or `docs/` (a design decision's full
 text in `docs/decisions/`, a file's own notes in `docs/code-notes/`),
 never in a comment.

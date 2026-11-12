@@ -633,4 +633,26 @@ RSpec.describe ClaudeService do
       expect { failed_logged_call(429, body, error_class: ProviderError::RateLimitError) }.to change(ApiUsage, :count).by(1)
     end
   end
+
+  describe "a refusal reply with a field that is not an object" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+
+    def logged_refusal(stop_details)
+      body = { "content" => [], "stop_reason" => "refusal", "stop_details" => stop_details,
+               "usage" => { "input_tokens" => 3, "output_tokens" => 0 } }
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, body.to_json ] ]))
+      request = AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true)
+      service.send(:call_and_log, user, request)
+    end
+
+    [ "cyber", [ "cyber" ], { "category" => { "name" => "cyber" } } ].each do |stop_details|
+      it "raises an unspecified refusal and records one usage row when stop_details is #{stop_details.inspect}" do
+        expect { expect { logged_refusal(stop_details) }.to raise_error(ProviderError::RefusalError, /\(unspecified\)/) }
+          .to change(ApiUsage, :count).by(1)
+        expect(ApiUsage.last.failure).to eq("refusal")
+      end
+    end
+  end
 end

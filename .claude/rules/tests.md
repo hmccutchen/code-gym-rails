@@ -38,6 +38,15 @@ process, and splits the system specs into four groups, one runner each.
 (`spec/support/bcrypt_cost.rb`). At the default cost every `login_as` spent
 about half a second hashing, which was most of the suite's runtime.
 
+A spec under `spec/migrations/` migrates inside the example's transaction, so
+the rollback puts the schema back. A column that a spec drops and re-adds
+lands last until then, and a `SELECT *` plan the connection prepares in that
+window no longer matches the restored table. A later file reading the same
+table then fails with `cached plan must not change result type` (#758).
+`spec/support/migration_plan_reset.rb` clears the connection's prepared
+statements after every example in that folder. The hook matches on the
+folder, so a migration spec added later is covered without opting in.
+
 `spec/system/` holds a small number of real-browser specs (Capybara +
 capybara-playwright-driver) covering flows unit/request specs can't fully
 verify — rating-gated submit, review loading state — driven exclusively

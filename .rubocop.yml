@@ -3,13 +3,23 @@ inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
 inherit_from: .rubocop_todo.yml
 
-inherit_mode:
-  merge:
-    - Exclude
-
 AllCops:
+  # Replaces the inherited excludes so bin/* is checked; see docs/code-notes/.rubocop.md.
+  inherit_mode:
+    override:
+      - Exclude
   Exclude:
     - ".claude/**/*"
+    - ".git/**/*"
+    - "node_modules/**/*"
+    - "tmp/**/*"
+    - "vendor/**/*"
+    - "**/app/assets/**/*"
+    - "db/*schema.rb"
+    - "log/**/*"
+    - "public/**/*"
+    - "storage/**/*"
+    - "data/**/*"
 
 require:
   - ./lib/rubocop/cop/code_gym/single_line_comment.rb

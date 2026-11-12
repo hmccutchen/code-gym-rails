@@ -30,6 +30,9 @@ says what a deviation from one requires.
   define the `API_URL` it posts to, keep a private `route_for`, and own the model each purpose routes to
   (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). A subclass overrides
   `long_running?` only when its retry rule differs, as `OpenaiService` does.
+  A subclass's `build_connection` passes its own retry statuses and headers to
+  `AiService.retry_options` and `#provider_connection`, which hold the shared
+  timeouts and retry rule.
   Adding a provider is adding a subclass and listing it in `AiProvider.all`,
   the closed registry used by dispatch, key detection and user validation.
   Each subclass owns its `provider_key`, `key_pattern` and any environment
@@ -113,8 +116,10 @@ says what a deviation from one requires.
   draft makes one call and a retry runs on the thread that asked for it. `AiService` keeps the calls and builds the prompts, or
   takes them from a prompt class;
   the module keeps the orchestration and the policy, and its specs drive it
-  with lambdas. Threads start through `CallerZoneThread.start`; `Archspec.rb`
-  holds the thread and `send` bans.
+  with lambdas. Threads start through `CallerZoneThread.start`, which runs
+  the work in the caller's time zone and inside `ActiveSupport::Executor`,
+  never `Rails.application.executor`, whose development reload lock would
+  deadlock the joining parent; `Archspec.rb` holds the thread and `send` bans.
 - **Outcomes at the HTTP edge** — domain work an action triggers returns a
   value naming what happened (`ResponseReview::Outcome`, like
   `ProblemSetIngest::Result`), and the action only maps it to a redirect and a

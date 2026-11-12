@@ -412,4 +412,45 @@ RSpec.describe OpenaiService do
   describe "an error body with a field that is not an object" do
     include_examples "a provider reading an error field that is not an object"
   end
+
+  describe "a reply with a field that is not an object" do
+    let(:user) { create_user_with_key }
+    let(:text_output) { [ message({ "type" => "output_text", "text" => "hello" }) ] }
+
+    def logged_call(response)
+      service.instance_variable_set(:@conn, recording_connection([], response))
+      request = AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true)
+      service.send(:call_and_log, user, request)
+    end
+
+    [ "cached", [ "cached" ] ].each do |details|
+      it "counts no cached tokens and records one usage row when input_tokens_details is #{details.inspect}" do
+        usage = { "input_tokens" => 10, "output_tokens" => 2, "input_tokens_details" => details }
+
+        expect { expect(logged_call(reply(output: text_output, usage: usage))).to include(text: "hello", input_tokens: 10) }
+          .to change(ApiUsage, :count).by(1)
+        expect(ApiUsage.last).to have_attributes(tokens_in: 10, cache_read_tokens: 0, cache_write_tokens: 0)
+      end
+    end
+
+    it "counts no tokens and records one usage row when usage is a string" do
+      expect { expect(logged_call(reply(output: text_output, usage: "unknown"))).to include(text: "hello") }
+        .to change(ApiUsage, :count).by(1)
+    end
+
+    it "returns the reply and records one usage row when a completed reply's incomplete_details is a string" do
+      response = reply(output: text_output, incomplete_details: "none")
+
+      expect { expect(logged_call(response)).to include(text: "hello", truncated: false, refusal: nil) }
+        .to change(ApiUsage, :count).by(1)
+    end
+
+    it "raises a truncation error and records one usage row when an incomplete reply's incomplete_details is a string" do
+      allow(Rails.logger).to receive(:warn)
+      response = reply(status: "incomplete", output: text_output, incomplete_details: "content_filter")
+
+      expect { expect { logged_call(response) }.to raise_error(ProviderError::TruncatedResponseError) }
+        .to change(ApiUsage, :count).by(1)
+    end
+  end
 end

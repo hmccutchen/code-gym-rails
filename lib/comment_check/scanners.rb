@@ -1,3 +1,4 @@
+require "psych"
 require_relative "line_scan"
 require_relative "c_style_scan"
 
@@ -5,11 +6,22 @@ module CommentCheck
   module Scanners
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
+    SHELL_HEREDOC = /(?<!<)<<(?!<)(?<dash>-?)[ \t]*(?<quote>['"]?)(?<word>\w+)\k<quote>/
+    SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function
 
-    def for(path)
-      case File.extname(path)
+    def for(path, text = nil)
+      extension = File.extname(path)
+      extension.empty? ? for_shebang(text.to_s.lines.first.to_s) : for_extension(extension)
+    end
+
+    def for_shebang(line)
+      method(:shell_comments) if line.match?(SHELL_SHEBANG)
+    end
+
+    def for_extension(extension)
+      case extension
       when ".yml", ".yaml" then method(:yaml_comments)
       when ".py" then method(:python_comments)
       when ".css" then method(:css_comments)
@@ -19,7 +31,27 @@ module CommentCheck
     end
 
     def yaml_comments(text)
-      LineScan.line_comments(text, "#", require_space: true)
+      LineScan.line_comments(without_yaml_block_scalars(text), "#", require_space: true)
+    end
+
+    def without_yaml_block_scalars(text)
+      lines = text.lines
+      yaml_block_scalar_lines(text).each { |index| lines[index] = lines[index].gsub(/[^\n]/, " ") }
+      lines.join
+    end
+
+    def yaml_block_scalar_lines(text)
+      yaml_block_scalars(Psych.parse_stream(text)).flat_map do |scalar|
+        last = scalar.end_column.zero? ? scalar.end_line - 1 : scalar.end_line
+        ((scalar.start_line + 1)..last).to_a
+      end
+    rescue Psych::SyntaxError
+      []
+    end
+
+    def yaml_block_scalars(node)
+      block = node.is_a?(Psych::Nodes::Scalar) && [ Psych::Nodes::Scalar::LITERAL, Psych::Nodes::Scalar::FOLDED ].include?(node.style)
+      (block ? [ node ] : []) + Array(node.children).flat_map { |child| yaml_block_scalars(child) }
     end
 
     def python_comments(text)
@@ -29,7 +61,57 @@ module CommentCheck
     def python_tooling?(comment)
       return false unless comment.own_line && comment.first_line <= 2
 
-      comment.text.start_with?("#!") && comment.first_line == 1 || comment.text.match?(PYTHON_ENCODING)
+      shebang?(comment) || comment.text.match?(PYTHON_ENCODING)
+    end
+
+    def shell_comments(text)
+      LineScan.line_comments(without_heredoc_bodies(text), "#", require_space: true).reject { |comment| shebang?(comment) }
+    end
+
+    def without_heredoc_bodies(text)
+      lines = text.lines
+      index = 0
+      while index < lines.length
+        opener = heredoc_opener(lines[index])
+        index += 1
+        close = opener && (index...lines.length).find { |at| lines[at].chomp.sub(opener[:indent], "") == opener[:word] }
+        next unless close
+
+        (index..close).each { |at| lines[at] = lines[at].gsub(/[^\n]/, " ") }
+        index = close + 1
+      end
+      lines.join
+    end
+
+    def heredoc_opener(line)
+      opener = line.to_enum(:scan, SHELL_HEREDOC).map { Regexp.last_match }.find { |match| shell_code_at?(line, match.begin(0)) }
+      opener && { word: opener[:word], indent: opener[:dash].empty? ? "" : /\A\t+/ }
+    end
+
+    def shell_code_at?(line, position)
+      quote = nil
+      depth = 0
+      index = 0
+      while index < position
+        char = line[index]
+        step = 1
+        if quote
+          quote = nil if char == quote
+          step = 2 if quote == '"' && char == "\\"
+        elsif char == "\\" then step = 2
+        elsif char == "'" || char == '"' then quote = char
+        elsif char == "#" && (index.zero? || line[index - 1].match?(/\s/)) then return false
+        elsif line[index, 2] == "((" then depth += 1
+        elsif line[index, 2] == "))" then depth -= 1
+        end
+        step = 2 if %w[(( ))].include?(line[index, 2]) && quote.nil?
+        index += step
+      end
+      quote.nil? && depth <= 0
+    end
+
+    def shebang?(comment)
+      comment.first_line == 1 && comment.text.start_with?("#!")
     end
 
     def css_comments(text, offset: 0)

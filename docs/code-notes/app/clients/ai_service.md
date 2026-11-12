@@ -25,6 +25,20 @@ rescues catch it.
 A timeout on a long-running call is final: the provider has likely finished and
 billed the work, so a retry pays twice.
 
+## `BASE_RETRY_OPTIONS`, `.retry_options` and `#provider_connection`
+
+The three providers retry and connect the same way, so the shared part lives
+here once. `BASE_RETRY_OPTIONS` holds the backoff and the retry limits from
+`CallProfiles`, and `.retry_options(retry_statuses:)` adds the statuses a
+provider retries; each subclass keeps the result as its own `RETRY_OPTIONS`.
+`methods: []` sends every retry decision through `retry_if`
+(`RETRY_TIMEOUT_GUARD`), since faraday-retry retries a listed method without
+asking `retry_if`. `#provider_connection(retry_options, headers)` builds the
+Faraday connection with the default timeouts from `CallProfiles`, the
+subclass's auth headers, a JSON content type and that retry middleware. Each
+subclass's `#build_connection` calls it with its own `RETRY_OPTIONS` and
+headers.
+
 ## `MAX_GENERATED_CODE_LENGTH`
 
 Provider output is rendered into the page, so it is bounded at the boundary.
@@ -249,11 +263,25 @@ page, a cut-off reply) must arrive as one.
 Every provider nests error detail as `{"error": {"message": ...}}`. Each
 provider's `raise_for_status` parses the body once through `#error_envelope`
 and passes the resulting hash here, so the body is never parsed twice. A
-missing or blank message falls back to `fallback`. `#error_envelope` returns an
+missing or blank message falls back to `fallback`, and so does a message that
+is not a string: a hash or an array would otherwise reach `ProviderError` and
+show up as its `inspect` text. `#error_envelope` returns an
 empty hash for a body that is not JSON or whose `"error"` is a string or an
 array, as in a 500 reply of `{"error":"upstream down"}`, so those fall back
 too. Reading the message with `dig` raised `TypeError`, which escaped
 `call_and_log` without writing a usage row.
+
+## `#object_field`
+
+Returns the named field when it is a JSON object and an empty hash otherwise.
+`#error_envelope` and each provider's `read_result` read nested reply fields
+through it (`usage`, OpenAI's `input_tokens_details` and
+`incomplete_details`, Claude's `stop_details`), because `dig` or `[]` on a
+string a provider sent in place of an object raises `TypeError` or
+`NoMethodError`. Neither is a `ProviderError`, so the call escaped
+`call_and_log` without its usage row. Each field is optional, so an unreadable
+one reads as absent: no cache counts, no content-filter reason, no refusal
+category.
 
 ## `#log_raw_snippet`
 
@@ -265,6 +293,14 @@ flash alerts and error trackers. `.scrub` repairs a multi-byte character that
 
 Rescues database errors only. Swallowing anything else would silently empty the
 table that cost questions rely on.
+
+It checks out no connection by hand. `ApiUsage.create!` takes one through
+Active Record's `with_connection` and returns it after the write, on any
+thread, and a fan-out thread also runs inside the executor
+(`docs/code-notes/app/clients/caller_zone_thread.md`). The block that wrapped
+the write in `connection_pool.with_connection` came out with #754; a failed
+checkout still raises `ActiveRecord::ConnectionTimeoutError`, which the rescue
+logs.
 
 The row's `cost_usd` is priced here, at call time, from the subclass's
 `PRICE_PER_MILLION`, so a later price change never rewrites an old row. A model

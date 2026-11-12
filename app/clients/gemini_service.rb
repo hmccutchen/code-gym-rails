@@ -1,6 +1,3 @@
-require "faraday"
-require "faraday/retry"
-
 # Design notes: docs/code-notes/app/clients/gemini_service.md
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
@@ -20,17 +17,7 @@ class GeminiService < AiService
 
   MINIMAL_THINKING_LEVEL = "minimal".freeze
 
-  # `methods: []` routes every retry decision through retry_if; a listed method is retried without consulting it.
-  RETRY_OPTIONS = {
-    max:                 CallProfiles::RETRY_MAX,
-    interval:            0.5,
-    max_interval:        CallProfiles::RETRY_MAX_INTERVAL,
-    backoff_factor:      2,
-    interval_randomness: 0.5,
-    methods:             [],
-    retry_if:            AiService::RETRY_TIMEOUT_GUARD,
-    retry_statuses:      [ 429, 500, 502, 503, 504 ]
-  }.freeze
+  RETRY_OPTIONS = retry_options(retry_statuses: [ 429, 500, 502, 503, 504 ])
 
   private
 
@@ -52,7 +39,7 @@ class GeminiService < AiService
   end
 
   def read_result(parsed, request)
-    usage  = read_usage(parsed["usage"] || {}, request.purpose)
+    usage  = read_usage(object_field(parsed, "usage"), request.purpose)
     status = parsed["status"]
     return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
 
@@ -128,14 +115,5 @@ class GeminiService < AiService
     { type: "text", mime_type: "application/json", schema: schema }
   end
 
-  def build_connection
-    Faraday.new do |f|
-      f.options.open_timeout      = CallProfiles::OPEN_TIMEOUT
-      f.options.timeout           = CallProfiles::READ_TIMEOUT
-      f.headers["x-goog-api-key"] = @api_key
-      f.headers["content-type"]   = "application/json"
-      f.request :retry, RETRY_OPTIONS
-      f.adapter :net_http
-    end
-  end
+  def build_connection = provider_connection(RETRY_OPTIONS, "x-goog-api-key" => @api_key)
 end

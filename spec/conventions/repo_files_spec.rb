@@ -1,4 +1,6 @@
 require "rails_helper"
+require "rubocop"
+require_relative "../../lib/comment_check"
 
 RSpec.describe "Conventions held over the repository's own files" do
   REFERENCE_DOCS = %w[CLAUDE.md .github/copilot-instructions.md].freeze
@@ -137,6 +139,41 @@ RSpec.describe "Conventions held over the repository's own files" do
     expect(mapped?("app/models/a/b/c.rb", paths)).to be(true)
     expect(mapped?("app/models/b/c.rb", paths)).to be(false)
     expect(mapped?("lib/x/b/c.rb", paths)).to be(false)
+  end
+
+  def rubocop_targets(paths)
+    RuboCop::ConfigLoader.ignore_parent_exclusion = true
+    finder = RuboCop::TargetFinder.new(RuboCop::ConfigStore.new, force_exclusion: true, ignore_parent_exclusion: true)
+    finder.find(paths.map { |path| Rails.root.join(path).to_s }, :only_recognized_file_types).map { |path| relative(path) }
+  ensure
+    RuboCop::ConfigLoader.ignore_parent_exclusion = nil
+  end
+
+  def comment_checked?(path) = Dir.chdir(Rails.root) { CommentCheck.checked_path?(path) }
+
+  it "holds every file under bin to the comment rules, through RuboCop or bin/comment-check" do
+    scripts = `git -C #{Rails.root} ls-files bin`.split("\n")
+    unchecked = scripts - rubocop_targets(scripts) - scripts.select { |path| comment_checked?(path) }
+
+    expect(unchecked).to be_empty, "files under bin/ that neither RuboCop nor bin/comment-check reads:\n#{unchecked.join("\n")}"
+  end
+
+  def rubocop_excludes(config_path)
+    root = "#{Rails.root}/"
+    RuboCop::ConfigLoader.configuration_from_file(config_path).for_all_cops["Exclude"].map { |pattern| pattern.to_s.delete_prefix(root) }
+  end
+
+  def inherited_rubocop_excludes
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, ".rubocop.yml"), "inherit_gem: { rubocop-rails-omakase: rubocop.yml }\n")
+      Dir.chdir(Rails.root) { rubocop_excludes(File.join(dir, ".rubocop.yml")) }
+    end
+  end
+
+  it "restates every exclude RuboCop, rubocop-rails and omakase set, apart from bin/*, so a new upstream one is not lost" do
+    restated = Dir.chdir(Rails.root) { rubocop_excludes(Rails.root.join(".rubocop.yml").to_s) } - [ ".claude/**/*" ]
+
+    expect(restated).to match_array(inherited_rubocop_excludes - [ "bin/*" ])
   end
 
   it "reads a file as listed by its full path and an unknown file as unlisted" do
