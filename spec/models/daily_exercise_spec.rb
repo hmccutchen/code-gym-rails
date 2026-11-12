@@ -267,4 +267,42 @@ RSpec.describe DailyExercise, type: :model do
       expect(held.claim_regenerating!(regenerated_at: nil)).to be_nil
     end
   end
+
+  describe "#mark_opened!" do
+    let(:generated) { Time.utc(2026, 11, 10, 13) }
+    let(:set) do
+      DailyExercise.create!(user: user, date: Date.new(2026, 11, 10), problem_set: { "code_review" => {} },
+                            generated_at: generated, created_at: generated, updated_at: generated)
+    end
+
+    it "starts a new set unopened" do
+      expect(set.opened_at).to be_nil
+    end
+
+    it "stamps the set once and leaves updated_at alone" do
+      first = Time.utc(2026, 11, 10, 15)
+      travel_to(first) { set.mark_opened! }
+      travel_to(first + 2.hours) { set.mark_opened! }
+
+      expect(set.opened_at).to eq(first)
+      expect(set.reload).to have_attributes(opened_at: first, updated_at: generated)
+    end
+
+    it "keeps the time another request stamped first, though this copy was loaded before it" do
+      stale = DailyExercise.find(set.id)
+      first = Time.utc(2026, 11, 10, 15)
+      travel_to(first) { set.mark_opened! }
+
+      travel_to(first + 1.minute) { stale.mark_opened! }
+
+      expect(set.reload.opened_at).to eq(first)
+    end
+
+    it "runs no callback and no validation" do
+      set.problem_set = nil
+
+      expect { set.mark_opened! }.not_to raise_error
+      expect(DailyExercise.find(set.id).opened_at).to be_present
+    end
+  end
 end

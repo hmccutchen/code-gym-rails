@@ -82,6 +82,14 @@ class DailyExercise < ApplicationRecord
     !(response&.persisted? && response.reviewed?) && regenerated_at.nil? && !user.trial_ended?
   end
 
+  def mark_opened!
+    return if opened_at.present?
+
+    self.class.where(id: id, opened_at: nil).update_all(opened_at: Time.current)
+    self.opened_at = self.class.where(id: id).pick(:opened_at)
+    clear_attribute_changes([ :opened_at ])
+  end
+
   def with_response_locked
     transaction do
       lock!

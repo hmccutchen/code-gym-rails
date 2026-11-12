@@ -12,6 +12,7 @@ class DashboardController < ApplicationController
 
     return @content_state = :generating if @exercise&.regenerating?
 
+    @exercise&.mark_opened!
     @regeneration_failed = @exercise.present? && current_user.generation_failed_today?
     @content_state = settle_missing_set if @exercise.nil?
   end
