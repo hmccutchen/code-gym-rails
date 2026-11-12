@@ -24,6 +24,10 @@ paths:
   - "spec/**/competency_gate/**"
   - "spec/**/*{weighted_roll,daily_exercise}*"
   - "app/models/{daily_kinds,daily_kind_swap,section_kind_settings}.rb"
+  - "app/models/{unopened_sets,scheduled_generation,missing_set_state}.rb"
+  - "app/models/concerns/generation_pause.rb"
+  - "app/jobs/enqueue_due_generations_job.rb"
+  - "spec/**/*{unopened_set,generation_pause,automatic_pause,key_hold,scheduled_generation}*"
   - "app/models/daily_kind_swap/**"
   - "app/controllers/daily_kinds_controller.rb"
   - "app/views/daily_kinds/**"
@@ -208,9 +212,21 @@ read it before changing that area.
   safety hold; protected practice and #264 checkpointing remain separate.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
-  (cron and the dashboard auto-trigger), never submit or review. `PATCH
-  /account/toggle_generation` is the only pause control, and its buttons post
-  the state they want. A held unsubmitted set and its draft response move to
+  (cron and the dashboard auto-trigger), never submit or review. A pause has
+  a source, `manual` or `automatic` (`GenerationPause`): the hourly hand-out
+  pauses an account as `automatic` when `UnopenedSets` (pure) says its last
+  `PAUSE_AFTER` sets ended their day unopened and unsaved, and sends no
+  notice. `paused_generation_at` is the authority: a pause with no source
+  reads as manual, a source with no pause time is ignored, and no validation
+  ties the two columns. `User#pause_generation!` and `#resume_generation!`
+  are the only writers. `PATCH /account/toggle_generation` is the one pause
+  action; the Account buttons and the dashboard's automatic-pause line
+  (Resume, Keep it paused) post the state they want, and it returns to the
+  dashboard only for the fixed name `return_to=dashboard`, never a URL. The
+  line is drawn outside `MissingSetState`. `DailyExercise#mark_opened!`
+  stamps `opened_at` once, when the dashboard shows a finished set to its
+  owner. The key hold is a separate rule
+  (`.claude/rules/providers.md`). A held unsubmitted set and its draft response move to
   today (`User#carry_held_set_forward!`, `#recover_held_set`) under
   `DailyExercise#with_response_locked`, clearing both regeneration columns; a
   submitted response ends the move, and it is skipped when today already has a

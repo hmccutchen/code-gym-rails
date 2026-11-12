@@ -15,6 +15,12 @@ signed-in user instead of loading the user again and building a second one.
 When generation is paused, the paused state renders the manual generate
 button back in, so the user can still ask for a set.
 
+`#show` calls `DailyExercise#mark_opened!` on the set it is about to render,
+after the regenerating check has returned, so a set behind the spinner is
+not stamped. The write is one guarded `UPDATE` on a GET. It records that the
+page was shown, which is the fact the pause rule needs, and `#load_todays_set`
+already writes on this action when it carries a held set forward.
+
 ## `#settle_missing_set`
 
 `MissingSetState` decides what a day with no set shows, and its order is the

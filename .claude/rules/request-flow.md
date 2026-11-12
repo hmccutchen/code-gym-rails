@@ -19,12 +19,20 @@ User logs in (address, then an emailed 6-digit code or, once it is on, an authen
 
 Every hour (Solid Queue cron via config/recurring.yml):
   EnqueueDueGenerationsJob, the hand-out, calls no provider. For each user
-  ScheduledGeneration.users holds, at or past 8am on a weekday in their own
-  zone (ScheduledGeneration.due?):
+  ScheduledGeneration.users holds (active, with a key, not paused, and not
+  held after ScheduledGeneration::KEY_HOLD_AFTER bad-key or out-of-credit
+  failures in a row), at or past 8am on a weekday in their own zone
+  (ScheduledGeneration.due?):
     today's set exists → SendPushReminderJob (kind: :nudge) when PushNudgePlan says so
+    no set yet, and the last three sets went unopened (UnopenedSets.pause?)
+                       → User#pause_generation!(source: "automatic"); nothing
+                         is enqueued, and later runs skip the paused account
     no set yet         → GenerateDailyExercisesJob(user_id:, scheduled: true),
                          at EnqueueDueGenerationsJob::SCHEDULED_PRIORITY, so a
                          job a person is waiting on runs first
+  So a later hourly run picks up a missing set only while the account is
+  neither paused nor held. A held account's next set comes from a generation
+  its owner starts.
 
 GenerateDailyExercisesJob(user_id:), from the hand-out or the dashboard:
   a scheduled job first checks the user is still due (the same two
@@ -43,8 +51,10 @@ GenerateDailyExercisesJob(user_id:), from the hand-out or the dashboard:
                 user.recent_delivered_content (repetition-only notes)
          calls: the user's provider with a personalized prompt, in the user's
                 chosen language (user.language_for_today)
-         saves: DailyExercise { problem_set: jsonb, language } on success, or
-         persists last_generation_error(_date) on the user on failure — the
+         saves: DailyExercise { problem_set: jsonb, language } on success
+         and sets users.generation_account_failures back to zero, or
+         persists last_generation_error(_date) on the user on failure, raising
+         that count for a bad key or no credit — the
          dashboard learns the outcome by polling GET /dashboard/status and
          reloading
 
@@ -52,6 +62,11 @@ User opens dashboard:
   └→ DashboardController#show
        shows today's DailyExercise, or triggers on-demand generation if missing
        (weekdays only; weekends offer a manual "generate anyway" button)
+       stamps the set's opened_at the first time it is shown
+       (DailyExercise#mark_opened!), never while it is still generating
+       while the pause is automatic, shows one line above every state with
+       Resume and "Keep it paused", both posting to
+       PATCH /account/toggle_generation with return_to=dashboard
        2-4 sections, sized by the unified core-workload fold,
        unless the user fixed a count from 1 to 4 in Setup's Daily sections: the
        user's daily kinds (DailyKinds; Code Review and Design Comparison by
@@ -108,6 +123,10 @@ User interacts:
        review is what someone opening the page came for.
   └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
        the account in place while preserving all exercise/response/usage history
+  └→ AccountsController#toggle_generation → pauses as manual, or resumes, by
+       the state the button posts; a repeated pause keeps the pause time and
+       makes an automatic pause manual. Returns to the Account page, or to
+       the dashboard for return_to=dashboard
 
 User browses /learn (independent of the daily flow above):
   └→ LearnController#index            → every concept in the user's vocabularies

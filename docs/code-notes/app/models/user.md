@@ -47,6 +47,16 @@ written are bookkeeping that nothing validates, so skipping validation
 loses nothing. The specs that pin this write an invalid value with
 `update_columns` first.
 
+`#record_generation_failure!` also raises `generation_account_failures` for
+a kind in `ScheduledGeneration::KEY_HOLD_KINDS`, with `increment!`, which
+adds in SQL, so a copy of the user loaded before another failure still adds
+one to the stored count. `RegenerateExerciseJob` passes
+`counts_toward_key_hold: false`. `#record_generation_success!` resets the
+count with a guarded `UPDATE` for the same reason: the job's copy of the
+user can predate the failures. `#clear_generation_failure!` leaves the count
+alone, because "Try again" calls it before any provider has answered.
+`docs/decisions/pausing-generation.md` has the rule.
+
 ## `#carry_held_set_forward!`
 
 The read of `held_exercise` before the lock only avoids taking a lock when

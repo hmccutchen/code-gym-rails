@@ -103,3 +103,8 @@ The hourly hand-out (`EnqueueDueGenerationsJob`) rescues any error per user,
 logs it with the user's id and moves on, so one broken account can't stop it
 enqueuing the users after it. Each user's generation then runs in a job of its own, where one
 failure has no other user to reach.
+
+Two bad-key or out-of-credit failures in a row stop the hand-out enqueuing
+for that account (`docs/decisions/pausing-generation.md`). The person is
+told nothing new: the failure message from the last attempt stays on the
+dashboard, and "Try again" still makes one call.
