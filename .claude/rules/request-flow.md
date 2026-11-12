@@ -16,6 +16,10 @@ paths:
 User logs in (address, then an emailed 6-digit code or, once it is on, an authenticator code)
   └→ enters their own Anthropic, Gemini or OpenAI API key (stored encrypted per-user;
      the key's prefix determines user.provider)
+       └→ ApiKeysController#update asks that provider's list-models endpoint
+          about the key first (AiService#check_key, one free GET, no retry):
+          a rejected key is not stored and the form says so; an accepted one
+          is stored; a 403 or no answer stores it with a warning
 
 Every hour (Solid Queue cron via config/recurring.yml):
   EnqueueDueGenerationsJob, the hand-out, calls no provider. For each user

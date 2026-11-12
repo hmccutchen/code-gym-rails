@@ -9,6 +9,14 @@ sections, Track), then the Exercise mix and Display disclosures, which are
 (`.card-heading` and `.card-tag`). Track has its own inline preview with
 explicit Apply and Cancel; the other preference controls save by themselves.
 
+## The language select after a refused save
+
+The select shows `chosen_language`, the controller's helper, which is the
+posted language when the form is re-rendered and the stored one otherwise.
+A key the provider rejected re-renders this page without saving anything,
+and the person's language choice should still be there when they correct
+the key. The key field stays empty, since a key is never echoed.
+
 ## Muted paragraphs: `:where(...) p:not(.card-note)`
 
 The disclosures still hold paragraphs written as bare `<p>` that need the old

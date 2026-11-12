@@ -253,6 +253,29 @@ reasoning within an allowance. A Faraday timeout becomes `TimeoutError` and
 any other Faraday error `NetworkError`, both naming the provider.
 `FakeService` overrides `#call` itself, since it makes no HTTP request.
 
+## `#check_key`
+
+A second template, for Setup's key check
+(`docs/decisions/per-user-api-keys.md`, "A key is checked when it is
+saved"). It makes one GET to the subclass's `MODELS_URL` on a connection of
+its own (`#key_check_connection`): the subclass's `#auth_headers`, the short
+`CallProfiles::KEY_CHECK_*` timeouts, and no retry middleware, since a
+person is waiting on the page. It shares nothing with `#call` or
+`call_and_log` on purpose: there is no prompt, purpose or `Request`, it
+reads no trial allowance, and it writes no usage row.
+
+It returns a result and raises nothing. `#key_check_result` reads a 2xx as
+`:accepted`, the subclass's `#key_rejected?` as `:rejected` (a 401 here;
+`GeminiService` adds its 400 naming `API_KEY_INVALID`), a 403 as
+`:refused`, and everything else as `:unanswered`, a Faraday error included.
+A 403 is kept apart from a rejection here, unlike in
+`#raise_if_key_rejected`, because Setup stores the key after one.
+
+`#log_key_check` writes the provider, the result and the status or error
+class. It never writes the response body or the error's message: a bad-key
+body can quote the key, as OpenAI's does. `FakeService` overrides
+`#check_key` to answer `:accepted` with no connection.
+
 ## `#parse_provider_envelope`
 
 Callers rescue `ProviderError`, so a body that is not a JSON object (an HTML

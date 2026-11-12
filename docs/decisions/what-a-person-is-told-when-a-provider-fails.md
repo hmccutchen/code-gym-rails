@@ -15,6 +15,15 @@ the reset and the next step; it can carry no provider text, status code,
 socket detail or key, and `provider_failure_text_spec` holds every kind on
 every surface to that.
 
+Setup's key check is one of those surfaces, `key_save`, though it rescues
+nothing: `AiService#check_key` returns `:rejected` and
+`ApiKeysController` words it as a `bad_key` on that surface, always in the
+`own_key` variant, since the key in question is the one the person pasted.
+The sentence is the same one a failed generation shows, ending "so it
+wasn't saved." Its next step still reads "Check the key in Setup." on the
+Setup page itself; the sentence was reused whole so a bad key has one
+wording.
+
 **Page scripts show only the app's own words.** A fetch that fails can
 reject with the browser's text ("Failed to fetch"), land on an HTML error
 page whose parse error names a token, or come back as the JSON Rails writes

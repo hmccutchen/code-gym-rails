@@ -76,3 +76,8 @@ The Account page reads these costs back. `ApiUsage.own_key_totals` sums
 null cost as unpriced, so a Gemini or OpenAI row shows as unpriced instead of
 as zero. The weekday projection is not computed there: `MonthlySpend` decides
 the month's total and the projection (`docs/code-notes/app/models/monthly_spend.md`).
+
+**Setup's key check writes no row.** `AiService#check_key` is the one
+provider request outside `call_and_log`: a free list-models GET with no
+purpose, model or tokens. `docs/decisions/per-user-api-keys.md` says which
+counts a row for it would distort.

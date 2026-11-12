@@ -17,6 +17,16 @@ do vary by provider, such as a provider's own quota day.
 The longest `#review` chain must stay under
 `DailyResponse::REVIEW_CLAIM_STALE_AFTER`, and `ai_service_spec` asserts it.
 
+## `KEY_CHECK_OPEN_TIMEOUT` and `KEY_CHECK_READ_TIMEOUT`
+
+Setup's key check runs inside the `PATCH /setup` request, so a person is
+looking at a page that has not answered yet. Three seconds to connect and
+five for the reply bound that wait at eight, with no retry. A list-models
+call returns a short list and generates nothing, so a provider that needs
+longer is having trouble, and the key is then saved unchecked with a
+warning. These are kept apart from `OPEN_TIMEOUT` and `READ_TIMEOUT`, which
+are sized for a worker waiting on generated text.
+
 ## `GENERATION_READ_TIMEOUT` and `SHORT_GENERATION_READ_TIMEOUT`
 
 A day's draft runs on the worker and can wait for `GENERATION_READ_TIMEOUT`.
