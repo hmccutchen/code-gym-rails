@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -454,6 +454,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_140000) do
     t.datetime "generating_since"
     t.string "generation_pause_source"
     t.integer "generation_account_failures", default: 0, null: false
+    t.jsonb "key_saved_at", default: {}, null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
