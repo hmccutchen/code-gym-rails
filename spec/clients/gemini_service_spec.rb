@@ -574,7 +574,7 @@ RSpec.describe GeminiService do
       "total_cached_tokens" => [ {}, { tokens_in: 9, cache_read_tokens: 0 } ],
       "total_output_tokens" => [ {}, { tokens_out: 1 } ],
       "total_thought_tokens" => [ {}, { tokens_out: 2 } ] }.each do |field, (others, expected)|
-      [ { "n" => 5 }, [ 5 ], "5" ].each do |count|
+      [ { "n" => 5 }, [ 5 ], "5", 2**40, -3 ].each do |count|
         it "counts #{field} as zero and records one usage row when it is #{count.inspect}" do
           usage = counts.merge(others).merge(field => count)
 
@@ -583,6 +583,13 @@ RSpec.describe GeminiService do
           expect(ApiUsage.last).to have_attributes(expected)
         end
       end
+    end
+
+    it "still returns the reply when counts that each fit add up to more than a usage row holds" do
+      largest = ApiUsage.max_token_count
+      usage = counts.merge("total_output_tokens" => largest, "total_thought_tokens" => largest)
+
+      expect(logged_reply(usage: usage)).to include(text: "hello")
     end
 
     [ "hello", { "type" => "model_output" }, 7 ].each do |steps|

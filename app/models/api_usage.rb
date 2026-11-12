@@ -12,6 +12,10 @@ class ApiUsage < ApplicationRecord
 
   scope :failed, -> { where.not(failure: nil) }
 
+  def self.max_token_count
+    2**(8 * columns_hash.fetch("tokens_in").limit - 1) - 1
+  end
+
   ProviderTotal = Data.define(:provider, :requests, :cost_usd, :unpriced_requests) do
     def priced? = !cost_usd.nil?
   end

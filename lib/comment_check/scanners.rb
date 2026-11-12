@@ -7,7 +7,7 @@ module CommentCheck
     PYTHON_ENCODING = /\A[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+/
     ERB_LOCALS = /\A<%#\s*locals:/
     SHELL_HEREDOC = /(?<!<)<<(?!<)(?<dash>-?)[ \t]*(?<quote>['"]?)(?<word>\w+)\k<quote>/
-    DOCKERFILE_DIRECTIVE = /\A#[ \t]*[a-z][a-z-]*[ \t]*=/i
+    DOCKERFILE_DIRECTIVE = /\A#[ \t]*(?:syntax|escape|check)[ \t]*=/i
     SHELL_SHEBANG = %r{\A#!\s*\S*?/(?:env\s+)?(?:ba)?sh\b}
 
     module_function

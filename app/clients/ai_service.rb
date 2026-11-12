@@ -544,7 +544,7 @@ class AiService
       purpose:    purpose,
       date:       Date.current
     )
-  rescue ActiveRecord::ActiveRecordError => e
+  rescue ActiveRecord::ActiveRecordError, ActiveModel::RangeError => e
     Rails.logger.warn(
       "[usage] ApiUsage log failed for purpose=#{purpose} user_id=#{user&.id} " \
       "tokens_in=#{result[:input_tokens].to_i} tokens_out=#{result[:output_tokens].to_i}: " \
@@ -626,7 +626,7 @@ class AiService
 
   def count_field(parent, key)
     value = parent[key]
-    value.is_a?(Integer) ? value : 0
+    value.is_a?(Integer) && value.between?(0, ApiUsage.max_token_count) ? value : 0
   end
 
   def self.daily_quota_reset_at(failed_at)

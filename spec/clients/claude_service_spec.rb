@@ -671,7 +671,7 @@ RSpec.describe ClaudeService do
 
     { "input_tokens" => :tokens_in, "output_tokens" => :tokens_out,
       "cache_read_input_tokens" => :cache_read_tokens, "cache_creation_input_tokens" => :cache_write_tokens }.each do |field, column|
-      [ { "n" => 5 }, [ 5 ], "5" ].each do |count|
+      [ { "n" => 5 }, [ 5 ], "5", 2**40, -3 ].each do |count|
         it "counts #{field} as zero and records one usage row when it is #{count.inspect}" do
           usage = { "input_tokens" => 3, "output_tokens" => 2, field => count }
 

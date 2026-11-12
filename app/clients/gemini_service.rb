@@ -43,9 +43,13 @@ class GeminiService < AiService
     status = parsed["status"]
     return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
 
-    model_output = object_list(parsed, "steps").find { |s| s["type"] == "model_output" }
-    text_parts   = object_list(model_output || {}, "content").select { |c| c["type"] == "text" }.map { |c| c["text"] }
+    text_parts = model_output_parts(parsed).select { |c| c["type"] == "text" }.map { |c| c["text"] }
     usage.merge(text: text_parts.join, truncated: parsed["status"] == "incomplete")
+  end
+
+  def model_output_parts(parsed)
+    model_output = object_list(parsed, "steps").find { |step| step["type"] == "model_output" }
+    model_output ? object_list(model_output, "content") : []
   end
 
   def read_usage(usage, purpose)

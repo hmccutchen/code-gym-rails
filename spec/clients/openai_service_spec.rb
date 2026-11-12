@@ -453,7 +453,7 @@ RSpec.describe OpenaiService do
       "cache_write_tokens" => [ { "input_tokens_details" => { "cached_tokens" => 3, "cache_write_tokens" => :bad } },
                                 { tokens_in: 7, cache_write_tokens: 0 } ]
     }.each do |field, (fields, expected)|
-      [ { "n" => 5 }, [ 5 ], "5" ].each do |count|
+      [ { "n" => 5 }, [ 5 ], "5", 2**40, -3 ].each do |count|
         it "counts #{field} as zero and records one usage row when it is #{count.inspect}" do
           usage = { "input_tokens" => 10, "output_tokens" => 2 }.merge(fields).to_json.gsub('"bad"', count.to_json)
 

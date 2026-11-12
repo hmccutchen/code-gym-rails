@@ -153,6 +153,12 @@ RSpec.describe CommentCheck do
     expect(comment_bodies(:dockerfile_comments, text)).to eq([ "Real", "indented" ])
   end
 
+  it "counts a key=value comment at the top of a Dockerfile unless the key is a parser directive" do
+    text = "# note=hello\nFROM x\n"
+
+    expect(comment_bodies(:dockerfile_comments, text)).to eq([ "note=hello" ])
+  end
+
   it "treats a RUN heredoc body in a Dockerfile as content" do
     text = "RUN <<EOF\n# in the script\nEOF\n# After\n"
 

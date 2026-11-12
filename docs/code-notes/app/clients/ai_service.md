@@ -296,13 +296,22 @@ as for any reply, and the caller's `#text_or_raise` or `#parse_json_object`
 raises `ProviderError::InvalidResponseError`, as it already did for a reply
 with no text.
 
-`#count_field` returns a token count only when it is a JSON integer, and 0
-otherwise, the same as a missing count. Every token count each `read_result`
-reads goes through it, so the result hash always carries integers and the
-`.to_i` calls in `#log_usage`, `.cost_usd` and `#raise_for_reply!` never see a
-hash or array. A numeric string or a float also reads as 0: the providers
-document integer counts, so either shape is as malformed as a hash, and
-guessing at it would put a made-up number in a usage row.
+`#count_field` returns a token count only when it is a JSON integer from 0 to
+`ApiUsage.max_token_count`, and 0 otherwise, the same as a missing count.
+Every token count each `read_result` reads goes through it, so the result hash
+always carries integers and the `.to_i` calls in `#log_usage`, `.cost_usd` and
+`#raise_for_reply!` never see a hash or array. A numeric string or a float
+also reads as 0: the providers document integer counts, so either shape is as
+malformed as a hash, and guessing at it would put a made-up number in a usage
+row. The upper bound is the largest number the usage columns hold, read from
+the schema by `ApiUsage.max_token_count`. A larger count raised
+`ActiveModel::RangeError` while the row was saved, and a negative one stored a
+negative count and inflated the input count it was subtracted from.
+
+Two counts that each fit can still add up to more than a column holds, such as
+Gemini's output and thought tokens. `#log_usage` therefore rescues
+`ActiveModel::RangeError` as well as `ActiveRecord::ActiveRecordError`: the
+row is lost and a warning logged, but the reply still reaches the caller.
 
 ## `#log_raw_snippet`
 
