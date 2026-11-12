@@ -192,8 +192,8 @@ en:
     api_keys:
       unrecognized_key: "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
       key_saved: "API key saved. You're all set!"
-      key_saved_check_refused: "Saved, but %{provider} refused the check. The key may be fine: a 403 can mean a region or account restriction. If your first set fails, check your %{provider} account."
-      key_saved_unchecked: "Saved, but %{provider} didn't answer, so the key hasn't been checked."
+      key_saved_check_refused: "Saved, but %{provider} wouldn't let the key be checked. If your first set fails, check the key in your %{provider} account."
+      key_saved_unchecked: "Saved, but the key couldn't be checked with %{provider}. If your first set fails, check the key."
       key_saves_limited: "You've saved a key several times in the last hour. Try again later."
       no_changes: "No changes made."
       preferences_saved: "Preferences saved!"

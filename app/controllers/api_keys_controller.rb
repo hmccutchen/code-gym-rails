@@ -29,12 +29,10 @@ class ApiKeysController < ApplicationController
     provider = AiProvider.detect(pasted_key)
     return render_key_alert(t("flash.api_keys.unrecognized_key")) unless provider
 
-    result = AiProvider.find(provider).new(pasted_key).check_key
+    result = AiService.check_key(provider, pasted_key)
     return render_key_alert(key_rejected_text(provider)) if result == :rejected
 
-    current_user.store_api_key(pasted_key, provider: provider)
-    current_user.language = chosen_language
-    current_user.save!
+    store_key(provider)
     redirect_to root_path, notice: t("flash.api_keys.#{SAVED_NOTICES.fetch(result)}", provider: AiProvider.label(provider))
   end
 
@@ -44,7 +42,19 @@ class ApiKeysController < ApplicationController
 
   def key_pasted? = pasted_key.present?
 
-  def chosen_language = User::LANGUAGES.include?(params[:language]) ? params[:language] : current_user.language
+  def posted_language = (params[:language] if User::LANGUAGES.include?(params[:language]))
+
+  def chosen_language = posted_language || current_user.language
+
+  # The check can take seconds, so the lock reloads the row and the merge reads a key saved from another tab meanwhile.
+  def store_key(provider)
+    language = chosen_language
+    current_user.with_lock do
+      current_user.store_api_key(pasted_key, provider: provider)
+      current_user.language = language
+      current_user.save!
+    end
+  end
 
   def render_key_alert(message, status: :unprocessable_content)
     flash.now[:alert] = message
@@ -55,7 +65,7 @@ class ApiKeysController < ApplicationController
 
   def key_rejected_text(provider)
     ProviderFailureText.new("bad_key", provider: provider, surface: :key_save, failed_at: Time.current,
-                            zone: current_user.effective_time_zone).full
+                            zone: current_user.effective_time_zone).title
   end
 
   def suggested_level
@@ -80,7 +90,7 @@ class ApiKeysController < ApplicationController
   def preferences_update
     return render_key_alert(t("flash.application.api_key_needed")) unless current_user.api_key_present?
 
-    language = params[:language] if User::LANGUAGES.include?(params[:language])
+    language = posted_language
     provider = params[:provider] if current_user.stored_providers.include?(params[:provider])
     return redirect_to root_path, notice: t("flash.api_keys.no_changes") unless language || provider
 

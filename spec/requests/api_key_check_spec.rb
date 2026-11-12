@@ -48,7 +48,7 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
 
         expect(response).to have_http_status(:unprocessable_content)
         page = Nokogiri::HTML(response.body)
-        expect(page.at_css("#flash-alert").text).to eq("#{label} didn't accept your API key, so it wasn't saved. Check the key in Setup.")
+        expect(page.at_css("#flash-alert").text).to eq("#{label} didn't accept your API key, so it wasn't saved.")
         expect(page.at_css("select[name=language] option[selected]")["value"]).to eq("javascript")
         expect(page.at_css("input[name=api_key]")["value"]).to be_nil
         expect(user.reload.api_keys).to be_nil
@@ -64,8 +64,7 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
 
         expect(response).to redirect_to(root_path)
         expect(flash[:notice]).to eq(
-          "Saved, but #{label} refused the check. The key may be fine: a 403 can mean a region or account restriction. " \
-          "If your first set fails, check your #{label} account."
+          "Saved, but #{label} wouldn't let the key be checked. If your first set fails, check the key in your #{label} account."
         )
         expect(user.reload.api_key).to eq(facts[:key])
       end
@@ -77,7 +76,7 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
           patch setup_path, params: { api_key: facts[:key] }
 
           expect(response).to redirect_to(root_path)
-          expect(flash[:notice]).to eq("Saved, but #{label} didn't answer, so the key hasn't been checked.")
+          expect(flash[:notice]).to eq("Saved, but the key couldn't be checked with #{label}. If your first set fails, check the key.")
           expect(user.reload.api_key).to eq(facts[:key])
           expect(requests.size).to eq(1)
         end
@@ -88,7 +87,7 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
 
         patch setup_path, params: { api_key: facts[:key] }
 
-        expect(flash[:notice]).to eq("Saved, but #{label} didn't answer, so the key hasn't been checked.")
+        expect(flash[:notice]).to eq("Saved, but the key couldn't be checked with #{label}. If your first set fails, check the key.")
         expect(user.reload.api_key).to eq(facts[:key])
         expect(requests.size).to eq(1)
       end
@@ -153,6 +152,40 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
     end
   end
 
+  describe "a key saved from another tab while the check is running" do
+    before { user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-old" }) }
+
+    it "survives, since the store merges into the map as it is under the row lock" do
+      allow_any_instance_of(GeminiService).to receive(:check_key) do
+        User.find(user.id).tap { |other_tab| other_tab.store_api_key("sk-proj-FromAnotherTab", provider: "openai") }.save!
+        :accepted
+      end
+
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345", language: "javascript" }
+
+      user.reload
+      expect(user.api_keys).to eq("anthropic" => "sk-ant-old", "openai" => "sk-proj-FromAnotherTab", "gemini" => "AIzaSyPastedSecret12345")
+      expect(user.provider).to eq("gemini")
+      expect(user.language).to eq("javascript")
+    end
+  end
+
+  it "says nothing about a status code or a guessed cause in either warning" do
+    %w[key_saved_check_refused key_saved_unchecked].each do |key|
+      text = I18n.t("flash.api_keys.#{key}", provider: "Claude")
+
+      expect(text).not_to match(/\d{3}|region|restriction|timed? ?out|didn't answer/)
+    end
+  end
+
+  it "keeps \"Check the key in Setup.\" on every other surface's bad-key sentence" do
+    (ProviderFailureText::SURFACES - [ :key_save ]).each do |surface|
+      text = ProviderFailureText.new("bad_key", provider: "anthropic", surface: surface, failed_at: Time.current, zone: "UTC")
+
+      expect(text.full).to end_with("Check the key in Setup.")
+    end
+  end
+
   describe "saves that call no provider" do
     let!(:requests) { PASTED.values.flat_map { |facts| [ stub_key_check(facts[:service]) ] } }
 
@@ -161,6 +194,21 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
 
       expect(response.body).to include("We don&#39;t recognize this key format")
       expect(requests).to all(be_empty)
+    end
+
+    { "an embedded newline" => "sk-ant-api03-Pasted\nX-Evil: 1", "a carriage return" => "sk-ant-api03-Pasted\rSecret",
+      "a tab inside" => "sk-ant-api03-Pasted\tSecret", "a space inside" => "sk-ant-api03-Pasted Secret",
+      "far too many characters" => "sk-ant-api03-Pasted#{'A' * 5_000}" }.each do |name, key|
+      it "treats a key with #{name} as an unrecognized format: no request, nothing stored, nothing of it logged" do
+        output = logged { patch setup_path, params: { api_key: key } }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.body).to include("We don&#39;t recognize this key format")
+        expect(requests).to all(be_empty)
+        expect(user.reload.api_keys).to be_nil
+        expect(output).not_to include("sk-ant-api03-Pasted")
+        expect(output).not_to include("[key_check]")
+      end
     end
 
     it "makes no request for a preferences-only save" do
