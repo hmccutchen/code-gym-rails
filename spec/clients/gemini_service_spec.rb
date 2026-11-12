@@ -555,4 +555,63 @@ RSpec.describe GeminiService do
   describe "an error body with a field that is not an object" do
     include_examples "a provider reading an error field that is not an object"
   end
+
+  describe "a reply with a count or list field of the wrong shape" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+    let(:text_step) { { "type" => "model_output", "content" => [ { "type" => "text", "text" => "hello" } ] } }
+    let(:counts) { { "total_input_tokens" => 9, "total_cached_tokens" => 4, "total_output_tokens" => 2, "total_thought_tokens" => 1 } }
+
+    def logged_reply(steps: [ text_step ], usage: counts)
+      body = { "status" => "completed", "steps" => steps, "usage" => usage }
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, body.to_json ] ]))
+      request = AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true)
+      service.send(:call_and_log, user, request)
+    end
+
+    { "total_input_tokens" => [ { "total_cached_tokens" => 0 }, { tokens_in: 0 } ],
+      "total_cached_tokens" => [ {}, { tokens_in: 9, cache_read_tokens: 0 } ],
+      "total_output_tokens" => [ {}, { tokens_out: 1 } ],
+      "total_thought_tokens" => [ {}, { tokens_out: 2 } ] }.each do |field, (others, expected)|
+      [ { "n" => 5 }, [ 5 ], "5", 2**40, -3 ].each do |count|
+        it "counts #{field} as zero and records one usage row when it is #{count.inspect}" do
+          usage = counts.merge(others).merge(field => count)
+
+          expect { expect(logged_reply(usage: usage)).to include(text: "hello") }
+            .to change(ApiUsage, :count).by(1)
+          expect(ApiUsage.last).to have_attributes(expected)
+        end
+      end
+    end
+
+    it "still returns the reply when counts that each fit add up to more than a usage row holds" do
+      largest = ApiUsage.max_token_count
+      usage = counts.merge("total_output_tokens" => largest, "total_thought_tokens" => largest)
+
+      expect(logged_reply(usage: usage)).to include(text: "hello")
+    end
+
+    [ "hello", { "type" => "model_output" }, 7 ].each do |steps|
+      it "finds no text, records one usage row and leaves the caller an InvalidResponseError when steps is #{steps.inspect}" do
+        result = nil
+        expect { result = logged_reply(steps: steps) }.to change(ApiUsage, :count).by(1)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }
+          .to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
+    it "skips steps that are not objects and records one usage row" do
+      expect { expect(logged_reply(steps: [ 1, "model_output", nil, text_step ])).to include(text: "hello") }
+        .to change(ApiUsage, :count).by(1)
+    end
+
+    it "skips content parts that are not objects and reads no text from a content that is not a list" do
+      parts = [ 1, "text", { "type" => "text", "text" => "hello" } ]
+
+      expect(logged_reply(steps: [ text_step.merge("content" => parts) ])).to include(text: "hello")
+      expect(logged_reply(steps: [ text_step.merge("content" => { "type" => "text", "text" => "hello" }) ])).to include(text: "")
+      expect(ApiUsage.count).to eq(2)
+    end
+  end
 end
