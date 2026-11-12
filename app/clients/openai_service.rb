@@ -87,7 +87,7 @@ class OpenaiService < AiService
     usage = read_usage(object_field(parsed, "usage"), route_for(request.purpose))
     return unfinished_reply(usage, parsed["status"]) unless FINISHED_STATUSES.include?(parsed["status"])
 
-    content = Array(parsed["output"]).select { |item| item["type"] == "message" }.flat_map { |item| Array(item["content"]) }
+    content = object_list(parsed, "output").select { |item| item["type"] == "message" }.flat_map { |item| object_list(item, "content") }
     usage.merge(
       text:      content.select { |part| part["type"] == "output_text" }.map { |part| part["text"] }.join,
       truncated: parsed["status"] == "incomplete" && !filtered?(parsed),
@@ -97,12 +97,12 @@ class OpenaiService < AiService
 
   def read_usage(usage, route)
     details = object_field(usage, "input_tokens_details")
-    cached_tokens = details["cached_tokens"].to_i
-    cache_write_tokens = details["cache_write_tokens"].to_i
+    cached_tokens = count_field(details, "cached_tokens")
+    cache_write_tokens = count_field(details, "cache_write_tokens")
 
     {
-      input_tokens:  usage["input_tokens"].to_i - cached_tokens - cache_write_tokens,
-      output_tokens: usage["output_tokens"],
+      input_tokens:  count_field(usage, "input_tokens") - cached_tokens - cache_write_tokens,
+      output_tokens: count_field(usage, "output_tokens"),
       model:         route[:model],
       cache_read_tokens:  cached_tokens,
       cache_write_tokens: cache_write_tokens

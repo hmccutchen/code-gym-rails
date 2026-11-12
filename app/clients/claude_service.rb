@@ -55,15 +55,15 @@ class ClaudeService < AiService
   def read_result(parsed, request)
     usage = object_field(parsed, "usage")
     # A leading thinking block means the text block is not reliably content[0].
-    text_block = (parsed["content"] || []).find { |block| block["type"] == "text" }
+    text_block = object_list(parsed, "content").find { |block| block["type"] == "text" }
 
     {
       text:          text_block&.dig("text"),
-      input_tokens:  usage["input_tokens"],
-      output_tokens: usage["output_tokens"],
+      input_tokens:  count_field(usage, "input_tokens"),
+      output_tokens: count_field(usage, "output_tokens"),
       model:         routed_model(request.purpose),
-      cache_read_tokens:  usage["cache_read_input_tokens"].to_i,
-      cache_write_tokens: usage["cache_creation_input_tokens"].to_i,
+      cache_read_tokens:  count_field(usage, "cache_read_input_tokens"),
+      cache_write_tokens: count_field(usage, "cache_creation_input_tokens"),
       truncated:     parsed["stop_reason"] == "max_tokens",
       refusal:       refusal_category(parsed)
     }

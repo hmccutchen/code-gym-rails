@@ -283,6 +283,27 @@ string a provider sent in place of an object raises `TypeError` or
 one reads as absent: no cache counts, no content-filter reason, no refusal
 category.
 
+## `#object_list` and `#count_field`
+
+The same rule for the two other shapes a reply field takes (#761).
+`#object_list` returns the Hash elements of a field that is a JSON array, and
+an empty list for anything else. Claude's `content`, Gemini's `steps` and each
+step's `content`, and OpenAI's `output` and each message's `content` go
+through it, so a string, number or object in place of the list, or a bare
+string or number among its elements, no longer raises in `read_result`. A reply
+left with no text block returns empty text: `call_and_log` writes its usage row
+as for any reply, and the caller's `#text_or_raise` or `#parse_json_object`
+raises `ProviderError::InvalidResponseError`, as it already did for a reply
+with no text.
+
+`#count_field` returns a token count only when it is a JSON integer, and 0
+otherwise, the same as a missing count. Every token count each `read_result`
+reads goes through it, so the result hash always carries integers and the
+`.to_i` calls in `#log_usage`, `.cost_usd` and `#raise_for_reply!` never see a
+hash or array. A numeric string or a float also reads as 0: the providers
+document integer counts, so either shape is as malformed as a hash, and
+guessing at it would put a made-up number in a usage row.
+
 ## `#log_raw_snippet`
 
 Raw output is logged instead of put in an exception message, which would reach

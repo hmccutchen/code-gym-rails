@@ -655,4 +655,44 @@ RSpec.describe ClaudeService do
       end
     end
   end
+
+  describe "a reply with a count or list field of the wrong shape" do
+    include AuthHelpers
+
+    let(:user) { create_user_with_key }
+    let(:text_content) { [ { "type" => "text", "text" => "hello" } ] }
+
+    def logged_reply(content: text_content, usage: { "input_tokens" => 3, "output_tokens" => 2 })
+      body = { "content" => content, "stop_reason" => "end_turn", "usage" => usage }
+      service.instance_variable_set(:@conn, stubbed_connection([ [ 200, body.to_json ] ]))
+      request = AiService::Request.build(purpose: "duck_thread", system: "sys", prompt: "p", single_attempt: true)
+      service.send(:call_and_log, user, request)
+    end
+
+    { "input_tokens" => :tokens_in, "output_tokens" => :tokens_out,
+      "cache_read_input_tokens" => :cache_read_tokens, "cache_creation_input_tokens" => :cache_write_tokens }.each do |field, column|
+      [ { "n" => 5 }, [ 5 ], "5" ].each do |count|
+        it "counts #{field} as zero and records one usage row when it is #{count.inspect}" do
+          usage = { "input_tokens" => 3, "output_tokens" => 2, field => count }
+
+          expect { expect(logged_reply(usage: usage)).to include(text: "hello") }.to change(ApiUsage, :count).by(1)
+          expect(ApiUsage.last.public_send(column)).to eq(0)
+        end
+      end
+    end
+
+    [ "hello", { "type" => "text", "text" => "hello" }, 7 ].each do |content|
+      it "finds no text, records one usage row and leaves the caller an InvalidResponseError when content is #{content.inspect}" do
+        result = nil
+        expect { result = logged_reply(content: content) }.to change(ApiUsage, :count).by(1)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }
+          .to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
+    it "skips content blocks that are not objects and records one usage row" do
+      expect { expect(logged_reply(content: [ 1, "text", nil ] + text_content)).to include(text: "hello") }
+        .to change(ApiUsage, :count).by(1)
+    end
+  end
 end

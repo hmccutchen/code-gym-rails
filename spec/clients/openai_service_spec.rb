@@ -445,6 +445,47 @@ RSpec.describe OpenaiService do
         .to change(ApiUsage, :count).by(1)
     end
 
+    {
+      "input_tokens"       => [ { "input_tokens" => :bad }, { tokens_in: 0 } ],
+      "output_tokens"      => [ { "output_tokens" => :bad }, { tokens_out: 0 } ],
+      "cached_tokens"      => [ { "input_tokens_details" => { "cached_tokens" => :bad, "cache_write_tokens" => 2 } },
+                                { tokens_in: 8, cache_read_tokens: 0 } ],
+      "cache_write_tokens" => [ { "input_tokens_details" => { "cached_tokens" => 3, "cache_write_tokens" => :bad } },
+                                { tokens_in: 7, cache_write_tokens: 0 } ]
+    }.each do |field, (fields, expected)|
+      [ { "n" => 5 }, [ 5 ], "5" ].each do |count|
+        it "counts #{field} as zero and records one usage row when it is #{count.inspect}" do
+          usage = { "input_tokens" => 10, "output_tokens" => 2 }.merge(fields).to_json.gsub('"bad"', count.to_json)
+
+          expect { expect(logged_call(reply(output: text_output, usage: JSON.parse(usage)))).to include(text: "hello") }
+            .to change(ApiUsage, :count).by(1)
+          expect(ApiUsage.last).to have_attributes(expected)
+        end
+      end
+    end
+
+    [ "hello", { "type" => "message" }, 7 ].each do |output|
+      it "finds no text, records one usage row and leaves the caller an InvalidResponseError when output is #{output.inspect}" do
+        result = nil
+        expect { result = logged_call(reply(output: output)) }.to change(ApiUsage, :count).by(1)
+        expect { service.send(:text_or_raise, result, subject: "duck response") }
+          .to raise_error(ProviderError::InvalidResponseError)
+      end
+    end
+
+    it "skips output items and content parts that are not objects and records one usage row" do
+      output = [ 1, "message", nil, message(1, "output_text", { "type" => "output_text", "text" => "hello" }) ]
+
+      expect { expect(logged_call(reply(output: output))).to include(text: "hello", refusal: nil) }
+        .to change(ApiUsage, :count).by(1)
+    end
+
+    it "reads no text and records one usage row when a message's content is not a list" do
+      output = [ { "type" => "message", "content" => { "type" => "output_text", "text" => "hello" } } ]
+
+      expect { expect(logged_call(reply(output: output))).to include(text: "") }.to change(ApiUsage, :count).by(1)
+    end
+
     it "raises a truncation error and records one usage row when an incomplete reply's incomplete_details is a string" do
       allow(Rails.logger).to receive(:warn)
       response = reply(status: "incomplete", output: text_output, incomplete_details: "content_filter")

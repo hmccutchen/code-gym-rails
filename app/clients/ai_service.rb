@@ -619,6 +619,16 @@ class AiService
     value.is_a?(Hash) ? value : {}
   end
 
+  def object_list(parent, key)
+    value = parent[key]
+    value.is_a?(Array) ? value.grep(Hash) : []
+  end
+
+  def count_field(parent, key)
+    value = parent[key]
+    value.is_a?(Integer) ? value : 0
+  end
+
   def self.daily_quota_reset_at(failed_at)
     failed_at + 1.day
   end
