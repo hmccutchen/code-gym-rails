@@ -73,11 +73,11 @@ class LearnController < ApplicationController
     references = references_by_key
 
     ungenerated_concepts(references).each do |concept, bucket|
-      GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id)
+      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id)
     end
 
     missing_recognition_guides.each do |group_key|
-      GenerateRecognitionGuideJob.perform_later(group_key: group_key, user_id: current_user.id)
+      bulk(GenerateRecognitionGuideJob).perform_later(group_key: group_key, user_id: current_user.id)
     end
 
     redirect_to learn_path, notice: t("learn.preparing")
@@ -88,13 +88,15 @@ class LearnController < ApplicationController
     gaps = current_user.prepares_ladders? ? LadderCoverage.for(current_user).gaps : []
 
     gaps.each do |concept, bucket|
-      GenerateConceptReferenceJob.perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
+      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
     end
 
     redirect_to setup_path(anchor: "exercise-mix"), notice: t("exercise_mix.ladders_preparing", count: gaps.size)
   end
 
   private
+
+  def bulk(job) = job.set(priority: JobPriority::BULK)
 
   def write_up_failure(concept, bucket)
     failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)

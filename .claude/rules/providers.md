@@ -31,6 +31,31 @@ read it before changing that area.
   `AiService.for(user)` is the only dispatch. Use `User#store_api_key`,
   `User#api_key` and `User#stored_providers`; no keys stores NULL.
   `ResponseReview` sets `daily_responses.review_provider` on every review.
+  A pasted key is checked through `AiService.check_key(provider_key, key)`,
+  the one other way to a provider class, which applies the same
+  availability gate; `AiService.skip_key_check` passes that gate and calls no
+  provider. `AiProvider.detect` first refuses a key that is not one
+  run of printable ASCII within `AiProvider::MAX_KEY_LENGTH`
+  (`KEY_SHAPE`), the one home of that rule. The check is one GET to the
+  provider's list-models endpoint (`MODELS_URL`, with the subclass's
+  `#auth_headers`), bounded as a whole by
+  `CallProfiles::KEY_CHECK_TOTAL_SECONDS`, with no retry, outside
+  `call_and_log`. The instance `#check_key` returns one of
+  `AiService::KEY_CHECK_RESULTS` and raises nothing; the class method
+  raises `SetupError` for an unknown or unavailable provider, as
+  `AiService.for` does. Only `:rejected` (a 401, or Gemini's 400
+  `API_KEY_INVALID`) blocks the save; a 403 and an unanswered check save
+  with a warning that names no status code. It logs the result and an error
+  class, never a key, a provider body or an error message: a transport
+  failure at info, any other error class at error level. A key that was
+  not saved leaves the key-hold count alone, and a saved one is merged under
+  the user row lock, where an account deleted during the check gets no
+  key and the browser is sent to sign in. The form that follows a rejection, and only that one,
+  offers "Save without checking": the same `PATCH /setup` with
+  `skip_check=1` goes through `AiService.skip_key_check`, which calls no
+  provider and logs `result=skipped`. Every other step still runs (save
+  limit, trimming, shape, prefix, row lock), and a rejected key is never
+  echoed into the page, the session or a log.
 - **Provider abstraction**: `AiService` is a template-method base class owning provider orchestration, JSON parsing, usage logging, and calls each prompt class (`app/prompts/*_prompt.rb`; `.claude/rules/patterns.md` says what one holds) for its text; the concept vocabularies those prompts draw from live in `ConceptVocabulary`. `AiService#call(request)` is the template for the HTTP round trip; subclasses implement `request_body`, `read_result`, `raise_for_status` and `provider_name` behind it, plus `build_connection`, define the `API_URL` it posts to, and own which model each purpose routes to (see "Per-purpose model routing" below). Each call carries one `AiService::Request` built by `AiService.request_for` from the purpose's row in `CallProfiles::BY_PURPOSE` (see `.claude/rules/patterns.md`), the provider-neutral module that also holds the timeouts, retry counts and worst-case call times. Adding a provider means adding a subclass and an `AiProvider.all` entry, not editing the base. The registry follows `ExerciseSection.all`'s explicit class-list pattern, so Zeitwerk loads each class when asked rather than relying on subclasses having already registered themselves. `User` validates against its keys and Setup uses the subclasses' key patterns. It is also where a model asks for a provider's own quota day (`.daily_quota_reset_at`), so no other model names a provider class; call timing is no provider's fact and is read from `CallProfiles`. `FakeService` has no key pattern and is available only in local environments; a manually stored fake provider is still refused in production.
 - **Per-purpose model routing**
   (`docs/decisions/per-purpose-model-routing.md`): Each provider routes a call
@@ -71,9 +96,12 @@ read it before changing that area.
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
   declares `ProviderCallLimits`, one shared hourly and daily count that runs
-  before every other check. `/generate`, Learn prepare actions and the
-  per-user generation claim and queue permit apply to all accounts. All use
-  `LazyCacheStore`.
+  before every other check. `/generate`, Learn prepare actions, the
+  per-user generation claim and queue permit, and Setup's key saves
+  (`ApiKeysController::KEY_SAVES_PER_HOUR` per account,
+  `KEY_SAVES_PER_HOUR_BY_IP` per address, since a checked save asks a
+  provider about a key; a save without checking counts too) apply to all
+  accounts. All use `LazyCacheStore`.
 - **The key hold** (`docs/decisions/pausing-generation.md`, "Holding the
   schedule for a key that keeps failing"): `User#record_generation_failure!`
   counts a failure classified as a kind in `KeyHold::KINDS` (bad key, out of
@@ -91,7 +119,8 @@ read it before changing that area.
 - **What a usage row records** (`docs/decisions/what-a-usage-row-records.md`):
   Every provider call writes exactly one `ApiUsage` row through
   `AiService#log_usage`, including a call that fails before a reply (zero
-  tokens, from the rescue in `call_and_log(user, request)`). `model` is the
+  tokens, from the rescue in `call_and_log(user, request)`). Setup's key
+  check is the one exception and writes none. `model` is the
   routed model; `tokens_in` is uncached input, with cache reads and writes in their own
   columns, so each provider subclass subtracts what its API counts inside
   input. `failure` comes from `AiService.failure_code_for`. `cost_usd` is

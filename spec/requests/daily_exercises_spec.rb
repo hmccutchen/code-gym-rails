@@ -213,7 +213,7 @@ RSpec.describe "DailyExercises", type: :request do
       let(:user) { create_fake_provider_user }
 
       def queue_scheduled_job
-        GenerateDailyExercisesJob.set(priority: EnqueueDueGenerationsJob::SCHEDULED_PRIORITY).perform_later(user_id: user.id, scheduled: true)
+        GenerateDailyExercisesJob.set(priority: JobPriority::SCHEDULED).perform_later(user_id: user.id, scheduled: true)
       end
 
       it "enqueues a job of its own at the default priority, which generates the set the dashboard is polling for" do

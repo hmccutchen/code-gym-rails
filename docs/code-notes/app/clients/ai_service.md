@@ -253,6 +253,52 @@ reasoning within an allowance. A Faraday timeout becomes `TimeoutError` and
 any other Faraday error `NetworkError`, both naming the provider.
 `FakeService` overrides `#call` itself, since it makes no HTTP request.
 
+## `.check_key` and `#check_key`
+
+A second template, for Setup's key check
+(`docs/decisions/per-user-api-keys.md`, "A key is checked when it is
+saved"). `.check_key(provider_key, key)` is how a caller reaches it: it
+finds the provider in the registry and refuses one that is not available,
+the gate `.for` applies, so Setup has one way in and names no subclass. A
+pasted key belongs to no user yet, which is why it does not go through
+`.for`. The instance method makes one GET to the subclass's `MODELS_URL` on a connection of
+its own (`#key_check_connection`): the subclass's `#auth_headers`, the short
+`CallProfiles::KEY_CHECK_*` timeouts, and no retry middleware, since a
+person is waiting on the page. It shares nothing with `#call` or
+`call_and_log` on purpose: there is no prompt, purpose or `Request`, it
+reads no trial allowance, and it writes no usage row.
+
+The GET runs inside `Timeout.timeout(CallProfiles::KEY_CHECK_TOTAL_SECONDS)`.
+Faraday's timeouts bound the connect and each read, never the whole reply,
+and the check holds a web thread. `Timeout` is safe here because the
+connection is made for this request and dropped after it.
+
+It returns a result and raises nothing: any `StandardError`, the timeout
+included, is `:unanswered`. A `Faraday::Error` or `Timeout::Error` is the
+provider not answering and is logged at info; any other class is a bug in
+the check and is logged at error level, so it shows up in production logs
+while the person still gets their key saved. `#key_check_result` reads a 2xx as
+`:accepted`, the subclass's `#key_rejected?` as `:rejected` (a 401 here;
+`GeminiService` adds its 400 naming `API_KEY_INVALID`), a 403 as
+`:refused`, and everything else as `:unanswered`.
+A 403 is kept apart from a rejection here, unlike in
+`#raise_if_key_rejected`, because Setup stores the key after one.
+
+`#log_key_check` writes the provider, the result and the status or error
+class. It never writes the response body or the error's message: a bad-key
+body can quote the key, as OpenAI's does. `FakeService` overrides
+`#check_key` to answer `:accepted` with no connection.
+
+## `.skip_key_check`
+
+What Setup calls in place of `.check_key` when a person saves a rejected
+key without checking. It makes no request. It still looks the provider up
+through `.key_check_provider`, so the availability gate holds on both
+paths, and it writes the `result=skipped` line through `.key_check_tag`,
+which the instance's `#log_key_check` also uses, so the `[key_check]`
+prefix is written in one place. It returns `:skipped`, which is not in
+`KEY_CHECK_RESULTS`: that list is what a check can answer.
+
 ## `#parse_provider_envelope`
 
 Callers rescue `ProviderError`, so a body that is not a JSON object (an HTML

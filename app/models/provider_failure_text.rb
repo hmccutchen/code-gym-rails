@@ -1,7 +1,7 @@
 # Inputs are only kind, provider label, surface and times, so no provider text, status code or key can reach a person.
 class ProviderFailureText
   VARIANTS = %w[own_key trial].freeze
-  SURFACES = %i[generation regeneration review review_partial duck follow_up alternate critique reference].freeze
+  SURFACES = %i[generation regeneration review review_partial duck follow_up alternate critique reference key_save].freeze
 
   attr_reader :kind
 
@@ -31,6 +31,10 @@ class ProviderFailureText
     user.on_trial? ? "trial" : "own_key"
   end
 
+  def title
+    entry(:title, outcome: I18n.t("provider_failures.outcomes.#{@surface}"))
+  end
+
   private
 
   # A kind only a trial can hit has text only under the trial variant.
@@ -38,10 +42,6 @@ class ProviderFailureText
     return "trial" if ProviderFailure.trial_kind?(@kind)
 
     VARIANTS.include?(variant.to_s) ? variant.to_s : "own_key"
-  end
-
-  def title
-    entry(:title, outcome: I18n.t("provider_failures.outcomes.#{@surface}"))
   end
 
   def saved

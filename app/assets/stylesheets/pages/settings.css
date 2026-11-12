@@ -1,5 +1,7 @@
 :where(#exercise-mix, #display-preferences) p:not(.card-note) { color: var(--muted); margin-bottom: 2rem; }
 .form-field { margin-bottom: 1rem; }
+.unchecked-save { margin-top: 1rem; }
+.form-field .flash { margin-bottom: .75rem; }
 .form-field .card-note a { overflow-wrap: anywhere; }
 :is(.form-field, .settings-fields) label:not(:where(.switch-row)):not(:where(.mix-level)) { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
 :is(.form-field, .settings-fields) input:not([type="checkbox"], [type="radio"], [type="range"]) { width: 100%; padding: .65rem .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: var(--input-font-size); font-family: monospace; }

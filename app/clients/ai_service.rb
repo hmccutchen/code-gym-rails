@@ -1,4 +1,5 @@
 require "json"
+require "timeout"
 require "faraday"
 require "faraday/retry"
 
@@ -110,6 +111,33 @@ class AiService
 
     price = price_for(result[:model]) or return
     counts.sum { |rate, count| count * price.public_send(rate) } / 1_000_000
+  end
+
+  KEY_CHECK_RESULTS = %i[accepted rejected refused unanswered].freeze
+
+  def self.check_key(provider_key, api_key) = key_check_provider(provider_key).new(api_key).check_key
+
+  def self.skip_key_check(provider_key)
+    Rails.logger.info("#{key_check_tag(key_check_provider(provider_key))} result=skipped")
+    :skipped
+  end
+
+  def self.key_check_provider(provider_key)
+    provider = AiProvider.find(provider_key)
+    raise SetupError, "No usable AI provider named #{provider_key.inspect} to check a key with" unless provider&.available?
+
+    provider
+  end
+
+  def self.key_check_tag(provider) = "[key_check] provider=#{provider.provider_key}"
+
+  def check_key
+    response = Timeout.timeout(CallProfiles::KEY_CHECK_TOTAL_SECONDS) { key_check_connection.get(self.class::MODELS_URL) }
+    key_check_result(response).tap { |result| log_key_check("result=#{result} status=#{response.status}") }
+  rescue Faraday::Error, Timeout::Error => e
+    key_check_unanswered(e, :info)
+  rescue StandardError => e
+    key_check_unanswered(e, :error)
   end
 
   JudgedSet = Data.define(:problem_set, :dropped_sections, :outcomes, :plan_notes, :solves, :schedule_context) do
@@ -379,7 +407,7 @@ class AiService
 
   def long_running?(request) = request.read_timeout > CallProfiles::READ_TIMEOUT
 
-  # Subclasses supply API_URL and the hooks below; build_connection returns a Faraday::Connection, read_result text, token and cache counts, model, truncated and refusal.
+  # Subclasses supply API_URL, MODELS_URL and the hooks below; build_connection returns a Faraday::Connection, read_result text, token and cache counts, model, truncated and refusal.
   def request_body(_request)
     raise NotImplementedError, "#{self.class} must implement #request_body"
   end
@@ -398,6 +426,37 @@ class AiService
 
   def build_connection
     raise NotImplementedError, "#{self.class} must implement #build_connection"
+  end
+
+  def auth_headers
+    raise NotImplementedError, "#{self.class} must implement #auth_headers"
+  end
+
+  def key_check_connection
+    Faraday.new do |f|
+      f.options.open_timeout = CallProfiles::KEY_CHECK_OPEN_TIMEOUT
+      f.options.timeout      = CallProfiles::KEY_CHECK_READ_TIMEOUT
+      auth_headers.each { |name, value| f.headers[name] = value }
+      f.adapter :net_http
+    end
+  end
+
+  def key_check_result(response)
+    return :accepted if response.success?
+    return :rejected if key_rejected?(response)
+
+    response.status == 403 ? :refused : :unanswered
+  end
+
+  def key_rejected?(response) = response.status == 401
+
+  def key_check_unanswered(error, level)
+    log_key_check("result=unanswered error=#{error.class}", level)
+    :unanswered
+  end
+
+  def log_key_check(outcome, level = :info)
+    Rails.logger.public_send(level, "#{AiService.key_check_tag(self.class)} #{outcome}")
   end
 
   def provider_connection(retry_options, headers)

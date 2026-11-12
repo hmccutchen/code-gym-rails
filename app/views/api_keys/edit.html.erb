@@ -29,8 +29,12 @@
 
     <%= form_with url: setup_path, method: :patch do |f| %>
       <div class="form-field">
+        <% if @key_error %>
+          <p class="flash alert" id="api-key-error"><%= @key_error %></p>
+        <% end %>
         <%= f.label :api_key, t("api_keys.edit.api_key_label") %>
-        <%= f.password_field :api_key, placeholder: t("api_keys.edit.api_key_placeholder"), autocomplete: "off" %>
+        <%= f.password_field :api_key, placeholder: t("api_keys.edit.api_key_placeholder"), autocomplete: "off",
+              autofocus: @key_error.present?, aria: { invalid: @key_error.present? || nil, describedby: ("api-key-error" if @key_error) } %>
         <p class="card-note"><%= t("api_keys.edit.api_key_hint_html") %></p>
         <% if current_user.stored_providers.any? %>
           <p class="card-note"><%= t("api_keys.edit.saved_keys_hint") %></p>
@@ -50,13 +54,19 @@
       <% language_options = User::LANGUAGES.map { |language| [ t("api_keys.edit.language_options.#{language}"), language ] } %>
       <div class="value-row" data-controller="value-row">
         <%= f.label :language, t("api_keys.edit.language_label") %>
-        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= language_options.rassoc(current_user.language)&.first %></span>
+        <span class="value-row-value" aria-hidden="true" data-value-row-target="value"><%= language_options.rassoc(chosen_language)&.first %></span>
         <%= f.select :language, language_options,
-              { selected: current_user.language },
+              { selected: chosen_language },
               data: { action: "change->value-row#show" } %>
       </div>
       <p class="card-note"><%= t("api_keys.edit.language_hint") %></p>
       <%= f.button t("api_keys.edit.save"), type: "submit", name: "commit", value: t("api_keys.edit.save"), class: "btn btn-primary btn-block" %>
+      <% if @offer_unchecked_save %>
+        <div class="unchecked-save">
+          <p class="card-note"><%= t("api_keys.edit.save_unchecked_hint") %></p>
+          <%= f.button t("api_keys.edit.save_unchecked"), type: "submit", name: "skip_check", value: ApiKeysController::SKIP_CHECK, class: "btn btn-ghost btn-block" %>
+        </div>
+      <% end %>
     <% end %>
   </section>
 

@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/clients/gemini_service.md
 class GeminiService < AiService
   API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+  MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
   def self.provider_key = "gemini"
 
@@ -122,5 +123,9 @@ class GeminiService < AiService
     { type: "text", mime_type: "application/json", schema: schema }
   end
 
-  def build_connection = provider_connection(RETRY_OPTIONS, "x-goog-api-key" => @api_key)
+  def key_rejected?(response) = super || error_reasons(error_envelope(response.body)).include?("API_KEY_INVALID")
+
+  def auth_headers = { "x-goog-api-key" => @api_key }
+
+  def build_connection = provider_connection(RETRY_OPTIONS, auth_headers)
 end

@@ -3,6 +3,8 @@ require "rails_helper"
 RSpec.describe "Learn", type: :request do
   let(:user) { create_user_with_key }
 
+  def provider_jobs = enqueued_jobs.select { |job| job["queue_name"] == "provider_calls" }
+
   before { login_as(user) }
 
   it "distinguishes reserved members from active group members and retains the group Stop" do
@@ -652,6 +654,31 @@ RSpec.describe "Learn", type: :request do
       post prepare_learn_concept_path(bucket: "ruby_rails", concept: "prototype_chain")
 
       expect(response).to have_http_status(:not_found)
+    end
+
+    it "enqueues at a click's priority, since a person is waiting on it" do
+      post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(provider_jobs.map { |job| job["priority"] || JobPriority::CLICK }).to eq([ JobPriority::CLICK ])
+    end
+  end
+
+  describe "the priority of a bulk press" do
+    before { user.update!(language: "ruby_rails") }
+
+    let(:bulk_priorities) { provider_jobs.map { |job| job["priority"] }.uniq }
+
+    it "gives every write-up and guide job of POST /learn/prepare that priority" do
+      post prepare_learn_path
+
+      expect(provider_jobs.map { |job| job["job_class"] }.uniq).to contain_exactly("GenerateConceptReferenceJob", "GenerateRecognitionGuideJob")
+      expect(bulk_priorities).to eq([ JobPriority::BULK ])
+    end
+
+    it "gives every job of POST /learn/prepare_ladders that priority" do
+      post prepare_learn_ladders_path
+
+      expect(bulk_priorities).to eq([ JobPriority::BULK ])
     end
   end
 

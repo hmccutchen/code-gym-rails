@@ -30,6 +30,10 @@ says what a deviation from one requires.
   define the `API_URL` it posts to, keep a private `route_for`, and own the model each purpose routes to
   (`DEFAULT_ROUTE` / `MODEL_FOR_PURPOSE`). A subclass overrides
   `long_running?` only when its retry rule differs, as `OpenaiService` does.
+  `AiService#check_key` is a second, smaller template for Setup's key check:
+  a subclass gives it `MODELS_URL` and `#auth_headers`, which
+  `build_connection` sends too, and overrides `#key_rejected?` only when its
+  bad-key answer is not a 401, as `GeminiService` does.
   A subclass's `build_connection` passes its own retry statuses and headers to
   `AiService.retry_options` and `#provider_connection`, which hold the shared
   timeouts and retry rule.

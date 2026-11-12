@@ -406,6 +406,8 @@ class FakeService < AiService
     "judge_review"                => { "status" => "keep" }.to_json
   }.freeze
 
+  def check_key = :accepted
+
   private
 
   # Raises bare RuntimeErrors because the job turns ProviderError into a user-facing message that hides the bug.

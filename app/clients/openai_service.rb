@@ -1,5 +1,6 @@
 class OpenaiService < AiService
   API_URL = "https://api.openai.com/v1/responses"
+  MODELS_URL = "https://api.openai.com/v1/models"
 
   def self.provider_key = "openai"
 
@@ -138,5 +139,7 @@ class OpenaiService < AiService
     "unspecified" if content.any? { |part| part["type"] == "refusal" }
   end
 
-  def build_connection = provider_connection(RETRY_OPTIONS, "authorization" => "Bearer #{@api_key}")
+  def auth_headers = { "authorization" => "Bearer #{@api_key}" }
+
+  def build_connection = provider_connection(RETRY_OPTIONS, auth_headers)
 end

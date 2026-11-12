@@ -18,7 +18,14 @@ class AiProvider
 
   def self.daily_quota_reset_at(key, failed_at) = (find(key.to_s) || AiService).daily_quota_reset_at(failed_at)
 
+  MAX_KEY_LENGTH = 512
+
+  # A key travels in an HTTP header, so anything but one run of printable ASCII is refused before a provider sees it.
+  KEY_SHAPE = /\A[\x21-\x7E]{1,#{MAX_KEY_LENGTH}}\z/
+
   def self.detect(api_key)
+    return unless KEY_SHAPE.match?(api_key.to_s)
+
     all.find { |provider| provider.key_pattern&.match?(api_key) }&.provider_key
   end
 end

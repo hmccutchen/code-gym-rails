@@ -192,6 +192,10 @@ en:
     api_keys:
       unrecognized_key: "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
       key_saved: "API key saved. You're all set!"
+      key_saved_check_refused: "Saved, but %{provider} wouldn't let the key be checked. If your first set fails, check the key in your %{provider} account."
+      key_saved_unchecked: "Saved, but the key couldn't be checked with %{provider}. If your first set fails, check the key."
+      key_saved_without_check: "Saved without checking. If your first set fails, check the key in your %{provider} account."
+      key_saves_limited: "You've saved a key several times in the last hour. Try again later."
       no_changes: "No changes made."
       preferences_saved: "Preferences saved!"
     daily_exercises:
@@ -231,6 +235,7 @@ en:
       alternate: "that explanation didn't come back"
       critique: "the critique didn't run"
       reference: "the write-up didn't finish"
+      key_save: "it wasn't saved"
     saved:
       review: "Your answers are saved."
       review_partial: "Your answers are saved."
@@ -1005,6 +1010,8 @@ en:
         mixed: "Mixed (alternates daily)"
       language_hint: 'Choose the language your daily exercise sets are generated in. "Mixed" alternates between Ruby/Rails and JavaScript one full day at a time.'
       save: "Save"
+      save_unchecked: "Save without checking"
+      save_unchecked_hint: "If you're sure the key is right, paste it again and save it without checking."
       time_zone_label: "Time zone"
       time_zone_detect: "— detect automatically —"
       time_zones:
