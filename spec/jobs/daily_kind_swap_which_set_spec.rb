@@ -16,7 +16,7 @@ RSpec.describe "Which set a daily kind swap first applies to" do
   end
 
   def run_batch_and_its_jobs
-    GenerateDailyExercisesJob.perform_now
+    EnqueueDueGenerationsJob.perform_now
     perform_enqueued_jobs(only: GenerateDailyExercisesJob)
   end
 

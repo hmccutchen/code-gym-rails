@@ -21,8 +21,9 @@ ids; no replacement was inserted into its position. Historical source ids
 remain readable and no longer participate in picking.
 
 `GenerateDailyExercisesJob#generate_if_due` retired when the hourly batch
-stopped generating sets itself. `#generate_due_set`, the part of it that still
-generates, was appended at the end of the list as a new entry.
+stopped generating sets itself. `#generate_under_claim`, which takes the
+user's generation claim around the part that still generates, was appended at
+the end of the list as a new entry.
 
 ## `.last_seen_for`
 

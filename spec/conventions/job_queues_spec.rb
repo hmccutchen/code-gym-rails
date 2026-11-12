@@ -32,7 +32,7 @@ RSpec.describe "The queue each job runs on" do
   def queues_in_use = (job_classes.map(&:queue_name) + recurring_tasks.map { |task| recurring_queue(task) } << mailer_queue).uniq
 
   it "finds the job classes, the provider jobs among them and an environment block to check" do
-    expect(job_classes).to include(GenerateDailyExercisesJob, SendPushReminderJob, SweepDuckThreadsJob)
+    expect(job_classes).to include(GenerateDailyExercisesJob, EnqueueDueGenerationsJob, SendPushReminderJob, SweepDuckThreadsJob)
     expect(provider_job_classes).to contain_exactly(GenerateDailyExercisesJob, RegenerateExerciseJob,
                                                     GenerateConceptReferenceJob, GenerateRecognitionGuideJob)
     expect(worker_environments.keys).to include("production", "development", "test")
@@ -50,11 +50,17 @@ RSpec.describe "The queue each job runs on" do
     expect(mailer_queue).to eq(general_queue)
   end
 
-  it "keeps the hourly batch, which calls no provider, off the provider queue" do
-    batches = recurring_tasks.select { |_key, options| options.fetch("class") == "GenerateDailyExercisesJob" }
+  it "runs the hourly hand-out, which calls no provider, on the general queue in every environment that schedules it" do
+    hand_outs = recurring_tasks.select { |_key, options| options.fetch("class") == "EnqueueDueGenerationsJob" }
 
-    expect(batches).not_to be_empty
-    expect(batches.map { |task| recurring_queue(task) }.uniq).to eq([ general_queue ])
+    expect(EnqueueDueGenerationsJob.queue_name).to eq(general_queue)
+    expect(hand_outs.size).to eq(parsed("recurring.yml").size)
+    expect(hand_outs.map { |task| recurring_queue(task) }.uniq).to eq([ general_queue ])
+    expect(hand_outs.map { |_key, options| options.keys }.flatten).not_to include("queue")
+  end
+
+  it "schedules no provider job directly, so a recurring task never lands on the provider queue" do
+    expect(recurring_tasks.map { |_key, options| options.fetch("class") } & provider_job_classes.map(&:name)).to eq([])
   end
 
   it "gives each queue a worker of its own, so no worker takes both and none takes a wildcard" do
