@@ -3,6 +3,33 @@ require "rails_helper"
 RSpec.describe ScheduledGeneration do
   def user_in(zone) = User.new(time_zone: zone)
 
+  describe ".users" do
+    def account(name, **columns)
+      User.create!(email: "#{name}@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, **columns)
+    end
+
+    it "holds an active account with a key, and none that is paused, keyless or deleted" do
+      covered = account("covered")
+      account("paused", paused_generation_at: Time.current)
+      User.create!(email: "keyless@example.com")
+      account("gone").anonymize!
+
+      expect(described_class.users).to contain_exactly(covered)
+    end
+
+    it "holds an account one account failure short of the hold, and drops it at the hold and past it" do
+      short = account("short", generation_account_failures: KeyHold::AFTER - 1)
+      account("held", generation_account_failures: KeyHold::AFTER)
+      account("long-held", generation_account_failures: KeyHold::AFTER + 5)
+
+      expect(described_class.users).to contain_exactly(short)
+    end
+
+    it "names neither the kinds nor the count itself, which KeyHold owns" do
+      expect(described_class.constants).not_to include(:KEY_HOLD_KINDS, :KEY_HOLD_AFTER)
+    end
+  end
+
   describe ".due?" do
     let(:pacific) { user_in("America/Los_Angeles") }
 

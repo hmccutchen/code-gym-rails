@@ -1,6 +1,9 @@
+<%# Required local: resume_link, false while the automatic-pause notice above already offers Resume. %>
 <div class="section today-state">
   <p class="today-state-message"><%= t("dashboard.paused_empty.message") %></p>
   <%= button_to t("dashboard.generate_anyway"), generate_path, method: :post, class: "btn btn-ghost btn-sm",
         form: { data: loading_form_data(label: t("dashboard.generating_label")) } %>
-  <p class="today-state-link"><%= link_to t("dashboard.paused_empty.resume"), account_path %></p>
+  <% if resume_link %>
+    <p class="today-state-link"><%= link_to t("dashboard.paused_empty.resume"), account_path %></p>
+  <% end %>
 </div>

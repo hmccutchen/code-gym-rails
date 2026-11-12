@@ -44,6 +44,44 @@ RSpec.describe SchemaWait do
     end
   end
 
+  describe ".migrations_pending?" do
+    it "is false when every migration file has run" do
+      expect(described_class.migrations_pending?).to be(false)
+    end
+
+    it "is true while the newest migration file has not run yet" do
+      newest = ActiveRecord::Base.connection_pool.migration_context.get_all_versions.max
+      ActiveRecord::Base.connection.execute("DELETE FROM schema_migrations WHERE version = '#{newest}'")
+
+      expect(described_class.migrations_pending?).to be(true)
+    end
+
+    it "counts as pending, and logs a warning naming the error, when the answer cannot be read" do
+      allow(ActiveRecord::Base).to receive(:connection_pool).and_raise(ActiveRecord::ConnectionNotEstablished, "no route")
+      lines = []
+      allow(Rails.logger).to receive(:warn) { |line| lines << line }
+
+      expect(described_class.migrations_pending?).to be(true)
+      expect(lines).to eq([ "[schema_wait] could not tell whether a migration is pending (ActiveRecord::ConnectionNotEstablished); counting it as pending" ])
+    end
+
+    it "counts as pending when the migration folder cannot be read" do
+      allow(Dir).to receive(:[]).and_raise(Errno::EACCES)
+      allow(Rails.logger).to receive(:warn)
+
+      expect(described_class.migrations_pending?).to be(true)
+      expect(Rails.logger).to have_received(:warn).with(/Errno::EACCES/)
+    end
+
+    it "agrees with Rails' own answer" do
+      expect(described_class.migrations_pending?).to eq(ActiveRecord::Base.connection_pool.migration_context.needs_migration?)
+    end
+
+    it "answers whatever the clock says, where Rails' own check refuses a migration dated after it" do
+      travel_to(Time.utc(2026, 1, 1)) { expect(described_class.migrations_pending?).to be(false) }
+    end
+  end
+
   # railway.worker.toml depends on this task name; a missed rename would surface only as a failed deploy.
   it "is reachable through the rake task the worker's pre-deploy step calls" do
     expect(File.read(Rails.root.join("railway.worker.toml")))

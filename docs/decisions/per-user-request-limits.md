@@ -73,3 +73,10 @@ the other then generates. Or a click's job waits in the queue past its
 permit's expiry, a later dashboard load queues a duplicate, the first fails,
 and the duplicate generates. Both are retries one after the other, never two
 calls at once.
+
+The hand-out enqueues a job each hour for a due account with no set, so a
+morning failure is tried again an hour later. Two things bound that. An
+account whose key was rejected, or that ran out of credit, twice in a row
+leaves `ScheduledGeneration.users` until its owner starts a generation that
+works or saves a key. An account whose last three sets went unopened is
+paused. `docs/decisions/pausing-generation.md` has both rules.

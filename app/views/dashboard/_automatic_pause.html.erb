@@ -1,0 +1,9 @@
+<div class="section automatic-pause" role="status">
+  <p><%= t("dashboard.automatic_pause.message") %></p>
+  <div class="automatic-pause-actions">
+    <%= button_to t("dashboard.automatic_pause.resume"), toggle_generation_account_path, method: :patch,
+          params: { paused: "0", return_to: "dashboard" }, class: "btn btn-primary" %>
+    <%= button_to t("dashboard.automatic_pause.keep_paused"), toggle_generation_account_path, method: :patch,
+          params: { paused: "1", return_to: "dashboard" }, class: "btn btn-ghost" %>
+  </div>
+</div>

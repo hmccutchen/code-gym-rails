@@ -31,6 +31,16 @@ class SchemaWait
     false
   end
 
+  def self.migrations_pending?
+    context = ActiveRecord::Base.connection_pool.migration_context
+    files = context.migrations_paths.flat_map { |folder| Dir[File.join(folder, "*.rb")] }
+
+    (files.filter_map { |file| File.basename(file)[/\A\d+/]&.to_i } - context.get_all_versions).any?
+  rescue StandardError => e
+    Rails.logger.warn("[schema_wait] could not tell whether a migration is pending (#{e.class}); counting it as pending")
+    true
+  end
+
   def self.monotonic_now
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end

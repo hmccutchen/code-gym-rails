@@ -28,24 +28,40 @@ safe; malformed nonempty state fails closed. See
 
 
 `DailyExercise.opened_at`, `User.generation_pause_source` and
-`User.generation_account_failures` are reserved, inactive columns. No
-application code reads or writes them yet. They ship one release ahead of
-the code that will pause generation after unopened sets and stop retrying a
-failing provider account, because the worker can start before the web
-service has migrated (`.claude/rules/deployment.md`, Migrations). The
-migration fills `opened_at` with `created_at` on every set that exists when
-it runs, and marks every account paused at that time as `manual`. It covers
-nothing written afterwards: until the code ships, a new set has no
-`opened_at` even when someone opens it, and an account paused or resumed
-from the Account page gets no source change. The release that first reads
-the columns repeats both fills and treats `paused_generation_at` as the
-authority, as `docs/decisions/tracks.md` records for `track_chosen_at`.
+`User.generation_account_failures` shipped one release ahead of the code
+that uses them, because the worker can start before the web service has
+migrated (`.claude/rules/deployment.md`, Migrations).
+`AddUnopenedSetPauseColumns` filled `opened_at` with `created_at` on every
+set that existed then and marked every paused account `manual`;
+`RepeatUnopenedSetPauseFills` repeats both fills for rows written in
+between, as `docs/decisions/tracks.md` records for `track_chosen_at`. What
+reads and writes each column:
+
+- `opened_at`: the first time the set was shown on the dashboard, or the
+  time a resume acknowledged it. Written once by `DailyExercise#mark_opened!`,
+  when the dashboard shows a finished set to its owner, and by
+  `DailyExercise.acknowledge_unopened!`, which `#clear_generation_pause!`
+  runs on the user's unopened sets dated before today. A count of sets
+  opened therefore overcounts slightly for an account that was paused and
+  resumed. Read by
+  `DailyExercise.latest_openings` for `UnopenedSets`. A set created by
+  current code starts with none.
+- `generation_pause_source`: written by `User#pause_generation!` and cleared
+  by `#clear_generation_pause!`, which `#resume_generation!` calls. Read by `#generation_pause_kind` and
+  `#generation_paused_automatically?`, which treat `paused_generation_at` as
+  the authority, so no validation ties the two columns.
+- `generation_account_failures`: raised by `User#record_generation_failure!`
+  for a kind in `KeyHold::KINDS`, set to zero by
+  `#record_generation_success!`, `#store_api_key` and `#use_provider`. Read by
+  `ScheduledGeneration.users`.
+
+`docs/decisions/pausing-generation.md` has the rules.
 
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| `User`          | email, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; ignored by `User` and read by nothing, until the next release drops the column), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), level_suggestion_answers (integer, default 0), daily_section_kinds (jsonb, default []: the user's daily kinds in place order, the pair then up to two chosen extra sections; empty = `DailyKinds::DEFAULT`), track_chosen_at (nullable datetime: set when the welcome track choice is recorded; for accounts that predate it, their creation time, so it is a flag, not a clock; null means no decision was recorded, not that the account is undecided), login_code_digest / login_code_sent_at / login_code_attempts (the emailed sign-in code), otp_secret (encrypted) / consumed_timestep (last accepted TOTP step) / otp_backup_codes (bcrypt digests of unused recovery codes) / two_factor_enabled_at (nil = authenticator off), second_factor_challenge_at / second_factor_challenge_failures (the pending sign-in challenge and its wrong codes), second_factor_failures / second_factor_failures_since (the 24-hour cap on wrong codes), sessions_valid_after (a session signed in before this counts as signed out), generating_since (nullable datetime: the claim a running `GenerateDailyExercisesJob` holds on the user, declared with `Claimable` and stale after `User::GENERATION_STALE_AFTER`), generation_pause_source (nullable string, no default; reserved: no code reads or writes it yet) and generation_account_failures (integer, default 0; reserved the same way) |
-| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `daily_kinds`, `size`, `coverage`, `shared_concept`), opened_at (nullable datetime; reserved: no code reads or writes it yet, and every set that existed when the column was added holds its created_at) |
+| `User`          | email, skill_level, focus_areas (jsonb), api_keys (encrypted JSON map of provider to key), provider (the one in use), invite_code_id (nullable fk; the code that admitted the account), trial_started_at / trial_ends_at / trial_consented_at (nullable; a present trial_ends_at is the trial), language, daily_section_count (nullable integer; nil = Automatic), reminder_level (enum: none/ready/ready_and_nudges, default none), anonymized_at (nullable — set on self-service deletion), section_kind_weights (jsonb, default {}), excluded_section_kinds (jsonb, default []), section_kind_levels (jsonb, default {}), locked_section_kinds (jsonb, default []), learning_track (nullable: junior/none; ignored by `User` and read by nothing, until the next release drops the column), level_suggestion_cutoffs (non-null jsonb, default {}), level_suggestions (boolean, default true), level_suggestion_answers (integer, default 0), daily_section_kinds (jsonb, default []: the user's daily kinds in place order, the pair then up to two chosen extra sections; empty = `DailyKinds::DEFAULT`), track_chosen_at (nullable datetime: set when the welcome track choice is recorded; for accounts that predate it, their creation time, so it is a flag, not a clock; null means no decision was recorded, not that the account is undecided), login_code_digest / login_code_sent_at / login_code_attempts (the emailed sign-in code), otp_secret (encrypted) / consumed_timestep (last accepted TOTP step) / otp_backup_codes (bcrypt digests of unused recovery codes) / two_factor_enabled_at (nil = authenticator off), second_factor_challenge_at / second_factor_challenge_failures (the pending sign-in challenge and its wrong codes), second_factor_failures / second_factor_failures_since (the 24-hour cap on wrong codes), sessions_valid_after (a session signed in before this counts as signed out), generating_since (nullable datetime: the claim a running `GenerateDailyExercisesJob` holds on the user, declared with `Claimable` and stale after `User::GENERATION_STALE_AFTER`), generation_pause_source (nullable string, no default: `manual` or `automatic` while paused, and `paused_generation_at` is the authority for whether it is) and generation_account_failures (integer, default 0: generation failures in a row the provider put down to a bad key or no credit; `KeyHold::AFTER` of them hold the schedule) |
+| `DailyExercise` | user_id, date, problem_set (jsonb: code_review, design_comparison, pattern, a rotating third key, a rotating fourth key; at most four of them per day), language, generated_at, regenerated_at, dropped_sections (jsonb), plan_notes (jsonb, default {}: what the plan did — `daily_kinds`, `size`, `coverage`, `shared_concept`), opened_at (nullable datetime: the first time the dashboard showed the finished set to its owner, or the time a resume of generation acknowledged it unopened; a set from before the column holds its created_at) |
 | `DailyResponse` | user_id, daily_exercise_id, answers (jsonb), section_ratings (jsonb, per-section self-rating), ai_review (jsonb), review_provider (which provider wrote the review), concept_tags (jsonb), mastery_application (non-null jsonb, default {}: durable v1/v2 receipt with legacy/processed section keys, once-only core-session flag and skip identities; v2 pins policy 2 and retains enrollment after suffix compaction) |
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
 | `ConceptMastery` | user_id, concept, language, tier (standard/reduced/paused), streak, last_rating, mastered_at, retention_interval_days, next_retention_check_on, drilled_at, drill_group, cooldown_remaining, practice_requests (non-null jsonb, default {}, per-kind mode/source/time), review_reconciliation (non-null jsonb, default {}: v1 nine-field or v2 extended baseline and ordered review/session/skip/drill correction suffix, retained from the earliest pending contribution) — one user's standing on one concept; `record_review!` and `ConceptDrills` route every write through pure policy dispatch and reconciliation |

@@ -24,6 +24,10 @@ paths:
   - "spec/**/competency_gate/**"
   - "spec/**/*{weighted_roll,daily_exercise}*"
   - "app/models/{daily_kinds,daily_kind_swap,section_kind_settings}.rb"
+  - "app/models/{unopened_sets,scheduled_generation,missing_set_state}.rb"
+  - "app/models/concerns/generation_pause.rb"
+  - "app/jobs/enqueue_due_generations_job.rb"
+  - "spec/**/*{unopened_set,generation_pause,automatic_pause,key_hold,scheduled_generation}*"
   - "app/models/daily_kind_swap/**"
   - "app/controllers/daily_kinds_controller.rb"
   - "app/views/daily_kinds/**"
@@ -208,9 +212,31 @@ read it before changing that area.
   safety hold; protected practice and #264 checkpointing remain separate.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
-  (cron and the dashboard auto-trigger), never submit or review. `PATCH
-  /account/toggle_generation` is the only pause control, and its buttons post
-  the state they want. A held unsubmitted set and its draft response move to
+  (cron and the dashboard auto-trigger), never submit or review. A pause has
+  a source, `manual` or `automatic` (`GenerationPause`): the hourly hand-out
+  pauses an account as `automatic` when `UnopenedSets` (pure) says its last
+  `PAUSE_AFTER` sets ended their day unopened and unsaved, and sends no
+  notice. It skips that check while a migration is pending
+  (`SchemaWait.migrations_pending?`), since the `opened_at` fill may not have
+  run. `paused_generation_at` is the authority: a pause with no source
+  reads as manual, a source with no pause time is ignored, and no validation
+  ties the two columns. `User#pause_generation!` and
+  `#clear_generation_pause!` are the only writers, both in the concern; the
+  hand-out pauses through `#pause_for_unopened_sets!`, which decides again
+  under the user row lock. `PATCH /account/toggle_generation` is the one pause
+  action; the Account buttons and the dashboard's automatic-pause line
+  (Resume, Keep it paused) post the state they want, and it returns to the
+  dashboard only for the fixed name `return_to=dashboard`, never a URL. The
+  line is drawn outside `MissingSetState`. `opened_at` means first shown on the
+  dashboard, or acknowledged by resuming generation:
+  `DailyExercise#mark_opened!` stamps it once when the dashboard shows a
+  finished set to its owner, and every resume stamps the sets that count as
+  unopened (`DailyExercise.acknowledge_unopened!`, in the transaction that
+  clears the pause), so a resume gives three fresh chances. "Keep it paused"
+  acknowledges nothing, and neither does a resume on an account that is not
+  paused. `DailyExercise.unopened_before` and
+  `UnopenedSets.unopened?` are one rule, held equal by a spec. The key hold is a separate rule
+  (`.claude/rules/providers.md`). A held unsubmitted set and its draft response move to
   today (`User#carry_held_set_forward!`, `#recover_held_set`) under
   `DailyExercise#with_response_locked`, clearing both regeneration columns; a
   submitted response ends the move, and it is skipped when today already has a

@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/models/user.md
 class User < ApplicationRecord
   include SignedInSessions
+  include GenerationPause
 
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
@@ -148,11 +149,20 @@ class User < ApplicationRecord
   NO_GENERATION_FAILURE = { last_generation_failure: nil, last_generation_failure_provider: nil,
                             last_generation_failed_at: nil, last_generation_retry_after: nil }.freeze
 
-  def record_generation_failure!(error)
+  def record_generation_failure!(error, counts_toward_key_hold: true)
+    kind = ProviderFailure.classify(error)
     write_generation_status!(last_generation_error_date: Date.current, last_generation_error: nil,
-                             last_generation_failure: ProviderFailure.classify(error),
+                             last_generation_failure: kind,
                              last_generation_failure_provider: error.try(:provider) || provider,
                              last_generation_failed_at: Time.current, last_generation_retry_after: error.try(:retry_after))
+    increment!(:generation_account_failures) if counts_toward_key_hold && KeyHold.counts?(kind)
+  end
+
+  def record_generation_success!
+    clear_generation_failure! if last_generation_error_date.present?
+    self.class.where(id: id).where.not(generation_account_failures: 0).update_all(generation_account_failures: 0)
+    self.generation_account_failures = 0
+    clear_attribute_changes([ :generation_account_failures ])
   end
 
   def record_generation_message!(message)
@@ -172,15 +182,11 @@ class User < ApplicationRecord
                             variant: ProviderFailureText.variant_for(self)).full
   end
 
-  def paused_generation_at?
-    paused_generation_at.present?
-  end
-
   def resume_generation!
     Time.use_zone(effective_time_zone) do
       with_lock do
         recovered = recover_held_set
-        update!(paused_generation_at: nil)
+        clear_generation_pause!
         recovered
       end
     end
@@ -258,7 +264,11 @@ class User < ApplicationRecord
 
   def store_api_key(key, provider:)
     self.api_keys = api_keys.to_h.merge(provider => key)
-    self.provider = provider
+    put_key_in_use(provider)
+  end
+
+  def use_provider(name)
+    put_key_in_use(name) unless name == provider
   end
 
   def suggests_level_moves? = level_suggestions?
@@ -453,6 +463,11 @@ class User < ApplicationRecord
   end
 
   private
+
+  def put_key_in_use(name)
+    self.provider = name
+    self.generation_account_failures = 0
+  end
 
   def write_generation_status!(columns)
     update_columns(columns.merge(updated_at: Time.current))

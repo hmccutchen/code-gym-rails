@@ -31,9 +31,19 @@ class DailyExercise < ApplicationRecord
   validates :language, inclusion: { in: LANGUAGES }
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
+  # The same rule as UnopenedSets.unopened?, in SQL; daily_exercise_spec holds the two equal.
+  scope :unopened_before, ->(today) { where(opened_at: nil, date: ...today).where.missing(:daily_response) }
+
+  def self.acknowledge_unopened!(today:, at: Time.current) = unopened_before(today).update_all(opened_at: at)
 
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
+  end
+
+  def self.latest_openings(limit = UnopenedSets::PAUSE_AFTER)
+    left_joins(:daily_response).order(date: :desc).limit(limit)
+      .pluck(:date, :opened_at, "daily_responses.id")
+      .map { |date, opened_at, response_id| UnopenedSets::Entry.new(date: date, opened: opened_at.present?, saved: response_id.present?) }
   end
 
   def coverage_shown
@@ -80,6 +90,15 @@ class DailyExercise < ApplicationRecord
 
   def regeneration_offered?(response)
     !(response&.persisted? && response.reviewed?) && regenerated_at.nil? && !user.trial_ended?
+  end
+
+  def mark_opened!
+    return if opened_at.present?
+
+    now = Time.current
+    self.class.where(id: id, opened_at: nil).update_all(opened_at: now)
+    self.opened_at = now
+    clear_attribute_changes([ :opened_at ])
   end
 
   def with_response_locked

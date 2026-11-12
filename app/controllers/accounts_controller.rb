@@ -2,6 +2,8 @@ class AccountsController < ApplicationController
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
+  PAUSE_NOTICES = { paused: "flash.accounts.generation_paused", kept: "flash.accounts.generation_kept_paused" }.freeze
+
   # GET /account
   def show
     now = Time.current.in_time_zone(current_user.effective_time_zone)
@@ -19,21 +21,18 @@ class AccountsController < ApplicationController
   # PATCH /account/toggle_generation
   def toggle_generation
     if resume_requested?
-      resumed = current_user.resume_generation!
-      notice = if resumed
-        t("flash.accounts.generation_resumed_with_held_set")
-      else
-        t("flash.accounts.generation_resumed")
-      end
-      redirect_to account_path, notice: notice
+      held = current_user.resume_generation!
+      notice = held ? "flash.accounts.generation_resumed_with_held_set" : "flash.accounts.generation_resumed"
     else
-      # Re-stamping would move #held_exercise's floor past the set the first pause stranded, losing it for good.
-      current_user.update!(paused_generation_at: Time.current) unless current_user.paused_generation_at?
-      redirect_to account_path, notice: t("flash.accounts.generation_paused")
+      notice = PAUSE_NOTICES.fetch(current_user.pause_generation!(source: User::MANUAL_PAUSE))
     end
+    redirect_to after_toggle_path, notice: t(notice)
   end
 
   private
+
+  # A fixed name, never a URL, so the form's return_to cannot send the browser off this site.
+  def after_toggle_path = params[:return_to] == "dashboard" ? root_path : account_path
 
   # Honor the posted state so a double-tapped Resume stays a resume; with no param posted, flip.
   def resume_requested?

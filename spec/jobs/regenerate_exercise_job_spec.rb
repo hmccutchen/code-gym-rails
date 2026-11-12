@@ -37,6 +37,29 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service
   end
 
+  describe "the count of account failures that holds the schedule" do
+    it "is left alone when a regeneration's key is rejected, since today's set exists and its nudges still need the schedule" do
+      claimed_exercise
+      stub_provider(ProviderError::AuthenticationError.new("401 invalid x-api-key"))
+      allow(Rails.logger).to receive(:error)
+
+      2.times { described_class.new.perform(user_id: user.id) }
+
+      expect(user.reload).to have_attributes(last_generation_failure: "bad_key", generation_account_failures: 0)
+      expect(ScheduledGeneration.users).to include(user)
+    end
+
+    it "goes back to zero when a regeneration succeeds, since a generation the user started worked" do
+      claimed_exercise
+      user.update_columns(generation_account_failures: KeyHold::AFTER)
+      stub_provider({ "code_review" => { "question" => "new" } })
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload.generation_account_failures).to eq(0)
+    end
+  end
+
   it "keeps the old inactive set, draft and notes after settings change during one paid call" do
       stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise = claimed_exercise

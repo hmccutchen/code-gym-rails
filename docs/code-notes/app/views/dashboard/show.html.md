@@ -15,3 +15,20 @@ so the callout lands in view on the days it has the most to offer.
 
 It sits outside `#dashboard-content` because the generating state's poller
 replaces that div and would take the callout with it.
+
+## Automatic-pause line
+
+`dashboard/_automatic_pause` renders above `#dashboard-content` while
+`User#generation_paused_automatically?` holds. It is outside the `case` on
+`@content_state` because it shows in every state, a weekend and a day with a
+set included, and `MissingSetState` names one state at a time. Its two
+controls are `button_to` forms with no Stimulus controller, so they work
+with scripts off.
+
+It uses the page's `.section` card, so it reads as information and not as
+the green or red of a flash. The message carries the accent bar the Exercise
+mix note uses. The bar is on the paragraph and not on the card, because
+below 600px every card on the page loses its side borders. While the line
+shows, `@automatic_pause` also tells `dashboard/_paused_empty` to leave out
+its resume link.
+`docs/decisions/pausing-generation.md` has the rule.
