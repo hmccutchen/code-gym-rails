@@ -38,7 +38,9 @@ class ApiKeysController < ApplicationController
 
   private
 
-  def pasted_key = params[:api_key].to_s.strip
+  EDGE_WHITESPACE = /\A[[:space:]]+|[[:space:]]+\z/
+
+  def pasted_key = params[:api_key].to_s.gsub(EDGE_WHITESPACE, "")
 
   def key_pasted? = pasted_key.present?
 
@@ -48,10 +50,9 @@ class ApiKeysController < ApplicationController
 
   # The check can take seconds, so the lock reloads the row and the merge reads a key saved from another tab meanwhile.
   def store_key(provider)
-    language = chosen_language
     current_user.with_lock do
       current_user.store_api_key(pasted_key, provider: provider)
-      current_user.language = language
+      current_user.language = posted_language if posted_language
       current_user.save!
     end
   end

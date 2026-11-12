@@ -170,6 +170,62 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
     end
   end
 
+  describe "a language changed in another tab while the check is running" do
+    before do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-old" })
+      allow_any_instance_of(GeminiService).to receive(:check_key) do
+        User.find(user.id).update!(language: "mixed")
+        :accepted
+      end
+    end
+
+    it "is left alone by a save that posted no language" do
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345" }
+
+      expect(user.reload.language).to eq("mixed")
+      expect(user.api_key).to eq("AIzaSyPastedSecret12345")
+    end
+
+    it "is replaced by a language the save did post" do
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345", language: "javascript" }
+
+      expect(user.reload.language).to eq("javascript")
+    end
+  end
+
+  describe "a key pasted with whitespace around it" do
+    { "leading spaces and a trailing newline" => "   sk-ant-api03-PastedSecret\r\n",
+      "tabs" => "\tsk-ant-api03-PastedSecret\t",
+      "non-breaking spaces" => "\u00A0sk-ant-api03-PastedSecret\u00A0 " }.each do |name, pasted|
+      it "is trimmed of #{name}, checked and saved" do
+        requests = stub_key_check(ClaudeService)
+
+        patch setup_path, params: { api_key: pasted }
+
+        expect(response).to redirect_to(root_path)
+        expect(requests.first.request_headers["x-api-key"]).to eq("sk-ant-api03-PastedSecret")
+        expect(user.reload.api_key).to eq("sk-ant-api03-PastedSecret")
+      end
+    end
+
+    it "is still refused when a non-breaking space sits inside the key" do
+      requests = stub_key_check(ClaudeService)
+
+      patch setup_path, params: { api_key: "sk-ant-api03-Pasted\u00A0Secret" }
+
+      expect(response.body).to include("We don&#39;t recognize this key format")
+      expect(requests).to be_empty
+    end
+
+    it "treats a field holding only non-breaking spaces as a preferences-only save" do
+      user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-existing" })
+
+      patch setup_path, params: { api_key: "\u00A0\u00A0", language: "javascript" }
+
+      expect(flash[:notice]).to eq(I18n.t("flash.api_keys.preferences_saved"))
+    end
+  end
+
   it "says nothing about a status code or a guessed cause in either warning" do
     %w[key_saved_check_refused key_saved_unchecked].each do |key|
       text = I18n.t("flash.api_keys.#{key}", provider: "Claude")
