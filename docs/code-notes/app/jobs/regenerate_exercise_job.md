@@ -7,6 +7,16 @@ user, exercise and response locks before anything is written. A
 superseded or blocked set writes nothing, so the transaction ends without a
 rollback.
 
+## `#record_provider_failure`
+
+A regeneration notes `User#key_in_use` before the call. A provider or setup
+failure is written through `User#report_call_failure` under the user row
+lock, which reloads the account, so a failure from a key removed, replaced
+or switched during the call is not recorded
+(`docs/decisions/per-user-api-keys.md`, "A call that outlives its key").
+`#release` has already released the exercise's claim by then, so the user
+lock is taken alone. The "set was kept" messages do not go through it.
+
 ## `#generate`
 
 Every regeneration is judged, as first generation is; a weekend one makes a

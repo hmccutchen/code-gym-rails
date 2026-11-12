@@ -43,7 +43,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   def set_today?(user) = DailyExercise.exists?(user: user, date: Date.current)
 
   def generate_for(user, claim)
-    key_used = key_in_use(user)
+    key_used = user.key_in_use
     date     = Date.current
     language = user.language_for_today
     service  = AiService.for(user)
@@ -60,18 +60,16 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, claim) { user.record_generation_message!(e.message) }
+    persist_failure(user, claim) { user.report_call_failure(key_used) { user.record_generation_message!(e.message) } }
   rescue ProviderError, SetupError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
-    persist_failure(user, claim) { user.record_generation_failure!(e, counts_toward_key_hold: key_in_use(user) == key_used) }
+    persist_failure(user, claim) { user.report_call_failure(key_used) { user.record_generation_failure!(e) } }
   rescue ActiveRecord::RecordNotUnique
     Rails.logger.info(skipped_duplicate(user))
   rescue ActiveRecord::RecordInvalid => e
     raise unless e.record.errors[:date].present?
     Rails.logger.info(skipped_duplicate(user))
   end
-
-  def key_in_use(user) = [ user.provider, user.api_key ]
 
   def skipped_duplicate(user) = "Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)"
 

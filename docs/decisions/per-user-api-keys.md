@@ -280,8 +280,8 @@ replaced but never deleted, short of deleting the account.
   provider, so nothing was removed." The posted name is never echoed.
 - **Removal is not rate-limited** and calls no provider.
 - **A generation already running finishes.** It holds the key in memory.
-  If it then fails, `GenerateDailyExercisesJob#key_in_use` sees the key
-  changed and does not count the failure toward the hold.
+  If it then fails, the failure is not recorded; see "A call that outlives
+  its key" below.
 - **Trials.** `User#on_trial?` is "has a trial and no key in use", so an
   account with an unfinished trial counts as on trial again once its key is
   gone. With `provider` nil there is no house key to resolve, so such a
@@ -304,6 +304,43 @@ replaced but never deleted, short of deleting the account.
   "Provider in use" choice beside the list names them.
 - The setup failure's next step for an own-key account now ends "If they
   look right, remove the key and add it again."
+
+## A call that outlives its key
+
+A generation holds its key in memory for the whole call, which can run for
+minutes. The person can remove, replace or switch the key meanwhile. The
+jobs used to write the old key's failure anyway and only left it out of the
+key-hold count. The dashboard then showed "Claude didn't accept your API
+key" to an account that had already moved to another key, and
+`MissingSetState` puts a failure today ahead of starting a generation, so
+no set was started with the new key.
+
+- **The rule has one home.** `User#key_in_use` is the provider and key in
+  use. A job notes it before the call. When the call fails, the job reloads
+  the account under the user row lock and writes through
+  `User#report_call_failure(key_used)`, which runs the write only when
+  `key_in_use` is unchanged. Otherwise it writes nothing and clears a
+  failure recorded today, so the account ends with none from that call.
+- **`GenerateDailyExercisesJob`** applies it inside `persist_failure`, after
+  the claim check and the `set_today?` branch, to a provider or setup
+  failure and to the "every section failed its quality check" message. The
+  drafts that failed the check were written by a provider the account no
+  longer uses, the day has no set, and with nothing recorded the next
+  dashboard visit starts a set with the current key. Showing the message
+  would hold that back behind "Try again" for an attempt the person has
+  already moved on from.
+- **The "Settings or another set changed" message is still recorded
+  whatever the key.** It says nothing about a provider, and it is true of
+  the account as it stands.
+- **`RegenerateExerciseJob`** applies it to a provider or setup failure. It
+  releases the exercise's claim first and then takes the user lock by
+  itself, so the two locks are never nested. Its "today's set was kept"
+  messages are still recorded whatever the key: the person asked for a new
+  set and is looking at the old one, and the message is the only thing
+  that says why. Today's set exists, so no generation waits behind it.
+- **A key changed after the failure was written** leaves the failure in
+  place, apart from a removal, which clears a failure recorded against the
+  removed provider.
 
 ### Open items
 

@@ -225,6 +225,33 @@ RSpec.describe User, "removing a stored key" do
     end
   end
 
+  describe "#report_call_failure" do
+    it "runs the block while the account still uses the provider and key the call started with" do
+      key_used = user.key_in_use
+
+      user.report_call_failure(key_used) { user.record_generation_failure!(bad_key) }
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
+    end
+
+    it "skips the block once the key was removed, replaced or switched, and clears a failure left today" do
+      changes = [ ->(account) { account.remove_api_key("anthropic") },
+                  ->(account) { account.store_api_key("sk-ant-new", provider: "anthropic") },
+                  ->(account) { account.use_provider("openai") } ]
+      changes.each do |change|
+        account = User.create!(email: "#{SecureRandom.hex(4)}@example.com", provider: "anthropic", api_keys: keys)
+        key_used = account.key_in_use
+        account.record_generation_message!("left earlier today")
+        change.call(account)
+        account.save!
+
+        account.report_call_failure(key_used) { raise "the block ran" }
+
+        expect(account.reload.generation_failed_today?).to be(false)
+      end
+    end
+  end
+
   describe "#anonymize!" do
     it "clears the save times with the keys" do
       user.update!(key_saved_times: { "anthropic" => "2026-11-01T00:00:00Z" })

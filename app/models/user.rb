@@ -169,6 +169,14 @@ class User < ApplicationRecord
     write_generation_status!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
   end
 
+  def key_in_use = [ provider, api_key ]
+
+  def report_call_failure(key_used)
+    return yield if key_in_use == key_used
+
+    clear_generation_failure! if last_generation_error_date.present?
+  end
+
   def clear_generation_failure!
     write_generation_status!(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
   end

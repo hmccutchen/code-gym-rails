@@ -56,6 +56,12 @@ count with a guarded `UPDATE` for the same reason: the job's copy of the
 user can predate the failures. `#clear_generation_failure!` leaves the count
 alone, because "Try again" calls it before any provider has answered.
 
+`#report_call_failure` is the one place that decides whether a failed
+call's outcome is written: only while `#key_in_use` still equals what the
+job noted before the call. The caller holds the row lock, which is what
+makes the comparison current. `docs/decisions/per-user-api-keys.md` ("A
+call that outlives its key") has the rule.
+
 `#store_api_key` and `#use_provider` both put a key in use through the
 private `#put_key_in_use`, the one place `provider` is assigned for a key
 choice, and it sets the count back to zero: the count describes one

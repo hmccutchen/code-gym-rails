@@ -17,6 +17,7 @@ class RegenerateExerciseJob < ApplicationJob
 
     # The claim's timestamp is this worker's token; a cleared and retaken claim is present but not ours.
     claim = exercise.regenerating_since
+    key_used = user.key_in_use
     service = AiService.for(user)
     context = PracticeGeneration.capture(user, date: exercise.date, replacing: exercise)
     generated = generate(service, user, exercise.language, GenerationDeadline.new(claim + DailyExercise::REGENERATION_DEADLINE), context)
@@ -35,7 +36,7 @@ class RegenerateExerciseJob < ApplicationJob
   rescue ProviderError::AllSectionsRejectedError => e
     release(user, exercise, claim, e) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }
   rescue ProviderError, SetupError => e
-    release(user, exercise, claim, e) { user.record_generation_failure!(e, counts_toward_key_hold: false) }
+    release(user, exercise, claim, e) { record_provider_failure(user, e, key_used) }
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
     release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
@@ -58,6 +59,12 @@ class RegenerateExerciseJob < ApplicationJob
     Rails.logger.info("Kept today's set (#{kept_for}) for user #{user.id} on #{Date.current}; discarded the regenerated one")
     exercise.release_regenerating!(claim)
     user.record_generation_message!(KEPT_SET_MESSAGES.fetch(kept_for))
+  end
+
+  def record_provider_failure(user, error, key_used)
+    user.with_lock do
+      user.report_call_failure(key_used) { user.record_generation_failure!(error, counts_toward_key_hold: false) }
+    end
   end
 
   # regenerated_at stays untouched so a failed attempt doesn't use up the day's one regeneration.

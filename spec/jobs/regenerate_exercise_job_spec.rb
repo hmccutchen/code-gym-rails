@@ -60,6 +60,62 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     end
   end
 
+  describe "a key that changes while a regeneration is calling the provider" do
+    def provider_raising_after(error)
+      service = instance_double(ClaudeService)
+      allow(service).to receive(:generate_judged_exercise) do |*|
+        yield
+        raise error
+      end
+      allow(AiService).to receive(:for).with(user).and_return(service)
+      allow(Rails.logger).to receive(:error)
+    end
+
+    def remove_key_in_use = User.find(user.id).tap { |fresh| fresh.remove_api_key(fresh.provider) }.save!
+
+    before { user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq")) }
+
+    it "records no failure for a key removed during the call, keeps the set and releases the claim" do
+      exercise = claimed_exercise
+      provider_raising_after(ProviderError::AuthenticationError.new("401 invalid x-api-key")) { remove_key_in_use }
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false, last_generation_failure: nil,
+                                             last_generation_failure_provider: nil)
+      expect(exercise.reload).to have_attributes(regenerating_since: nil, regenerated_at: nil)
+      expect(exercise.problem_set).to eq("code_review" => { "question" => "old" })
+    end
+
+    it "records no setup failure for a key removed during the call" do
+      claimed_exercise
+      provider_raising_after(SetupError.new("unsupported language")) { remove_key_in_use }
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload.generation_failed_today?).to be(false)
+    end
+
+    it "records the failure as today's when the key in use did not change" do
+      claimed_exercise
+      provider_raising_after(ProviderError::AuthenticationError.new("401 invalid x-api-key")) { User.find(user.id).update!(language: "javascript") }
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key",
+                                             last_generation_failure_provider: "anthropic")
+    end
+
+    it "still says why the set was kept when every section failed its check, whichever key wrote the drafts" do
+      claimed_exercise
+      provider_raising_after(ProviderError::AllSectionsRejectedError.new("all rejected")) { remove_key_in_use }
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.reload.last_generation_error).to eq(RegenerateExerciseJob::KEPT_SET_MESSAGES.fetch(:all_rejected))
+    end
+  end
+
   it "keeps the old inactive set, draft and notes after settings change during one paid call" do
       stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise = claimed_exercise
