@@ -75,6 +75,36 @@ RSpec.describe "The automatic pause on the dashboard and the Account page", type
       expect(response.body).to include('data-rating-for="code_review"')
     end
 
+    it "sits in the page's card as a notice, with Resume as the primary button and Keep it paused the quiet one, both full size" do
+      pause("automatic")
+
+      notice = dashboard_at(monday_noon).at_css(".automatic-pause")
+
+      expect(notice["class"].split).to include("section")
+      expect(notice["role"]).to eq("status")
+      expect(notice.css("button").map { |button| button["class"].split }).to eq([ %w[btn btn-primary], %w[btn btn-ghost] ])
+    end
+
+    it "leaves the paused card beneath it without its own resume link, so the page has one way to resume" do
+      pause("automatic")
+
+      page = dashboard_at(monday_noon)
+
+      expect(page.css("a[href='#{account_path}']").map(&:text)).not_to include(I18n.t("dashboard.paused_empty.resume"))
+      expect(page.at_css("#dashboard-content").text).to include("Automatic generation is paused", "Generate today's set anyway")
+      expect(page.css(".automatic-pause form button").map { |button| button.text.strip }).to include("Resume")
+    end
+
+    it "keeps the paused card's resume link for a manual pause, whose page is unchanged" do
+      pause("manual")
+
+      page = dashboard_at(monday_noon)
+
+      expect(page.at_css("#dashboard-content .today-state-link a[href='#{account_path}']").text)
+        .to eq(I18n.t("dashboard.paused_empty.resume"))
+      expect(page.at_css(".automatic-pause")).to be_nil
+    end
+
     it "offers Resume and Keep it paused as plain forms that post the state they want and name the dashboard" do
       pause("automatic")
 

@@ -23,4 +23,12 @@ replaces that div and would take the callout with it.
 `@content_state` because it shows in every state, a weekend and a day with a
 set included, and `MissingSetState` names one state at a time. Its two
 controls are `button_to` forms with no Stimulus controller, so they work
-with scripts off. `docs/decisions/pausing-generation.md` has the rule.
+with scripts off.
+
+It uses the page's `.section` card, so it reads as information and not as
+the green or red of a flash. The message carries the accent bar the Exercise
+mix note uses. The bar is on the paragraph and not on the card, because
+below 600px every card on the page loses its side borders. While the line
+shows, `@automatic_pause` also tells `dashboard/_paused_empty` to leave out
+its resume link.
+`docs/decisions/pausing-generation.md` has the rule.

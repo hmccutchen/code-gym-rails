@@ -6,6 +6,7 @@ class DashboardController < ApplicationController
     return redirect_to(welcome_path) if current_user.first_run?
 
     load_todays_set
+    @automatic_pause = current_user.generation_paused_automatically?
     load_submitted_day_notes
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
     @daily_kind_pickers = DailyKindSwap::Picker.for_day(current_user, exercise: @exercise, response: @response)
