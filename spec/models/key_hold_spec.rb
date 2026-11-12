@@ -25,19 +25,18 @@ RSpec.describe KeyHold do
     end
   end
 
-  describe ".held?" do
-    it "is false below the count and true at it and past it" do
-      expect(described_class.held?(0)).to be(false)
-      expect(described_class.held?(described_class::AFTER - 1)).to be(false)
-      expect(described_class.held?(described_class::AFTER)).to be(true)
-      expect(described_class.held?(described_class::AFTER + 5)).to be(true)
-    end
-  end
+  describe "COVERED_COUNTS, the counts the schedule still covers" do
+    it "holds every count below the threshold, and neither the threshold nor anything past it" do
+      covered = described_class::COVERED_COUNTS
 
-  it "gives the schedule the counts it still covers, the same ones held? calls not held" do
-    expect((0..described_class::AFTER + 3).reject { |count| described_class.held?(count) })
-      .to eq((0..described_class::AFTER + 3).select { |count| described_class::COVERED_COUNTS.cover?(count) })
-    expect(described_class::COVERED_COUNTS).to eq(...described_class::AFTER)
+      expect(covered).to eq(...described_class::AFTER)
+      expect([ 0, described_class::AFTER - 1 ].map { |count| covered.cover?(count) }).to all(be(true))
+      expect([ described_class::AFTER, described_class::AFTER + 5 ].map { |count| covered.cover?(count) }).to all(be(false))
+    end
+
+    it "is the one definition, with no second predicate beside it" do
+      expect(described_class).not_to respond_to(:held?)
+    end
   end
 
   it "reads plain values and no database" do
@@ -46,7 +45,7 @@ RSpec.describe KeyHold do
 
     ActiveSupport::Notifications.subscribed(counting, "sql.active_record") do
       described_class.counts?("bad_key")
-      described_class.held?(2)
+      described_class::COVERED_COUNTS.cover?(2)
     end
 
     expect(queries).to be_empty

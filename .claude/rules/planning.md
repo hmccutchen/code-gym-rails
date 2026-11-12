@@ -233,7 +233,8 @@ read it before changing that area.
   finished set to its owner, and every resume stamps the sets that count as
   unopened (`DailyExercise.acknowledge_unopened!`, in the transaction that
   clears the pause), so a resume gives three fresh chances. "Keep it paused"
-  acknowledges nothing. `DailyExercise.unopened_before` and
+  acknowledges nothing, and neither does a resume on an account that is not
+  paused. `DailyExercise.unopened_before` and
   `UnopenedSets.unopened?` are one rule, held equal by a spec. The key hold is a separate rule
   (`.claude/rules/providers.md`). A held unsubmitted set and its draft response move to
   today (`User#carry_held_set_forward!`, `#recover_held_set`) under

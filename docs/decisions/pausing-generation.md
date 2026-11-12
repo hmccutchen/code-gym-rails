@@ -57,7 +57,9 @@ nudges still run. The check compares the migration files with the versions
 the database has recorded. It does not use Rails' `needs_migration?`, which
 raises on a migration dated after the clock. A run that skips the check
 logs one warning, so a migration stuck pending cannot switch the rule off
-unseen.
+unseen. When the check itself fails, on a database error or an unreadable
+folder, `SchemaWait` logs a warning naming the error class and answers
+"pending", so that run pauses nobody and still generates and nudges.
 
 **Decided again under the lock.** The hand-out reads the sets with no lock
 held, to avoid locking every due account each hour. When that read says
@@ -115,6 +117,11 @@ else.
   three sets went unopened would otherwise be paused automatically by the
   first hand-out after resuming.
 - **"Keep it paused" acknowledges nothing.** It only changes the source.
+- **A resume on a running account acknowledges nothing.** The toggle honours
+  `paused=0` from a stale tab, and a late click there must not erase a run
+  of unopened sets. `#clear_generation_pause!` reads the pause under the row
+  lock and stamps only when one is running. It still clears a source left
+  with no pause time.
 
 The cost is in counting. A count of sets opened, taken from `opened_at`,
 slightly overcounts for an account that was paused and then resumed: its
@@ -170,6 +177,14 @@ The action returns to the dashboard for that exact name and to the Account
 page for anything else. It takes a fixed name and no URL, so the parameter
 cannot send the browser to another site.
 
+The line is drawn as a notice: the page's card with the accent bar, Resume
+as the primary button and "Keep it paused" as the quiet one. While it
+shows, the paused card beneath it leaves out its own "Resume automatic
+generation" link, so the page has one way to resume.
+`DashboardController#show` decides that and passes it to
+`dashboard/_paused_empty` as `resume_link`. A manually paused account's page
+keeps the link.
+
 The line shows in every dashboard state, including a weekend and a day with
 a set on the page. `MissingSetState` puts the weekend ahead of the pause, so
 the line is drawn outside it, above `#dashboard-content`, and that object is
@@ -197,8 +212,9 @@ failures create no set, so the pause rule never reaches such an account.
 **The rule.** After two generation failures in a row that the provider
 classified as a bad key or as out of credit, the schedule stops covering the
 account. The two can be one of each. `KeyHold`, a pure object, owns the rule:
-the kinds are `KeyHold::KINDS`, the count is `KeyHold::AFTER`, and
-`.counts?(kind)` and `.held?(count)` answer from plain values. `User` and
+the kinds are `KeyHold::KINDS`, the count is `KeyHold::AFTER`,
+`.counts?(kind)` answers from a plain value, and `KeyHold::COVERED_COUNTS`
+is the range of counts the schedule still covers. `User` and
 `ScheduledGeneration` both read it, so neither names the other for this
 rule.
 

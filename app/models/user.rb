@@ -271,12 +271,6 @@ class User < ApplicationRecord
     put_key_in_use(name) unless name == provider
   end
 
-  def put_key_in_use(name)
-    self.provider = name
-    self.generation_account_failures = 0
-  end
-  private :put_key_in_use
-
   def suggests_level_moves? = level_suggestions?
 
   def kind_rungs = KindDifficulty.for(self).rungs(skill_level: skill_level)
@@ -469,6 +463,11 @@ class User < ApplicationRecord
   end
 
   private
+
+  def put_key_in_use(name)
+    self.provider = name
+    self.generation_account_failures = 0
+  end
 
   def write_generation_status!(columns)
     update_columns(columns.merge(updated_at: Time.current))
