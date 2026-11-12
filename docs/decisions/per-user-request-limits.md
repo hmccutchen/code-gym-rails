@@ -13,6 +13,11 @@ per-page cap still applies; the shared count runs before every other check,
 so a request those checks refuse still counts. `/generate` allows
 `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
 prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
+A bulk press (`prepare`, `prepare_ladders`) enqueues its jobs at
+`LearnController::BULK_PRIORITY` (5): behind a dashboard click and the
+single-concept write-up a person waits on (both 0), and ahead of scheduled
+sets (`EnqueueDueGenerationsJob::SCHEDULED_PRIORITY`, 10). One press can
+queue about 90 jobs, and at 0 they held up a click made after it.
 These caps are starting values, not measured ones. All of them use
 `LazyCacheStore`, so the test env's `:null_store` never trips them and a
 spec that exercises one swaps in a real store.
