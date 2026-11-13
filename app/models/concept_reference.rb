@@ -27,6 +27,10 @@ class ConceptReference < ApplicationRecord
     exists?(language: language, concept: concept)
   end
 
+  def self.find_for(concept:, language:)
+    find_by(concept:, language:)
+  end
+
   def self.written_up_keys(languages:)
     where(language: languages).distinct.pluck(:language, :concept).to_set
   end
@@ -44,7 +48,7 @@ class ConceptReference < ApplicationRecord
     User.transaction do
       next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
 
-      own = uncached { user.concept_references.find_by(concept: concept, language: language) }
+      own = uncached { user.concept_references.find_for(concept:, language:) }
       next rewrite(own, written, refresh:, seen_version:) if own
       next :skipped unless write_wanted?(nil, refresh:, seen_version:)
 

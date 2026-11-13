@@ -5,8 +5,12 @@
 A user reads their own guides only, never another user's, through
 `user.recognition_guides`. Every row has an owner since the schema step of
 `docs/decisions/learn-content-per-user.md`. `.indexed_for` indexes the user's
-rows by group key. The association has no `dependent:`:
-`AccountData::FATES` is the one place that deletes a user's rows. `.missing_for` lists the group keys a user has no guide
+rows by group key.
+
+The association has no `dependent:`: `AccountData::FATES` is the one place
+that deletes a user's rows.
+
+`.missing_for` lists the group keys a user has no guide
 of their own for, which is what Learn's prepare button queues. `.written_for?` asks
 about one key without loading the row, for `GenerateRecognitionGuideJob`.
 

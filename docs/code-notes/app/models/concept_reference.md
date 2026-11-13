@@ -16,7 +16,8 @@ The migration `ClearNonHashConceptLessons` cleared every non-object lesson once,
 A user reads their own rows only, never another user's, through
 `user.concept_references`. Every row has an owner since the schema step of
 `docs/decisions/learn-content-per-user.md`. One row is
-`user.concept_references.find_by(concept:, language:)`, and `.indexed_for`
+`user.concept_references.find_for(concept:, language:)`, the one place that
+spells the lookup key, and `.indexed_for`
 indexes the user's rows by `[concept, language]`; the per-user unique index
 leaves one row per key. The association has no `dependent:`:
 `AccountData::FATES` is the one place that deletes a user's rows.

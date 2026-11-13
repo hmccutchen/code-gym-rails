@@ -60,7 +60,7 @@ class GenerateConceptReferenceJob < ApplicationJob
   private
 
   def wanted?(user, concept, language, refresh:, seen_version:)
-    ConceptReference.write_wanted?(user.concept_references.find_by(concept: concept, language: language), refresh:, seen_version:)
+    ConceptReference.write_wanted?(user.concept_references.find_for(concept:, language:), refresh:, seen_version:)
   end
 
   def write_up(user, concept, language, refresh, seen_version)

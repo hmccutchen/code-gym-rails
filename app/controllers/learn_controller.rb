@@ -18,7 +18,7 @@ class LearnController < ApplicationController
   def show
     @bucket    = validated_bucket
     @concept   = validated_concept(@bucket)
-    @reference = current_user.concept_references.find_by(concept: @concept, language: @bucket)
+    @reference = current_user.concept_references.find_for(concept: @concept, language: @bucket)
     @ladder_targets = ladder_targets_for(@reference)
     @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
     @lesson_missing = @reference.present? && !@reference.lesson? && params[:lesson] == "missing"
@@ -39,7 +39,7 @@ class LearnController < ApplicationController
     return head :bad_request if predicate.nil?
     return head :bad_request if AWAITING_REWRITE.include?(awaiting) && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
-    reference = current_user.concept_references.find_by(concept: concept, language: bucket)
+    reference = current_user.concept_references.find_for(concept:, language: bucket)
     body = { ready: reference&.public_send(predicate) || false }
     if AWAITING_REWRITE.include?(awaiting)
       body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
