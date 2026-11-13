@@ -20,13 +20,22 @@ RSpec.describe GenerateConceptReferenceJob do
     SolidQueue::ReadyExecution.claim([ described_class.queue_name ], 1, worker.id).sole.perform
   end
 
-  it "discards overlapping queued requests for the shared reference across users and refresh modes" do
+  it "discards one user's overlapping queued requests across refresh modes" do
     enqueue_reference
 
     expect {
-      enqueue_reference(user_id: user.id + 1, refresh: false)
+      enqueue_reference(refresh: false)
     }.not_to change(SolidQueue::Job, :count)
     expect(SolidQueue::BlockedExecution.count).to eq(0)
+  end
+
+  it "never discards another user's request for the same concept, since each writes their own row" do
+    other = User.create!(email: "reference-queue-other@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" })
+    enqueue_reference
+
+    expect {
+      enqueue_reference(user_id: other.id, refresh: false)
+    }.to change(SolidQueue::ReadyExecution, :count).by(1)
   end
 
   it "discards requests received during the provider call even when the result is incomplete" do
@@ -40,7 +49,7 @@ RSpec.describe GenerateConceptReferenceJob do
 
     expect(service).to have_received(:generate_concept_reference).once
     expect(SolidQueue::ReadyExecution.count).to eq(0)
-    expect(ConceptReference.find_by!(concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(1)
+    expect(ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(1)
   end
 
   it "allows an explicit retry after an incomplete generation finishes" do
@@ -50,7 +59,7 @@ RSpec.describe GenerateConceptReferenceJob do
     perform_next
 
     expect(service).to have_received(:generate_concept_reference).twice
-    expect(ConceptReference.find_by!(concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(2)
+    expect(ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(2)
   end
 
   it "releases the permit after a provider failure" do

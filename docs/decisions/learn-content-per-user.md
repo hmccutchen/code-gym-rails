@@ -47,9 +47,9 @@ ships one release before any code reads it for Learn
    language)` and `(user_id, group_key)`, and turns the old unique indexes
    into partial ones over rows with no user, so code still in production
    keeps deduplicating shared rows. Deletion removes a user's own rows.
-2. **L2, per-user concept references.** Reads and writes the user's own
-   reference, falling back to the shared row when the user has none. Waits
-   until L1 is deployed. L2 must also:
+2. **L2, per-user concept references (done).** Reads and writes the
+   user's own reference, falling back to the shared row when the user has
+   none. Waits until L1 is deployed. L2 must also:
    - scope `ConceptReference`'s `uniqueness: { scope: :language }` to
      `user_id`;
    - key `GenerateConceptReferenceJob`'s `limits_concurrency` on `user_id`
@@ -82,6 +82,35 @@ ships one release before any code reads it for Learn
    removed, the L4 copy runs again for accounts created since L4, so nobody
    loses text they could see. A later migration then removes the shared
    rows, drops the partial indexes and makes `user_id` non-null.
+
+## What L2 does
+
+- `ConceptReference.for(user, concept:, language:)` and
+  `ConceptReference.seen_by(user, ...)` are the one answer to which
+  reference a user sees: their own row, else the shared one, never another
+  user's. Learn, the dashboard and History inline reference, the featured
+  callout, the review's short version, generation's ladders
+  (`GenerationLadders.for(user, ...)`), `LadderCoverage` and
+  `explain_differently` read through them. L5 drops the shared half.
+- `GenerateConceptReferenceJob` writes only the user's own row. A user with
+  only the shared row who asks for a rewrite gets a new row of their own,
+  numbered past the shared row's `generation_version` so the Learn poll sees
+  the rewrite land; the shared row is never written again.
+- The admin promote check counts any row, a teammate's included. It asks
+  only whether the concept has ever been written up and shows no text, and
+  a reference for a concept outside the vocabulary exists only once
+  someone's set was tagged with it.
+- Generating a set (a new one or a regeneration) queues the user's missing
+  write-ups at `JobPriority::BULK` once the set is saved, leaving out a
+  concept the set hides until it is submitted, so Learn never gains a
+  write-up that hints at a hidden answer. Submitting still queues the rest.
+- `User#writes_learn_content?` (it replaced `#prepares_ladders?`) gates
+  every enqueue path and the job itself, so a trial account writes nothing.
+- The preview seed writes the preview user's own row, never a shared one,
+  so nothing writes a shared row after L2.
+- Until L3b moves bulk work behind the scheduled sets, `JobPriority::BULK`
+  still runs ahead of `JobPriority::SCHEDULED`, so the write-ups a morning
+  set queues can run before later users' scheduled sets.
 
 ## The deploy window between L1 and L2
 

@@ -23,7 +23,7 @@ class ResponsesController < ApplicationController
     return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
     return render_stale_answers if outcome == :stale
 
-    enqueue_concept_references(exercise) if outcome == :newly_submitted
+    GenerateConceptReferenceJob.queue_missing(current_user, exercise.concept_pairs) if outcome == :newly_submitted
     render_save_result(outcome != :failed)
   end
 
@@ -409,17 +409,5 @@ class ResponsesController < ApplicationController
     exercise.active_section_keys
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
-  end
-
-  def enqueue_concept_references(exercise)
-    enqueued = []
-    exercise_concept_tags(exercise).each do |section, concept|
-      next if concept == "other"
-      language = ConceptBucket.for(section, exercise.language)
-      pair = [ concept, language ]
-      next if enqueued.include?(pair) || ConceptReference.exists?(concept: concept, language: language)
-      GenerateConceptReferenceJob.perform_later(concept: concept, language: language, user_id: current_user.id)
-      enqueued << pair
-    end
   end
 end

@@ -7,16 +7,15 @@ class LadderCoverage
   def self.for(user)
     at_rungs = KindDifficulty.new(levels: user.kind_rungs, locked: [])
     pairs_by_kind = ConceptHosts.for(user, difficulty: at_rungs).pairs_by_kind
-    grounded = laddered_pairs(pairs_by_kind.values.flatten(1).uniq)
+    grounded = laddered_pairs(user, pairs_by_kind.values.flatten(1).uniq)
 
     new(pairs_by_kind.to_h { |kind, pairs| [ kind, Entry.new(kind: kind, pairs: pairs, grounded: pairs & grounded) ] },
         offered: KindPreferences.offered_to(user))
   end
 
-  def self.laddered_pairs(pairs)
-    ConceptReference.where(concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
-                    .select(&:ladder?)
-                    .map { |reference| [ reference.concept, reference.language ] }
+  def self.laddered_pairs(user, pairs)
+    ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+                    .select { |_key, reference| reference.ladder? }.keys
   end
   private_class_method :laddered_pairs
 

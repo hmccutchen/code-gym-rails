@@ -10,9 +10,9 @@ class ConceptReferencesController < ApplicationController
   # Bounds what a crafted request can forward: two framings with room to spare, in bytes since a character is up to four.
   MAX_PRIOR_ALTERNATE_BYTES = 8_000
 
-  # POST /concept_references/:id/explain_differently — unpersisted; the shared reference is read, never written.
+  # POST /concept_references/:id/explain_differently — unpersisted; the reference is read, never written.
   def explain_differently
-    reference = ConceptReference.find(params[:id])
+    reference = ConceptReference.visible_to(current_user).find(params[:id])
     prior = prior_alternates_param
 
     if prior.size >= MAX_ALTERNATES_PER_CONCEPT

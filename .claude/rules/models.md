@@ -76,11 +76,11 @@ reads and writes each column:
 | `DuckThread` | user_id, daily_exercise_id (unique), draft_scope (the exercise's scope when written; a mismatch reads as empty), threads (jsonb keyed by section: turns, version, cleared) |
 | `LevelSuggestionEvent` | user_id, kind, action (applied/dismissed/removed), source (suggestion/setup_edit/skill_level_edit, applied rows only), from_level, to_level, window_size, favourable, too_hard_latest3, newest_result_on |
 | `DailyKindSwapEvent` | table `daily_kind_swaps`: user_id, place (0-based), from_kind, to_kind, today_section (unanswered/answered/submitted/not_in_set/no_set), planned_size (the `plan_notes["size"]` of today's set, or of a paused user's held set not yet moved to today; null for no_set or an unrecorded size), size_setting (`daily_section_count` at the swap; null = Automatic) — one row per saved swap |
-| `ConceptReference` | user_id (nullable fk; read only by account deletion until L2, see `docs/decisions/learn-content-per-user.md`), concept, language (unique per user; unique together among rows with no user_id through a partial index), tagline, explanation, code_example, senior_lens, guide_plain_language, guide_worked_example, guide_pitfalls, ladder_junior, ladder_mid_level, ladder_senior, ladder_principal_engineer, lesson, generation_version — one shared reference per concept for every teammate; `.claude/rules/learn.md` owns its rules |
+| `ConceptReference` | user_id (nullable fk; the owner, or null for a shared row read as a fallback until L5, see `docs/decisions/learn-content-per-user.md`), concept, language (unique per user; unique together among rows with no user_id through a partial index), tagline, explanation, code_example, senior_lens, guide_plain_language, guide_worked_example, guide_pitfalls, ladder_junior, ladder_mid_level, ladder_senior, ladder_principal_engineer, lesson, generation_version — one reference per concept for each user; `.claude/rules/learn.md` owns its rules |
 | `JudgeSolve` | one row per blind judge pass on a design comparison: user_id, daily_exercise_id, set_generated_at (all null only for synthetic), source (live/replay/synthetic), section, attempt, edit_check, shipped, never_shown_reason (replaced_by_retry/section_dropped, live unshipped rows only), edit_reverted, revert_reason, rung, locked, concept, judge_status, judge_pick, key_better, matched (null = unsolved), unsolved_reason, unsolved_detail, judged_section (jsonb, with its answer_key), section_digest, judge_provider, judge_model, draft_model, app_revision, human_call (checked against matched), human_note, human_called_at. Every page reads content through `JudgeSolve.readable` (hidden unless proven: synthetic, a never_shown_reason, or that row's own section reviewed on the set it belongs to); `docs/decisions/design-comparison-the-second-fixed-section.md` |
 
-`ConceptReference` (its `user_id` is read only by account deletion until L2; see
-`.claude/rules/learn.md`) also carries `guide_plain_language`, `guide_worked_example`,
+`ConceptReference` (owned per user since L2; see `.claude/rules/learn.md`)
+also carries `guide_plain_language`, `guide_worked_example`,
 `guide_pitfalls` (all nullable text). `ConceptReference#guide?` — all three
 guide fields present — is the single authority for "does this row carry a
 guide". It also
@@ -102,9 +102,10 @@ content equality cannot do that because an unrelated update changes the
 timestamp and a valid generation may leave the prose unchanged. Failed calls and skipped
 rewrites do not advance it.
 
-`GenerateConceptReferenceJob` uses Solid Queue's per-concept/language
-concurrency permit with `on_conflict: :discard`. Users and refresh modes share
-the permit because they share the cached reference. Overlapping jobs are
+`GenerateConceptReferenceJob` uses Solid Queue's per-user/concept/language
+concurrency permit with `on_conflict: :discard`. One user's refresh modes
+share the permit because they write the same row; another user's job has a
+permit of its own, since it writes that user's row. Overlapping jobs are
 discarded rather than blocked: a blocked job could make another billed call
 immediately after an incomplete result. Finishing or failing releases the
 permit, so a later explicit retry remains possible. Its expiry derives from

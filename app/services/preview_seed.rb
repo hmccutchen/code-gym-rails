@@ -20,7 +20,7 @@ class PreviewSeed
 
     user = find_or_create_user
     Time.use_zone(user.effective_time_zone) { seed_days(user) }
-    seed_concept_reference
+    seed_concept_reference(user)
     user
   end
 
@@ -98,8 +98,8 @@ class PreviewSeed
     "quick_test" => "Load the page with ten rows, then a hundred, and compare how many queries the log shows."
   }.freeze
 
-  def seed_concept_reference
-    ConceptReference.find_or_create_by!(concept: "n_plus_one", language: "ruby_rails") do |reference|
+  def seed_concept_reference(user)
+    ConceptReference.find_or_create_by!(user: user, concept: "n_plus_one", language: "ruby_rails") do |reference|
       reference.tagline      = "Load the association once, not once per row."
       reference.explanation  = "A query inside a loop issues one statement per record. Eager loading fetches them in a single additional query."
       reference.code_example = "orders = Order.includes(:customer)\norders.each { |order| puts order.customer.name }"

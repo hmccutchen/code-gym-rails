@@ -3,9 +3,19 @@ require "rails_helper"
 RSpec.describe LadderCoverage do
   let(:user) { User.create!(email: "coverage@example.com", language: "ruby_rails") }
 
-  def laddered(concept, bucket)
-    ConceptReference.create!(concept: concept, language: bucket,
+  def laddered(concept, bucket, owner: nil)
+    ConceptReference.create!(concept: concept, language: bucket, user: owner,
                              ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
+  end
+
+  it "grounds a concept on the user's own ladder or the shared one, never on another user's" do
+    laddered("n_plus_one", "ruby_rails", owner: user)
+    laddered("caching", "ruby_rails")
+    laddered("memoization", "ruby_rails", owner: User.create!(email: "coverage-other@example.com"))
+
+    grounded = described_class.for(user).for_kind(ExerciseSection::Challenge).then { |entry| entry.pairs - entry.gaps }
+
+    expect(grounded).to contain_exactly([ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ])
   end
 
   it "has an entry for every section kind, targeted or not" do

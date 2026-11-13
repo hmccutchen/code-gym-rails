@@ -48,7 +48,7 @@ RSpec.describe ForcedConceptDrafts do
       draft = described_class.rung_draft(user, "ruby_rails", "senior")
 
       expect(draft.plan.featured_concept).to eq("n_plus_one")
-      expect(GenerationLadders).to have_received(:for).with(anything, "ruby_rails", anything, hash_including(featured_concept: "n_plus_one"))
+      expect(GenerationLadders).to have_received(:for).with(user, anything, "ruby_rails", anything, hash_including(featured_concept: "n_plus_one"))
     end
 
     it "plans without a stored row the user no longer meets, which production would replace" do

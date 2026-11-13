@@ -449,7 +449,7 @@ RSpec.describe ExerciseDraft do
       described_class.retry_section(draft_for(language: "javascript", mode: :schema_review), ExerciseSection::CodeReview,
                                     "promises", provider: provider)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
+      expect(GenerationLadders).to have_received(:for).with(user, anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end
   end
 end

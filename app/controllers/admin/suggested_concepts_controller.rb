@@ -9,6 +9,7 @@ module Admin
     def promote
       concept = SuggestedConcept.find(params[:id])
 
+      # Any user's row counts: the check asks whether the concept was ever written up, and shows no text.
       unless ConceptReference.exists?(language: concept.language, concept: concept.normalized_name)
         return redirect_to admin_suggested_concepts_path, alert: t("flash.admin.suggested_concepts.reference_missing")
       end

@@ -2,9 +2,11 @@ require "rails_helper"
 
 RSpec.describe "Learn write-up past the hourly limit", type: :system, with_csrf: true do
   it "shows the limit message instead of claiming work is in progress" do
-    user = create_trial_user
+    user = create_fake_provider_user
     user.update!(language: "ruby_rails")
     visit_as(user)
+    # A trial, the one account the limit used to reach, is offered no write-up since Learn became per user.
+    allow_any_instance_of(LearnController).to receive(:own_key?).and_return(false)
     store = ActiveSupport::Cache::MemoryStore.new
     allow(store).to receive(:increment).and_return(LearnController::PREPARE_PER_HOUR + 1)
     allow(Rails).to receive(:cache).and_return(store)

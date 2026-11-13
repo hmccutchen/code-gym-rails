@@ -1,6 +1,23 @@
 require "rails_helper"
 
 RSpec.describe GenerationLadders do
+  let(:user) { User.create!(email: "ladders@example.com") }
+
+  it "reads the user's own ladder over the shared one, falls back to the shared one, and never reads another user's" do
+    rungs = { ladder_junior: "j", ladder_mid_level: "m", ladder_principal_engineer: "p" }
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "shared", **rungs)
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "own", user: user, **rungs)
+    ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_senior: "shared caching", **rungs)
+    ConceptReference.create!(concept: "memoization", language: "ruby_rails", ladder_senior: "theirs", **rungs,
+                             user: User.create!(email: "ladders-other@example.com"))
+
+    ladder = described_class.for(user, { ExerciseSection::Challenge => "senior" }, "ruby_rails", :application_code)
+                            .fetch(ExerciseSection::Challenge)
+
+    expect(ladder).to include("n_plus_one" => "own", "caching" => "shared caching")
+    expect(ladder).not_to have_key("memoization")
+  end
+
   it "loads each kind's rungs at its level for the day's mode and retains their owners" do
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                              ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
@@ -9,7 +26,7 @@ RSpec.describe GenerationLadders do
                              ladder_junior: "j2", ladder_mid_level: "m", ladder_senior: "s2", ladder_principal_engineer: "p2")
     rungs = { ExerciseSection::CodeReview => "senior", ExerciseSection::Challenge => "senior" }
 
-    ladders = described_class.for(rungs, "ruby_rails", :schema_review)
+    ladders = described_class.for(user, rungs, "ruby_rails", :schema_review)
 
     expect(ladders.keys).to eq(rungs.keys)
     expect(ladders.fetch(ExerciseSection::CodeReview)).to include(schema_concept => "s2")
@@ -26,8 +43,8 @@ RSpec.describe GenerationLadders do
     rungs = { ExerciseSection::PlanReview => "senior", ExerciseSection::Challenge => "senior" }
     featured = hidden
 
-    plain = described_class.for(rungs, "ruby_rails", :application_code)
-    withheld = described_class.for(rungs, "ruby_rails", :application_code, featured_concept: featured)
+    plain = described_class.for(user, rungs, "ruby_rails", :application_code)
+    withheld = described_class.for(user, rungs, "ruby_rails", :application_code, featured_concept: featured)
 
     expect(plain.fetch(ExerciseSection::PlanReview)).to include(hidden => "s", shown => "s")
     expect(withheld.fetch(ExerciseSection::PlanReview)).to include(shown => "s")
@@ -39,7 +56,7 @@ RSpec.describe GenerationLadders do
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
                              ladder_junior: "x" * 500, ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
     ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_junior: "j")
-    rungs = described_class.for({ ExerciseSection::CodeReview => "junior" }, "ruby_rails", :application_code).fetch(ExerciseSection::CodeReview)
+    rungs = described_class.for(user, { ExerciseSection::CodeReview => "junior" }, "ruby_rails", :application_code).fetch(ExerciseSection::CodeReview)
 
     expect(rungs.fetch("n_plus_one").length).to eq(ConceptReference::MAX_LADDER_RUNG_LENGTH)
     expect(rungs).not_to have_key("caching")
@@ -67,7 +84,7 @@ RSpec.describe GenerationLadders do
 
     it "labels the ladder owner alongside mixed senior-equivalent and principal baselines" do
       reference
-      text = render_ladders(described_class.for(rungs, "ruby_rails", :bug_hunt, gotcha: gotcha))
+      text = render_ladders(described_class.for(user, rungs, "ruby_rails", :bug_hunt, gotcha: gotcha))
 
       expect(text).to include("Concept ladders for code_review:\n- #{gotcha.concept}:")
       expect(text).to include("Baseline: #{KindDifficulty::LEVEL_DEFINITIONS.fetch('senior')}",
@@ -76,7 +93,7 @@ RSpec.describe GenerationLadders do
 
     it "uses persisted senior text for principal bug hunts in full generation and retry, without moving the configured rung" do
       reference
-      ladders = described_class.for(rungs, "ruby_rails", :bug_hunt, gotcha: gotcha)
+      ladders = described_class.for(user, rungs, "ruby_rails", :bug_hunt, gotcha: gotcha)
 
       [ render_ladders(ladders), render_ladders(ladders, only: bug) ].each do |text|
         expect(text).to include(reference.ladder_senior, "Sections at #{principal}:")
@@ -88,11 +105,11 @@ RSpec.describe GenerationLadders do
 
     it "keeps ordinary principal text and preserves distinct shared-concept guidance in both input orders" do
       reference
-      ordinary = described_class.for(rungs, "ruby_rails", :application_code)
+      ordinary = described_class.for(user, rungs, "ruby_rails", :application_code)
       expect(ordinary.values).to all(include(gotcha.concept => reference.ladder_principal_engineer))
 
       [ rungs, rungs.to_a.reverse.to_h ].each do |ordered|
-        ladders = described_class.for(ordered, "ruby_rails", :bug_hunt)
+        ladders = described_class.for(user, ordered, "ruby_rails", :bug_hunt)
         expect(ladders.fetch(bug)).to include(gotcha.concept => reference.ladder_senior)
         expect(ladders.fetch(challenge)).to include(gotcha.concept => reference.ladder_principal_engineer)
         text = GenerationPrompt::DifficultyGuidance.render(rungs: ordered, difficulty: KindDifficulty.none, ladders: ladders, mode: :bug_hunt)
@@ -104,10 +121,10 @@ RSpec.describe GenerationLadders do
     end
 
     it "preserves the picked-gotcha exclusion and omits guidance when references are absent" do
-      expect(described_class.for(rungs, "ruby_rails", :bug_hunt, gotcha: gotcha).values).to all(be_empty)
+      expect(described_class.for(user, rungs, "ruby_rails", :bug_hunt, gotcha: gotcha).values).to all(be_empty)
       expect(render_ladders({})).not_to include("Concept ladders for")
       reference
-      ladders = described_class.for(rungs, "ruby_rails", :bug_hunt, gotcha: gotcha)
+      ladders = described_class.for(user, rungs, "ruby_rails", :bug_hunt, gotcha: gotcha)
       expect(ladders.fetch(bug)).to include(gotcha.concept => reference.ladder_senior)
       expect(ladders.fetch(challenge)).not_to have_key(gotcha.concept)
     end
@@ -117,7 +134,7 @@ RSpec.describe GenerationLadders do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
         ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "Trace the repeated query.", ladder_principal_engineer: "p")
       placed = { bug => "senior", challenge => "senior" }
-      ladders = described_class.for(placed, "ruby_rails", :bug_hunt, gotcha: gotcha)
+      ladders = described_class.for(user, placed, "ruby_rails", :bug_hunt, gotcha: gotcha)
       text = GenerationPrompt::DifficultyGuidance.render(rungs: placed, difficulty: KindDifficulty.none, ladders: ladders, mode: :bug_hunt)
 
       expect(ladders.fetch(bug).keys).to eq([ gotcha.concept ])

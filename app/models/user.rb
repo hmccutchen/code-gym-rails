@@ -258,7 +258,7 @@ class User < ApplicationRecord
 
   def on_trial? = trial? && !api_key_present?
 
-  def prepares_ladders? = !on_trial?
+  def writes_learn_content? = !on_trial?
 
   def trial_ended? = on_trial? && !trial_active?
 

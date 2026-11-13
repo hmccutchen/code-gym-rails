@@ -58,6 +58,7 @@ class GenerateDailyExercisesJob < ApplicationJob
       return
     end
     user.record_generation_success!
+    queue_write_ups(user, result.exercise) if result.status == :saved
 
     Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
@@ -76,6 +77,10 @@ class GenerateDailyExercisesJob < ApplicationJob
   # A page may be polling for this set, so a call whose key changed still ends in a failure the poll can report.
   def report_failure(user, key_used, &)
     user.report_call_failure(key_used, when_key_changed: -> { user.record_generation_message!(SUPERSEDED_MESSAGE) }, &)
+  end
+
+  def queue_write_ups(user, exercise)
+    GenerateConceptReferenceJob.queue_missing(user, exercise.concept_pairs(before_submission: true), priority: JobPriority::BULK)
   end
 
   def skipped_duplicate(user) = "Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)"

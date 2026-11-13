@@ -80,6 +80,14 @@ class DailyExercise < ApplicationRecord
     active_section_keys.select { |key| ExerciseSection.for(key).adaptation_evidence?(problem_set[key]) }
   end
 
+  def concept_pairs(before_submission: false)
+    withheld = before_submission ? concepts_withheld_before_submission : []
+    active_section_keys.filter_map do |key|
+      concept = problem_set.dig(key, "concept")
+      [ concept, ConceptBucket.for(key, language) ] if concept.present? && concept != "other" && withheld.exclude?(concept)
+    end.uniq
+  end
+
   def concepts_withheld_before_submission
     active_section_keys.filter_map do |key|
       section = problem_set[key]

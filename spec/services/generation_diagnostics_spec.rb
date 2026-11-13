@@ -38,7 +38,7 @@ RSpec.describe GenerationDiagnostics do
     ConceptReference.create!(concept: gotcha.concept, language: "ruby_rails",
       ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "Senior edge.", ladder_principal_engineer: "Principal cost.")
     placed = { ExerciseSection::CodeReview => "principal_engineer", ExerciseSection::Challenge => "principal_engineer" }
-    ladders = GenerationLadders.for(placed, "ruby_rails", :bug_hunt, gotcha: gotcha)
+    ladders = GenerationLadders.for(user, placed, "ruby_rails", :bug_hunt, gotcha: gotcha)
     captured = draft.with(kinds: placed.keys, kind_rungs: placed.transform_keys(&:key), ladders: ladders,
                           plan: plan.with(code_review_mode: :bug_hunt, code_review_gotcha: gotcha))
     sections = placed.keys.to_h { |kind| [ kind.key, { "concept" => gotcha.concept } ] }

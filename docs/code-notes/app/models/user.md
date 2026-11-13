@@ -165,11 +165,15 @@ undecided.
 `learning_track`, so a rollback to before tracks per level, two releases
 back, would send an account that chose under this code to `/welcome` again.
 
-## `#prepares_ladders?`
+## `#writes_learn_content?`
 
-Each prepared ladder is a billed rewrite of a shared reference. A trial
-account's calls run on a house key, so a trial is never offered the control
-and the endpoint queues nothing for one.
+Trials are paused, and a trial account's calls would run on a house key, so
+the owner decided a trial account writes no Learn content
+(`docs/decisions/learn-content-per-user.md`). Every way a concept write-up is
+queued checks it, and `GenerateConceptReferenceJob` checks it again before
+the call: the Learn prepare actions, AI difficulty guidance, the write-ups
+queued on submit and those queued when a set is generated. A trial is never
+offered the controls.
 
 ## `#kind_rungs`
 

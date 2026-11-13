@@ -136,6 +136,9 @@ Each path writes nothing once the account is gone:
 - A usage row for a call that finished after the deletion fails on its
   foreign key; `AiService#log_usage` already rescues and logs that.
 - A job enqueued earlier looks the user up by id, finds none, and exits.
+- A concept write-up (`GenerateConceptReferenceJob`) share-locks the user
+  before it writes and writes nothing once the account is gone, so its row
+  never fails on the foreign key and the job finishes cleanly.
 
 A mailer job enqueued with a record that is gone fails to deserialize its
 arguments. Deletion removes the unfinished ones it can match, so this

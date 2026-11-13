@@ -24,7 +24,7 @@ class ExerciseDraft
         rungs: kind_rungs.slice(*kinds.map(&:key)), reduced: eased_concepts_for(plan, difficulty))
     end
     plan = adjusted_plan(plan, adjustments) if adjustments
-    ladders    = ladders_for(plan, kinds, kind_rungs, language)
+    ladders    = ladders_for(user, plan, kinds, kind_rungs, language)
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, delivered_history: delivered_history,
                                      difficulty: difficulty, kind_rungs: kind_rungs, skill_level: skill_level, ladders: ladders,
                                      adjustments: adjustments)
@@ -58,7 +58,7 @@ class ExerciseDraft
     user, language = draft.user, draft.language
     prompt = provider.prompt.call(user, language, plan: draft.plan, history: draft.history, delivered_history: draft.delivered_history, difficulty: draft.difficulty,
                                   kind_rungs: draft.kind_rungs, skill_level: draft.skill_level,
-                                  ladders: ladders_for(draft.plan, [ kind ], draft.kind_rungs, language), adjustments: draft.adjustments)
+                                  ladders: ladders_for(user, draft.plan, [ kind ], draft.kind_rungs, language), adjustments: draft.adjustments)
     reply = provider.generate.call(user, "retry_section", language, prompt.render(only: kind, fixed_concept: concept, retry_cause: cause),
                                    subject: "#{kind.key} retry",
                                    deadline: deadline.leaving(CallProfiles.worst_case_seconds_for("judge_section")))
@@ -97,8 +97,8 @@ class ExerciseDraft
   end
   private_class_method :code_review_files
 
-  def self.ladders_for(plan, kinds, kind_rungs, language)
-    GenerationLadders.for(kinds.index_with { |kind| kind_rungs.fetch(kind.key) }, language,
+  def self.ladders_for(user, plan, kinds, kind_rungs, language)
+    GenerationLadders.for(user, kinds.index_with { |kind| kind_rungs.fetch(kind.key) }, language,
                           plan.code_review_mode, gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
   end
   private_class_method :ladders_for
