@@ -116,7 +116,7 @@ en:
         heading: "Deleting your account"
         body: "\"Delete my account\" on the Account page removes your account and everything tied to it: answers, reviews, conversations, usage records and your keys. A few things outlive it:"
         backups: "Database backups keep a copy for up to %{days} days."
-        logs: "Server logs record your account number and the IP address of each request, and leave out your email address. Railway keeps them for up to %{days} days."
+        logs: "Server logs record your account number and the IP address of each request, and leave out your email address. Railway keeps them for %{days} days."
         rate_limits: "Short-lived cache entries, such as the sign-in limits that stop someone guessing codes, keep your email address, IP address or account number for up to %{days} days."
         jobs: "Records of finished background jobs, which name your account number, are cleared about a day after each job finishes."
         library: "Concept write-ups generated with your key stay in the shared library. They're written from a concept's name, so they contain no text you wrote."

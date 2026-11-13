@@ -17,11 +17,10 @@ own. `.facts` is the one list the controller hands the view.
 
 ## Numbers the code cannot know
 
-`BACKUP_DAYS` (how long Railway keeps database backups) and `LOG_DAYS` (how
-long Railway keeps server logs) are settings on Railway, outside this
-repository. They started as bracketed placeholder strings so the rendered
-page shows plainly that they are unset, and
-`spec/models/privacy_notice_spec.rb` fails until both are whole numbers of
+`BACKUP_DAYS` (how long Railway keeps database backups, 6 for its daily
+backups) and `LOG_DAYS` (how long Railway keeps server logs, 7) are settings
+on Railway, outside this repository, so they are written here by hand.
+`spec/models/privacy_notice_spec.rb` fails unless both are whole numbers of
 days. When either Railway setting changes, change the constant with it.
 
 ## Why the page names the logs' IP addresses and the cache
