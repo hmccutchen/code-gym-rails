@@ -102,29 +102,21 @@ en:
         heading: "Where your work goes"
         provider: "Your exercises, answers and questions are sent to the AI provider whose key is in use, under that key. That provider's own data policy covers what it keeps."
         email: "Email goes out through Resend: your login codes, a notice when you turn your authenticator app on or off or make new recovery codes, and a copy of a review, which is sent only when you press the button asking for one."
-        scripts: "Two page scripts, one that draws diagrams and one that lets you drag answers into order, load from jsDelivr when a page needs them, so jsDelivr sees your IP address when they load."
       device:
         heading: "On your device"
-        draft: "Your browser keeps a copy of answers that haven't reached the server yet. It clears that copy once they're saved, when you submit, and when you open a page while signed out."
-        cookie: "The sign-in cookie lasts %{days} days after your last visit."
+        body: "Your browser keeps a copy of answers you haven't sent until they're saved, and you stay signed in for %{days} days after your last visit."
       cost:
         heading: "What it costs you"
         billing: "Your provider bills every request to your key. The Account page shows an estimate of this month's spend for Anthropic keys, and a request count for the others."
         schedule: "On weekdays, a set is generated with your key each morning, whether or not you open the app."
-        pause: "If %{count} sets in a row go unopened, generation pauses so your key isn't spent on sets you don't see. One tap on the dashboard resumes it."
+        pause: "If %{count} sets in a row go unopened, generation pauses until you resume it with one tap on the dashboard."
       reminders:
         heading: "Reminders"
-        body: "If you turn on reminders, your browser's push service delivers them. The browser's maker runs that service: Apple, Google, Mozilla or Microsoft. It handles the delivery but can't read the message, which is encrypted for your browser. Turning reminders off, or deleting your account, removes the delivery addresses the app holds for your devices."
+        body: "If you turn on reminders, your browser's push service delivers them without being able to read them. Turning reminders off, or deleting your account, stops them on all your devices."
       deleting:
         heading: "Deleting your account"
-        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: answers, reviews, conversations, usage records and your keys. A few things outlive it:"
-        backups: "Database backups keep a copy for up to %{days} days."
-        logs: "Server logs record the IP address of each request, and logs of the app's background work name your account's ID number. Email addresses are left out. Railway keeps them for %{days} days."
-        rate_limits: "Short-lived cache entries, such as the sign-in limits that stop someone guessing codes, keep your email address, IP address or account's ID number for about %{days} days."
-        jobs: "Records of finished background jobs, which name your account's ID number, are cleared about a day after each job finishes."
-        failed_jobs: "A background job that was running at the moment of deletion and then fails can stay in the failed-jobs list, naming your account's ID number, until it's cleared by hand."
-        library: "Concept write-ups generated with your key stay in the shared library. They're written from a concept's name, so they contain no text you wrote."
-        outside: "Copies held outside Coding Gym, such as email you were sent and what your AI provider keeps, are not affected."
+        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: your answers, reviews, conversations, usage records and keys. It can't be undone."
+        leftovers: "Server logs, which don't include your email address, are kept for up to %{log_days} days. Concept write-ups made with your key stay on Learn for everyone, but they contain nothing you wrote. Copies held outside Coding Gym, such as emails you were sent and what your AI provider keeps, are not affected."
       log_in: "Log in"
   sessions:
     new:

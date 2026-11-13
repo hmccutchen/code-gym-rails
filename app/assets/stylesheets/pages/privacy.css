@@ -4,9 +4,7 @@
 .privacy-page section { margin-bottom: 1.75rem; }
 .privacy-page section:last-of-type { margin-bottom: 0; }
 .privacy-page h2 { font-size: 1.1rem; margin-bottom: .5rem; }
-.privacy-page p, .privacy-page li { line-height: 1.6; }
+.privacy-page p { line-height: 1.6; }
 .privacy-page p + p { margin-top: .6rem; }
-.privacy-page ul { padding-left: 1.25rem; margin-top: .6rem; }
-.privacy-page li + li { margin-top: .4rem; }
 .privacy-log-in { margin-top: 1.75rem; }
 .privacy-log-in .btn { width: 100%; padding: .75rem; }

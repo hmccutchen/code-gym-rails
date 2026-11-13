@@ -51,14 +51,15 @@ read it before changing that area.
   Account page's delete card link to it. Its text is a set of claims about
   the code, so a change to the behaviour one describes changes the page in
   the same PR: what is stored and for how long, the authenticator secret and
-  recovery codes, the key's storage and use, the weekday schedule and the
-  unopened-set pause, what the Account page's usage card prices, the email
-  Resend sends, the scripts loaded from jsDelivr, the answer draft and the
-  sign-in cookie, the push services, what deletion removes and what it
-  leaves, and what the logs and the cache hold. It speaks for the app, with
-  no first person. The copy is `privacy.show` in `config/locales/en.yml`;
-  every number comes from `PrivacyNotice.facts`, and `BACKUP_DAYS` and
-  `LOG_DAYS` there must match Railway's settings
+  recovery codes, the key's storage and use, the email Resend sends, the
+  answer draft and how long a sign-in lasts, the weekday schedule and the
+  unopened-set pause, what the Account page's usage card prices, push
+  reminders, what deletion removes, and what outlives it (server logs
+  without the email address, the shared concept write-ups, copies outside
+  Coding Gym). It states no backups, since they are off. It speaks for the
+  app, with no first person. The copy is `privacy.show` in
+  `config/locales/en.yml`; every number comes from `PrivacyNotice.facts`,
+  and `LOG_DAYS` there must match Railway's log retention
   (`docs/code-notes/app/models/privacy_notice.md`). The page describes the
   behaviour in `docs/decisions/deleting-an-account.md`,
   `per-user-api-keys.md`, `the-duck-thread-is-stored.md`,

@@ -26,13 +26,11 @@
     <h2 id="privacy-sent"><%= t("privacy.show.sent.heading") %></h2>
     <p><%= t("privacy.show.sent.provider") %></p>
     <p><%= t("privacy.show.sent.email") %></p>
-    <p><%= t("privacy.show.sent.scripts") %></p>
   </section>
 
   <section aria-labelledby="privacy-device">
     <h2 id="privacy-device"><%= t("privacy.show.device.heading") %></h2>
-    <p><%= t("privacy.show.device.draft") %></p>
-    <p><%= t("privacy.show.device.cookie", days: @facts[:session_days]) %></p>
+    <p><%= t("privacy.show.device.body", days: @facts[:session_days]) %></p>
   </section>
 
   <section aria-labelledby="privacy-cost">
@@ -50,15 +48,7 @@
   <section id="deleting" aria-labelledby="privacy-deleting">
     <h2 id="privacy-deleting"><%= t("privacy.show.deleting.heading") %></h2>
     <p><%= t("privacy.show.deleting.body") %></p>
-    <ul>
-      <li><%= t("privacy.show.deleting.backups", days: @facts[:backup_days]) %></li>
-      <li><%= t("privacy.show.deleting.logs", days: @facts[:log_days]) %></li>
-      <li><%= t("privacy.show.deleting.rate_limits", days: @facts[:cache_days]) %></li>
-      <li><%= t("privacy.show.deleting.jobs") %></li>
-      <li><%= t("privacy.show.deleting.failed_jobs") %></li>
-      <li><%= t("privacy.show.deleting.library") %></li>
-      <li><%= t("privacy.show.deleting.outside") %></li>
-    </ul>
+    <p><%= t("privacy.show.deleting.leftovers", log_days: @facts[:log_days]) %></p>
   </section>
 
   <% unless logged_in? %>

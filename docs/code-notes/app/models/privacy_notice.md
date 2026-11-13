@@ -10,40 +10,36 @@ own. `.facts` is the one list the controller hands the view.
 - `duck_days`: `DuckThread::KEPT_FOR`, which `SweepDuckThreadsJob` enforces.
 - `unopened_sets`: `UnopenedSets::PAUSE_AFTER`, the run of unopened sets that
   pauses generation.
-- `cache_days`: `max_age` in `config/cache.yml`, read through
-  `Rails.application.config_for(:cache)` once and memoized, since the file
-  does not change while the process runs. The rate limit entries that hold an
-  email address or an IP address live in that cache, and Solid Cache removes
-  an entry once it is older than `max_age`.
 - `session_days`: the session store's `expire_after`
   (`config/initializers/session_store.rb`). The cookie's expiry moves forward
-  on every request that reads the session, so the page says it lasts that
-  long after the last visit.
-
-Both durations go through `.days_rounded_up`, which rounds a part day up, so
-a setting of 36 hours reads as 2 days and the page never claims less time
-than the setting. The page says "about" for the cache, since an entry can
-also be pushed out earlier by `max_size`.
+  on every request that reads the session, so the page says you stay signed
+  in that long after your last visit. `.days_rounded_up` rounds a part day
+  up, so a setting of 36 hours reads as 2 days and the page never claims
+  less time than the setting.
 
 ## Numbers the code cannot know
 
-`BACKUP_DAYS` (how long Railway keeps database backups, 6 for its daily
-backups) and `LOG_DAYS` (how long Railway keeps server logs, 7) are settings
-on Railway, outside this repository, so they are written here by hand.
-`spec/models/privacy_notice_spec.rb` fails unless both are whole numbers of
-days. When either Railway setting changes, change the constant with it.
+`LOG_DAYS` is how long Railway keeps server logs (7 days on the current
+plan), a setting outside this repository, so it is written here by hand.
+When the Railway setting changes, change the constant with it.
 
-## Why the page names the logs' IP addresses and the cache
+The page states nothing about database backups, because Railway backups are
+off. Turning them on means adding a line to the page, and a constant here,
+saying how long they keep a copy, in the same change.
 
-Rails' request log prints each request's client IP address on its
-`Started` line, and Railway's HTTP logs carry it too, so "never an email
-address" alone would have read as "nothing that identifies you". The jobs
-and services log a user's id (`user 42`), which the page calls "your
-account's ID number", since no page shows that number. The
-sign-in rate limits key their cache entries on the email address and the IP
-address, and those entries outlive a deletion until `max_age`, so they are
-listed with the other things deletion leaves behind
-(`docs/decisions/deleting-an-account.md`, "The two leftovers").
+## What the page leaves out
+
+The owner asked for the deletion section to stay short and plain. It names
+server logs, the shared concept write-ups and copies held outside Coding
+Gym. It leaves out the other leftovers `docs/decisions/deleting-an-account.md`
+lists: cache entries that hold an email, IP address or user id until
+`config/cache.yml`'s `max_age`, finished jobs cleared a day later, and a job
+that fails after deletion and stays in the failed-jobs list. It also leaves
+out that request logs carry IP addresses and that background work logs a
+user id. "Don't include your email address" is a claim about the logs only,
+and it holds: they carry IP addresses and user ids, never the address. The
+rate limit cache does hold email addresses, for up to `max_age`, and the page
+no longer mentions it.
 
 ## Voice
 

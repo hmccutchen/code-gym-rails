@@ -41,11 +41,15 @@ RSpec.describe "Privacy page", type: :request do
 
     expect(text).to include(I18n.t("privacy.show.stored.retention", duck_days: DuckThread::KEPT_FOR.in_days.to_i))
     expect(text).to include(I18n.t("privacy.show.cost.pause", count: UnopenedSets::PAUSE_AFTER))
-    expect(text).to include(I18n.t("privacy.show.deleting.rate_limits", days: PrivacyNotice.cache_days))
-    expect(text).to include(I18n.t("privacy.show.device.cookie", days: PrivacyNotice.session_days))
-    expect(text).to include("Database backups keep a copy for up to #{PrivacyNotice::BACKUP_DAYS} days.")
-    expect(text).to include("Railway keeps them for #{PrivacyNotice::LOG_DAYS} days.")
+    expect(text).to include(I18n.t("privacy.show.device.body", days: PrivacyNotice.session_days))
+    expect(text).to include("kept for up to #{PrivacyNotice::LOG_DAYS} days")
     expect(text).not_to include("%{")
+  end
+
+  it "makes no claim about database backups, which are off" do
+    get privacy_path
+
+    expect(page.at_css("main").text).not_to match(/backup/i)
   end
 
   it "speaks for the app, with no first person, no channel to message and no Gemini aside" do
