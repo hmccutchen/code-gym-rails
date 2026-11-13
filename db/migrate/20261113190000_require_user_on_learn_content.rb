@@ -4,7 +4,10 @@ require_relative "20261113150000_copy_shared_learn_content"
 class RequireUserOnLearnContent < ActiveRecord::Migration[8.1]
   disable_ddl_transaction!
 
+  LOCK_TIMEOUT = "5s"
+
   def self.require_owner(connection)
+    connection.execute("SET LOCAL lock_timeout = '#{LOCK_TIMEOUT}'")
     connection.execute("LOCK TABLE concept_references, recognition_guides IN ACCESS EXCLUSIVE MODE")
     connection.execute("DELETE FROM concept_references WHERE user_id IS NULL")
     connection.execute("DELETE FROM recognition_guides WHERE user_id IS NULL")

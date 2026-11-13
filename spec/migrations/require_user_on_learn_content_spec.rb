@@ -104,6 +104,43 @@ RSpec.describe RequireUserOnLearnContent do
     expect(new_rows("concept_references")).to be_empty
   end
 
+  it "can run again after the schema change fails, copying nothing twice" do
+    late = new_user("late")
+    reference(nil, tagline: "shared")
+    guide(nil, questions: "shared")
+    attempts = 0
+    allow(described_class).to receive(:require_owner).and_wrap_original do |original, *args|
+      attempts += 1
+      raise ActiveRecord::LockWaitTimeout, "busy" if attempts == 1
+
+      original.call(*args)
+    end
+
+    expect { migrate(:up) }.to raise_error(ActiveRecord::LockWaitTimeout)
+    expect(column(:concept_references, "user_id")).to have_attributes(null: true)
+    migrate(:up)
+
+    expect(new_rows("concept_references")).to eq([ [ late.id, "shared" ] ])
+    expect(new_rows("recognition_guides")).to eq([ [ late.id, "shared" ] ])
+    expect(column(:concept_references, "user_id")).to have_attributes(null: false)
+    expect(column(:recognition_guides, "user_id")).to have_attributes(null: false)
+  end
+
+  it "migrates up again after a rollback" do
+    owner = new_user("owner")
+    migrate(:up)
+    migrate(:down)
+    reference(nil, tagline: "shared after rollback")
+
+    migrate(:up)
+
+    expect(new_rows("concept_references")).to eq([ [ owner.id, "shared after rollback" ] ])
+    expect(column(:concept_references, "user_id")).to have_attributes(null: false)
+    expect(column(:recognition_guides, "user_id")).to have_attributes(null: false)
+    expect(index(:concept_references, %w[concept language])).to be_nil
+    expect(index(:recognition_guides, %w[group_key])).to be_nil
+  end
+
   it "runs outside a transaction, since the copy commits one user at a time" do
     expect(described_class.disable_ddl_transaction).to be(true)
   end

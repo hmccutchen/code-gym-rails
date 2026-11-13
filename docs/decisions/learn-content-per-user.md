@@ -113,35 +113,36 @@ ships one release before any code reads it for Learn
    called inside a transaction, which would hold every user's lock until
    the end. "What L5 does" below has the details.
 
-   The schema step is a later, separate pull request. Its migration
-   (`RequireUserOnLearnContent`) deletes
+   The schema step came in a later, separate pull request. Its migration
+   (`RequireUserOnLearnContent`) runs L4's copy a third time, then deletes
    the shared rows, drops the two partial unique indexes over rows with no
-   user, makes `user_id` NOT NULL on both tables, and makes `belongs_to
-   :user` required on both models. It keeps the per-user unique indexes. Its
-   deploy gate: L5 runs on both web and worker. Until then an L4 web or
-   worker still reads the shared rows, so deleting them earlier would take
-   text away from a page or skip a write-up on old code's say-so. It must
-   also run after L5's catch-up copy, which needs the shared rows to copy
-   from. It also changes `app/models/account_data.rb`, whose fate text says
-   shared rows "stay", and the fate table in `deleting-an-account.md`, which
-   says the same, because no shared row will exist to stay. "What the
-   schema step does" below has the details.
+   user and makes `user_id` NOT NULL on both tables; the same pull request
+   made `belongs_to :user` required on both models. It kept the per-user
+   unique indexes. Its deploy gate: L5 runs on both web and worker. An L4
+   web or worker still reads the shared rows, so for an account the copy
+   missed, one created after it, deleting them early would take text away
+   from a page or skip a write-up on old code's say-so. It also runs after
+   L5's catch-up copy, which needs the shared rows to copy from. The same
+   pull request changed `app/models/account_data.rb` and the fate table in
+   `deleting-an-account.md`, which said shared rows "stay", since no shared
+   row is left to stay. "What the schema step does" below has the details,
+   and "Open question for the owner" says how the gate is checked.
 
 ## What L2 does
 
-- `ConceptReference.for(user, concept:, language:)` and
-  `ConceptReference.seen_by(user, ...)` are the one answer to which
-  reference a user sees. Until L5 that was their own row, else the shared one,
-  never another user's. Learn, the dashboard and History inline reference, the featured
-  callout, the review's short version, generation's ladders
+- L2 made `ConceptReference.for(user, concept:, language:)` and
+  `ConceptReference.seen_by(user, ...)` the one answer to which reference a
+  user sees. Under L2 that was their own row, else the shared one, never
+  another user's. Learn, the dashboard and History inline reference, the
+  featured callout, the review's short version, generation's ladders
   (`GenerationLadders.for(user, ...)`), `LadderCoverage` and
   `explain_differently` read through them. "What L5 does" below gives the
   current read.
-- `GenerateConceptReferenceJob` writes only the user's own row. A user with
-  only the shared row who asked for a rewrite got a new row of their own,
-  numbered past the shared row's `generation_version` so the Learn poll saw
-  the rewrite land; the shared row was never written again. L5 changed the
-  numbering.
+- From L2, `GenerateConceptReferenceJob` wrote only the user's own row. A
+  user with only the shared row who asked for a rewrite got a new row of
+  their own, numbered past the shared row's `generation_version` so the
+  Learn poll saw the rewrite land; the shared row was never written again.
+  L5 changed the numbering.
 - The admin promote check (`ConceptReference.written_up?` and
   `.written_up_keys`) counts any row, a teammate's included. It asks
   only whether the concept has ever been written up and shows no text, and
@@ -163,20 +164,20 @@ ships one release before any code reads it for Learn
 - Which pairs still lack a write-up is `ConceptReference.missing_for(user,
   pairs)`, asked by both Learn's prepare button and
   `GenerateConceptReferenceJob.queue_missing`.
-- Until L5, "own wins" was decided per row, not per field: mixing fields
-  from two rows would have shown a ladder written for different text.
+- From L2 until L5, "own wins" was decided per row, not per field: mixing
+  fields from two rows would have shown a ladder written for different text.
 
 ## What L3 does
 
-- `RecognitionGuide.seen_by(user, group_keys)` is the one answer to which
-  guide a user sees (until L5, their own row, else the shared one). Learn's
-  index reads it, and `RecognitionGuide.missing_for(user,
+- L3 made `RecognitionGuide.seen_by(user, group_keys)` the one answer to
+  which guide a user sees (under L3, their own row, else the shared one;
+  since L5, their own row only). Learn's index reads it, and `RecognitionGuide.missing_for(user,
   group_keys)` decides which guides the prepare button queues. No endpoint
   finds a guide by id, so there is no cross-user path to close.
 - The uniqueness validation on `group_key` is scoped to `user_id`.
-- `GenerateRecognitionGuideJob` keys its permit on user and group key. Until
-  L5 it skipped the call when the user already saw a guide, their own or the
-  shared one; guides are never rewritten. It calls the provider
+- `GenerateRecognitionGuideJob` keys its permit on user and group key.
+  Under L3 it skipped the call when the user already saw a guide, their own
+  or the shared one; guides are never rewritten. It calls the provider
   outside any lock, then writes the user's own row inside a transaction that
   share-locks the user, and writes nothing once the account is gone. It
   never writes a shared row, and a trial account writes nothing
@@ -339,9 +340,20 @@ ships one release before any code reads it for Learn
 
 ## What remains
 
-Nothing in the schema. The privacy page copy in step 2 is still open: it
-lands in the first pull request opened after both #785 and L2 are merged,
-and removes the sentence about shared write-ups, which no longer exist.
+Nothing in the schema: the schema step ran L4's copy a third time, deleted
+the shared rows and made `user_id` NOT NULL. The privacy page copy in step 2
+is still open: it lands in the first pull request opened after both #785 and
+L2 are merged, and removes the sentence about shared write-ups, which no
+longer exist.
+
+## Open question for the owner
+
+The schema step's gate, L5 on both web and worker, is a manual check. No
+code can tell an L4 process from an L5 one, and the migration deletes the
+shared rows for good: database backups are off, so they cannot be restored.
+Before deploying the schema step, the person merging it must confirm on
+Railway that both the web and the worker service run L5, and say so in the
+pull request.
 
 ## The deploy window between L4 and L5
 

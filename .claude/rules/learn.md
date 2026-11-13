@@ -38,17 +38,15 @@ Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.
 
-- **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
-  `concept_references` and `recognition_guides` carry a NOT NULL `user_id`.
-  It shipped in six steps with deploy gates between them; follow that doc's
-  order and the obligations it lists for each step. Every reference and
-  guide is written as its user's own row, and since L5 every reader asks
+- **Learn content belongs to each user** (`docs/decisions/learn-content-per-user.md`):
+  `ConceptReference` is keyed on `(user_id, concept, language)` and
+  `RecognitionGuide` on `(user_id, group_key)`; every row has an owner
+  (`user_id` is NOT NULL). Every reference and guide is written as its
+  user's own row, and every reader asks
   `ConceptReference.for(user, ...)`, `.seen_by(user, ...)` or
   `RecognitionGuide.seen_by(user, ...)`, which read the user's own rows
   only, never another user's. The admin promote check alone counts any
-  row. The schema step deleted the shared rows and requires an owner on
-  every row (`docs/decisions/learn-content-per-user.md`).
-  A trial account writes no Learn content (`User#writes_learn_content?`).
+  row. A trial account writes no Learn content (`User#writes_learn_content?`).
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
@@ -64,11 +62,8 @@ read it before changing that area.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
-  `ConceptReference` is keyed on `(user_id, concept, language)`. L4's
-  `CopySharedLearnContent` copied every shared reference and guide to each
-  active account, inserting only where the user had no row yet, and L5's
-  `CatchUpSharedLearnContentCopy` ran that copy again before
-  `RequireUserOnLearnContent` deleted the shared rows. Guide, ladder and
+  `ConceptReference` is keyed on `(user_id, concept, language)`, and every
+  row has an owner. Guide, ladder and
   `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
