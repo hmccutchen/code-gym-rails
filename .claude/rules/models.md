@@ -102,17 +102,20 @@ content equality cannot do that because an unrelated update changes the
 timestamp and a valid generation may leave the prose unchanged. Failed calls and skipped
 rewrites do not advance it.
 
-`GenerateConceptReferenceJob` uses Solid Queue's per-user/concept/language
+`GenerateConceptReferenceJob` uses Solid Queue's per-priority/user/concept/language
 concurrency permit with `on_conflict: :discard`. One user's refresh modes
 share the permit because they write the same row; another user's job has a
-permit of its own, since it writes that user's row. Overlapping jobs are
+permit of its own, since it writes that user's row. A click and a bulk press
+for the same row hold separate permits, and the job's run-time claim
+(`AdvisoryLock`) keeps the two from both calling the provider. Overlapping jobs at one priority are
 discarded rather than blocked: a blocked job could make another billed call
 immediately after an incomplete result. Finishing or failing releases the
 permit, so a later explicit retry remains possible. Its expiry derives from
 the reference call budget, and the dispatcher recovers expired permits after
 an interrupted worker. That lease includes queue time; it does not guarantee
-deduplication beyond its expiry. The existing row lock still guards writes
-after expiry or for direct `perform_now` calls, which bypass queue controls.
+deduplication beyond its expiry. An expired permit or a direct `perform_now`
+bypasses only the permit and still takes the claim; the row lock guards
+writes from an older worker that takes no claim during a deploy.
 `GenerateRecognitionGuideJob` keys its permit on user and group key the same
 way, so one user's overlapping job is discarded and a teammate's never is.
 
