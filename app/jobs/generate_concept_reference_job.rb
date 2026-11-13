@@ -39,10 +39,12 @@ class GenerateConceptReferenceJob < ApplicationJob
     return if concept == "other"
 
     user = User.active.find_by(id: user_id)
-    return unless user&.writes_learn_content? && wanted?(user, concept, language, refresh:, seen_version:, part:)
+    wants = ->(own) { ConceptReference.wanted_write(own, ladder_asked: part == LADDER_PART, refresh:, seen_version:) }
+    return unless user&.writes_learn_content? && wants.call(user.concept_references.find_for(concept:, language:))
 
     claimed = AdvisoryLock.hold(self.class.claim_key(user_id: user.id, language: language, concept: concept)) do
-      write(user, concept, language, refresh:, seen_version:, part:)
+      own = ConceptReference.uncached { user.concept_references.find_for(concept:, language:) }
+      write(wants.call(own), user, own, concept, language, refresh:, seen_version:)
     end
     Rails.logger.info("Skipped concept reference for #{concept}/#{language}: another job is writing it") unless claimed
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
@@ -61,35 +63,20 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   private
 
-  def wanted?(user, concept, language, refresh:, seen_version:, part:)
-    own = user.concept_references.find_for(concept:, language:)
-    return ConceptReference.ladder_wanted?(own, seen_version:) if ladder_only?(own, part)
-
-    ConceptReference.write_wanted?(own, refresh:, seen_version:)
-  end
-
-  def ladder_only?(own, part) = part == LADDER_PART && own&.reference_text?
-
-  def write(user, concept, language, refresh:, seen_version:, part:)
-    own = ConceptReference.uncached { user.concept_references.find_for(concept:, language:) }
-    if ladder_only?(own, part)
-      write_ladder(user, own, seen_version)
-    else
-      write_up(user, concept, language, refresh, seen_version)
+  def write(wanted, user, own, concept, language, refresh:, seen_version:)
+    case wanted
+    when :ladder then write_ladder(user, own, seen_version)
+    when :full then write_up(user, concept, language, refresh, seen_version)
     end
   end
 
   def write_ladder(user, own, seen_version)
-    return unless ConceptReference.ladder_wanted?(own, seen_version:)
-
     ladder = AiService.for(user).generate_concept_ladder(user, own)
     report(ConceptReference.write_ladder_for(user, concept: own.concept, language: own.language, ladder:, seen_version:),
            user, own.concept, own.language)
   end
 
   def write_up(user, concept, language, refresh, seen_version)
-    return unless ConceptReference.uncached { wanted?(user, concept, language, refresh:, seen_version:, part: nil) }
-
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
     report(ConceptReference.write_for(user, concept:, language:, attributes: reference, refresh:, seen_version:), user, concept, language)
   end

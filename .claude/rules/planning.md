@@ -90,9 +90,9 @@ read it before changing that area.
   (`CODE_REVIEW_FILE_WEIGHTS`, `:single` on a `RealSource` or `bug_hunt` day) without
   reading `KindDifficulty`; `CodeReview.file_range` turns it into a count
   with the rung later. Weights and difficulty share
-  `section_kind_preferences_version`. `POST /learn/prepare_ladders` is the one
-  scoped exception to Learn's no-bulk-rewrite rule, writes only the user's
-  own `ConceptReference` rows, and is never offered to a trial account
+  `section_kind_preferences_version`. `POST /learn/prepare_ladders` writes
+  only the ladder into each of the user's own `ConceptReference` rows that
+  has its reference text, a full reference only where there is none, and is never offered to a trial account
   (`User#writes_learn_content?`). Generation reads only the user's own ladders
   (`GenerationLadders.for(user, ...)`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
   bounds the ladder block.

@@ -274,9 +274,10 @@ rather than only catching it afterward:
     use it.
   - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.
   - `#assess_difficulty` is handed no response or history, and
-    `#explain_concept_differently`, `#generate_concept_reference` and
-    `#generate_recognition_guide` no exercise or response; their signatures
-    hold this. `ConceptReference::REFERENCE_FIELDS` stays unwidened.
+    `#explain_concept_differently`, `#generate_concept_reference`,
+    `#generate_concept_ladder` (the stored tagline and explanation of the
+    user's own reference) and `#generate_recognition_guide` no exercise or
+    response; their signatures hold this. `ConceptReference::REFERENCE_FIELDS` stays unwidened.
   - Answer-key fields (`ExerciseSection.all_answer_key_fields`) never reach
     the page, a pre-submission AI context or a log before review.
   - No page shows or implies `ConceptMastery` tier.

@@ -94,6 +94,10 @@ whether a row has one. It reads through `#usable_lesson`, so a stored value
 with no part the page can show counts as none. It stays out of
 `#complete?`, so the ladder poll and `LadderCoverage` never wait on it; `#fully_written?` is `complete? &&
 lesson?`, the check `GenerateConceptReferenceJob` skips a row on.
+`#reference_text?` — every `REFERENCE_FIELDS` field present — is the authority
+for "does this row carry the text a ladder-only write keeps", and
+`#ladder_addable?` (`reference_text? && !ladder?`) is the one predicate both
+Learn's ladder offer and `.ladder_wanted?` check.
 
 `generation_version` advances on each successful generation write, even when
 the provider returns unchanged text or an incomplete ladder. Learn polls that

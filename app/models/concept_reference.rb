@@ -35,16 +35,26 @@ class ConceptReference < ApplicationRecord
     where(language: languages).distinct.pluck(:language, :concept).to_set
   end
 
-  def self.write_wanted?(own, refresh:, seen_version:)
-    return false unless seen_version.nil? || seen_version == (own&.generation_version || 0)
+  def self.wanted_write(own, ladder_asked:, refresh:, seen_version:)
+    if ladder_asked && own&.reference_text?
+      :ladder if ladder_wanted?(own, seen_version:)
+    elsif write_wanted?(own, refresh:, seen_version:)
+      :full
+    end
+  end
 
-    own.nil? || (refresh && !own.fully_written?)
+  def self.write_wanted?(own, refresh:, seen_version:)
+    version_seen?(own, seen_version) && (own.nil? || (refresh && !own.fully_written?))
   end
 
   def self.ladder_wanted?(own, seen_version:)
-    return false unless own&.reference_text? && !own.ladder?
+    return false unless own&.ladder_addable?
 
-    seen_version.nil? || seen_version == own.generation_version
+    version_seen?(own, seen_version)
+  end
+
+  def self.complete_ladder?(fields)
+    LADDER_FIELDS.all? { |field| fields[field].present? }
   end
 
   def self.write_for(user, concept:, language:, attributes:, refresh:, seen_version:)
@@ -84,15 +94,25 @@ class ConceptReference < ApplicationRecord
   end
   private_class_method :with_owner_share_locked
 
+  def self.version_seen?(own, seen_version)
+    seen_version.nil? || seen_version == (own&.generation_version || 0)
+  end
+  private_class_method :version_seen?
+
   def self.rewrite(own, written, refresh:, seen_version:)
     own.with_lock do
       next :skipped unless write_wanted?(own, refresh:, seen_version:)
 
-      own.update!(written.merge(generation_version: own.generation_version + 1))
+      own.update!(keeping_stored_ladder(written).merge(generation_version: own.generation_version + 1))
       :written
     end
   end
   private_class_method :rewrite
+
+  def self.keeping_stored_ladder(written)
+    complete_ladder?(written) ? written : written.except(*LADDER_FIELDS)
+  end
+  private_class_method :keeping_stored_ladder
 
   # Derived from the field list; a partly blank guide answers false so the row is regenerated whole.
   def guide?
@@ -104,7 +124,11 @@ class ConceptReference < ApplicationRecord
   end
 
   def ladder?
-    LADDER_FIELDS.all? { |field| public_send(field).present? }
+    self.class.complete_ladder?(self)
+  end
+
+  def ladder_addable?
+    reference_text? && !ladder?
   end
 
   def complete?

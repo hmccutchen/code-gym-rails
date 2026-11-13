@@ -107,7 +107,7 @@ class LearnController < ApplicationController
   end
 
   def ladder_targets_for(reference)
-    return [] unless writes_learn_content? && reference&.guide? && !reference.ladder?
+    return [] unless writes_learn_content? && reference&.guide? && reference.ladder_addable?
 
     LadderCoverage.for(current_user).grounding_kinds(reference.concept, reference.language)
                   .map { |kind| t("sections.#{kind.key}.name") }

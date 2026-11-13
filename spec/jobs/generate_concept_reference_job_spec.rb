@@ -596,6 +596,33 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       expect(Rails.logger).to have_received(:info).with(/the account was deleted/)
     end
 
+    it "keeps the ladder written on its own when a later lesson press's full rewrite comes back without one" do
+      row = written_row.tap { |own| own.update!(lesson: nil) }
+      service = stub_ladder_service
+      press_ladder
+      no_ladder = reference_hash.merge(ConceptReference::LADDER_FIELDS.index_with { nil }, "lesson" => { "definition" => "new" })
+      allow(service).to receive(:generate_concept_reference).and_return(no_ladder)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 3)
+
+      row.reload
+      expect([ row.lesson, row.generation_version ]).to eq([ { "definition" => "new" }, 4 ])
+      expect(row.attributes.slice(*ConceptReference::LADDER_FIELDS)).to eq(ladder)
+    end
+
+    [ [ "the full rewrite", nil ], [ "the ladder", described_class::LADDER_PART ] ].each do |path, part|
+      it "reads the row once before the claim and once under it on #{path}, besides the write's own read under the lock" do
+        written_row.update!(lesson: nil)
+        stub_ladder_service
+        allow(ConceptReference).to receive(:find_for).and_call_original
+
+        described_class.perform_now(**{ concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true,
+                                        seen_version: 2, part: part }.compact)
+
+        expect(ConceptReference).to have_received(:find_for).exactly(3).times
+      end
+    end
+
     it "keeps a job queued by older code, with no part, on the full rewrite" do
       row = written_row
       service = stub_ladder_service

@@ -96,9 +96,13 @@ read it before changing that area.
   `AdvisoryLock` claim on user, language and concept before its call, so
   the two make one provider call. A job that finds the claim held or the
   row written calls nothing. A ladder press passes `part: "ladder"` through
-  the same job, permit and claim, and `ConceptReference.write_ladder_for`
-  writes only `LADDER_FIELDS` under the same lock order as `.write_for`. `GenerateRecognitionGuideJob` keeps its
-  discard permit, since only a press queues a guide.
+  the same job, permit and claim; `ConceptReference.wanted_write` decides
+  which write applies, and `.write_ladder_for` writes only `LADDER_FIELDS`
+  under the same lock order as `.write_for`. A later full rewrite keeps a
+  stored ladder when its reply has no complete one. Learn offers the ladder
+  only on a row that is `#ladder_addable?`, the predicate the write checks.
+  `GenerateRecognitionGuideJob` keeps its discard permit, since only a press
+  queues a guide.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one
   `RecognitionGuide` per user on how to look for that kind of problem. It

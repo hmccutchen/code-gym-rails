@@ -42,6 +42,16 @@ So a row's ladder can come from a later response than its reference. The
 ladder prompt carries the explanation as context to keep the two consistent,
 and the ladder instruction is one constant
 (`ConceptReferencePrompt::LADDER_INSTRUCTION`) shared by both prompts, so the
-rungs are asked for in the same words either way. The new purpose,
+rungs are asked for in the same words either way.
+
+A later full rewrite ("Write this up" or "Write the short lesson") keeps a
+stored ladder when its reply has no complete ladder of its own, since the
+ladder is optional in that reply and losing a ladder the person paid for
+would reopen Setup's coverage. Only a complete ladder replaces the stored
+one: `GenerationLadders` and `LadderCoverage` read a ladder only when all
+four rungs are present, so a partial reply ladder would add nothing.
+Learn offers the ladder press only on a row that is
+`ConceptReference#ladder_addable?`, the same predicate the ladder-only write
+checks, so an offered press never falls back to a whole-row rewrite. The new purpose,
 `generate_concept_ladder`, routes like the reference: every provider's
 default route, with the reference's read timeout.

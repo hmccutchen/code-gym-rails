@@ -532,6 +532,14 @@ RSpec.describe "Learn", type: :request do
         expect(response.body).not_to include(I18n.t("learn.write_ladder"))
       end
 
+      it "is not offered for a row with a guide but no reference text, which a ladder-only write could not keep" do
+        guided.update!(senior_lens: nil)
+
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(response.body).not_to include(I18n.t("learn.write_ladder"))
+      end
+
       it "is not offered once the reference carries its ladder" do
         guided.update!(ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
 

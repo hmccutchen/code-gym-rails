@@ -68,7 +68,11 @@ writes nothing. An existing row is locked (`with_lock`, which reloads it)
 and asked the same question: a write lands only when the row is still the
 one the request was made against. A rewrite sets every `WRITTEN_FIELDS`
 column, so a field the reply left out is cleared, and adds one to the
-version.
+version. The ladder is the exception: when the reply has no complete ladder
+(`.complete_ladder?`), the rewrite leaves the stored rungs as they are
+(`.keeping_stored_ladder`), so a ladder written on its own survives a later
+"Write the short lesson". Only a complete ladder replaces the stored one,
+since nothing reads a partial ladder.
 
 ### Losing a creation race
 
@@ -83,7 +87,8 @@ not on `concept`, since that is a real validation failure. A new caller
 must do the same.
 
 `.write_wanted?` is the one statement of when a write is wanted. A request
-naming a `seen_version` the row no longer has already ran. Otherwise a
+naming a `seen_version` the row no longer has already ran (`.version_seen?`,
+shared with `.ladder_wanted?`). Otherwise a
 missing row is wanted, and an existing one only on a refresh while it is
 not `#fully_written?`. The job asks it before its claim and again under the
 claim, so a job with nothing to write makes no call.
@@ -100,8 +105,17 @@ instead. It sets only `LADDER_FIELDS` and adds one to `generation_version`,
 so Learn's poll sees the write land.
 
 `.ladder_wanted?` is the one statement of when a ladder-only write is
-wanted: the row exists, has every `REFERENCE_FIELDS` value
-(`#reference_text?`), has no complete ladder, and is still at the version
-the request named, or the request named none. The job asks it before the
-claim and again under it, and `.write_ladder_for` asks once more under the
-row lock.
+wanted: the row exists and is `#ladder_addable?` (every `REFERENCE_FIELDS`
+value present, `#reference_text?`, and no complete ladder), and is still at
+the version the request named, or the request named none. Learn's ladder
+offer checks `#ladder_addable?` too, so what the page offers is what the
+write accepts. `.write_ladder_for` asks once more under the row lock.
+
+## `.wanted_write`
+
+Answers which write a job should make: `:ladder` for a ladder press on a
+row with its reference text, when `.ladder_wanted?` holds; `:full` when
+`.write_wanted?` holds, which covers a ladder press on a row with no text or
+no row; nil when neither is wanted. A ladder press on a row that already has
+its ladder answers nil rather than falling through to a full rewrite. The
+job asks it before the claim and again under it, on the one row it read.
