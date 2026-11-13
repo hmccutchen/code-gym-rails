@@ -103,14 +103,23 @@ export default class extends Controller {
     this.dismiss()
   }
 
-  // Chrome closes a sheet on a second Escape even when the first was refused; a swap still saving keeps its choice for the reply.
+  // Chrome may close a sheet on a second Escape and fires close a frame late; a saving swap keeps its choice, and focus moved on stays put.
   closed(event) {
     if (!event.target.isConnected || event.target.open || !this.wanted) return
 
     this.wanted = false
     this.savedReply = null
     if (!this.busy) this.resetChoice()
-    this.triggerTarget.focus()
+    if (this.focusLeftWithSheet()) this.triggerTarget.focus()
+  }
+
+  focusLeftWithSheet() {
+    return this.focusNowhere || this.sheetTarget.contains(document.activeElement)
+  }
+
+  get focusNowhere() {
+    const active = document.activeElement
+    return !active || active === document.body
   }
 
   press(event) {
@@ -166,8 +175,7 @@ export default class extends Controller {
       { line: "daily_kind_swap" })
     this.busy = false
     this.wanted = this.wanted && this.sheetTarget.open
-    const before = document.activeElement
-    this.replyMayFocus = this.element.contains(before) || ((!before || before === document.body) && lastConfirmed === this)
+    this.replyMayFocus = this.element.contains(document.activeElement) || (this.focusNowhere && lastConfirmed === this)
     this.attempted = result && result.ok ? null : kind
     if (result && result.ok && result.data) return this.saved(result.data)
     if (result && result.status === 409 && result.data) return this.refreshStale(result.data)

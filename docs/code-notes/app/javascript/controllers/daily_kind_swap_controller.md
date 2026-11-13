@@ -40,14 +40,21 @@ Chrome closes a modal dialog on a second Escape even after the page refused
 the first, when there has been no user activation in between. `closed`
 handles a `close` the controller didn't ask for: it clears `wanted` and any
 saved reply, resets the choice unless a swap is saving, and focuses the
-trigger. A swap left saving that way finishes in the queue as usual, and its
-reply never brings the sheet back (see "Where a reply shows"). That doesn't
-depend on `closed` having run: the event can arrive after the reply, so the
-reply reads the dialog's own `open` state. The system spec closes a saving
-sheet from script rather than with two Escapes, because whether Chrome lets
-a second Escape close it depends on user activation, which differs between
-builds. Two of its examples close the sheet and release the reply in the
-same script, so the reply always lands before the `close` event. That close is also why two
+trigger when focus is still in the sheet or nowhere
+(`focusLeftWithSheet`). Observed in Chrome, not a spec guarantee: `close`
+fires with the next animation frame, not when the dialog closes, and closing
+the dialog already returns focus to the trigger there. On a busy machine that frame can come
+after the reader, or a system spec, has moved focus into an answer and
+started typing. Focusing the trigger then would send the rest of the typing
+to it, and a space would reopen the sheet (#801). A swap left saving that
+way finishes in the queue as usual, and its reply never brings the sheet
+back (see "Where a reply shows"). That doesn't depend on `closed` having
+run: the event can arrive after the reply, so the reply reads the dialog's
+own `open` state. The system spec closes a saving sheet from script rather
+than with two Escapes, because whether Chrome lets a second Escape close it
+depends on user activation, which differs between builds. Two of its
+examples close the sheet and release the reply in the same script, so the
+reply always lands before the `close` event. That close is also why two
 swaps can still overlap, and why the queue below matters.
 
 ## Swaps go one at a time through `CodeGymSaveStatus.queue`
@@ -92,15 +99,17 @@ replacement.
 Each panel holds its card's trigger, the stored-kind line, the first-time
 hint and the dialog, so replacing a panel removes an open sheet from the
 page. Whether a sheet should come back is read from the DOM at the moment of
-the replacement, never from the `close` event. Chrome fires `close` as a
-queued task after the dialog has already closed, so a reply that lands in
-between would still see the sheet as wanted and reopen one the reader just
-left. CI hit exactly that. So `replacePanels` checks each other card's dialog
-for `open` before replacing it, and marks the new panel `data-sheet-open`
-when it was. `panelTargetConnected` reshows only a marked panel, and clears
-`wanted` when its sheet is neither marked nor open. A card's own reply re-reads
-its sheet's `open` state as soon as it lands, before deciding anything. Targets are read from the DOM on each access, so a reply handler
-that runs before Stimulus sees the new panel already works on it.
+the replacement, never from the `close` event. Chrome fires `close` on the
+next animation frame, after the dialog has already closed, so a reply that
+lands in between would still see the sheet as wanted and reopen one the
+reader just left. CI hit exactly that. So `replacePanels` checks each other
+card's dialog for `open` before replacing it, and marks the new panel
+`data-sheet-open` when it was. `panelTargetConnected` reshows only a marked
+panel, and clears `wanted` when its sheet is neither marked nor open. A
+card's own reply re-reads its sheet's `open` state as soon as it lands,
+before deciding anything. Targets are read from the DOM on each access, so a
+reply handler that runs before Stimulus sees the new panel already works on
+it.
 
 ## Where a reply shows
 
