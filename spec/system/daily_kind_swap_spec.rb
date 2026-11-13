@@ -590,7 +590,15 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(page.evaluate_script(%(document.activeElement.matches('textarea[data-field="code_review"]')))).to be(true)
     page.driver.with_playwright_page { |pw| pw.keyboard.type("Typed after the sheet closed") }
     expect(find(%(textarea[data-field="code_review"])).value).to eq("Typed after the sheet closed")
-    expect(page).to have_no_css("#{sheet(1)}[open]")
+  end
+
+  it "moves focus to the trigger when a close the page didn't ask for finds focus nowhere" do
+    open_sheet(1)
+    find("#daily-kind-1-pattern").click
+    page.execute_script(%(document.querySelector(#{sheet(1).to_json}).close(); document.activeElement.blur()))
+    expect(page).to have_css("#daily-kind-1-design_comparison:checked", visible: :all)
+
+    expect(trigger_focused?).to be(true)
   end
 
   it "holds the review poll's reload while a swap has failed, and reloads once it saves" do
