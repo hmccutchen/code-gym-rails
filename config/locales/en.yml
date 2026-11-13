@@ -934,7 +934,7 @@ en:
       practice_heading: "Daily practice"
       reminders_heading: "Reminders"
       session_heading: "Session"
-      danger_body: "Deleting your account permanently removes it and everything in it: your email, API keys, exercises, answers, reviews and usage history. It also logs you out. This cannot be undone."
+      danger_body: "Deleting your account permanently removes it and everything in it: your email, API keys, exercises, answers, reviews and usage history. It also logs you out. This cannot be undone. Copies held outside Coding Gym, such as email you were sent and what your AI provider keeps, are not affected."
       delete: "Delete my account"
       delete_confirm: "Delete your account? This permanently removes your email, exercises, answers, reviews and usage history, and logs you out. It cannot be undone."
     api_usage:

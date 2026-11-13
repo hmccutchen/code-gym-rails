@@ -116,6 +116,14 @@ RSpec.describe AccountDeletion, type: :model do
     expect(locked.first(4)).to eq(%w[users daily_exercises daily_responses concept_masteries])
   end
 
+  it "refuses a fate kind it does not know and deletes nothing" do
+    stub_const("AccountData::FATES", { "planted" => AccountData::Fate.of(:shred, "A fate kind no branch handles.") }
+      .merge(AccountData::FATES))
+
+    expect { described_class.call(leaving) }.to raise_error(ArgumentError, /shred/)
+    expect(User.exists?(leaving.id)).to be(true)
+  end
+
   it "reports an account that is already gone" do
     described_class.call(leaving)
 

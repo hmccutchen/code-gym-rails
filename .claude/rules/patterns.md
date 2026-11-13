@@ -141,7 +141,9 @@ says what a deviation from one requires.
   date under the user lock in `PracticeGeneration.commit_new`, so a job whose
   stale claim was taken over still lands its set when the day has none.
   Anything that locks an exercise and its response goes through
-  `DailyExercise#with_response_locked`.
+  `DailyExercise#with_response_locked`, which share-locks the user row
+  first, so an insert under it never waits on the user while holding the
+  exercise.
   Mastery review and every manual drill command follow user → exercise
   when needed → response → mastery rows in ascending ID order, with paid
   calls outside locks. Reconciliation stores concrete commands and captured

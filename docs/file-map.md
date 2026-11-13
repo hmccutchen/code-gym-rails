@@ -195,7 +195,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/helpers/loading_form_helper.rb` — `#loading_form_data`, the one statement of how a form is wired to the `loading-form` controller, with its optional label and confirm message
 - `app/helpers/authenticator_setups_helper.rb` — the setup page's inline QR code SVG and the setup key in groups of four
 - `app/javascript/controllers/copy_text_controller.js` — the Copy buttons on the setup key and recovery codes, selecting the text instead when the clipboard is missing or refuses
-- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (anonymizes the user row in place)
+- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (`AccountDeletion` removes the user row and every row that belongs to it)
 - `app/models/monthly_spend.rb` — `MonthlySpend`: decides the month's own-key total and the weekday projection, which stays hidden until the 4th in the user's zone; see `docs/code-notes/app/models/monthly_spend.md`
 - `app/helpers/usage_helper.rb` — `usage_dollars`: formats a cost as dollars, showing anything under a cent as `< $0.01`
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
@@ -340,7 +340,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/clients/lazy_cache_store.rb` — `LazyCacheStore`: forwards `increment` to `Rails.cache` at call time, so `rate_limit` (which binds its store at class load) still sees a store that specs swap in.
 - `app/jobs/application_job.rb` — `ApplicationJob`: the base class every background job inherits from; `#unless_account_deleted` stops a job quietly when its account is deleted mid-run.
 - `app/jobs/generate_concept_reference_job.rb` — `GenerateConceptReferenceJob`: asks the user's provider for a concept's reference, guide, ladder and lesson, and writes or completes the shared `ConceptReference` row under a lock. It allows one run per concept and language, and records provider and setup failures through `ConceptReferenceFailures`.
-- `app/mailers/application_mailer.rb` — `ApplicationMailer`: base mailer that sets the `from` address (`MAIL_FROM`, with a default) and the shared mailer layout.
+- `app/mailers/application_mailer.rb` — `ApplicationMailer`: base mailer that sets the `from` address (`MAIL_FROM`, with a default) and the shared mailer layout, and ends a queued mail whose records were deleted instead of failing the job.
 - `app/mailers/review_mailer.rb` — `ReviewMailer`: `#send_review` emails a completed AI review to the response owner's own address on request, with the date in the subject.
 - `app/mailers/user_mailer.rb` — `UserMailer`: sends the login code email, minting the code inside the mailer so it never becomes a job argument, and the notice that a second factor changed (`SECOND_FACTOR_CHANGES` lists the allowed changes).
 - `app/models/api_usage.rb` — `ApiUsage`: one row per provider request. It is the authority for the `PURPOSES` and `FAILURES` vocabularies, and it totals a user's own-key requests and cost per provider, counts requests on a day, and gives the largest token count a row can hold.
@@ -366,7 +366,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/glossary.rb` — `Glossary`: the hand-written table of technical terms (`TERMS`) and their extra word forms (`FORMS`), with the lookup that finds a term's definition for text shown to the engineer.
 - `app/models/judge_solve.rb` — `JudgeSolve`: one row per blind judge pass on a kind that has solve options, such as `design_comparison`. It owns the source, revert and call vocabularies, and the `readable` and `withheld` scopes that hide a row until showing it gives nothing away.
 - `app/models/mermaid_source.rb` — `MermaidSource`: `.usable?` accepts only plain flowchart or graph source within `MAX_LENGTH`, and refuses directives, styling statements and odd spacing, since other Mermaid diagram types carry known script-injection bugs.
-- `app/models/review_follow_up.rb` — `ReviewFollowUp`: one turn, from the user or the assistant, in a section's follow-up thread on a `DailyResponse`. It is kept when a user is anonymized.
+- `app/models/review_follow_up.rb` — `ReviewFollowUp`: one turn, from the user or the assistant, in a section's follow-up thread on a `DailyResponse`. It is deleted with the account (`AccountData::FATES`).
 - `app/models/section_digest.rb` — `SectionDigest`: `.call` returns the SHA-256 of a section hash's canonical JSON, with keys sorted at every depth, so equal sections give equal digests whatever their key order.
 - `app/models/section_rotation.rb` — `SectionRotation`: pure choice of which optional slots fill a day and which kind fills each, by how long ago each kind last appeared. A kind unseen for more than `STARVATION_LIMIT` sessions is picked first, and the rest are drawn by weight.
 - `app/models/suggested_concept.rb` — `SuggestedConcept`: a concept name the provider proposed outside the fixed vocabulary, counted by language and name, with a pending, promoted or dismissed status. `.record!` is its only write path and skips "other".

@@ -1,7 +1,6 @@
 # Design notes: docs/code-notes/app/services/account_deletion.md
 class AccountDeletion
   Outcome = Data.define(:status)
-  STATUSES = %i[deleted already_deleted].freeze
   LOCK_ORDER = [ DailyExercise, DailyResponse, ConceptMastery ].freeze
 
   def self.call(user) = new(user.id).call
@@ -30,6 +29,8 @@ class AccountDeletion
     when :nullify then fate.rows.call(owner).update_all(fate.columns.index_with(nil))
     when :give_back_seat then owner.give_back_invite_seat!
     when :delete_unfinished then UnfinishedJobs.discard_naming(user_id: @user_id, global_ids: @global_ids)
+    when :cascades, :keep then nil
+    else raise ArgumentError, "Unhandled account data fate: #{fate.kind.inspect}"
     end
   end
 

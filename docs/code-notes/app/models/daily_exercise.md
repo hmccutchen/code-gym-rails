@@ -7,6 +7,16 @@ response: `RegenerateExerciseJob`, `User#carry_forward` and
 `ResponsesController#save_answers_under_lock`. One order means two of them
 wait for each other instead of deadlocking.
 
+Before either, it takes a `FOR SHARE` lock on the owner's `users` row. The
+first autosave of a day inserts a `daily_responses` row, and that insert
+needs a key-share lock on the user through the foreign key. `AccountDeletion`
+holds the user `FOR UPDATE` and then waits for the exercise, so an autosave
+that held the exercise and then waited for the user deadlocked with it.
+Taking the user first puts every caller in deletion's order: user, exercise,
+response. A caller that already holds the user `FOR UPDATE` loses nothing,
+since a transaction can share-lock a row it already holds. When deletion
+wins, the exercise is gone and `#lock!` raises `RecordNotFound`.
+
 The response is read with `DailyResponse.lock.find_by`, not `#lock!` on a
 loaded association, so a response deleted by `#start_over` after the
 exercise was loaded comes back as nil rather than raising, and one submitted

@@ -51,17 +51,28 @@ the example's transaction and expects all four to be reported.
 The same file keeps a hand-written list of what a schema walk cannot see,
 and asserts each item is on it: user ids and GlobalIDs inside job
 arguments; user ids in Solid Queue concurrency keys and semaphores; failed
-job error text; emails, IP addresses and user ids inside cache keys; ids
-inside JSON columns such as `concept_masteries.practice_requests`; cookies;
-browser storage; logs; backups; Resend; and the AI providers. Deletion does
-nothing about logs, backups, Resend or the providers.
+job error text; failed jobs left by a job that was running at deletion;
+emails, IP addresses and user ids inside cache keys; ids inside JSON
+columns such as `concept_masteries.practice_requests`; cookies; browser
+storage; logs; backups; Resend; and the AI providers. Deletion does nothing
+about logs, backups, Resend or the providers, and the Account page says so.
 
 ## Locks and foreign keys
 
-`AccountDeletion` runs in one transaction and takes locks in the order
-every other writer uses: the user row, then the person's exercises, then
-responses, then mastery rows, each in ascending id order. It deletes
-children before the rows their foreign keys point at.
+`AccountDeletion` runs in one transaction and takes locks in this order:
+the user row, then the person's exercises, then responses, then mastery
+rows, each in ascending id order. It deletes children before the rows their
+foreign keys point at, and the coverage spec checks that `FATES` lists every
+child table before its parent.
+
+The first version of this change claimed every other writer already used
+that order. The autosave did not: it locked the exercise, then inserted the
+day's first response, whose foreign key waits for a key-share lock on the
+user. With deletion holding the user and waiting for the exercise, Postgres
+reported a deadlock. `DailyExercise#with_response_locked` now takes the user
+`FOR SHARE` before the exercise, so every caller of it follows the same
+order, and `spec/requests/responses_account_deletion_concurrency_spec.rb`
+runs the two on separate connections.
 
 None of the foreign keys has `ON DELETE`, so the order matters, and so do
 the locks. Every table with a `user_id` foreign key takes a key-share lock
@@ -92,9 +103,17 @@ Each path writes nothing once the account is gone:
 - A job enqueued earlier looks the user up by id, finds none, and exits.
 
 A mailer job enqueued with a record that is gone fails to deserialize its
-arguments and stays as a failed job. Deletion removes the unfinished ones
-it can match, so this happens only when a mail is enqueued in the moment
-before deletion commits.
+arguments. Deletion removes the unfinished ones it can match, so this
+happens only when a mail is enqueued in the moment before deletion commits.
+Solid Queue would keep such a job as a failed execution with no
+`finished_at`, which the hourly cleanup never clears, so the user's
+GlobalID would stay in its arguments and error text. `ApplicationMailer`
+rescues `ActiveJob::DeserializationError`, logs one line and sends nothing,
+so the job finishes and is cleared a day later like any other.
+
+A job that was already running when deletion committed and then fails for
+some other reason still stays as a failed job naming the user. The coverage
+spec's hand-kept list names it ("failed jobs").
 
 ## The two leftovers
 

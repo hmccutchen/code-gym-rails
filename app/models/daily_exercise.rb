@@ -101,8 +101,10 @@ class DailyExercise < ApplicationRecord
     clear_attribute_changes([ :opened_at ])
   end
 
+  # The owner first: inserting a response takes a key-share lock on it, which AccountDeletion holds before the exercise.
   def with_response_locked
     transaction do
+      User.lock("FOR SHARE").where(id: user_id).ids
       lock!
       yield DailyResponse.lock.find_by(daily_exercise_id: id)
     end

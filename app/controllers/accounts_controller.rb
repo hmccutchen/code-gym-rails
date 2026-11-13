@@ -13,11 +13,14 @@ class AccountsController < ApplicationController
 
   # DELETE /account
   def destroy
-    status = AccountDeletion.call(current_user).status
-    raise ArgumentError, "Unhandled account deletion outcome: #{status}" unless AccountDeletion::STATUSES.include?(status)
+    outcome = AccountDeletion.call(current_user)
 
-    reset_session
-    redirect_to login_path, notice: t("flash.accounts.deleted")
+    case outcome.status
+    when :deleted, :already_deleted
+      reset_session
+      redirect_to login_path, notice: t("flash.accounts.deleted")
+    else raise ArgumentError, "Unhandled account deletion outcome: #{outcome.status}"
+    end
   end
 
   # PATCH /account/toggle_generation
