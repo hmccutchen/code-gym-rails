@@ -638,8 +638,8 @@ mean writing the usage row ahead of the reply and amending it after, a
 change to `log_usage`'s one-row-after-the-call rule that the stack does not
 make.
 
-The audit's per-user request limits (`ProviderCallLimits`, `/generate` and
-the Learn prepares) now apply only to an account without a key of its own
+The audit's per-user request limits (`ProviderCallLimits`, `/generate` and,
+until #792 removed it, the Learn prepares) now apply only to an account without a key of its own
 (`ApplicationController#own_key?`), so they guard the house key alongside the
 caps above. An account with its own key pays for its calls and is never
 limited by them, by decision. Each endpoint's own per-section or per-page

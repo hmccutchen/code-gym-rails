@@ -94,46 +94,4 @@ RSpec.describe "Per-user request limits", type: :request do
       expect(flash[:alert]).to be_nil
     end
   end
-
-  describe "Learn write-ups" do
-    let(:concept_path) { prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one") }
-
-    before { user.update!(language: "ruby_rails") }
-
-    it "answers a script's request past the limit with JSON" do
-      LearnController::PREPARE_PER_HOUR.times { post concept_path, as: :json }
-
-      expect { post concept_path, as: :json }.not_to have_enqueued_job(GenerateConceptReferenceJob)
-      expect(response).to have_http_status(:too_many_requests)
-      expect(response.parsed_body["error"]).to match(/several write-ups/)
-    end
-
-    it "counts the ladder button with the per-concept requests and redirects it back to Setup" do
-      LearnController::PREPARE_PER_HOUR.times { post concept_path, as: :json }
-
-      expect { post prepare_learn_ladders_path, headers: { "HTTP_REFERER" => setup_url } }
-        .not_to have_enqueued_job(GenerateConceptReferenceJob)
-      expect(response).to redirect_to(setup_url)
-      expect(flash[:alert]).to match(/several write-ups/)
-    end
-
-    it "counts the backfill button with the per-concept requests and redirects it" do
-      LearnController::PREPARE_PER_HOUR.times { post concept_path, as: :json }
-
-      post prepare_learn_path
-
-      expect(response).to redirect_to(learn_path)
-      expect(flash[:alert]).to match(/several write-ups/)
-    end
-
-    it "never limits an account with its own key" do
-      own = create_user_with_key(email: "own@example.com")
-      own.update!(language: "ruby_rails")
-      login_as(own)
-
-      (LearnController::PREPARE_PER_HOUR + 1).times { post concept_path, as: :json }
-
-      expect(response).not_to have_http_status(:too_many_requests)
-    end
-  end
 end

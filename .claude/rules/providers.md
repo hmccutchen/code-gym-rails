@@ -110,10 +110,10 @@ read it before changing that area.
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
   declares `ProviderCallLimits`, one shared hourly and daily count that runs
-  before every other check. `/generate` and the Learn prepare actions
-  are capped for accounts without a key of their own; since L2 of
-  `docs/decisions/learn-content-per-user.md` the Learn cap reaches only
-  trial presses, which queue nothing. The
+  before every other check. `/generate` is capped for accounts without a
+  key of their own. The Learn prepare actions have no cap: since L2 of
+  `docs/decisions/learn-content-per-user.md` a trial writes no Learn
+  content, so a cap that skipped own-key accounts limited nothing (#792). The
   per-user generation claim and queue permit, and Setup's key saves
   (`ApiKeysController::KEY_SAVES_PER_HOUR` per account,
   `KEY_SAVES_PER_HOUR_BY_IP` per address, since a checked save asks a

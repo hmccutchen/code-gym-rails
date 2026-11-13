@@ -1,6 +1,6 @@
 # Per-user request limits
 
-they guard a trial's house key, so an account
+These limits guard a trial's house key, so an account
 with a key of its own is never held to them (`ApplicationController#own_key?`,
 the `unless:` on each limit below). Every endpoint that bills one provider
 call (`ResponsesController`'s duck, follow-ups, explain
@@ -11,8 +11,7 @@ differently and pseudocode critique, and
 count is shared across both controllers. Each endpoint's own per-section or
 per-page cap still applies; the shared count runs before every other check,
 so a request those checks refuse still counts. `/generate` allows
-`DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
-prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
+`DailyExercisesController::GENERATE_PER_HOUR` (3) presses an hour.
 A bulk press (`prepare`, `prepare_ladders`) enqueues its jobs at
 `JobPriority::BACKGROUND` (20): behind a dashboard click and the
 single-concept write-up a person waits on (`JobPriority::CLICK`, 0, the
@@ -21,9 +20,12 @@ press can queue about 90 jobs, and at 0 they held up a click made after it;
 until L3b of `docs/decisions/learn-content-per-user.md` they ran at 5, ahead
 of the scheduled sets. `JobPriority` is the one place the priority numbers
 live.
-Since L2 a trial account on the house key writes no Learn content, and the
-Learn prepare cap skips accounts with a key of their own, so the cap now
-reaches only presses that are refused before anything is queued.
+The three Learn prepare actions have no hourly cap. The one they had
+(`PREPARE_PER_HOUR`, 10 presses an hour) skipped accounts with a key of their
+own, and since L2 of `docs/decisions/learn-content-per-user.md` a trial
+account on the house key writes no Learn content, so the cap reached only
+presses refused before anything was queued. It was removed as dead code
+(#792).
 Saving a key in Setup allows `ApiKeysController::KEY_SAVES_PER_HOUR` (10)
 saves an hour per account and `KEY_SAVES_PER_HOUR_BY_IP` (30) per address.
 Each such save asks a provider about the key
@@ -36,7 +38,7 @@ These caps are starting values, not measured ones. All of them use
 spec that exercises one swaps in a real store.
 
 The key-save caps and the generation claim and permit below apply to every
-account; the `/generate` and Learn prepare caps skip an account with a key
+account; the `/generate` cap skips an account with a key
 of its own, like the shared provider-call count. `GenerateDailyExercisesJob` takes a claim on its user
 (`users.generating_since`, declared with `Claimable`) when it starts running
 and releases it when it ends, because every dashboard load with no set

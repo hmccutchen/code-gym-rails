@@ -3,12 +3,6 @@ class LearnController < ApplicationController
 
   helper_method :encountered?
 
-  PREPARE_PER_HOUR = 10
-
-  rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
-             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ],
-             unless: :own_key?
-
   def index
     @references = references_by_key
     @drills     = ConceptDrills.for(current_user)
@@ -101,13 +95,6 @@ class LearnController < ApplicationController
                                    failed_at: Time.zone.parse(failure["at"].to_s), zone: current_user.effective_time_zone,
                                    retry_after: failure["retry_after"], variant: ProviderFailureText.variant_for(current_user))
     { failed: text.kind, message: text.brief }
-  end
-
-  def preparing_limited
-    message = t("learn.preparing_limited")
-    return render_json_error(message, status: :too_many_requests) if request.format.json?
-
-    redirect_back fallback_location: learn_path, alert: message
   end
 
   def ladder_targets_for(reference)
