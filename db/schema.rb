@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_171000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -399,6 +399,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_171000) do
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.index ["language", "normalized_name"], name: "index_suggested_concepts_on_language_and_normalized_name", unique: true
+    t.index ["reviewed_by_id"], name: "index_suggested_concepts_on_reviewed_by_id"
     t.index ["status"], name: "index_suggested_concepts_on_status"
   end
 

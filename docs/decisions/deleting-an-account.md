@@ -93,6 +93,11 @@ order deletion uses. A review that started first finishes, and deletion
 then clears its id; one that comes after finds no reviewer, writes nothing,
 and the request is sent to the login page.
 
+Every column the deletion finds a person's rows by is indexed, so clearing
+or deleting them never scans a whole table while the user row is locked.
+`reviewed_by_id` was the one without an index and gained one with this
+change; `user_data_coverage_spec` fails on a fate column with none.
+
 ## Unfinished jobs and Solid Queue workers
 
 A Solid Queue worker claims a job in one transaction

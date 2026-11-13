@@ -37,6 +37,15 @@ RSpec.describe "What happens to each row that refers to a user when the account 
     end
   end
 
+  it "indexes every column the deletion finds a person's rows by" do
+    unindexed = AccountData::FATES.flat_map do |table, fate|
+      fate.columns.reject { |column| connection.indexes(table).any? { |index| Array(index.columns).first == column } }
+                  .map { |column| "#{table}.#{column}" }
+    end
+
+    expect(unindexed).to eq([])
+  end
+
   def deleted_before_parent_violations(fates)
     deleting = fates.select { |_, fate| %i[delete delete_unfinished].include?(fate.kind) }.keys
     deleting.flat_map do |child|
