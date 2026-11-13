@@ -118,10 +118,12 @@ ships one release before any code reads it for Learn
   a reference for a concept outside the vocabulary exists only once
   someone's set was tagged with it.
 - Generating a set (a new one or a regeneration) queues the user's missing
-  write-ups at `JobPriority::SCHEDULED` once the set is saved. They are
-  enqueued after that hour's scheduled sets, and Solid Queue breaks a
-  priority tie by job id, so they run behind every set already queued and
-  never delay a teammate's daily set. It leaves out a
+  write-ups at `JobPriority::BACKGROUND` once the set is saved, one step
+  below the scheduled sets. At `JobPriority::SCHEDULED` they would have
+  tied with the sets, and Solid Queue breaks a tie by job id, so a write-up
+  from an earlier hour, or from early in the hourly hand-out, would have run
+  ahead of a teammate's set enqueued after it. One step lower, they never
+  delay a teammate's daily set. It leaves out a
   concept the set hides until it is submitted, so Learn never gains a
   write-up that hints at a hidden answer. Submitting still queues the rest.
 - `User#writes_learn_content?` (it replaced `#prepares_ladders?`) gates

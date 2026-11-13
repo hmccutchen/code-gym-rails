@@ -4,6 +4,7 @@ RSpec.describe GenerateDailyExercisesJob do
   include ActiveSupport::Testing::TimeHelpers
   include ActiveJob::TestHelper
   include PracticeGenerationHelpers
+  include SolidQueueOrderHelpers
 
   let(:user) { User.create!(email: "cronuser@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }, time_zone: "UTC") }
 
@@ -49,7 +50,7 @@ RSpec.describe GenerateDailyExercisesJob do
         "design_comparison" => { "question" => "q", "concept" => "memoization" } }
     end
 
-    it "queues the user's missing write-ups at scheduled priority once the set is saved, behind that hour's sets" do
+    it "queues the user's missing write-ups at background priority once the set is saved" do
       ConceptReference.create!(concept: "memoization", language: "ruby_rails", tagline: "shared")
       stub_provider(problem_set: tagged_set)
 
@@ -59,7 +60,19 @@ RSpec.describe GenerateDailyExercisesJob do
       queued = enqueued_jobs.select { |job| job["job_class"] == "GenerateConceptReferenceJob" }
       expect(queued.map { |job| job["arguments"].first.slice("concept", "language", "user_id") })
         .to eq([ { "concept" => "n_plus_one", "language" => "ruby_rails", "user_id" => user.id } ])
-      expect(queued.sole["priority"]).to eq(JobPriority::SCHEDULED)
+      expect(queued.sole["priority"]).to eq(JobPriority::BACKGROUND)
+    end
+
+    it "leaves its write-ups behind a scheduled set the hand-out enqueues later, in Solid Queue's claim order" do
+      stub_provider(problem_set: tagged_set)
+      described_class.new.perform(user_id: user.id)
+      teammate = User.create!(email: "teammate@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
+      described_class.set(priority: JobPriority::SCHEDULED).perform_later(user_id: teammate.id, scheduled: true)
+
+      move_to_solid_queue(ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job["queue_name"] == "provider_calls" })
+
+      expect(solid_queue_claim_order("provider_calls"))
+        .to eq(%w[GenerateDailyExercisesJob GenerateConceptReferenceJob GenerateConceptReferenceJob])
     end
 
     it "queues none for a concept the set hides until it is submitted" do
