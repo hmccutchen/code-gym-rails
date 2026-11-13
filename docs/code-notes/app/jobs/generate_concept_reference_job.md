@@ -91,13 +91,17 @@ and the creation race this job's `rescue` answers.
 
 The provider call runs outside any lock. `.write_for` share-locks the user
 row before it writes, the lock `AccountDeletion` takes for update. If
-deletion committed first, the user is gone and nothing is written, so the
-insert never fails on the foreign key. If the write committed first,
-deletion waits for it and then deletes the new row with the rest of the
-account. Either way the job finishes cleanly and leaves no failed execution
-naming the user. The two-connection specs
-(`generate_concept_reference_account_deletion_concurrency_spec.rb`) hold
-both orders.
+deletion took that lock first, the write waits for it to commit, then finds
+the user gone and writes nothing, so the insert never fails on the foreign
+key. If the write took it first, deletion waits for it and then deletes the
+new row with the rest of the account. Either way the job finishes cleanly
+and leaves no failed execution naming the user.
+
+`generate_concept_reference_account_deletion_concurrency_spec.rb` runs the
+job and the deletion on two connections. It covers three cases: the write
+holds the lock first, for a new row and for a refresh's rewrite, and
+deletion holds it first while a new row's write waits. The job spec covers
+a deletion that commits during the provider call, before the write starts.
 
 ## `.queue_missing`
 

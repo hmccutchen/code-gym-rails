@@ -48,7 +48,9 @@ calls it after the provider call and logs the answer (issue #790).
 
 Locks are taken user first, then row, as `AccountDeletion` takes them. The
 user row is share-locked (`FOR SHARE`) and must still be active, or nothing
-is written. The user's own row is then read inside `uncached`, so the answer
+is written. A deletion that holds the user row makes the write wait, and the
+write then finds the account gone; a write that holds it first makes the
+deletion wait. The job's code note says which spec covers each order. The user's own row is then read inside `uncached`, so the answer
 never comes from a query cache the caller had on; a job runs with one, and
 its earlier read would otherwise hide a row written since. Whichever way
 that read comes out, `.write_wanted?` decides. With no row, it is asked
