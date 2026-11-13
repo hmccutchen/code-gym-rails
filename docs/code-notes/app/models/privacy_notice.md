@@ -46,3 +46,7 @@ no longer mentions it.
 The page speaks for the app, with no first person and no channel to write
 to, because it stands alone inside the app. `spec/requests/privacy_spec.rb`
 fails on "I", "me" or "my" outside the quoted "Delete my account" button.
+
+It reads `DuckThread::KEPT_FOR`, so `duck_thread_isolation_spec` lists this
+file as allowed, next to `AccountData`. It reads only that constant, never a
+thread, and it reaches no generation, review, judge, mastery or planning code.
