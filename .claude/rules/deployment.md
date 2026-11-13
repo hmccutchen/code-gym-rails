@@ -51,6 +51,11 @@ paths:
   a new column ships a release before any code reads it, and a column being
   removed is ignored by the model for one release before a migration drops
   it (`docs/decisions/tracks.md`, `docs/decisions/per-user-api-keys.md`).
+- Learn content per user ships L1 to L5 with deploy gates
+  (`docs/decisions/learn-content-per-user.md`). L1's migration can be
+  reverted only until L2 ships: its `down` refuses once any
+  `concept_references` or `recognition_guides` row has a `user_id`, and
+  after that the rollback floor is L2's code.
 - Never rename a migration that has been pushed: the PR app has already run
   it under its old version (see "The preview migration version is
   reconciled" in `docs/decisions/tracks.md`).

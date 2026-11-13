@@ -83,8 +83,10 @@ opens wording change; it rewrites the whole row for the team. Nothing
 backfills lessons. The inline reference above a section and the featured
 callout are unchanged.
 
-`ConceptReference` has no `user_id` — it's a shared, team-wide cache
-keyed on `(concept, language)`, so the first person to run the backfill pays
+`ConceptReference` is a shared, team-wide cache keyed on
+`(concept, language)`. It gains a nullable `user_id` in L1, the first step of
+making Learn content per user (`learn-content-per-user.md`), and until that
+work reaches L2 every row is shared, so the first person to run the backfill pays
 for everyone and every later teammate pays almost nothing. Roughly $0.02 per
 concept, an estimate from before the reference moved to `claude-sonnet-5-5`
 at effort `high` (the new effort level changed the cost by an amount nobody
