@@ -21,7 +21,8 @@ while the first is queued or running. A click and a bulk press have
 different priorities, so they never share a permit, and a click for a
 concept a press already queued gets a job of its own at click priority
 (issue #777). Solid Queue reads the key with the job as `self`, which is
-why the lambda can read `priority`. Another user's job writes another row,
+why the lambda can read `priority`. The rest of the key is `.claim_key`,
+so the permit and the claim name a concept the same way. Another user's job writes another row,
 so it has its own permit too.
 
 The claim decides which running job calls. Before the call, the job takes
@@ -32,7 +33,11 @@ failure note answers the same poll. The claim is keyed without the
 priority, so it is the one place a click and a press meet. The job checks
 whether it needs to write before taking the claim and again under it, so a
 job with nothing to write never holds the claim and never makes a click
-skip.
+skip. The second read runs inside `ConceptReference.uncached`. A job runs
+inside the Rails executor with the query cache on, and the lock query does
+not clear it, so without `uncached` the second read would return the
+first read's answer. A job that took the claim just after another job
+wrote the row would then call the provider again.
 
 ## Why an advisory lock and not a `Claimable` column
 
@@ -66,8 +71,9 @@ front of every set still waiting. It queues nothing for a trial account
 
 ## A row finished by another job during the call
 
-The claim and the permit can be bypassed (a direct `perform_now`, or an
-older worker during a deploy), so two calls for one row can still overlap.
-`#rewrite` checks the row again under its lock and writes nothing when it
-is already fully written. The job then logs a skip, and it leaves any
+The claim and the permit can be bypassed (a direct `perform_now`, a permit
+that expired while its job was still running, or an older worker during a
+deploy), so two calls for one row can still overlap. That is why
+`#rewrite` keeps its row lock: it checks the row again under that lock and
+writes nothing when it is already fully written. The job then logs a skip, and it leaves any
 failure note alone, since this call wrote nothing.

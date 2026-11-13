@@ -179,7 +179,9 @@ ships one release before any code reads it for Learn
   PostgreSQL advisory lock on the user, language and concept, held through
   `AdvisoryLock.hold` for the call and the write. A job that finds the claim
   held logs a skip and calls nothing, and the job holding it writes the row.
-  A job that finds the row already written calls nothing either. So when
+  A job that finds the row already written calls nothing either: it reads
+  the row again once it holds the claim, outside the job's query cache,
+  which would otherwise answer with the read from before the claim. So when
   the click runs first, the press's job finds the row written; when the
   press's job is already running, the click finds the claim. Either way
   the concept gets one call.
@@ -192,6 +194,11 @@ ships one release before any code reads it for Learn
   the share lock on the user and the row lock come after it in the same
   order as before (user, then the user's own row), so it adds no lock
   cycle with `AccountDeletion`.
+- A session lock needs a direct database connection. A pooler in
+  transaction mode, such as PgBouncer, could run the unlock on another
+  server session than the lock, so the claim would never be released.
+  Railway's `Database` service is reached directly today
+  (`.claude/rules/deployment.md`).
 - During the deploy, an L3 worker can run a job beside an L3b one for the
   same concept, and the L3 job takes no claim, so both may call. That is
   one extra write-up call at most, for one deploy, and the row lock in

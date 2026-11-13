@@ -14,8 +14,10 @@ work today.
 One press of `#prepare` or `#prepare_ladders` can queue about 90 jobs on
 `provider_calls`, the queue the day's sets run on. At the default priority 0
 they ran ahead of a dashboard click made after the press and ahead of every
-scheduled set. The bulk enqueues go through `#bulk`, which sets
-`JobPriority::BACKGROUND`, so a click (`JobPriority::CLICK`) and every
+scheduled set. The bulk enqueues run at `JobPriority::BACKGROUND`: the
+press's write-ups through `GenerateConceptReferenceJob.queue_missing`, the
+way a saved set queues its own, and its guides and ladders through
+`#bulk`, so a click (`JobPriority::CLICK`) and every
 scheduled set (`JobPriority::SCHEDULED`) run first, even a set enqueued
 after the press. Nobody is waiting on any one job of a press.
 `#prepare_concept` sets no priority, because its page polls for that one

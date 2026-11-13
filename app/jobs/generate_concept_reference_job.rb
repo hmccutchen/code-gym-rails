@@ -3,7 +3,7 @@ class GenerateConceptReferenceJob < ApplicationJob
   queue_as :provider_calls
 
   # One queued job per priority, so a click is never discarded for a bulk press; the claim stops the second call.
-  limits_concurrency key: ->(args) { "#{priority || JobPriority::CLICK}/#{args.fetch(:user_id)}/#{args.fetch(:language)}/#{args.fetch(:concept)}" },
+  limits_concurrency key: ->(args) { "#{priority || JobPriority::CLICK}/#{self.class.claim_key(**args.slice(:user_id, :language, :concept))}" },
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
@@ -47,7 +47,7 @@ class GenerateConceptReferenceJob < ApplicationJob
   def wanted?(seen, refresh) = seen.nil? || (refresh && !seen.fully_written?)
 
   def write_up(user, concept, language, refresh)
-    seen = ConceptReference.for(user, concept: concept, language: language)
+    seen = ConceptReference.uncached { ConceptReference.for(user, concept: concept, language: language) }
     return unless wanted?(seen, refresh)
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)

@@ -31,6 +31,19 @@ RSpec.describe GenerateConceptReferenceJob do
     other&.disconnect!
   end
 
+  def claim_free_elsewhere?(key)
+    other = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(ActiveRecord::Base.connection_pool.db_config.configuration_hash)
+    other.select_value(AdvisoryLock.statement("pg_try_advisory_lock", key))
+  ensure
+    other&.disconnect!
+  end
+
+  def write_row_behind_the_query_cache
+    ActiveRecord::Base.connection.raw_connection.exec(ConceptReference.sanitize_sql_array([ <<~SQL, user.id ]))
+      INSERT INTO concept_references (user_id, concept, language, created_at, updated_at) VALUES (?, 'n_plus_one', 'ruby_rails', NOW(), NOW())
+    SQL
+  end
+
   describe "a click for a concept a bulk press already queued (#777)" do
     it "queues the click beside the press, claims it first at click priority, and calls the provider once" do
       enqueue_bulk_press
@@ -70,12 +83,22 @@ RSpec.describe GenerateConceptReferenceJob do
 
     it "releases the claim when the job ends, even after a provider failure" do
       allow(service).to receive(:generate_concept_reference).and_raise(ProviderError::RateLimitError, "slow down")
-      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
-      allow(service).to receive(:generate_concept_reference).and_return(reference)
 
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
 
-      expect(ConceptReference.where(user: user).count).to eq(1)
+      expect(claim_free_elsewhere?(described_class.claim_key(user_id: user.id, language: "ruby_rails", concept: "n_plus_one"))).to be(true)
+    end
+
+    it "reads the row again under the claim past the query cache, so a row another job wrote meanwhile calls nothing" do
+      enqueue_reference(refresh: false)
+      allow(AdvisoryLock).to receive(:hold).and_wrap_original do |hold, key, &block|
+        write_row_behind_the_query_cache
+        hold.call(key, &block)
+      end
+
+      perform_next
+
+      expect(service).not_to have_received(:generate_concept_reference)
     end
   end
 

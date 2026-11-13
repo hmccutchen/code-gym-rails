@@ -33,6 +33,18 @@ RSpec.describe AdvisoryLock do
     expect(taken_elsewhere?("write-up/1")).to be(false)
   end
 
+  it "logs a failed unlock and lets the block's own error through, since a lost session drops the lock anyway" do
+    allow(Rails.logger).to receive(:warn)
+    connection = ActiveRecord::Base.connection
+    allow(connection).to receive(:select_value).and_call_original
+    allow(connection).to receive(:select_value).with(described_class.statement("pg_advisory_unlock", "write-up/1"))
+      .and_raise(ActiveRecord::ConnectionFailed, "server closed the connection")
+
+    expect { described_class.hold("write-up/1") { raise ArgumentError, "the block's error" } }
+      .to raise_error(ArgumentError, "the block's error")
+    expect(Rails.logger).to have_received(:warn).with(/write-up\/1.*server closed the connection/)
+  end
+
   it "keeps different keys apart" do
     other_session.select_value(described_class.statement("pg_advisory_lock", "write-up/2"))
 

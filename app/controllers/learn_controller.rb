@@ -73,9 +73,7 @@ class LearnController < ApplicationController
   def prepare
     return redirect_to learn_path unless current_user.writes_learn_content?
 
-    ungenerated_concepts.each do |concept, bucket|
-      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id)
-    end
+    GenerateConceptReferenceJob.queue_missing(current_user, learn_pairs, priority: JobPriority::BACKGROUND)
 
     missing_recognition_guides.each do |group_key|
       bulk(GenerateRecognitionGuideJob).perform_later(group_key: group_key, user_id: current_user.id)
@@ -127,10 +125,11 @@ class LearnController < ApplicationController
     ConceptReference.seen_by(current_user, language: learn_buckets)
   end
 
-  def ungenerated_concepts
-    pairs = learn_buckets.flat_map { |bucket| ConceptBucket.vocabulary_for(bucket).map { |concept| [ concept, bucket ] } }
-    ConceptReference.missing_for(current_user, pairs)
+  def learn_pairs
+    learn_buckets.flat_map { |bucket| ConceptBucket.vocabulary_for(bucket).map { |concept| [ concept, bucket ] } }
   end
+
+  def ungenerated_concepts = ConceptReference.missing_for(current_user, learn_pairs)
 
   def recognition_group_keys
     @recognition_group_keys ||= learn_buckets.flat_map do |bucket|
