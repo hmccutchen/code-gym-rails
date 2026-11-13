@@ -16,7 +16,7 @@ class LearnController < ApplicationController
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
     @ungenerated = ungenerated_concepts.size
-    @recognition_guides = RecognitionGuide.where(group_key: recognition_group_keys).index_by(&:group_key)
+    @recognition_guides = RecognitionGuide.seen_by(current_user, recognition_group_keys)
     @ungenerated_guides = recognition_group_keys.size - @recognition_guides.size
   end
 
@@ -139,7 +139,7 @@ class LearnController < ApplicationController
   end
 
   def missing_recognition_guides
-    recognition_group_keys - RecognitionGuide.where(group_key: recognition_group_keys).pluck(:group_key)
+    RecognitionGuide.missing_for(current_user, recognition_group_keys)
   end
 
   def encountered?(concept, bucket)

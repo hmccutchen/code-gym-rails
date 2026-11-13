@@ -139,6 +139,9 @@ Each path writes nothing once the account is gone:
 - A concept write-up (`GenerateConceptReferenceJob`) share-locks the user
   before it writes and writes nothing once the account is gone, so its row
   never fails on the foreign key and the job finishes cleanly.
+- A recognition guide (`GenerateRecognitionGuideJob`) does the same: it
+  share-locks the user before it writes its own row and writes nothing
+  once the account is gone.
 
 A mailer job enqueued with a record that is gone fails to deserialize its
 arguments. Deletion removes the unfinished ones it can match, so this

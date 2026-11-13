@@ -537,7 +537,7 @@ en:
     prepare_guides_prompt:
       one: "1 guide on how to look for a group's problems hasn't been written yet."
       other: "%{count} guides on how to look for each group's problems haven't been written yet."
-    prepare_cost: "Writing these up runs against your own API key. The concept write-ups are yours alone, and the guides on how to look for each group's problems are shared with everyone on the team."
+    prepare_cost: "Writing these up runs against your own API key, and what it writes is yours alone."
     prepare_button: "Write up the rest"
     preparing: "Writing them up now — they'll appear as each one finishes."
     buckets:
