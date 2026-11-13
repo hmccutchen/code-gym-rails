@@ -5,7 +5,9 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
   around { |example| travel_to(a_weekday + 12.hours) { example.run } }
 
+  # Reduced motion: a click on a sliding sheet can press one row and release on another.
   before do
+    page.driver.with_playwright_page { |pw| pw.emulate_media(reducedMotion: "reduce") }
     visit_with_todays_set(user)
   end
 

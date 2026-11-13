@@ -56,4 +56,23 @@ RSpec.describe "Reduced motion", type: :system do
       expect(computed("getComputedStyle(document.querySelector('.progress-fill')).transitionDuration")).to eq("0s")
     end
   end
+
+  def sheet_animation_name
+    travel_to(a_weekday + 12.hours) do
+      visit_with_todays_set(user)
+      within("#daily-kind-swap-panel-1") { find("button.daily-kind-trigger").click }
+      expect(page).to have_css("#daily-kind-1-sheet[open]")
+      computed("getComputedStyle(document.getElementById('daily-kind-1-sheet')).animationName")
+    end
+  end
+
+  it "slides the daily kind sheet open only when the OS allows motion" do
+    prefer_reduced_motion("no-preference")
+    expect(sheet_animation_name).not_to eq("none")
+  end
+
+  it "opens the daily kind sheet without sliding when the OS asks for less motion" do
+    prefer_reduced_motion
+    expect(sheet_animation_name).to eq("none")
+  end
 end
