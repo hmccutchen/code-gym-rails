@@ -66,9 +66,12 @@ provider asked for or a minute, and once the reset has passed the sentence
 says the limit has reset rather than naming a time behind the reader.
 The provider is stored because `call_and_log` stamps every
 `ProviderError` with the provider whose call raised
-(`ProviderError#provider`), and a user can switch keys before reading:
-the sentence names the provider that failed, and a stored failure with no
-provider reads as the current one.
+(`ProviderError#provider`), and the sentence names the provider that
+failed. Every change of key or provider now clears the leaving provider's
+failure, so a failure outlives a switch only on a row written before those
+clears shipped, or through a direct column write; the stored provider
+still words that line correctly. A stored failure with no provider reads
+as the current one.
 `last_generation_error` keeps text that is not a provider failure (a
 reviewed set kept, an unusable draft, every section rejected) and rows from
 before the columns existed, which render as they did. A failed review

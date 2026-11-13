@@ -35,11 +35,11 @@ class RegenerateExerciseJob < ApplicationJob
     GenerateConceptReferenceJob.queue_missing(user, result.exercise.concept_pairs(before_submission: true), priority: JobPriority::BACKGROUND)
     Rails.logger.info("Regenerated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
-    release(user, exercise, claim, e) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }
+    release_after_failure(e, user, exercise, claim) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }
   rescue ProviderError, SetupError => e
-    release(user, exercise, claim, e) { record_provider_failure(user, e, key_used) }
+    release_after_failure(e, user, exercise, claim) { record_provider_failure(user, e, key_used) }
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
-    release(user, exercise, claim, e) { user.record_generation_message!("Generation returned an unusable set — try again.") }
+    release_after_failure(e, user, exercise, claim) { user.record_generation_message!("Generation returned an unusable set — try again.") }
   end
 
   def generate(service, user, language, deadline, context)
@@ -58,17 +58,20 @@ class RegenerateExerciseJob < ApplicationJob
 
   def keep_reviewed_set(user, exercise, kept_for, claim)
     Rails.logger.info("Kept today's set (#{kept_for}) for user #{user.id} on #{Date.current}; discarded the regenerated one")
-    exercise.release_regenerating!(claim)
-    user.record_generation_message!(KEPT_SET_MESSAGES.fetch(kept_for))
+    release(user, exercise, claim) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(kept_for)) }
   end
 
   def record_provider_failure(user, error, key_used)
     user.report_call_failure(key_used) { user.record_generation_failure!(error, counts_toward_key_hold: false) }
   end
 
-  # regenerated_at stays untouched so a failed attempt doesn't use up the day's one regeneration.
-  def release(user, exercise, claim, error)
+  def release_after_failure(error, user, exercise, claim, &)
     Rails.logger.error("Failed to regenerate exercise for user #{user.id}: #{error.message}")
+    release(user, exercise, claim, &)
+  end
+
+  # regenerated_at stays untouched so a failed attempt doesn't use up the day's one regeneration.
+  def release(user, exercise, claim)
     user.with_lock { yield if exercise&.release_regenerating!(claim) }
   end
 end

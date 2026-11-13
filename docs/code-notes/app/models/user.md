@@ -59,15 +59,28 @@ alone, because "Try again" calls it before any provider has answered.
 `#report_call_failure` is the one place that decides whether a failed
 call's outcome is written: only while `#key_in_use` still equals what the
 job noted before the call. The caller holds the row lock, which is what
-makes the comparison current. A changed key clears only a failure whose
-`last_generation_failure_provider` is the call's own provider, so another
-provider's failure and a provider-less message survive.
-`when_key_changed:` is what the daily job wants written in that case. It
-runs only when the account still has a provider in use and today holds no
-failure but the call's own provider's; otherwise the method falls back to
-the clear above. A nil provider in
-what the job noted means the call started with no key at all, and nothing
-is written or cleared for it. `docs/decisions/per-user-api-keys.md` ("A
+makes the comparison current. A changed key writes and clears nothing,
+except that `when_key_changed:`, what the daily job wants written in that
+case, runs when the account still has a provider in use and today holds no
+failure or message. A nil provider in what the job noted means the call
+started with no key at all, and nothing is written for it.
+
+The method relies on one invariant: a recorded provider failure always
+belongs to the provider in use when it was written. Every change of key or
+provider clears the leaving provider's failure as it happens
+(`#forget_generation_failure_from`), and only a call whose key is still in
+use writes one, so a failure for a call's own provider can only appear
+after a change through another attempt. The generation claim, the
+regeneration claim's release and the daily job's `set_today?` check keep
+that attempt from overlapping the call that is reporting.
+No database constraint holds it, so any new code that changes `provider`
+must clear the leaving provider's failure the same way. `#start_trial!`
+sets `provider` without the clear, which is safe only because it runs for an
+account with no key, whose failures were cleared when its last key went.
+`spec/jobs/call_failure_after_key_change_spec.rb` tries those
+interleavings, a row from before key changes cleared failures included,
+and finds no own-provider failure at a report. A failure written straight
+to the columns is left as it is. `docs/decisions/per-user-api-keys.md` ("A
 call that outlives its key") has the rule.
 
 `#store_api_key` and `#use_provider` both put a key in use through the
@@ -98,9 +111,8 @@ daily job's quality-check message passes. It fills
 `last_generation_failure_provider` and leaves `last_generation_failure`
 nil, so `#generation_failure_message` still returns the text as written
 and nothing counts toward the key hold. Because the provider column is
-set, `#forget_generation_failure_from` and `#report_call_failure` treat the
-message as that provider's; the first clears `last_generation_error` with
-the rest.
+set, `#forget_generation_failure_from` treats the message as that
+provider's and clears `last_generation_error` with the rest.
 `#key_removal_outcome` names what a removal would do without doing it;
 Setup words its confirmation from it and the controller words its notice
 from the same value once the removal has run. `#store_api_key` and

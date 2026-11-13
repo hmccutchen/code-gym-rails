@@ -128,22 +128,24 @@ read it before changing that area.
   key's failure, in that job and in `RegenerateExerciseJob`: both note
   `User#key_in_use` before the call and write through
   `User#report_call_failure` under the user row lock, the one home of that
-  rule. It clears only a failure recorded against the call's own provider,
-  and a call that started with no provider records and clears nothing. The
+  rule. A call with a changed key clears nothing, since every key or
+  provider change has already cleared the leaving provider's failure, and a
+  call that started with no provider records nothing. The
   daily job passes `when_key_changed:` so a changed key ends in
   `SUPERSEDED_MESSAGE`, which names no provider: a dashboard polling for
   the set must get "failed", never "pending" with no job left. The
   regeneration stays silent there, since its set exists and status answers
   "ready". A
-  regeneration also reports only while the exercise's claim is still its
-  own, checked under the user row lock. `#store_api_key` clears a failure
+  regeneration also reports, and records its "set was kept" messages,
+  only while the exercise's claim is still its own, checked under the user
+  row lock. `#store_api_key` clears a failure
   recorded against the provider saved or the one it switches away from,
   `#remove_api_key` one recorded against the provider removed, and
   `#use_provider` one recorded against the provider it leaves when the
   provider changes. The daily job's "every section failed its quality
   check" message is stored with its provider (`#record_generation_message!`
   with `provider:`, kind nil), so it counts as that provider's for these
-  clears and for `#report_call_failure`; it never counts toward the hold.
+  clears; it never counts toward the hold.
   `SUPERSEDED_MESSAGE` and the regeneration's "set was kept" messages stay
   provider-less. At
   `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,

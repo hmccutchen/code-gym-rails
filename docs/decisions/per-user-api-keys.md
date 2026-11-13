@@ -331,15 +331,19 @@ no set was started with the new key.
   `User#report_call_failure(key_used)`, which runs the write only when
   `key_in_use` is unchanged. Otherwise the old key's failure is never
   written.
-- **What a call with a changed key clears.** Only a failure recorded
-  against the call's own provider (`last_generation_failure_provider`
-  equal to the provider the call started with). A failure recorded against another
-  provider stays: a newer attempt on the key that took over may have
-  written it, and clearing it would erase that attempt's message and its
-  recovery text. A message that names no provider ("Settings or another
-  set changed", "today's set was kept") stays too. Nothing ties it to the
-  call that is reporting, and each such message is about the set or the
-  settings and is still true.
+- **A call with a changed key clears nothing.** The key change has already
+  cleared the call's own provider's failure (`User#forget_generation_failure_from`),
+  so a recorded provider failure always belongs to the provider in use
+  when it was written. A failure recorded since then was written by a
+  newer attempt on the key that took over, and clearing it would erase
+  that attempt's message and its recovery text. A message that names no
+  provider ("Settings or another set changed", "today's set was kept")
+  stays too. Nothing ties it to the call that is reporting, and each such
+  message is about the set or the settings and is still true. The method
+  once also cleared a failure for the call's own provider found after the
+  change; #782 removed that branch once
+  `spec/jobs/call_failure_after_key_change_spec.rb` showed that the claim
+  checks keep any attempt from writing one in that window.
 - **A regeneration reports only while its claim is its own.** With a key
   replaced by another key for the same provider, the provider alone cannot
   tell an old call's failure from one a newer attempt recorded on the new
@@ -375,13 +379,11 @@ no set was started with the new key.
   the message it already uses when settings moved under a call. The poll
   then answers "failed", the page reloads, and the person sees a true
   sentence with "Try again". It names no provider, so it says nothing
-  about the old key, and saving or removing a key leaves it in place. It
-  replaces a failure left for the call's own provider. It is passed to
+  about the old key, and saving or removing a key leaves it in place. It is passed to
   `User#report_call_failure` as `when_key_changed:`, so the rule keeps one
   home; the job only supplies what to write.
 - **When the neutral message is not recorded.** A failure or message
-  already recorded today that is not the call's own provider's stays as it
-  is, since the poll already has an answer and a newer attempt may have
+  already recorded today stays as it is, since the poll already has an answer and a newer attempt may have
   written it. An account left with no provider in use gets nothing either:
   every page that requires a provider sends it to Setup, so no dashboard is
   waiting, and a message would only sit in front of the first set after a
@@ -398,7 +400,7 @@ no set was started with the new key.
   exercise. Today's set exists, so once the claim is released the status
   endpoint answers "ready" and the waiting page reloads onto the set;
   nothing is left polling. Its "today's set was kept" messages are still
-  recorded whatever the key: the person asked for a new set and is looking
+  recorded whatever the key, under the same claim check: the person asked for a new set and is looking
   at the old one, and the message is the only thing that says why.
 - **A key changed after the failure was written.** Removing a key clears a
   failure recorded against the removed provider. Saving a key clears one
@@ -452,15 +454,20 @@ generation, so no set started on the key they had just chosen.
   clear a failure the person has done nothing about.
 - **Anything else stays**: a failure recorded against a third provider, one
   recorded against the provider being switched to, and a message that
-  names no provider. The quality-check message for the provider left is
+  names no provider. The app no longer creates the first two, since every
+  change of key or provider clears the leaving provider's failure; they
+  come only from rows written before these clears shipped, or from a
+  direct column write. The quality-check message for the provider left is
   cleared, since it carries that provider.
 - **The failure line still names the provider that was tried.** A failure
   stores its provider, and `User#generation_failure_message` words the
   line from that and not from the provider in use when it is read
   (`docs/decisions/what-a-person-is-told-when-a-provider-fails.md`). That
-  still matters wherever a failure outlives a change of provider: the
-  third-provider case above, and an account whose provider was changed
-  without going through the model's key methods.
+  still matters wherever a failure outlives a change of provider, which
+  now happens only for a row written before these clears shipped (the
+  third-provider case above) or a direct column write, such as an account
+  whose provider was changed without going through the model's key
+  methods.
 
 ## The quality-check message carries its provider
 
@@ -484,8 +491,9 @@ person who moved to another provider was still held behind that message.
   hold and never reads as "check your key". Every reader of the provider
   column is about which provider a failure belongs to:
   `#forget_generation_failure_from` (a key saved, removed or switched away
-  from) and `#report_call_failure`'s "own provider" check. Both now treat
-  the message as that provider's, which is the decision.
+  from) and, until #782 item 2 removed it, `#report_call_failure`'s "own
+  provider" check. `#forget_generation_failure_from` treats the message as
+  that provider's, which is the decision.
   `#forget_generation_failure_from` clears the message text with the
   provider.
 - **What stays provider-less.** `GenerateDailyExercisesJob::SUPERSEDED_MESSAGE`

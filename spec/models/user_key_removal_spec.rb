@@ -57,7 +57,7 @@ RSpec.describe User, "removing a stored key" do
       expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false, last_generation_failure: nil)
     end
 
-    it "keeps a failure recorded against a provider that is neither saved nor the one the save switches away from" do
+    it "keeps a legacy or directly written failure against a provider neither saved nor switched away from" do
       user.record_generation_failure!(rate_limited_on("gemini"))
       user.reload
 
@@ -121,7 +121,7 @@ RSpec.describe User, "removing a stored key" do
       "switching between two other providers" => ->(account) { account.use_provider("openai") },
       "removing another provider's key" => ->(account) { account.remove_api_key("openai") }
     }.each do |name, change|
-      it "stays after #{name}" do
+      it "stays, on a row the app no longer creates, after #{name}" do
         record_rejection("gemini")
         user.update!(provider: "anthropic") if name.start_with?("switching")
 
@@ -188,7 +188,7 @@ RSpec.describe User, "removing a stored key" do
       expect(user).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
     end
 
-    it "keeps a failure recorded against a third provider" do
+    it "keeps a failure left against a third provider by a legacy row or a direct column write" do
       user.record_generation_failure!(rate_limited_on("gemini"))
       user.reload
 
@@ -198,7 +198,7 @@ RSpec.describe User, "removing a stored key" do
       expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure_provider: "gemini")
     end
 
-    it "keeps a failure recorded against the provider it switches to" do
+    it "keeps a failure left against the provider it switches to by a legacy row or a direct column write" do
       user.record_generation_failure!(rate_limited_on("openai"))
       user.reload
 
@@ -421,7 +421,7 @@ RSpec.describe User, "removing a stored key" do
       expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_failure: "bad_key")
     end
 
-    it "skips the block once the key was removed, replaced or switched, and clears the call's own provider's failure" do
+    it "skips the block once the key was removed, replaced or switched, after the change cleared the call's own provider's failure" do
       changes = [ ->(account) { account.store_api_key("sk-ant-new", provider: "anthropic") },
                   ->(account) { account.use_provider("openai") } ]
       changes.each do |change|
@@ -470,16 +470,25 @@ RSpec.describe User, "removing a stored key" do
 
       before { user.update!(key_saved_times: { "openai" => "2026-11-07T00:00:00Z" }) }
 
-      it "does it when no failure is recorded today, and when today's failure is the call's own provider's" do
+      it "does it when no failure is recorded today" do
         key_used = user.key_in_use
         user.use_provider("openai")
         user.save!
         report(user, key_used)
         expect(user.reload).to have_attributes(last_generation_error: neutral, last_generation_failure_provider: nil)
+      end
 
+      it "leaves a failure written straight to the columns for the call's own provider after the change" do
+        key_used = user.key_in_use
+        user.use_provider("openai")
+        user.save!
         user.record_generation_failure!(ProviderError::AuthenticationError.new("bad").tap { |e| e.provider = "anthropic" })
+
         report(user, key_used)
-        expect(user.reload).to have_attributes(last_generation_error: neutral, last_generation_failure: nil)
+
+        expect(user.reload).to have_attributes(last_generation_failure: "bad_key", last_generation_failure_provider: "anthropic",
+                                               last_generation_error: nil)
+        expect(user.generation_failure_message(surface: :generation)).to include("Claude")
       end
 
       it "leaves a failure recorded today against another provider, and records nothing" do

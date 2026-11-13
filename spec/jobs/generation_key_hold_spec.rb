@@ -275,7 +275,7 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
       expect(missing_set_state).to eq(:generation_failed)
     end
 
-    it "replaces a failure left for the call's own provider with the neutral message" do
+    it "leaves a failure written straight to the columns for the call's own provider, since no job path writes one" do
       user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
       provider_raising_after(bad_key) do
         User.find(user.id).tap { |fresh| fresh.use_provider("openai") }.save!
@@ -284,8 +284,8 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
 
       GenerateDailyExercisesJob.new.perform(user_id: user.id)
 
-      expect(user.reload).to have_attributes(last_generation_failure: nil, last_generation_failure_provider: nil,
-                                             last_generation_error: GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
+      expect(user.reload).to have_attributes(last_generation_failure: "out_of_credit", last_generation_failure_provider: "anthropic",
+                                             last_generation_error: nil)
     end
 
     it "leaves a failure a newer attempt recorded against the key that took over" do
