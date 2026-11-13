@@ -72,9 +72,10 @@ front of every set still waiting. It queues nothing for a trial account
 
 ## A row finished by another job during the call
 
-The claim and the permit can be bypassed (a direct `perform_now`, a permit
-that expired while its job was still running, or an older worker during a
-deploy), so two calls for one row can still overlap. That is why
-`#rewrite` keeps its row lock: it checks the row again under that lock and
+A direct `perform_now`, or a permit that expired while its job was still
+running, bypasses only the queue's permit. Both still run `perform`, so they
+take the claim and never overlap another job's call. An older worker during
+a deploy takes no claim, so its call can overlap a new job's call for the
+same row. That is why `#rewrite` keeps its row lock: it checks the row again under that lock and
 writes nothing when it is already fully written. The job then logs a skip, and it leaves any
 failure note alone, since this call wrote nothing.
