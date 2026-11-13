@@ -91,7 +91,7 @@ en:
         heading: "What's stored"
         body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, and a record of each request sent with your key: what it was for and how many tokens it used."
         kept: "Your sets, answers, reviews and usage records are kept until you delete your account."
-        retention: "Thinking-partner conversations are deleted automatically %{duck_days} days after the day of their set."
+        retention: "Thinking-partner conversations are deleted automatically once their set is more than %{duck_days} days old."
         authenticator: "If you turn on an authenticator app, its secret is stored encrypted, and your recovery codes are stored only in a scrambled form that can't be turned back into the codes."
       key:
         heading: "Your API key"
