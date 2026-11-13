@@ -38,6 +38,11 @@ Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.
 
+- **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
+  `concept_references` and `recognition_guides` carry a nullable `user_id`
+  that no code reads yet. It ships in five steps with deploy gates between
+  them; follow that doc's order. Until the last step, rows with no user are
+  the shared ones, kept unique by partial indexes, and deletion leaves them.
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
@@ -52,8 +57,8 @@ read it before changing that area.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
-  `ConceptReference` is a team-wide cache keyed on `(concept, language)` with
-  no `user_id`. Guide, ladder and `lesson` come from the same
+  `ConceptReference` is a team-wide cache keyed on `(concept, language)`; its
+  `user_id` is not read yet. Guide, ladder and `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.

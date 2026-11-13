@@ -31,7 +31,7 @@ two cannot disagree.
 | `judge_solves` | delete the rows with this `user_id` or on this person's sets | judge passes on the person's own sets; synthetic rows have no user |
 | `invite_codes` | keep the code, give the seat back (`redeemed_count` down by one) | the code is shared |
 | `suggested_concepts.reviewed_by_id` | set to NULL | the concept stays for the team |
-| `concept_references`, `recognition_guides` | keep | shared text with no user link |
+| `concept_references`, `recognition_guides` | delete the rows with this `user_id`; shared rows (no `user_id`) stay | the person's own Learn write-ups; the shared rows name no one (`learn-content-per-user.md`) |
 | `solid_queue_jobs` | delete the person's unfinished jobs that no worker has claimed or is claiming | their arguments name the person |
 | the Solid Queue execution tables | go with their job row | the foreign key cascades |
 | `solid_cache_entries` | keep | entries expire through `max_age` |
