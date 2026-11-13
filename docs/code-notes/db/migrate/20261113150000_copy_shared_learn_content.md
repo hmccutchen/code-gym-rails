@@ -101,6 +101,7 @@ class.
 
 ## `down` does nothing
 
-The reason is in the decision doc. Rolling back past this step changes
-nothing the code from L2 on does, since it reads own rows first and the shared
-row second. L1's `down` still refuses once any owned row exists.
+The reason is in the decision doc. Rolling back past this step leaves every
+copy in place, so the code from L2 to L4, which reads own rows first and the
+shared row second, and L5's, which reads own rows only, show the same text.
+L1's `down` still refuses once any owned row exists.

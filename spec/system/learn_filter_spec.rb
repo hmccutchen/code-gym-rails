@@ -2,9 +2,9 @@ require "rails_helper"
 
 # The filter matches a rendered attribute request specs never execute; typing the visible label must narrow the list.
 RSpec.describe "Learn tab filter", type: :system do
-  def seeded_reference(concept:, language: "ruby_rails")
+  def seeded_reference(user, concept:, language: "ruby_rails")
     ConceptReference.create!(
-      concept: concept, language: language,
+      user: user, concept: concept, language: language,
       tagline: "One clear rule, not a grab-bag of tips.",
       explanation: "This concept has one core idea worth internalizing.",
       code_example: "def example; true; end",
@@ -48,7 +48,7 @@ RSpec.describe "Learn tab filter", type: :system do
   it "narrows to the matching entry when typing the displayed, humanized label" do
     user = create_fake_provider_user
     user.update!(language: "ruby_rails")
-    seeded_reference(concept: "n_plus_one")
+    seeded_reference(user, concept: "n_plus_one")
 
     visit_as(user)
     visit learn_path
@@ -64,7 +64,7 @@ RSpec.describe "Learn tab filter", type: :system do
   it "hides every entry and shows the empty state for a non-matching term" do
     user = create_fake_provider_user
     user.update!(language: "ruby_rails")
-    seeded_reference(concept: "n_plus_one")
+    seeded_reference(user, concept: "n_plus_one")
 
     visit_as(user)
     visit learn_path

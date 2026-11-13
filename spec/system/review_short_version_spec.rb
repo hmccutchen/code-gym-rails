@@ -16,7 +16,7 @@ RSpec.describe "The concept's short version in a review, on a phone", type: :sys
       concept_tags: { "code_review" => "n_plus_one" },
       ai_review: { "code_review" => { "rating" => "developing", "missed" => [ "Loads each customer alone." ], "essential_gaps" => [ 0 ] } }
     )
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "Load what the loop reads in one query",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "Load what the loop reads in one query",
                              explanation: "e", code_example: "Order.includes(:customer)", senior_lens: "s",
                              guide_plain_language: "Reach for eager loading when a loop reads an association.",
                              guide_worked_example: "Before the fix, each order loads its customer.",

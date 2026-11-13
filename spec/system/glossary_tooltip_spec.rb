@@ -136,17 +136,17 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
     let(:learn_tagline) { "Memoization keeps repeated reads cheap." }
     let(:worked_example) { "Each read hits the database again, so caching the result avoids it, so memoization helps." }
 
-    def create_reference(tagline:, worked_example: FakeService::CONCEPT_REFERENCE["guide_worked_example"])
+    def create_reference(user, tagline:, worked_example: FakeService::CONCEPT_REFERENCE["guide_worked_example"])
       ConceptReference.create!(
         FakeService::CONCEPT_REFERENCE.except("lesson").merge(
-          "concept" => "n_plus_one", "language" => "ruby_rails",
+          "user_id" => user.id, "concept" => "n_plus_one", "language" => "ruby_rails",
           "tagline" => tagline, "guide_worked_example" => worked_example
         )
       )
     end
 
     def visit_learn_concept(user)
-      create_reference(tagline: learn_tagline, worked_example: worked_example)
+      create_reference(user, tagline: learn_tagline, worked_example: worked_example)
       visit_as(user)
       visit learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
       expect(page).to have_content(learn_tagline)
@@ -246,7 +246,7 @@ RSpec.describe "Glossary tooltips on a phone-sized viewport", type: :system do
 
       travel_to(a_weekday) do
         page.current_window.resize_to(phone_width, 800)
-        create_reference(tagline: learn_tagline)
+        create_reference(user, tagline: learn_tagline)
         start_dashboard(user, question: "x")
         wait_for_js
         expect(page).to have_css("details.ref[open]")
