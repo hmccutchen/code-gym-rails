@@ -11,12 +11,15 @@ The `lesson` column is read back through `ConceptLesson.from_provider`, the same
 
 The migration `ClearNonHashConceptLessons` cleared every non-object lesson once, on the owner's choice to remove the bad values from the data as well. It doesn't touch an object whose parts are all unusable, which `#lesson?` already treats as no lesson.
 
-## `.for`, `.seen_by` and `.visible_to`
+## `User#concept_references` and `.indexed_for`
 
-The one answer to which reference a user sees: their own row only, never
-another user's. Every row has an owner since the schema step of
-`docs/decisions/learn-content-per-user.md`. `.for` finds the one row by user, concept and language, and `.seen_by` indexes the
-user's rows by `[concept, language]`; the per-user unique index leaves one row per key.
+A user reads their own rows only, never another user's, through
+`user.concept_references`. Every row has an owner since the schema step of
+`docs/decisions/learn-content-per-user.md`. One row is
+`user.concept_references.find_by(concept:, language:)`, and `.indexed_for`
+indexes the user's rows by `[concept, language]`; the per-user unique index
+leaves one row per key. The association has no `dependent:`:
+`AccountData::FATES` is the one place that deletes a user's rows.
 
 ## `.missing_for`
 

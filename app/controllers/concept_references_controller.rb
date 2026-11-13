@@ -12,7 +12,7 @@ class ConceptReferencesController < ApplicationController
 
   # POST /concept_references/:id/explain_differently — unpersisted; the reference is read, never written.
   def explain_differently
-    reference = ConceptReference.visible_to(current_user).find(params[:id])
+    reference = current_user.concept_references.find(params[:id])
     prior = prior_alternates_param
 
     if prior.size >= MAX_ALTERNATES_PER_CONCEPT

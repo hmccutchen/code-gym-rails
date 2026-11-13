@@ -81,9 +81,9 @@ RSpec.describe RecognitionGuide do
       create_guide(questions: "theirs", user: other)
       create_guide(group_key: "data_modeling", user: other)
 
-      expect(described_class.seen_by(owner, %w[code_smell architecture data_modeling])).to eq("code_smell" => own)
-      expect(described_class.seen_by(other, %w[architecture])).to be_empty
-      expect(described_class.visible_to(owner)).to contain_exactly(own)
+      expect(described_class.indexed_for(owner, %w[code_smell architecture data_modeling])).to eq("code_smell" => own)
+      expect(described_class.indexed_for(other, %w[architecture])).to be_empty
+      expect(owner.recognition_guides).to contain_exactly(own)
     end
 
     it "says whether the user has their own guide for one key, ignoring other users' rows" do

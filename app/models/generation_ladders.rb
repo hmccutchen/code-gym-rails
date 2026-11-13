@@ -9,7 +9,7 @@ class GenerationLadders
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
 
-    references = ConceptReference.seen_by(user, language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
+    references = ConceptReference.indexed_for(user, language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
                                  .select { |_key, reference| reference.ladder? }
 
     requests.each_with_object({}) do |request, ladders|

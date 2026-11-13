@@ -46,7 +46,7 @@ RSpec.describe "A concept write-up racing account deletion on PostgreSQL", type:
 
   def start_deletion_after_owner_check
     deletion = nil
-    allow(ConceptReference).to receive(:find_by).and_wrap_original do |original, *args, **kwargs|
+    allow_any_instance_of(User).to receive(:concept_references).and_wrap_original do |original, *args, **kwargs|
       if ActiveRecord::Base.connection.transaction_open?
         deletion ||= ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
           backend_pid = []

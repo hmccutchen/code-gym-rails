@@ -312,10 +312,10 @@ ships one release before any code reads it for Learn
   without `optional: true`, so a row with no owner fails validation before
   it reaches the NOT NULL constraint. Their uniqueness validations were
   already scoped to `user_id` and stay as they are.
-- The readers keep their names (`visible_to`, `for`, `seen_by`,
-  `missing_for`, `written_for?`). `User` gains no `has_many` for the two
-  tables: nothing would call it, and `AccountData::FATES` already deletes
-  the rows.
+- The readers kept their names (`visible_to`, `for`, `seen_by`,
+  `missing_for`, `written_for?`), and `User` gained no `has_many` for the
+  two tables. Issue #796 later replaced the first three; "After the schema
+  step" below says how.
 - It runs the copy a third time because L5's catch-up reads the list of
   active accounts once, before its loop, so an account created after that
   list was read got no copy. That includes a trial started through
@@ -334,6 +334,30 @@ ships one release before any code reads it for Learn
 - Its deploy gate is step 6 above. How it runs (locking, the deploy window
   and rolling back) is in
   `docs/code-notes/db/migrate/20261113190000_require_user_on_learn_content.md`.
+
+## After the schema step
+
+Issue #796 retired the read methods named for the time when a user also saw
+shared rows. With every row owned, `visible_to` and `.for` were the same
+`user_id` filter as `AccountData.owned`, and `seen_by` returned the user's
+rows indexed by key, which had nothing to do with the "seen" Learn uses for
+exposure (`ConceptExposureIndex#count`, the `.learn-seen` filter).
+
+- `User` has `has_many :concept_references` and
+  `has_many :recognition_guides`, without `dependent:`, since
+  `AccountData::FATES` stays the one place that deletes a user's rows.
+- `ConceptReference.visible_to(user)` and `RecognitionGuide.visible_to(user)`
+  became `user.concept_references` and `user.recognition_guides`;
+  `ConceptReference.for(user, concept:, language:)` became
+  `user.concept_references.find_by(concept:, language:)`, including the
+  uncached re-read inside `ConceptReference.write_for`'s transaction.
+- `seen_by` became `indexed_for` on both models, with the same arguments.
+- `missing_for`, `written_for?`, `written_up?`, `written_up_keys`,
+  `write_for` and `write_wanted?` keep their names. `seen_version` keeps its
+  name too, since queued jobs carry it as an argument.
+
+The sections above describe each step as it shipped, so they keep the old
+names.
 
 ## What remains
 

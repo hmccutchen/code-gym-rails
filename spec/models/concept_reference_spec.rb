@@ -54,9 +54,9 @@ RSpec.describe ConceptReference do
     it "never gives one user another user's row" do
       own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
 
-      expect(ConceptReference.for(owner, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
-      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to be_nil
-      expect(ConceptReference.visible_to(other)).to be_empty
+      expect(owner.concept_references.find_by(concept: "n_plus_one", language: "ruby_rails")).to eq(own)
+      expect(other.concept_references.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_nil
+      expect(other.concept_references).to be_empty
     end
 
     it "indexes the user's own rows by concept and language, leaving out other users' rows" do
@@ -64,9 +64,9 @@ RSpec.describe ConceptReference do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "theirs", user: other)
       ConceptReference.create!(concept: "memoization", language: "ruby_rails", user: other)
 
-      seen = ConceptReference.seen_by(owner, language: "ruby_rails")
+      owned = ConceptReference.indexed_for(owner, language: "ruby_rails")
 
-      expect(seen).to eq([ "n_plus_one", "ruby_rails" ] => own)
+      expect(owned).to eq([ "n_plus_one", "ruby_rails" ] => own)
     end
 
     it "lists the pairs a user has no reference of their own for, in the order given" do
@@ -320,7 +320,7 @@ RSpec.describe ConceptReference do
       subscriber = ->(*, payload) { cached_reads << payload[:sql] if payload[:cached] && payload[:sql].include?("concept_references") }
 
       described_class.cache do
-        described_class.for(owner, concept: "n_plus_one", language: "ruby_rails")
+        owner.concept_references.find_by(concept: "n_plus_one", language: "ruby_rails")
         ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { write }
       end
 

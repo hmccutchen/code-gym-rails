@@ -10,7 +10,7 @@ class LearnController < ApplicationController
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
     @ungenerated = ungenerated_concepts.size
-    @recognition_guides = RecognitionGuide.seen_by(current_user, recognition_group_keys)
+    @recognition_guides = RecognitionGuide.indexed_for(current_user, recognition_group_keys)
     @ungenerated_guides = missing_recognition_guides.size
   end
 
@@ -18,7 +18,7 @@ class LearnController < ApplicationController
   def show
     @bucket    = validated_bucket
     @concept   = validated_concept(@bucket)
-    @reference = ConceptReference.for(current_user, concept: @concept, language: @bucket)
+    @reference = current_user.concept_references.find_by(concept: @concept, language: @bucket)
     @ladder_targets = ladder_targets_for(@reference)
     @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
     @lesson_missing = @reference.present? && !@reference.lesson? && params[:lesson] == "missing"
@@ -39,7 +39,7 @@ class LearnController < ApplicationController
     return head :bad_request if predicate.nil?
     return head :bad_request if AWAITING_REWRITE.include?(awaiting) && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
-    reference = ConceptReference.for(current_user, concept: concept, language: bucket)
+    reference = current_user.concept_references.find_by(concept: concept, language: bucket)
     body = { ready: reference&.public_send(predicate) || false }
     if AWAITING_REWRITE.include?(awaiting)
       body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
@@ -111,7 +111,7 @@ class LearnController < ApplicationController
   end
 
   def references_by_key
-    ConceptReference.seen_by(current_user, language: learn_buckets)
+    ConceptReference.indexed_for(current_user, language: learn_buckets)
   end
 
   def learn_pairs

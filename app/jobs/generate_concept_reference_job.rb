@@ -23,10 +23,10 @@ class GenerateConceptReferenceJob < ApplicationJob
   end
 
   def self.queue_rewrites(user, pairs, priority: JobPriority::CLICK)
-    seen = ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+    owned = ConceptReference.indexed_for(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
     pairs.each do |concept, language|
       set(priority: priority).perform_later(concept: concept, language: language, user_id: user.id, refresh: true,
-                                            seen_version: seen[[ concept, language ]]&.generation_version || 0)
+                                            seen_version: owned[[ concept, language ]]&.generation_version || 0)
     end
   end
 
@@ -60,7 +60,7 @@ class GenerateConceptReferenceJob < ApplicationJob
   private
 
   def wanted?(user, concept, language, refresh:, seen_version:)
-    ConceptReference.write_wanted?(ConceptReference.for(user, concept: concept, language: language), refresh:, seen_version:)
+    ConceptReference.write_wanted?(user.concept_references.find_by(concept: concept, language: language), refresh:, seen_version:)
   end
 
   def write_up(user, concept, language, refresh, seen_version)

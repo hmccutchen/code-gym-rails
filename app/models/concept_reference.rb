@@ -11,21 +11,15 @@ class ConceptReference < ApplicationRecord
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: %i[user_id language] }
 
-  scope :visible_to, ->(user) { where(user_id: user.id) }
-
-  def self.for(user, concept:, language:)
-    find_by(user_id: user.id, concept: concept, language: language)
-  end
-
-  def self.seen_by(user, **conditions)
-    visible_to(user).where(conditions).index_by { |reference| [ reference.concept, reference.language ] }
+  def self.indexed_for(user, **conditions)
+    user.concept_references.where(conditions).index_by { |reference| [ reference.concept, reference.language ] }
   end
 
   def self.missing_for(user, pairs)
     return [] if pairs.empty?
 
-    seen = seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
-    pairs.reject { |pair| seen.key?(pair) }
+    owned = indexed_for(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+    pairs.reject { |pair| owned.key?(pair) }
   end
 
   # Any user's row counts: the admin promote check asks only whether a concept was ever written up, and shows no text.
@@ -37,10 +31,10 @@ class ConceptReference < ApplicationRecord
     where(language: languages).distinct.pluck(:language, :concept).to_set
   end
 
-  def self.write_wanted?(seen, refresh:, seen_version:)
-    return false unless seen_version.nil? || seen_version == (seen&.generation_version || 0)
+  def self.write_wanted?(own, refresh:, seen_version:)
+    return false unless seen_version.nil? || seen_version == (own&.generation_version || 0)
 
-    seen.nil? || (refresh && !seen.fully_written?)
+    own.nil? || (refresh && !own.fully_written?)
   end
 
   # The owner is share-locked before the row, as AccountDeletion locks it, so a deleted account gets nothing.
@@ -50,7 +44,7 @@ class ConceptReference < ApplicationRecord
     User.transaction do
       next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
 
-      own = uncached { self.for(user, concept: concept, language: language) }
+      own = uncached { user.concept_references.find_by(concept: concept, language: language) }
       next rewrite(own, written, refresh:, seen_version:) if own
       next :skipped unless write_wanted?(nil, refresh:, seen_version:)
 
