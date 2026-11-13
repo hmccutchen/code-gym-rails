@@ -18,8 +18,8 @@ class GenerateConceptReferenceJob < ApplicationJob
   # The set is already saved, so a failed enqueue must not fail its job; submit and Learn's prepare queue the rest.
   def self.queue_for_new_set(user, exercise)
     queue_missing(user, exercise.concept_pairs(before_submission: true), priority: JobPriority::BACKGROUND)
-  rescue ActiveRecord::ActiveRecordError, SolidQueue::Job::EnqueueError => e
-    Rails.logger.warn("Could not queue concept write-ups for user #{user.id} on #{exercise.date}: #{e.class}: #{e.message}")
+  rescue SolidQueue::Job::EnqueueError, ActiveRecord::ConnectionNotEstablished, ActiveRecord::ConnectionFailed => e
+    Rails.logger.error("Could not queue concept write-ups for user #{user.id} on #{exercise.date}: #{e.class}: #{e.message}")
   end
 
   def self.queue_rewrites(user, pairs, priority: JobPriority::CLICK)

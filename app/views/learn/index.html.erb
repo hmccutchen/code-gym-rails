@@ -27,7 +27,7 @@
   </div>
 </div>
 
-<% if @writes_learn_content && (@ungenerated.positive? || @ungenerated_guides.positive?) %>
+<% if writes_learn_content? && (@ungenerated.positive? || @ungenerated_guides.positive?) %>
   <div class="card learn-prepare">
     <p>
       <% if @ungenerated.positive? %><%= t("learn.prepare_prompt", count: @ungenerated) %><% end %>

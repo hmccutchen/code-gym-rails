@@ -55,7 +55,7 @@
   </ul>
 <% end %>
 
-<% if !@writes_learn_content %>
+<% if !writes_learn_content? %>
   <% unless @reference&.guide? %><p class="learn-no-guide"><%= t("learn.no_guide") %></p><% end %>
 <% elsif !@reference&.guide? %>
   <%= render "learn/write_up_control", awaiting: "guide", generation_version: nil,

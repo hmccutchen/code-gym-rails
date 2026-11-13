@@ -7,12 +7,20 @@ says why it was removed in #792). A press is paid for with the account's own
 key; a trial account is refused before anything is queued
 (`User#writes_learn_content?`).
 
-## `@writes_learn_content`
+## `#writes_learn_content?`
 
-A `before_action` asks `User#writes_learn_content?` once per request, and
-the actions and the `learn/index` and `learn/show` views read the answer, so
-one page never asks the trial question twice (#790). `#status` skips it,
-since a poll never needs it.
+The private `#writes_learn_content?` asks `User#writes_learn_content?` the
+first time a request needs it and keeps the answer, so one page never asks
+the trial question twice (#790). The actions call it, and the `learn/index`
+and `learn/show` views reach it through `helper_method`. It guards the memo
+with `defined?`, because a trial account's answer is `false` and `||=` would
+ask again. `#status` never calls it, since a poll never needs it.
+
+It replaced a `before_action` that set an instance variable for every
+action but `#status`. An action added later and left out of that hook would
+have read `nil`, which looks like a trial account, so it would have refused
+the user without any error. Asking on demand has no list of actions to keep
+in step.
 
 ## `#bulk`
 

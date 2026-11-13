@@ -48,12 +48,29 @@ calls it after the provider call and logs the answer (issue #790).
 
 Locks are taken user first, then row, as `AccountDeletion` takes them. The
 user row is share-locked (`FOR SHARE`) and must still be active, or nothing
-is written. A user with no row gets one at `generation_version` 1. An
-existing row is locked (`with_lock`, which reloads it) and asked
-`.write_wanted?` again: a write lands only when the row is still the one
-the request was made against. A rewrite sets every `WRITTEN_FIELDS`
+is written. The user's own row is then read inside `uncached`, so the answer
+never comes from a query cache the caller had on; a job runs with one, and
+its earlier read would otherwise hide a row written since. Whichever way
+that read comes out, `.write_wanted?` decides. With no row, it is asked
+about `nil`, and a wanted write creates the row at `generation_version` 1.
+A refresh against a version the user saw, for a row that has since gone,
+writes nothing. An existing row is locked (`with_lock`, which reloads it)
+and asked the same question: a write lands only when the row is still the
+one the request was made against. A rewrite sets every `WRITTEN_FIELDS`
 column, so a field the reply left out is cleared, and adds one to the
 version.
+
+### Losing a creation race
+
+No lock covers a row that does not exist yet. If another writer inserts the
+user's row after the uncached read and before `create!`, `.write_for`
+raises instead of returning: `ActiveRecord::RecordNotUnique` from the unique
+index, or `ActiveRecord::RecordInvalid` when the uniqueness validation
+already sees the other row. It does not rescue either, because only the
+caller knows whether losing is fine. `GenerateConceptReferenceJob#perform`
+rescues both and logs a skip, re-raising a `RecordInvalid` whose error is
+not on `concept`, since that is a real validation failure. A new caller
+must do the same.
 
 `.write_wanted?` is the one statement of when a write is wanted. A request
 naming a `seen_version` the row no longer has already ran. Otherwise a

@@ -83,8 +83,9 @@ logging. The save is `ConceptReference.write_for`, which returns
 `app/clients`, which `Archspec.rb` bars models from using. The question
 "is a write still wanted?" is `ConceptReference.write_wanted?`, which the
 job asks before the claim and again under it, and `.write_for` asks a
-third time under the row lock. The model's code note has the lock order
-and the skip rules.
+third time, under the row lock when the row exists and before its insert
+when it does not. The model's code note has the lock order, the skip rules
+and the creation race this job's `rescue` answers.
 
 ## An account deleted during the call
 
@@ -118,10 +119,20 @@ write-ups through it, after the set is saved. An enqueue can raise there:
 Solid Queue turns a database error during the insert into
 `SolidQueue::Job::EnqueueError`, which is not the `ActiveJob::EnqueueError`
 that `perform_later` catches, and `ConceptReference.missing_for` reads the
-database first. Before #790 that error failed the set's job although the
-set had landed, and a scheduled job then skipped the reminder push. It is
-now logged as a warning and the set's job goes on. The missing write-ups
-are queued again on submit, or by Learn's prepare button.
+database first, so a lost connection can raise from that read. Before #790
+either error failed the set's job although the set had landed, and a
+scheduled job then skipped the reminder push.
+
+It rescues only those failures: `SolidQueue::Job::EnqueueError`, and
+connection loss, which Rails raises as `ActiveRecord::ConnectionNotEstablished`
+(with `ConnectionTimeoutError`, a subclass, when the pool has no free
+connection) or as `ActiveRecord::ConnectionFailed` when the connection drops
+during a query. It logs them at error level and the set's job goes on. The
+missing write-ups are queued again on submit, or by Learn's prepare button.
+Any other database error, such as a `StatementInvalid` from a broken query
+in `missing_for`, is a defect, so it is not rescued and fails the job where
+it can be seen. The job spec holds both sides, and the daily job's spec
+raises `SolidQueue::Job::EnqueueError` from the queue adapter itself.
 
 ## A row written by another writer during the call
 

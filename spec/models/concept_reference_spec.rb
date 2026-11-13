@@ -305,6 +305,28 @@ RSpec.describe ConceptReference do
       expect([ row.reload.tagline, row.generation_version ]).to eq([ "old", 1 ])
     end
 
+    it "writes nothing when a refresh asked against a row that has since gone" do
+      expect(write(refresh: true, seen_version: 2)).to eq(:skipped)
+      expect(described_class.count).to eq(0)
+    end
+
+    it "creates the row on a refresh asked when the user saw none" do
+      expect(write(refresh: true, seen_version: 0)).to eq(:written)
+      expect(described_class.sole.generation_version).to eq(1)
+    end
+
+    it "reads the user's own row past the caller's query cache" do
+      cached_reads = []
+      subscriber = ->(*, payload) { cached_reads << payload[:sql] if payload[:cached] && payload[:sql].include?("concept_references") }
+
+      described_class.cache do
+        described_class.for(owner, concept: "n_plus_one", language: "ruby_rails")
+        ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { write }
+      end
+
+      expect(cached_reads).to be_empty
+    end
+
     it "is written for a user with only another user's row" do
       described_class.create!(user: other, concept: "n_plus_one", language: "ruby_rails", tagline: "theirs")
 

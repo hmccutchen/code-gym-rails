@@ -784,6 +784,28 @@ RSpec.describe "Learn", type: :request do
 
       expect(response).to have_http_status(:ok)
     end
+
+    it "is decided once for a trial account, whose answer is false" do
+      trial = create_trial_user
+      trial.update!(language: "ruby_rails")
+      login_as(trial)
+      ConceptReference.create!(user: trial, concept: "n_plus_one", language: "ruby_rails", tagline: "t",
+                               guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
+      expect_any_instance_of(User).to receive(:writes_learn_content?).once.and_call_original
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(I18n.t("learn.write_guide"))
+    end
+
+    it "is never asked by the status poll" do
+      expect_any_instance_of(User).not_to receive(:writes_learn_content?)
+
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response).to have_http_status(:ok)
+    end
   end
 
   describe "the priority of a bulk press" do

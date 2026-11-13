@@ -50,8 +50,9 @@ class ConceptReference < ApplicationRecord
     User.transaction do
       next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
 
-      own = self.for(user, concept: concept, language: language)
+      own = uncached { self.for(user, concept: concept, language: language) }
       next rewrite(own, written, refresh:, seen_version:) if own
+      next :skipped unless write_wanted?(nil, refresh:, seen_version:)
 
       create!(written.merge("user_id" => user.id, "concept" => concept, "language" => language, "generation_version" => 1))
       :written

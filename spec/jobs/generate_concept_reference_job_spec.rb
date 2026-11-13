@@ -146,6 +146,33 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
     end
   end
 
+  describe ".queue_for_new_set" do
+    let(:exercise) { instance_double(DailyExercise, date: Date.new(2026, 7, 13), concept_pairs: [ %w[n_plus_one ruby_rails] ]) }
+
+    before { allow(Rails.logger).to receive(:error) }
+
+    it "logs a lost connection as an error and returns" do
+      allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::ConnectionNotEstablished, "connection lost")
+
+      expect { described_class.queue_for_new_set(user, exercise) }.not_to raise_error
+      expect(Rails.logger).to have_received(:error).with(/Could not queue concept write-ups for user #{user.id}.*ConnectionNotEstablished/)
+    end
+
+    it "logs a connection dropped mid-query as an error and returns" do
+      allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::ConnectionFailed, "server closed the connection")
+
+      expect { described_class.queue_for_new_set(user, exercise) }.not_to raise_error
+      expect(Rails.logger).to have_received(:error).with(/ConnectionFailed/)
+    end
+
+    it "raises a query error from reading the missing pairs, which is a defect and not a failed enqueue" do
+      allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::StatementInvalid, "PG::UndefinedColumn")
+
+      expect { described_class.queue_for_new_set(user, exercise) }.to raise_error(ActiveRecord::StatementInvalid)
+      expect(Rails.logger).not_to have_received(:error)
+    end
+  end
+
   describe "ownership" do
     let(:teammate) { User.create!(email: "teammate@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-other" }) }
 
