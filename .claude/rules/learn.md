@@ -66,7 +66,10 @@ read it before changing that area.
   `ConceptReference` is keyed on `(user_id, concept, language)`, and every
   row has an owner. Guide, ladder and
   `lesson` come from the same
-  `#generate_concept_reference` call, outside its required fields;
+  `#generate_concept_reference` call, outside its required fields, except
+  that a ladder press on a row with reference text writes only the ladder
+  (`#generate_concept_ladder`, which requires all four rungs and takes no
+  exercise or response; `difficulty-targets-and-locks.md`, #800);
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.
   The review's short version reads the tagline, explanation, code example
@@ -92,7 +95,9 @@ read it before changing that area.
   click is never discarded for a queued press, and the job takes an
   `AdvisoryLock` claim on user, language and concept before its call, so
   the two make one provider call. A job that finds the claim held or the
-  row written calls nothing. `GenerateRecognitionGuideJob` keeps its
+  row written calls nothing. A ladder press passes `part: "ladder"` through
+  the same job, permit and claim, and `ConceptReference.write_ladder_for`
+  writes only `LADDER_FIELDS` under the same lock order as `.write_for`. `GenerateRecognitionGuideJob` keeps its
   discard permit, since only a press queues a guide.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one

@@ -2,6 +2,8 @@
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :provider_calls
 
+  LADDER_PART = "ladder".freeze
+
   # One queued job per priority, so a click is never discarded for a bulk press; the claim stops the second call.
   limits_concurrency key: ->(args) { "#{priority || JobPriority::CLICK}/#{self.class.claim_key(**args.slice(:user_id, :language, :concept))}" },
                      to: 1, on_conflict: :discard,
@@ -22,25 +24,25 @@ class GenerateConceptReferenceJob < ApplicationJob
     Rails.logger.error("Could not queue concept write-ups for user #{user.id} on #{exercise.date}: #{e.class}: #{e.message}")
   end
 
-  def self.queue_rewrites(user, pairs, priority: JobPriority::CLICK)
+  def self.queue_rewrites(user, pairs, priority: JobPriority::CLICK, part: nil)
     owned = ConceptReference.indexed_for(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
     pairs.each do |concept, language|
-      set(priority: priority).perform_later(concept: concept, language: language, user_id: user.id, refresh: true,
-                                            seen_version: owned[[ concept, language ]]&.generation_version || 0)
+      set(priority: priority).perform_later(**{ concept: concept, language: language, user_id: user.id, refresh: true,
+                                                seen_version: owned[[ concept, language ]]&.generation_version || 0, part: part }.compact)
     end
   end
 
   def self.claim_key(user_id:, language:, concept:) = "concept_reference/#{user_id}/#{language}/#{concept}"
 
-  # A rewrite asked for against an older seen_version already ran; jobs queued by older code pass no seen_version.
-  def perform(concept:, language:, user_id:, refresh: false, seen_version: nil)
+  # A rewrite asked for against an older seen_version already ran; jobs queued by older code pass no seen_version or part.
+  def perform(concept:, language:, user_id:, refresh: false, seen_version: nil, part: nil)
     return if concept == "other"
 
     user = User.active.find_by(id: user_id)
-    return unless user&.writes_learn_content? && wanted?(user, concept, language, refresh:, seen_version:)
+    return unless user&.writes_learn_content? && wanted?(user, concept, language, refresh:, seen_version:, part:)
 
     claimed = AdvisoryLock.hold(self.class.claim_key(user_id: user.id, language: language, concept: concept)) do
-      write_up(user, concept, language, refresh, seen_version)
+      write(user, concept, language, refresh:, seen_version:, part:)
     end
     Rails.logger.info("Skipped concept reference for #{concept}/#{language}: another job is writing it") unless claimed
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
@@ -59,15 +61,41 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   private
 
-  def wanted?(user, concept, language, refresh:, seen_version:)
-    ConceptReference.write_wanted?(user.concept_references.find_for(concept:, language:), refresh:, seen_version:)
+  def wanted?(user, concept, language, refresh:, seen_version:, part:)
+    own = user.concept_references.find_for(concept:, language:)
+    return ConceptReference.ladder_wanted?(own, seen_version:) if ladder_only?(own, part)
+
+    ConceptReference.write_wanted?(own, refresh:, seen_version:)
+  end
+
+  def ladder_only?(own, part) = part == LADDER_PART && own&.reference_text?
+
+  def write(user, concept, language, refresh:, seen_version:, part:)
+    own = ConceptReference.uncached { user.concept_references.find_for(concept:, language:) }
+    if ladder_only?(own, part)
+      write_ladder(user, own, seen_version)
+    else
+      write_up(user, concept, language, refresh, seen_version)
+    end
+  end
+
+  def write_ladder(user, own, seen_version)
+    return unless ConceptReference.ladder_wanted?(own, seen_version:)
+
+    ladder = AiService.for(user).generate_concept_ladder(user, own)
+    report(ConceptReference.write_ladder_for(user, concept: own.concept, language: own.language, ladder:, seen_version:),
+           user, own.concept, own.language)
   end
 
   def write_up(user, concept, language, refresh, seen_version)
-    return unless ConceptReference.uncached { wanted?(user, concept, language, refresh:, seen_version:) }
+    return unless ConceptReference.uncached { wanted?(user, concept, language, refresh:, seen_version:, part: nil) }
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    case ConceptReference.write_for(user, concept:, language:, attributes: reference, refresh:, seen_version:)
+    report(ConceptReference.write_for(user, concept:, language:, attributes: reference, refresh:, seen_version:), user, concept, language)
+  end
+
+  def report(outcome, user, concept, language)
+    case outcome
     when :account_deleted then log_deleted(user.id, concept, language)
     when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: the row changed during the call")
     else

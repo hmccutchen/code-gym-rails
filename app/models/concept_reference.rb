@@ -41,13 +41,16 @@ class ConceptReference < ApplicationRecord
     own.nil? || (refresh && !own.fully_written?)
   end
 
-  # The owner is share-locked before the row, as AccountDeletion locks it, so a deleted account gets nothing.
+  def self.ladder_wanted?(own, seen_version:)
+    return false unless own&.reference_text? && !own.ladder?
+
+    seen_version.nil? || seen_version == own.generation_version
+  end
+
   def self.write_for(user, concept:, language:, attributes:, refresh:, seen_version:)
     written = WRITTEN_FIELDS.index_with { |field| attributes[field] }
 
-    User.transaction do
-      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
-
+    with_owner_share_locked(user) do
       own = uncached { user.concept_references.find_for(concept:, language:) }
       next rewrite(own, written, refresh:, seen_version:) if own
       next :skipped unless write_wanted?(nil, refresh:, seen_version:)
@@ -56,6 +59,30 @@ class ConceptReference < ApplicationRecord
       :written
     end
   end
+
+  def self.write_ladder_for(user, concept:, language:, ladder:, seen_version:)
+    with_owner_share_locked(user) do
+      own = uncached { user.concept_references.find_for(concept:, language:) }
+      next :skipped unless own
+
+      own.with_lock do
+        next :skipped unless ladder_wanted?(own, seen_version:)
+
+        own.update!(LADDER_FIELDS.index_with { |field| ladder[field] }.merge(generation_version: own.generation_version + 1))
+        :written
+      end
+    end
+  end
+
+  # The owner is share-locked before the row, as AccountDeletion locks it, so a deleted account gets nothing.
+  def self.with_owner_share_locked(user)
+    User.transaction do
+      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
+
+      yield
+    end
+  end
+  private_class_method :with_owner_share_locked
 
   def self.rewrite(own, written, refresh:, seen_version:)
     own.with_lock do
@@ -70,6 +97,10 @@ class ConceptReference < ApplicationRecord
   # Derived from the field list; a partly blank guide answers false so the row is regenerated whole.
   def guide?
     GUIDE_FIELDS.all? { |field| public_send(field).present? }
+  end
+
+  def reference_text?
+    REFERENCE_FIELDS.all? { |field| public_send(field).present? }
   end
 
   def ladder?

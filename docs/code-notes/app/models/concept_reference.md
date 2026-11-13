@@ -39,8 +39,12 @@ someone's set was tagged with it.
 ## `WRITTEN_FIELDS`
 
 Every column one `#generate_concept_reference` call fills: the reference,
-guide and ladder fields and the lesson. The job writes all of them together
-so a row's parts always come from one response. `#fully_written?` does not
+guide and ladder fields and the lesson. A full write-up writes all of them
+together. The ladder is the one part written on its own: since 2026-11-13
+(#800) a ladder press on a row with reference text writes only
+`LADDER_FIELDS` through `.write_ladder_for`, so a row's ladder can come from
+a later response than its text (`docs/decisions/difficulty-targets-and-locks.md`,
+"The ladder is written on its own"). `#fully_written?` does not
 read this list: it asks for the guide, the ladder and a lesson
 `#usable_lesson` can show, and checks no reference field.
 
@@ -83,3 +87,21 @@ naming a `seen_version` the row no longer has already ran. Otherwise a
 missing row is wanted, and an existing one only on a refresh while it is
 not `#fully_written?`. The job asks it before its claim and again under the
 claim, so a job with nothing to write makes no call.
+
+## `.write_ladder_for` and `.ladder_wanted?`
+
+`.write_ladder_for` saves a ladder-only reply onto the user's existing row
+and returns `:written`, `:skipped` or `:account_deleted`, as `.write_for`
+does. It takes the same locks in the same order through
+`.with_owner_share_locked`: the user row `FOR SHARE`, then the reference row
+with `with_lock`. It never creates a row, because a ladder alone is not a
+reference; with no row it skips, and the job writes a full reference
+instead. It sets only `LADDER_FIELDS` and adds one to `generation_version`,
+so Learn's poll sees the write land.
+
+`.ladder_wanted?` is the one statement of when a ladder-only write is
+wanted: the row exists, has every `REFERENCE_FIELDS` value
+(`#reference_text?`), has no complete ladder, and is still at the version
+the request named, or the request named none. The job asks it before the
+claim and again under it, and `.write_ladder_for` asks once more under the
+row lock.

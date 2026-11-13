@@ -43,6 +43,13 @@ RSpec.describe "Conventions held over config/locales" do
                             "progress.not_offered_note")
   end
 
+  it "never says a ladder press rewrites a reference, since it writes only the ladder" do
+    ladder_copy = %w[learn.ladder_offer learn.ladder_missing exercise_mix.ladders_cost].to_h { |key| [ key, locale.dig(*key.split(".")) ] }
+
+    expect(ladder_copy.values).to all(be_present)
+    expect(ladder_copy.reject { |_, text| text.match?(/rewr|wording/i) }.keys).to eq(ladder_copy.keys)
+  end
+
   it "names the switch by the word on its label wherever the swap picker sends someone to turn Skip off" do
     label_word = locale.dig("exercise_mix", "exclude_label").split.first
     sentences = strings(locale).select { |key, _| key.start_with?("daily_kinds.") }.map(&:last).grep(/turn \w+ off/i)

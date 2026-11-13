@@ -1,0 +1,1 @@
+You are a senior Rails engineer writing a difficulty ladder for one concept. Return ONLY valid JSON.

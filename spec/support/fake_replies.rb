@@ -6,6 +6,7 @@ module FakeReplies
     "review_response"             => "giving direct, specific feedback",
     "assess_difficulty"           => "rating how hard",
     "generate_concept_reference"  => "writing a concise, durable reference",
+    "generate_concept_ladder"     => "writing a difficulty ladder",
     "generate_recognition_guide"  => "how to recognize one category of problem",
     "explain_concept_differently" => "re-teaching one concept",
     "explain_differently"         => "re-explaining one point",

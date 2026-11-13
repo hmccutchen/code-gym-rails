@@ -2,7 +2,7 @@
 <% poll_interval_s = 2.0 %>
 <div id="learn-guide" data-controller="write-up-control"
      <%= tag.attributes(data: {
-           write_up_control_url_value: prepare_learn_concept_path(bucket: @bucket, concept: @concept),
+           write_up_control_url_value: prepare_learn_concept_path(bucket: @bucket, concept: @concept, part: (awaiting if awaiting == "ladder")),
            write_up_control_status_url_value: learn_concept_status_path(bucket: @bucket, concept: @concept, awaiting: awaiting, generation_version: generation_version),
            write_up_control_rewritten_url_value: learn_concept_path(bucket: @bucket, concept: @concept, awaiting => "missing"),
            write_up_control_interval_ms_value: (poll_interval_s * 1000).to_i,

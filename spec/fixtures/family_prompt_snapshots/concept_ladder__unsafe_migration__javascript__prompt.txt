@@ -1,0 +1,22 @@
+The JavaScript/React concept: "unsafe_migration". It is a database schema concept: tables, columns, keys, indexes, constraints and the migrations that change them, whatever language the application is written in.
+
+An engineer has already read this reference for it, and it stays as written:
+tagline: One query per row is the smell
+explanation: The association loads once per iteration.
+
+Write a difficulty ladder: for each of junior, mid_level, senior, principal_engineer, what a
+problem about THIS concept looks like at that level. Name its concrete form, never a
+description of the level in general. For missing_index, for example: junior is an
+unindexed foreign key, mid_level is an index the query can't use because it wraps the
+column in a function, senior is composite index column order, principal_engineer is
+the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
+300 characters.
+Keep every rung consistent with the reference above.
+
+Return JSON matching this schema exactly:
+{
+  "ladder_junior": "string — a junior-level problem about this concept",
+  "ladder_mid_level": "string — a mid_level-level problem about this concept",
+  "ladder_senior": "string — a senior-level problem about this concept",
+  "ladder_principal_engineer": "string — a principal_engineer-level problem about this concept"
+}

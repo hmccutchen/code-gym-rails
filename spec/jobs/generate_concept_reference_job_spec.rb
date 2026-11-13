@@ -281,6 +281,15 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
                             { "concept" => "caching", "refresh" => true, "seen_version" => 5 },
                             { "concept" => "closures", "refresh" => true, "seen_version" => 0 })
       expect(queued.map { |job| job["priority"] }.uniq).to eq([ JobPriority::BACKGROUND ])
+      expect(queued.map { |job| job["arguments"].first }).to all(satisfy { |args| !args.key?("part") })
+    end
+
+    it "names the ladder part when asked for the ladder only" do
+      described_class.queue_rewrites(user, [ %w[n_plus_one ruby_rails] ], part: described_class::LADDER_PART)
+
+      queued = enqueued_jobs.select { |job| job["job_class"] == described_class.name }
+      expect(queued.map { |job| job["arguments"].first.slice("refresh", "seen_version", "part") })
+        .to eq([ { "refresh" => true, "seen_version" => 0, "part" => "ladder" } ])
     end
   end
 
@@ -479,6 +488,123 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       expect(Rails.logger).to have_received(:info).with(/Skipped concept reference for n_plus_one\/ruby_rails: the row changed during the call/)
       expect(Rails.logger).not_to have_received(:info).with(/Generated concept reference/)
       expect(ConceptReferenceFailures.read(user_id: user.id, concept: "n_plus_one", language: "ruby_rails")).to be_present
+    end
+  end
+
+  describe "the ladder part" do
+    let(:ladder) { ConceptReference::LADDER_FIELDS.index_with { |field| "new #{field}" } }
+    let(:kept) { reference_hash.except(*ConceptReference::LADDER_FIELDS).merge("lesson" => { "definition" => "kept" }) }
+
+    def written_row(version: 2)
+      ConceptReference.create!(kept.merge(concept: "n_plus_one", language: "ruby_rails", user: user, generation_version: version))
+    end
+
+    def press_ladder(seen_version: 2)
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true,
+                                  seen_version: seen_version, part: described_class::LADDER_PART)
+    end
+
+    def stub_ladder_service
+      service = instance_double(ClaudeService)
+      allow(service).to receive(:generate_concept_ladder).and_return(ladder)
+      allow(service).to receive(:generate_concept_reference).and_return(reference_hash)
+      allow(AiService).to receive(:for).with(user).and_return(service)
+      service
+    end
+
+    it "asks for the ladder alone, handing over the row, and writes only its rungs" do
+      row = written_row
+      service = stub_ladder_service
+
+      press_ladder
+
+      expect(service).to have_received(:generate_concept_ladder).with(user, row).once
+      expect(service).not_to have_received(:generate_concept_reference)
+      row.reload
+      expect(row.attributes.slice(*kept.keys)).to eq(kept)
+      expect(ConceptReference::LADDER_FIELDS.map { |field| row.public_send(field) }).to eq(ladder.values)
+      expect(row.generation_version).to eq(3)
+    end
+
+    it "clears an earlier failure note once the ladder is written" do
+      written_row
+      stub_ladder_service
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      ConceptReferenceFailures.record(user_id: user.id, concept: "n_plus_one", language: "ruby_rails",
+                                      error: ProviderError::RateLimitError.new("slow down"))
+
+      press_ladder
+
+      expect(ConceptReferenceFailures.read(user_id: user.id, concept: "n_plus_one", language: "ruby_rails")).to be_nil
+    end
+
+    it "writes the whole reference when the user has no row yet, since there is no text to keep" do
+      service = stub_ladder_service
+
+      press_ladder(seen_version: 0)
+
+      expect(service).to have_received(:generate_concept_reference).with(user, "n_plus_one", "ruby_rails").once
+      expect(service).not_to have_received(:generate_concept_ladder)
+      expect(ConceptReference.sole).to have_attributes(tagline: reference_hash["tagline"], generation_version: 1)
+    end
+
+    it "calls nothing when the row already has a ladder" do
+      written_row.update!(ladder)
+      expect(AiService).not_to receive(:for)
+
+      press_ladder
+    end
+
+    it "calls nothing when asked for against an older version" do
+      written_row(version: 3)
+      expect(AiService).not_to receive(:for)
+
+      press_ladder(seen_version: 2)
+    end
+
+    it "records a missing rung as a failure Learn can show, and writes nothing" do
+      row = written_row
+      before = row.attributes
+      service = ClaudeService.new(user.api_key)
+      allow(AiService).to receive(:for).with(user).and_return(service)
+      allow(service).to receive(:call).and_return(
+        text: ladder.except("ladder_senior").to_json, input_tokens: 10, output_tokens: 20, model: "claude-sonnet-5-5"
+      )
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      allow(Rails.logger).to receive(:warn)
+
+      press_ladder
+
+      expect(row.reload.attributes).to eq(before)
+      expect(ConceptReferenceFailures.read(user_id: user.id, concept: "n_plus_one", language: "ruby_rails"))
+        .to include("kind" => ProviderFailure.classify(ProviderError::InvalidResponseError.new("x")).to_s)
+      expect(Rails.logger).to have_received(:warn).with(/Failed to generate concept reference/)
+    end
+
+    it "writes nothing when the account is deleted during the call" do
+      row = written_row
+      service = stub_ladder_service
+      allow(service).to receive(:generate_concept_ladder) do
+        user.update_columns(anonymized_at: Time.current)
+        ladder
+      end
+      allow(Rails.logger).to receive(:info)
+
+      press_ladder
+
+      expect([ row.reload.ladder_junior, row.generation_version ]).to eq([ nil, 2 ])
+      expect(Rails.logger).to have_received(:info).with(/the account was deleted/)
+    end
+
+    it "keeps a job queued by older code, with no part, on the full rewrite" do
+      row = written_row
+      service = stub_ladder_service
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 2)
+
+      expect(service).to have_received(:generate_concept_reference).once
+      expect(service).not_to have_received(:generate_concept_ladder)
+      expect(row.reload.generation_version).to eq(3)
     end
   end
 end

@@ -123,8 +123,8 @@ RSpec.describe "per-purpose model routing" do
       expect(body["output_config"]).to eq("effort" => "medium")
     end
 
-    it "keeps review, duck and pseudocode translation on the default model" do
-      %w[review_response duck_thread pseudocode_translate].each do |purpose|
+    it "keeps review, duck, pseudocode translation and concept write-ups on the default model" do
+      %w[review_response duck_thread pseudocode_translate generate_concept_reference generate_concept_ladder].each do |purpose|
         expect(ClaudeService::MODEL_FOR_PURPOSE).not_to have_key(purpose)
       end
     end

@@ -150,3 +150,24 @@ same row, and a migration that copies rows writes without the claim too. That is
 finds a row it did not see, a rewrite whose version the row has moved past, and any job that
 finds the row fully written all write nothing. The job then logs a skip, and it leaves any
 failure note alone, since this call wrote nothing.
+
+## The ladder part
+
+`part: "ladder"` (`LADDER_PART`) asks for the ladder alone. Learn's ladder
+press and Setup's bulk button pass it through `.queue_rewrites`; every other
+caller passes nothing, and a job queued by older code has no `part`, so it
+runs the full rewrite as before. The permit key does not read `part`, so a
+ladder press and a lesson press for one concept at the same priority share a
+permit and the second is discarded while the first is queued. Learn shows
+one of those offers at a time, so a person cannot make both presses on one
+page.
+
+Under the claim the job reads the row again, uncached. When it has its
+reference text, the job asks `ConceptReference.ladder_wanted?`, calls
+`AiService#generate_concept_ladder` with the row, and saves through
+`ConceptReference.write_ladder_for`. Otherwise, including when there is no
+row, it runs the full write-up, since there is no text to keep. Both paths
+keep the permit, the claim, `seen_version`, the failure notes, the deletion
+race and the lock order. A reply with a missing rung raises
+`ProviderError::InvalidResponseError`, which the `rescue` records like any
+other write-up failure, and the row is left as it was.

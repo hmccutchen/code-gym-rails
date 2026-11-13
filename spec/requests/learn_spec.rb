@@ -471,7 +471,14 @@ RSpec.describe "Learn", type: :request do
         expect(response.body).to include(ERB::Util.h(I18n.t("learn.lesson_missing")))
       end
 
-      it "offers the ladder instead when a target still needs one, since that rewrite writes the lesson too" do
+      it "posts the lesson press as a full rewrite, naming no part" do
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        expect(Nokogiri::HTML(response.body).at_css("#learn-guide")["data-write-up-control-url-value"])
+          .to eq(prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one"))
+      end
+
+      it "offers the ladder first when a target still needs one" do
         written.update!(ladder_junior: nil)
         user.update!(section_kind_levels: { "challenge" => "senior" })
         get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
@@ -507,6 +514,13 @@ RSpec.describe "Learn", type: :request do
         status_url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-write-up-control-status-url-value"]
         expect(Rack::Utils.parse_query(URI.parse(status_url).query))
           .to include("generation_version" => guided.generation_version.to_s)
+      end
+
+      it "posts the press as a ladder-only rewrite" do
+        get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+        url = Nokogiri::HTML(response.body).at_css("#learn-guide")["data-write-up-control-url-value"]
+        expect(url).to eq(prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one", part: "ladder"))
       end
 
       it "is not offered to a trial account" do
@@ -683,6 +697,22 @@ RSpec.describe "Learn", type: :request do
         post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
       }.to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 3)
+    end
+
+    it "enqueues a ladder-only rewrite for the ladder press" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user, generation_version: 3)
+
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one", part: "ladder")
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 3, part: "ladder")
+    end
+
+    it "treats any other part as a full rewrite" do
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one", part: "lesson")
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
     end
 
     it "404s on an off-vocabulary pair" do
@@ -928,7 +958,7 @@ RSpec.describe "Learn", type: :request do
       expect(response).to redirect_to(setup_path(anchor: "exercise-mix"))
     end
 
-    it "enqueues one refreshing job per gap across every kind's level, deduplicated" do
+    it "enqueues one ladder-only refreshing job per gap across every kind's level, deduplicated" do
       user.update!(section_kind_levels: { "code_review" => "senior", "challenge" => "junior" })
       expected = LadderCoverage.for(user).gaps
       expect(expected.size).to be < ExerciseSection.all.sum { |kind| LadderCoverage.for(user).for_kind(kind).gaps.size }
@@ -938,7 +968,8 @@ RSpec.describe "Learn", type: :request do
       }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(expected.size).times
 
       expect(GenerateConceptReferenceJob).to have_been_enqueued
-        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true, seen_version: 0)
+        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true, seen_version: 0,
+              part: "ladder")
     end
 
     it "enqueues nothing for a trial account, whose house key must not fund shared rewrites" do
@@ -966,7 +997,8 @@ RSpec.describe "Learn", type: :request do
     include SolidQueueOrderHelpers
 
     let(:incomplete) { ConceptReference::REFERENCE_FIELDS.index_with { "Reference text." } }
-    let(:service) { instance_double(FakeService, generate_concept_reference: incomplete) }
+    let(:ladder) { ConceptReference::LADDER_FIELDS.index_with { "A rung." } }
+    let(:service) { instance_double(FakeService, generate_concept_reference: incomplete, generate_concept_ladder: ladder) }
 
     before do
       user.update!(language: "ruby_rails")
@@ -993,7 +1025,7 @@ RSpec.describe "Learn", type: :request do
       expect(ConceptReference.find_by!(user: user, concept: concept, language: bucket).generation_version).to eq(1)
     end
 
-    it "still rewrites on a later press made after the click's write" do
+    it "asks a later press made after the click's write for the ladder alone, keeping the click's text" do
       concept, bucket = LadderCoverage.for(user).gaps.first
       post prepare_learn_concept_path(bucket: bucket, concept: concept)
       run_every_provider_job
@@ -1002,8 +1034,11 @@ RSpec.describe "Learn", type: :request do
       post prepare_learn_ladders_path
       run_every_provider_job
 
-      expect(service).to have_received(:generate_concept_reference).with(user, concept, bucket).twice
-      expect(ConceptReference.find_by!(user: user, concept: concept, language: bucket).generation_version).to eq(2)
+      row = ConceptReference.find_by!(user: user, concept: concept, language: bucket)
+      expect(service).to have_received(:generate_concept_reference).with(user, concept, bucket).once
+      expect(service).to have_received(:generate_concept_ladder).with(user, row).once
+      expect([ row.explanation, row.generation_version ]).to eq([ "Reference text.", 2 ])
+      expect(row).to be_ladder
     end
   end
 
