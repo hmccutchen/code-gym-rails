@@ -262,6 +262,18 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).not_to include(ERB::Util.h(I18n.t("learn.prepare_prompt", count: 2).delete_prefix("2 ")))
     end
 
+    it "counts as missing the same guides the prepare press queues" do
+      create_guide("code_smell")
+      RecognitionGuide.create!(group_key: "architecture", questions: "q", contrast: "c", misfires: "m", user: user)
+      teammate = User.create!(email: "guide-count-teammate@example.com")
+      RecognitionGuide.create!(group_key: "oo_design", questions: "q", contrast: "c", misfires: "m", user: teammate)
+      missing = RecognitionGuide.missing_for(user, RecognitionGuide::GROUP_KEYS)
+      get learn_path
+
+      expect(response.body).to include(ERB::Util.h(I18n.t("learn.prepare_guides_prompt", count: missing.size)))
+      expect { post prepare_learn_path }.to have_enqueued_job(GenerateRecognitionGuideJob).exactly(missing.size).times
+    end
+
     it "offers no backfill once every concept and guide is written" do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
