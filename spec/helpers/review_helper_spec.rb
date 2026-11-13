@@ -37,6 +37,11 @@ RSpec.describe ReviewHelper, type: :helper do
   end
 
   describe "#review_short_version" do
+    before do
+      reader = user
+      helper.define_singleton_method(:current_user) { reader }
+    end
+
     let(:guide) do
       { tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
         guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "f" }
@@ -49,7 +54,7 @@ RSpec.describe ReviewHelper, type: :helper do
     end
 
     it "gives the reference row, its bucket and whether pitfalls show, for a section that offers it" do
-      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+      reference = ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
 
       offer = helper.review_short_version(reviewed(rating: "developing", gaps: [ 0 ]), "code_review")
 
@@ -61,7 +66,7 @@ RSpec.describe ReviewHelper, type: :helper do
     end
 
     it "gives nothing for a section that doesn't offer it" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
 
       expect(helper.review_short_version(reviewed(rating: "developing", gaps: [ 0 ]), "pattern")).to be_nil
     end

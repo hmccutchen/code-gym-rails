@@ -409,7 +409,7 @@ RSpec.describe "History", type: :request do
       DailyResponse.create!(user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
                             answers: { "code_review" => "Answer with plenty of substance" },
                             submitted_at: Time.current)
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
       login_as(user)
@@ -420,7 +420,7 @@ RSpec.describe "History", type: :request do
     end
 
     it "gives every copy of one reference the same reference id to share a cap by" do
-      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      reference = ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                            tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
       [ 1, 2 ].each do |days_ago|
         exercise = DailyExercise.create!(
@@ -563,7 +563,7 @@ RSpec.describe "History", type: :request do
         user: user, daily_exercise: exercise, date: 1.day.ago.to_date,
         answers: { "architecture" => "I would shard because of write volume" }, submitted_at: Time.current
       )
-      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+      ConceptReference.create!(user: user, concept: "scaling_bottlenecks", language: "architecture",
         tagline: "t", explanation: "e", code_example: "shard_by(:tenant_id)  # pseudocode", senior_lens: "s")
 
       login_as(user)
@@ -797,7 +797,7 @@ RSpec.describe "History", type: :request do
 
   describe "concept reference lookups" do
     it "reads a repeated concept once for the page rather than once per section" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "t",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "t",
                                explanation: "e", code_example: "x", senior_lens: "s")
       10.times do |i|
         date = (i + 1).days.ago.to_date

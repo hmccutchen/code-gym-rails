@@ -90,7 +90,7 @@ RSpec.describe ExerciseDraft do
           "requested_at" => "2026-11-06T12:00:00.123456Z" } })
       pending = row.practice_requests.deep_dup
       [ trap.concept, "service_objects" ].each do |concept|
-        ConceptReference.create!(concept: concept, language: "ruby_rails",
+        ConceptReference.create!(user: user, concept: concept, language: "ruby_rails",
           **ConceptReference::LADDER_FIELDS.index_with { "Reason about #{concept}." })
       end
       reply["pattern"]["concept"] = "service_objects"
@@ -428,9 +428,9 @@ RSpec.describe ExerciseDraft do
     end
 
     it "gives a one-section retry only that section's ladder rungs" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
-      ConceptReference.create!(concept: "scope_creep", language: ConceptBucket.for("plan_review", "ruby_rails"),
+      ConceptReference.create!(user: user, concept: "scope_creep", language: ConceptBucket.for("plan_review", "ruby_rails"),
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       user.update!(skill_level: "junior")
 
@@ -449,7 +449,7 @@ RSpec.describe ExerciseDraft do
       described_class.retry_section(draft_for(language: "javascript", mode: :schema_review), ExerciseSection::CodeReview,
                                     "promises", provider: provider)
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
+      expect(GenerationLadders).to have_received(:for).with(user, anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end
   end
 end

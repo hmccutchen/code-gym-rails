@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Concept reference alternate framings", type: :request do
   let(:user) { create_user_with_key }
   let(:reference) do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
   end
 
@@ -17,6 +17,30 @@ RSpec.describe "Concept reference alternate framings", type: :request do
   def post_alternate(prior: [])
     post explain_differently_concept_reference_path(reference),
          params: { prior_alternates: prior }, as: :json
+  end
+
+  it "answers 404 for another user's own reference and calls no provider" do
+    owner = User.create!(email: "reference-owner@example.com")
+    theirs = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner,
+                                      tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+    expect(AiService).not_to receive(:for)
+    login_as(user)
+
+    post explain_differently_concept_reference_path(theirs), params: { prior_alternates: [] }, as: :json
+
+    expect(response).to have_http_status(:not_found)
+    expect(JSON.parse(response.body)).to include("error" => I18n.t("errors.concept_references.reference_missing"))
+  end
+
+  it "reframes the user's own reference" do
+    stub_alternate("Picture a library courier.")
+    own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user,
+                                   tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+    login_as(user)
+
+    post explain_differently_concept_reference_path(own), params: { prior_alternates: [] }, as: :json
+
+    expect(response).to have_http_status(:ok)
   end
 
   it "returns a framing and how many remain" do
@@ -66,7 +90,7 @@ RSpec.describe "Concept reference alternate framings", type: :request do
     expect(DailyResponse.count).to eq(0)
   end
 
-  it "writes nothing anywhere, leaving the shared reference untouched" do
+  it "writes nothing anywhere, leaving the reference untouched" do
     stub_alternate
     login_as(user)
 

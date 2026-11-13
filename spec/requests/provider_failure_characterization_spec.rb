@@ -268,7 +268,7 @@ RSpec.describe "Provider failures as users see them", type: :request do
       end
 
       it "explain differently on a concept reference under a #{failure} answers 503" do
-        reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        reference = ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                              tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
         stub_gemini(FAILURES[failure])
         login_as(user)
@@ -310,8 +310,8 @@ RSpec.describe "Provider failures as users see them", type: :request do
       end
     end
 
-    it "a ladder rewrite under a daily-quota 429 leaves the shared row unchanged" do
-      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    it "a ladder rewrite under a daily-quota 429 leaves the reference unchanged" do
+      reference = ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                            tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
                                            guide_plain_language: "g", guide_worked_example: "w", guide_pitfalls: "p")
       stub_gemini(FAILURES["daily-quota 429"])

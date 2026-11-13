@@ -232,7 +232,7 @@ RSpec.describe AiService do
                .explain_differently(user, exercise, response, section: "code_review")
       spy_class.new(canned_text: "A different angle on the same concept.")
                .explain_concept_differently(user, ConceptReference.create!(
-                 concept: "n_plus_one", language: "ruby_rails",
+                 user: user, concept: "n_plus_one", language: "ruby_rails",
                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
                ))
       spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
@@ -1496,11 +1496,11 @@ RSpec.describe AiService do
     end
 
     it "renders the retried kind alone from the draft's plan, history and difficulty, with fresh ladders for that kind only" do
-      ConceptReference.create!(concept: "memoization", language: "ruby_rails", ladder_junior: "j", ladder_mid_level: "m",
+      ConceptReference.create!(user: draft.user, concept: "memoization", language: "ruby_rails", ladder_junior: "j", ladder_mid_level: "m",
                                ladder_senior: "a fresh senior rung", ladder_principal_engineer: "p")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
+      ConceptReference.create!(user: draft.user, concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
-      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
+      expect(GenerationLadders).to receive(:for).with(draft.user, { ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
                                                       gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
                                                .and_call_original
 
@@ -1616,7 +1616,7 @@ RSpec.describe AiService do
 
       FakeService.new("fake-key").then { |svc| ExerciseDraft.call(user, language: "javascript", provider: svc.exercise_draft_provider) }
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
+      expect(GenerationLadders).to have_received(:for).with(anything, anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
@@ -2431,7 +2431,7 @@ RSpec.describe AiService do
       pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       set = full_problem_set("challenge" => { "concept" => "n_plus_one" })
 
@@ -4099,6 +4099,12 @@ RSpec.describe AiService do
   end
 
   describe "#generate_concept_reference" do
+    it "is handed only the user, the concept and its language, never an exercise, response or history" do
+      params = AiService.instance_method(:generate_concept_reference).parameters
+
+      expect(params).to eq([ [ :req, :user ], [ :req, :concept ], [ :req, :language ] ])
+    end
+
     let(:valid_json) do
       {
         tagline:      "Avoid N+1 by eager loading.",
@@ -4695,7 +4701,7 @@ RSpec.describe AiService do
 
     it "does not send the guide to the alternate-framing prompt" do
       reference = ConceptReference.create!(
-        concept: "n_plus_one", language: "ruby_rails",
+        user: user, concept: "n_plus_one", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
         guide_plain_language: "PLAIN_MARKER", guide_worked_example: "WORKED_MARKER",
         guide_pitfalls: "PITFALLS_MARKER"
@@ -4708,7 +4714,7 @@ RSpec.describe AiService do
 
     it "does not send the ladder to the alternate-framing prompt" do
       reference = ConceptReference.create!(
-        concept: "caching", language: "ruby_rails",
+        user: user, concept: "caching", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
         ladder_junior: "JUNIOR_MARKER", ladder_mid_level: "m", ladder_senior: "SENIOR_MARKER", ladder_principal_engineer: "PRINCIPAL_MARKER"
       )

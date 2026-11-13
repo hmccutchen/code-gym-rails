@@ -12,6 +12,7 @@ RSpec.describe "Weekly featured concept", type: :request do
 
   def write_up(concept, language: "ruby_rails")
     ConceptReference.create!(
+      user: user,
       concept: concept, language: language,
       tagline: "Load the rows in one query", explanation: "e", code_example: "c", senior_lens: "s"
     )

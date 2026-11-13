@@ -189,22 +189,18 @@ measured the guide without it at 711, 1,069 and 1,340). Even at default
 size it extends below the initial viewport; enlarged text needs vertical
 scrolling. There is no unconditional one-screen promise or hidden content.
 
-**Operator preparation rewrites shared wording.** Run
-`bin/rails runner script/prepare_junior_ladders.rb <operator_user_id>` first
-for per-kind coverage and deduplicated gaps across both languages.
-It writes nothing. Adding `--run` queues missing ladders through
-`GenerateConceptReferenceJob` with `refresh: true`, billed to that active
-operator's own key. A refresh rewrites the whole shared reference and guide,
-including rows that already have a guide, for every user. Since 2026-10-15
-the report reads every kind at junior, the unsaved user's default skill
-level, where it read the union of every rung before; the 2026-10-08 figures
-below were measured the old way, and only design comparison differs. It is
-no longer the only bulk path: Setup's "Prepare AI guidance" now covers every
-section's level for any account with its own key (see
+**Operator preparation was retired with shared wording.** Until
+2026-11-13 an operator ran a pair of junior ladder preparation scripts under
+`script/` to report junior ladder coverage and,
+with `--run`, queue missing ladders on their own key for every user's shared
+reference. Learn content became per user that day
+(`learn-content-per-user.md`), so a refresh on one key no longer reaches
+anyone else, and both scripts were removed. Each account prepares its own
+ladders from Setup's "Prepare AI guidance" (see
 `difficulty-targets-and-locks.md`).
 
-**Production coverage before any run, 2026-10-08.** The report step, run
-against production, grounded 5 of 90 code review pairs, 3 of 48 design
+**Production coverage before any run, 2026-10-08.** The retired report step,
+run against production, grounded 5 of 90 code review pairs, 3 of 48 design
 comparison, 5 of 90 pattern, 5 of 90 challenge, 5 of 42 Parsons, and none
 of architecture (0/15), security review (0/4), plan review (0/4), ambiguity
 hunt (0/5) or pseudocode to code (0/8), leaving 117 concept and language

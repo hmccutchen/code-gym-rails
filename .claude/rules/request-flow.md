@@ -65,6 +65,9 @@ GenerateDailyExercisesJob(user_id:), from the hand-out or the dashboard:
   stops when today's set already exists
   a scheduled job that wrote a set enqueues SendPushReminderJob (the "ready"
   reminder)
+  a job that saved a set (this one or RegenerateExerciseJob) queues the
+  user's missing concept write-ups (GenerateConceptReferenceJob.queue_missing,
+  JobPriority::BACKGROUND, behind every scheduled set), leaving out concepts the set hides until submission
     └→ AiService.for(user) → ClaudeService | GeminiService | OpenaiService
          reads: user.recent_performance (latest qualifying assessed answers)
                 user.recent_delivered_content (repetition-only notes)
@@ -152,9 +155,18 @@ User interacts:
 User browses /learn (independent of the daily flow above):
   └→ LearnController#index            → every concept in the user's vocabularies
        (their language plus the four language-independent buckets), whether or
-       not they have ever been assigned one — a library, not a day's plan
+       not they have ever been assigned one — a library, not a day's plan;
+       each group shows the user's own recognition guide
+       (RecognitionGuide.seen_by: their own row only)
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
+  └→ LearnController#prepare / #prepare_ladders → queue the user's missing
+       write-ups and guides at JobPriority::BACKGROUND, behind every
+       scheduled set; #prepare_concept queues one write-up at click priority
+       even when a press already queued that concept
+  └→ GenerateConceptReferenceJob       → skips a row already written, else
+       takes the user, language and concept claim (AdvisoryLock) for the
+       call and the write; a job that finds the claim held calls nothing
 
 Every dashboard, /learn and /history load, any day of the week:
   └→ FeaturedConcept.for(user)        → this user's concept for the week, from

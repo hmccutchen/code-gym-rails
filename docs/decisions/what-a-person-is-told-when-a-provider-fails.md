@@ -88,7 +88,7 @@ whose `error.code` is `insufficient_quota`. Each provider raises
 per-day quota id or a wait of an hour or more makes a 429 a daily limit;
 any other is a short one.
 
-**Learn keeps a failure per user, not on the shared row.** A failed
+**Learn keeps a failure per user, not on the reference row.** A failed
 write-up is noted in the Rails cache by user and concept
 (`ConceptReferenceFailures`, `EXPIRY` one hour, shorter than any quota's
 reset), with the provider the job used, and `/learn/:bucket/:concept/status` returns `failed` and the

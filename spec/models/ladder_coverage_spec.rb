@@ -3,9 +3,18 @@ require "rails_helper"
 RSpec.describe LadderCoverage do
   let(:user) { User.create!(email: "coverage@example.com", language: "ruby_rails") }
 
-  def laddered(concept, bucket)
-    ConceptReference.create!(concept: concept, language: bucket,
+  def laddered(concept, bucket, owner:)
+    ConceptReference.create!(concept: concept, language: bucket, user: owner,
                              ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
+  end
+
+  it "grounds a concept on the user's own ladder only, never on another user's" do
+    laddered("n_plus_one", "ruby_rails", owner: user)
+    laddered("memoization", "ruby_rails", owner: User.create!(email: "coverage-other@example.com"))
+
+    grounded = described_class.for(user).for_kind(ExerciseSection::Challenge).then { |entry| entry.pairs - entry.gaps }
+
+    expect(grounded).to contain_exactly([ "n_plus_one", "ruby_rails" ])
   end
 
   it "has an entry for every section kind, targeted or not" do
@@ -34,8 +43,8 @@ RSpec.describe LadderCoverage do
   end
 
   it "counts a laddered row as grounded and both a missing and a ladderless row as gaps" do
-    laddered("n_plus_one", "ruby_rails")
-    ConceptReference.create!(concept: "caching", language: "ruby_rails", tagline: "no ladder")
+    laddered("n_plus_one", "ruby_rails", owner: user)
+    ConceptReference.create!(concept: "caching", language: "ruby_rails", tagline: "no ladder", user: user)
 
     entry = described_class.for(user).for_kind(ExerciseSection::Challenge)
 

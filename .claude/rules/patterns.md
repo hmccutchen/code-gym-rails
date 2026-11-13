@@ -140,6 +140,15 @@ says what a deviation from one requires.
   that way before a failure is written; the set itself is guarded by its
   date under the user lock in `PracticeGeneration.commit_new`, so a job whose
   stale claim was taken over still lands its set when the day has none.
+  When the claimed work has no row to hold a `Claimable` column, because
+  the work creates that row, the claim is `AdvisoryLock.hold`, a PostgreSQL
+  session advisory lock that ends with the session and so never goes stale
+  (`GenerateConceptReferenceJob`). A job or service takes it, since models
+  and forms may not use `app/clients` (`Archspec.rb`). It only tries the
+  lock and skips the work when another session holds it, never waiting, and
+  it is taken before any row lock. A read that decides whether the work is
+  still needed runs again under it inside `uncached`, since a job's query
+  cache would otherwise answer with the read from before the claim.
   Anything that locks an exercise and its response goes through
   `DailyExercise#with_response_locked`, which share-locks the user row
   first, so an insert under it never waits on the user while holding the

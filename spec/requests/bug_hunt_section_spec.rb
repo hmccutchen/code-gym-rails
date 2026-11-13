@@ -5,7 +5,7 @@ RSpec.describe "A bug_hunt section on the dashboard", type: :request do
 
   before do
     login_as(user)
-    ConceptReference.create!(concept: "memoization", language: "ruby_rails", tagline: "Remember the answer.",
+    ConceptReference.create!(user: user, concept: "memoization", language: "ruby_rails", tagline: "Remember the answer.",
                              explanation: "E", code_example: "x", senior_lens: "S")
   end
 

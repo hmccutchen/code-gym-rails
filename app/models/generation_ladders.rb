@@ -1,6 +1,6 @@
 # Design notes: docs/code-notes/app/models/generation_ladders.md
 class GenerationLadders
-  def self.for(rungs, language, code_review_mode, gotcha: nil, featured_concept: nil)
+  def self.for(user, rungs, language, code_review_mode, gotcha: nil, featured_concept: nil)
     requests = rungs.map do |kind, rung|
       { kind: kind, level: kind.difficulty_definition(rung: rung, mode: code_review_mode).rung,
         bucket: ConceptBucket.for(kind.key, language),
@@ -9,14 +9,13 @@ class GenerationLadders
     end
     pairs = requests.flat_map { |request| request[:concepts].map { |concept| [ request[:bucket], concept ] } }.uniq
 
-    references = ConceptReference.where(language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
-                                 .select(&:ladder?)
-                                 .index_by { |reference| [ reference.language, reference.concept ] }
+    references = ConceptReference.seen_by(user, language: pairs.map(&:first).uniq, concept: pairs.map(&:last).uniq)
+                                 .select { |_key, reference| reference.ladder? }
 
     requests.each_with_object({}) do |request, ladders|
       field = ConceptReference::LADDER_FIELD_FOR.fetch(request[:level])
       rungs = request[:concepts].filter_map do |concept|
-        reference = references[[ request[:bucket], concept ]]
+        reference = references[[ concept, request[:bucket] ]]
         [ concept, reference.public_send(field).truncate(ConceptReference::MAX_LADDER_RUNG_LENGTH) ] if reference
       end.to_h
       ladders[request[:kind]] = rungs

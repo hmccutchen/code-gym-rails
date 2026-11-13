@@ -79,13 +79,15 @@ The code example and worked example fold under "Code examples", and the
 senior lens folds under "How a senior sees it", both closed by default.
 A guided row without a lesson offers "Write the short lesson", the same
 on-demand rewrite as the guide's, with the same once-for-a-concept-someone-
-opens wording change; it rewrites the whole row for the team. Nothing
+opens wording change; it rewrites the user's whole row. Nothing
 backfills lessons. The inline reference above a section and the featured
 callout are unchanged.
 
-`ConceptReference` has no `user_id` — it's a shared, team-wide cache
-keyed on `(concept, language)`, so the first person to run the backfill pays
-for everyone and every later teammate pays almost nothing. Roughly $0.02 per
+`ConceptReference` is keyed on `(user_id, concept, language)` since L2 of
+making Learn content per user (`learn-content-per-user.md`). Each user's
+backfill writes their own rows on their own key. Since L5 a user reads only
+their own rows; the shared rows written before L2 were copied to each
+account by L4 and L5. Roughly $0.02 per
 concept, an estimate from before the reference moved to `claude-sonnet-5-5`
 at effort `high` (the new effort level changed the cost by an amount nobody
 has measured), so a couple of dollars for one user's

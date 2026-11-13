@@ -71,7 +71,7 @@ RSpec.describe "The design comparison section", type: :request do
     it "keeps the concept reference closed on first exposure, where another kind opens it" do
       exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => { "concept" => "n_plus_one" }))
       %w[open_closed n_plus_one].each do |concept|
-        ConceptReference.create!(concept: concept, language: "ruby_rails", tagline: "t", explanation: "e",
+        ConceptReference.create!(user: user, concept: concept, language: "ruby_rails", tagline: "t", explanation: "e",
                                  code_example: "c", senior_lens: "l")
       end
 

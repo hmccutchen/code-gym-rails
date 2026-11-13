@@ -3,6 +3,7 @@ require "rails_helper"
 RSpec.describe RegenerateExerciseJob, type: :job do
   include ActiveSupport::Testing::TimeHelpers
   include PracticeGenerationHelpers
+  include SolidQueueOrderHelpers
 
   let(:user) { create_user_with_key(email: "regen-job@example.com") }
 
@@ -35,6 +36,28 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     end
 
     fake_service
+  end
+
+  it "queues the user's missing write-ups for the replacement set at background priority" do
+    claimed_exercise
+    stub_provider({ "code_review" => { "question" => "new", "concept" => "n_plus_one" } })
+
+    expect { described_class.new.perform(user_id: user.id) }
+      .to have_enqueued_job(GenerateConceptReferenceJob)
+      .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      .at_priority(JobPriority::BACKGROUND)
+  end
+
+  it "leaves the replacement set's write-ups behind a scheduled set enqueued later, in Solid Queue's claim order" do
+    claimed_exercise
+    stub_provider({ "code_review" => { "question" => "new", "concept" => "n_plus_one" } })
+    described_class.new.perform(user_id: user.id)
+    teammate = create_user_with_key(email: "regen-teammate@example.com")
+    GenerateDailyExercisesJob.set(priority: JobPriority::SCHEDULED).perform_later(user_id: teammate.id, scheduled: true)
+
+    move_to_solid_queue(ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job["queue_name"] == "provider_calls" })
+
+    expect(solid_queue_claim_order("provider_calls")).to eq(%w[GenerateDailyExercisesJob GenerateConceptReferenceJob])
   end
 
   describe "the count of account failures that holds the schedule" do

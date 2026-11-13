@@ -15,7 +15,7 @@ RSpec.describe "Code blocks under display preferences", type: :system do
 
   before do
     ConceptReference.create!(
-      concept: "n_plus_one", language: "ruby_rails",
+      user: user, concept: "n_plus_one", language: "ruby_rails",
       tagline: "One query per row.", explanation: "Load what you need up front.",
       code_example: LONG_CODE, senior_lens: "Preload the association.",
       guide_plain_language: "Ask once.", guide_worked_example: "Before:\n#{LONG_CODE}\nAfter: the same, preloaded.",

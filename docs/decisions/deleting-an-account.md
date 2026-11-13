@@ -31,7 +31,7 @@ two cannot disagree.
 | `judge_solves` | delete the rows with this `user_id` or on this person's sets | judge passes on the person's own sets; synthetic rows have no user |
 | `invite_codes` | keep the code, give the seat back (`redeemed_count` down by one) | the code is shared |
 | `suggested_concepts.reviewed_by_id` | set to NULL | the concept stays for the team |
-| `concept_references`, `recognition_guides` | keep | shared text with no user link |
+| `concept_references`, `recognition_guides` | delete the rows with this `user_id` | the person's own Learn write-ups; every row has an owner since the schema step of `learn-content-per-user.md` deleted the shared rows |
 | `solid_queue_jobs` | delete the person's unfinished jobs that no worker has claimed or is claiming | their arguments name the person |
 | the Solid Queue execution tables | go with their job row | the foreign key cascades |
 | `solid_cache_entries` | keep | entries expire through `max_age` |
@@ -136,6 +136,17 @@ Each path writes nothing once the account is gone:
 - A usage row for a call that finished after the deletion fails on its
   foreign key; `AiService#log_usage` already rescues and logs that.
 - A job enqueued earlier looks the user up by id, finds none, and exits.
+- A concept write-up (`GenerateConceptReferenceJob`) share-locks the user
+  before it writes and writes nothing once the account is gone, so its row
+  never fails on the foreign key and the job finishes cleanly.
+- A recognition guide (`GenerateRecognitionGuideJob`) does the same: it
+  share-locks the user before it writes its own row and writes nothing
+  once the account is gone.
+- The copy of shared Learn rows (`CopySharedLearnContent`, L4 of
+  `learn-content-per-user.md`, run again by L5's
+  `CatchUpSharedLearnContentCopy`) share-locks each user and checks the
+  account is still active before copying to it, so a deletion either runs
+  first and gets no copy, or waits and deletes the copies with the rest.
 
 A mailer job enqueued with a record that is gone fails to deserialize its
 arguments. Deletion removes the unfinished ones it can match, so this

@@ -2,9 +2,9 @@ require "rails_helper"
 
 # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Concept reference alternate framings", type: :system, with_csrf: true do
-  def cache_reference
+  def cache_reference(user)
     ConceptReference.create!(
-      concept: "n_plus_one", language: "ruby_rails",
+      user: user, concept: "n_plus_one", language: "ruby_rails",
       tagline: "One query per row is the smell",
       explanation: "The association loads once per iteration.",
       code_example: "Post.all.each { |p| p.author.name }",
@@ -25,7 +25,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "adds a framing in place, then withdraws the control at the cap" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)
@@ -34,7 +34,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
       expect(box).to have_content(FakeService::CONCEPT_ALTERNATE_TEXT)
 
       expect(DailyResponse.count).to eq(0)
-      expect(ConceptReference.find_by(concept: "n_plus_one").explanation)
+      expect(ConceptReference.find_by(user: user, concept: "n_plus_one").explanation)
         .to eq("The association loads once per iteration.")
 
       box.find(".explain-concept-differently").click
@@ -45,7 +45,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "underlines glossary terms in a framing and still sends the plain text back as a prior framing" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)
@@ -72,7 +72,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "announces each framing and keeps focus in the page when the control goes" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)
@@ -93,7 +93,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "refuses an OK response that isn't this endpoint's JSON, such as an expired session's login page" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)
@@ -110,7 +110,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "shows a framing from a server that sends no HTML as plain text, since the call was already paid for" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)
@@ -129,7 +129,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "takes no space on the page while the dropdown is collapsed" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
@@ -144,7 +144,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "keeps nothing across a reload, which is the accepted cost of storing nothing" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)
@@ -161,7 +161,7 @@ RSpec.describe "Concept reference alternate framings", type: :system, with_csrf:
 
   it "surfaces a server-side rejection as a status message instead of a broken page" do
     user = create_fake_provider_user
-    cache_reference
+    cache_reference(user)
 
     travel_to(a_weekday) do
       box = open_reference(user)

@@ -71,7 +71,7 @@ RSpec.describe "Server-highlighted code blocks", type: :request do
   end
 
   it "escapes a concept reference's code example on its Learn page" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "t",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "t",
                              explanation: "e", code_example: PAYLOAD, senior_lens: "s")
 
     get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")

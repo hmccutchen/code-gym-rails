@@ -543,7 +543,7 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.ladders_explanation")))
 
       LadderCoverage.for(user).gaps.each do |concept, bucket|
-        ConceptReference.create!(concept: concept, language: bucket, ladder_junior: "j", ladder_mid_level: "m",
+        ConceptReference.create!(user: user, concept: concept, language: bucket, ladder_junior: "j", ladder_mid_level: "m",
                                  ladder_senior: "s", ladder_principal_engineer: "p")
       end
       get setup_path

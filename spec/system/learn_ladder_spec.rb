@@ -6,7 +6,7 @@ RSpec.describe "Learn ladder generation", type: :system, with_csrf: true do
     user.update!(language: "ruby_rails", section_kind_levels: { "challenge" => "senior" })
     prose = (ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS)
               .index_with { |field| "Existing #{field.humanize.downcase}." }
-    reference = ConceptReference.create!(prose.merge(concept: "n_plus_one", language: "ruby_rails"))
+    reference = ConceptReference.create!(prose.merge(user: user, concept: "n_plus_one", language: "ruby_rails"))
     allow_any_instance_of(FakeService).to receive(:generate_concept_reference)
       .with(user, reference.concept, reference.language).and_return(prose)
 

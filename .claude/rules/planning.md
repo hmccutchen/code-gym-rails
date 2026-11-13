@@ -91,9 +91,10 @@ read it before changing that area.
   reading `KindDifficulty`; `CodeReview.file_range` turns it into a count
   with the rung later. Weights and difficulty share
   `section_kind_preferences_version`. `POST /learn/prepare_ladders` is the one
-  scoped exception to Learn's no-bulk-rewrite rule, reaches every teammate
-  through the shared `ConceptReference`, and is never offered to a trial
-  account (`User#prepares_ladders?`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
+  scoped exception to Learn's no-bulk-rewrite rule, writes only the user's
+  own `ConceptReference` rows, and is never offered to a trial account
+  (`User#writes_learn_content?`). Generation reads only the user's own ladders
+  (`GenerationLadders.for(user, ...)`). `AiService::MAX_LADDER_GUIDANCE_CHARS`
   bounds the ladder block.
 - **`bug_hunt` days** (`docs/decisions/bug-hunt.md`): every weekend
   day is a `bug_hunt` day (`WEEKEND_CODE_REVIEW_MODE_WEIGHTS`), and a weekday

@@ -202,10 +202,11 @@ RSpec.describe PreviewSeed do
       expect(response.concept_tags.values.compact).not_to be_empty
     end
 
-    it "seeds a concept reference so the always-visible dropdown has content" do
-      PreviewSeed.run!
+    it "seeds the preview user's own concept reference so the always-visible dropdown has content, and no shared row" do
+      user = PreviewSeed.run!
 
-      expect(ConceptReference.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_present
+      expect(ConceptReference.find_by(user: user, concept: "n_plus_one", language: "ruby_rails")).to be_present
+      expect(ConceptReference.where(user_id: nil)).to be_empty
     end
 
     it "is idempotent — a second run creates nothing new" do

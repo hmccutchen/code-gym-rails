@@ -38,12 +38,22 @@ Each entry states what a change must not break. An entry that names a
 `docs/decisions/` doc has its full reasoning, measurements and history there;
 read it before changing that area.
 
+- **Learn content belongs to each user** (`docs/decisions/learn-content-per-user.md`):
+  `ConceptReference` is keyed on `(user_id, concept, language)` and
+  `RecognitionGuide` on `(user_id, group_key)`; every row has an owner
+  (`user_id` is NOT NULL). Every reference and guide is written as its
+  user's own row, and every reader asks
+  `ConceptReference.for(user, ...)`, `.seen_by(user, ...)` or
+  `RecognitionGuide.seen_by(user, ...)`, which read the user's own rows
+  only, never another user's. The admin promote check alone counts any
+  row. A trial account writes no Learn content (`User#writes_learn_content?`).
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
   `ConceptReferencesController#explain_differently` for another explanation,
-  capped at `MAX_ALTERNATES_PER_CONCEPT`. Nothing is persisted and the shared
-  `ConceptReference` row is never written.
+  capped at `MAX_ALTERNATES_PER_CONCEPT`. It reaches only a row the user
+  sees (`ConceptReference.visible_to`), and a teammate's row answers 404.
+  Nothing is persisted and the `ConceptReference` row is never written.
   `AiService#explain_concept_differently(user, reference, prior_alternates:)`
   takes no exercise, response or section, since it runs before submission; a
   spec pins that signature. The reply carries the framing as plain text and as
@@ -52,8 +62,9 @@ read it before changing that area.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
-  `ConceptReference` is a team-wide cache keyed on `(concept, language)` with
-  no `user_id`. Guide, ladder and `lesson` come from the same
+  `ConceptReference` is keyed on `(user_id, concept, language)`, and every
+  row has an owner. Guide, ladder and
+  `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.
@@ -73,9 +84,19 @@ read it before changing that area.
   new keyed kind until it has one. `pseudocode_to_code` keeps its tooltips:
   its missable requirements are stated in the problem statement, so a
   definition can't reveal one.
+- **Write-up jobs and the queue** (`docs/decisions/learn-content-per-user.md`,
+  L3b): Learn's bulk presses queue at `JobPriority::BACKGROUND`, never ahead
+  of a scheduled set, and a single-concept click at `JobPriority::CLICK`.
+  `GenerateConceptReferenceJob`'s permit key starts with the priority, so a
+  click is never discarded for a queued press, and the job takes an
+  `AdvisoryLock` claim on user, language and concept before its call, so
+  the two make one provider call. A job that finds the claim held or the
+  row written calls nothing. `GenerateRecognitionGuideJob` keeps its
+  discard permit, since only a press queues a guide.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
-  `ConceptGroup` or language-independent bucket gets one shared
-  `RecognitionGuide` on how to look for that kind of problem. It teaches a
+  `ConceptGroup` or language-independent bucket gets one
+  `RecognitionGuide` per user on how to look for that kind of problem. It
+  teaches a
   process and never defines a concept or hints at a defect:
   `#generate_recognition_guide(user, group_key)` is handed no exercise,
   response or history. All three fields are required, rows are never

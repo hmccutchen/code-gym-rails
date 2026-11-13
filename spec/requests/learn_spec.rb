@@ -60,7 +60,7 @@ RSpec.describe "Learn", type: :request do
 
     it "gives each entry its search words and keeps the reference text out of them" do
       user.update!(language: "ruby_rails")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "Zanzibar loads every row.",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "Zanzibar loads every row.",
                                explanation: "One query per row.", code_example: "x", senior_lens: "y")
 
       get learn_path
@@ -138,6 +138,7 @@ RSpec.describe "Learn", type: :request do
     it "marks a concept with no row at all as not written yet, distinct from one with a reference but no guide" do
       user.update!(language: "ruby_rails")
       ConceptReference.create!(
+        user: user,
         concept: "memoization", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       )
@@ -194,7 +195,7 @@ RSpec.describe "Learn", type: :request do
     before { user.update!(language: "ruby_rails") }
 
     def create_guide(group_key)
-      RecognitionGuide.create!(group_key: group_key, questions: "Ask #{group_key} questions.",
+      RecognitionGuide.create!(user: user, group_key: group_key, questions: "Ask #{group_key} questions.",
                                contrast: "#{group_key} contrast.", misfires: "#{group_key} misfires.")
     end
 
@@ -231,6 +232,17 @@ RSpec.describe "Learn", type: :request do
       end
     end
 
+    it "renders only the user's own guide, never another user's" do
+      teammate = User.create!(email: "guide-teammate@example.com")
+      RecognitionGuide.create!(group_key: "code_smell", questions: "Their questions.", contrast: "c", misfires: "m", user: teammate)
+      RecognitionGuide.create!(group_key: "code_smell", questions: "My own questions.", contrast: "c", misfires: "m", user: user)
+      RecognitionGuide.create!(group_key: "architecture", questions: "Teammate questions.", contrast: "c", misfires: "m", user: teammate)
+      get learn_path
+
+      expect(group_block("ruby_rails", "code_smell").at_css(".learn-recognition").text).to include("My own questions.")
+      expect(response.body).not_to include("Their questions.", "Teammate questions.")
+    end
+
     it "renders no guide in a language bucket's core group" do
       RecognitionGuide::GROUP_KEYS.each { |key| create_guide(key) }
       get learn_path
@@ -241,7 +253,7 @@ RSpec.describe "Learn", type: :request do
     it "offers the backfill when only guides are missing" do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
-          ConceptReference.create!(concept: concept, language: bucket,
+          ConceptReference.create!(user: user, concept: concept, language: bucket,
                                    tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
         end
       end
@@ -251,10 +263,22 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).not_to include(ERB::Util.h(I18n.t("learn.prepare_prompt", count: 2).delete_prefix("2 ")))
     end
 
+    it "counts as missing the same guides the prepare press queues" do
+      create_guide("code_smell")
+      RecognitionGuide.create!(group_key: "architecture", questions: "q", contrast: "c", misfires: "m", user: user)
+      teammate = User.create!(email: "guide-count-teammate@example.com")
+      RecognitionGuide.create!(group_key: "oo_design", questions: "q", contrast: "c", misfires: "m", user: teammate)
+      missing = RecognitionGuide.missing_for(user, RecognitionGuide::GROUP_KEYS)
+      get learn_path
+
+      expect(response.body).to include(ERB::Util.h(I18n.t("learn.prepare_guides_prompt", count: missing.size)))
+      expect { post prepare_learn_path }.to have_enqueued_job(GenerateRecognitionGuideJob).exactly(missing.size).times
+    end
+
     it "offers no backfill once every concept and guide is written" do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
-          ConceptReference.create!(concept: concept, language: bucket,
+          ConceptReference.create!(user: user, concept: concept, language: bucket,
                                    tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
         end
       end
@@ -285,6 +309,7 @@ RSpec.describe "Learn", type: :request do
 
     def full_reference
       ConceptReference.create!(
+        user: user,
         concept: "n_plus_one", language: "ruby_rails",
         tagline: "TAGLINE", explanation: "EXPLANATION",
         code_example: "User.includes(:posts)", senior_lens: "SENIOR LENS",
@@ -347,6 +372,7 @@ RSpec.describe "Learn", type: :request do
 
     it "renders a legacy row's reference with a control to write the guide" do
       ConceptReference.create!(
+        user: user,
         concept: "n_plus_one", language: "ruby_rails",
         tagline: "TAGLINE", explanation: "EXPLANATION",
         code_example: "code", senior_lens: "SENIOR LENS"
@@ -459,7 +485,7 @@ RSpec.describe "Learn", type: :request do
       before { user.update!(language: "ruby_rails") }
 
       let!(:guided) do
-        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
                                  guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
       end
@@ -524,7 +550,7 @@ RSpec.describe "Learn", type: :request do
     before { user.update!(language: "ruby_rails") }
 
     def reference(**attrs)
-      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!({ user: user, concept: "n_plus_one", language: "ruby_rails",
                                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s" }.merge(attrs))
     end
 
@@ -644,10 +670,19 @@ RSpec.describe "Learn", type: :request do
       expect {
         post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
       }.to have_enqueued_job(GenerateConceptReferenceJob)
-        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["status"]).to eq("queued")
+    end
+
+    it "names the version of the reference the user sees, so a rewrite that lands first ends the request" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user, generation_version: 3)
+
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 3)
     end
 
     it "404s on an off-vocabulary pair" do
@@ -663,22 +698,104 @@ RSpec.describe "Learn", type: :request do
     end
   end
 
+  describe "whose reference a user sees" do
+    let(:teammate) { User.create!(email: "learn-teammate@example.com") }
+
+    before { user.update!(language: "ruby_rails") }
+
+    def reference(tagline, **attrs)
+      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails", tagline: tagline, explanation: "e",
+                                 code_example: "c", senior_lens: "s" }.merge(attrs))
+    end
+
+    it "shows the user's own reference, never a teammate's" do
+      reference("TEAMMATE TEXT", user: teammate)
+      reference("OWN TEXT", user: user)
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.body).to include("OWN TEXT")
+      expect(response.body).not_to include("TEAMMATE TEXT")
+    end
+
+    it "shows no reference while the user has none, even when a teammate has one" do
+      reference("TEAMMATE TEXT", user: teammate)
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("TEAMMATE TEXT")
+    end
+
+    it "reports the user's own row on the write-up poll, not a teammate's" do
+      reference("TEAMMATE TEXT", user: teammate, guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
+
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one", awaiting: "guide")
+
+      expect(response.parsed_body["ready"]).to be(false)
+    end
+
+    it "offers to write up a concept only a teammate has written" do
+      reference("TEAMMATE TEXT", user: teammate)
+
+      expect { post prepare_learn_path }
+        .to have_enqueued_job(GenerateConceptReferenceJob).with(hash_including(concept: "n_plus_one", user_id: user.id))
+    end
+  end
+
+  describe "a trial account" do
+    let(:trial) { create_trial_user }
+
+    before do
+      trial.update!(language: "ruby_rails")
+      login_as(trial)
+    end
+
+    it "is offered no write-up and queues none from any Learn action" do
+      get learn_path
+      expect(response.body).not_to include(I18n.t("learn.prepare_button"))
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(response.body).not_to include(I18n.t("learn.write_guide"))
+
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+        post prepare_learn_path
+        post prepare_learn_ladders_path
+      }.not_to have_enqueued_job
+      expect(response).to redirect_to(setup_path(anchor: "exercise-mix"))
+    end
+  end
+
   describe "the priority of a bulk press" do
+    include SolidQueueOrderHelpers
+
     before { user.update!(language: "ruby_rails") }
 
     let(:bulk_priorities) { provider_jobs.map { |job| job["priority"] }.uniq }
 
-    it "gives every write-up and guide job of POST /learn/prepare that priority" do
+    it "gives every write-up and guide job of POST /learn/prepare background priority" do
       post prepare_learn_path
 
       expect(provider_jobs.map { |job| job["job_class"] }.uniq).to contain_exactly("GenerateConceptReferenceJob", "GenerateRecognitionGuideJob")
-      expect(bulk_priorities).to eq([ JobPriority::BULK ])
+      expect(bulk_priorities).to eq([ JobPriority::BACKGROUND ])
     end
 
-    it "gives every job of POST /learn/prepare_ladders that priority" do
+    it "gives every job of POST /learn/prepare_ladders background priority" do
       post prepare_learn_ladders_path
 
-      expect(bulk_priorities).to eq([ JobPriority::BULK ])
+      expect(bulk_priorities).to eq([ JobPriority::BACKGROUND ])
+    end
+
+    it "leaves an earlier press behind a scheduled set the hand-out enqueues later, in Solid Queue's claim order" do
+      post prepare_learn_path
+      teammate = User.create!(email: "learn-scheduled@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
+      GenerateDailyExercisesJob.set(priority: JobPriority::SCHEDULED).perform_later(user_id: teammate.id, scheduled: true)
+
+      move_to_solid_queue(provider_jobs)
+
+      order = solid_queue_claim_order("provider_calls")
+      expect(order.first).to eq("GenerateDailyExercisesJob")
+      expect(order.drop(1)).to be_present.and(all(match(/\AGenerate(ConceptReference|RecognitionGuide)Job\z/)))
     end
   end
 
@@ -699,6 +816,7 @@ RSpec.describe "Learn", type: :request do
 
     it "skips a concept that already has a row" do
       ConceptReference.create!(
+        user: user,
         concept: "n_plus_one", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       )
@@ -711,6 +829,7 @@ RSpec.describe "Learn", type: :request do
 
     it "does not ask to refresh a guide-less row, since only a concept someone opens may be refreshed" do
       ConceptReference.create!(
+        user: user,
         concept: "memoization", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       )
@@ -722,7 +841,7 @@ RSpec.describe "Learn", type: :request do
     end
 
     it "enqueues one job per recognition group with no guide" do
-      RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
+      RecognitionGuide.create!(user: user, group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
 
       expect {
         post prepare_learn_path
@@ -731,10 +850,20 @@ RSpec.describe "Learn", type: :request do
       expect(GenerateRecognitionGuideJob).not_to have_been_enqueued.with(group_key: "code_smell", user_id: user.id)
     end
 
+    it "enqueues a guide that only another user has" do
+      teammate = User.create!(email: "guide-prepare-teammate@example.com")
+      RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", user: teammate)
+
+      expect {
+        post prepare_learn_path
+      }.to have_enqueued_job(GenerateRecognitionGuideJob).with(group_key: "code_smell", user_id: user.id)
+    end
+
     it "enqueues nothing once every concept has a row" do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
           ConceptReference.create!(
+            user: user,
             concept: concept, language: bucket,
             tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
           )
@@ -767,7 +896,7 @@ RSpec.describe "Learn", type: :request do
       }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(expected.size).times
 
       expect(GenerateConceptReferenceJob).to have_been_enqueued
-        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true)
+        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true, seen_version: 0)
     end
 
     it "enqueues nothing for a trial account, whose house key must not fund shared rewrites" do
@@ -781,13 +910,58 @@ RSpec.describe "Learn", type: :request do
     it "enqueues only what remains after a partial run" do
       before_run = LadderCoverage.for(user).gaps
       concept, bucket = before_run.first
-      ConceptReference.create!(concept: concept, language: bucket,
+      ConceptReference.create!(user: user, concept: concept, language: bucket,
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
 
       expect {
         post prepare_learn_ladders_path
       }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(before_run.size - 1).times
       expect(GenerateConceptReferenceJob).not_to have_been_enqueued.with(hash_including(concept: concept))
+    end
+  end
+
+  describe "a ladder press and then a click for one concept, run on Solid Queue" do
+    include SolidQueueOrderHelpers
+
+    let(:incomplete) { ConceptReference::REFERENCE_FIELDS.index_with { "Reference text." } }
+    let(:service) { instance_double(FakeService, generate_concept_reference: incomplete) }
+
+    before do
+      user.update!(language: "ruby_rails")
+      allow(AiService).to receive(:for).and_return(service)
+    end
+
+    def run_every_provider_job
+      move_to_solid_queue(provider_jobs)
+      worker = SolidQueue::Process.create!(kind: "Worker", name: SecureRandom.uuid, pid: Process.pid,
+                                           hostname: "localhost", last_heartbeat_at: Time.current)
+      while (execution = SolidQueue::ReadyExecution.claim([ "provider_calls" ], 1, worker.id).first)
+        execution.perform
+      end
+    end
+
+    it "calls the provider once for the concept when the click's reply leaves the ladder incomplete" do
+      post prepare_learn_ladders_path
+      concept, bucket = LadderCoverage.for(user).gaps.first
+      post prepare_learn_concept_path(bucket: bucket, concept: concept)
+
+      run_every_provider_job
+
+      expect(service).to have_received(:generate_concept_reference).with(user, concept, bucket).once
+      expect(ConceptReference.find_by!(user: user, concept: concept, language: bucket).generation_version).to eq(1)
+    end
+
+    it "still rewrites on a later press made after the click's write" do
+      concept, bucket = LadderCoverage.for(user).gaps.first
+      post prepare_learn_concept_path(bucket: bucket, concept: concept)
+      run_every_provider_job
+      clear_enqueued_jobs
+
+      post prepare_learn_ladders_path
+      run_every_provider_job
+
+      expect(service).to have_received(:generate_concept_reference).with(user, concept, bucket).twice
+      expect(ConceptReference.find_by!(user: user, concept: concept, language: bucket).generation_version).to eq(2)
     end
   end
 
@@ -805,7 +979,7 @@ RSpec.describe "Learn", type: :request do
 
     def guided_reference(**overrides)
       ConceptReference.create!(
-        { concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
+        { user: user, concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
           code_example: "closure = 1", senior_lens: twice, guide_plain_language: twice,
           guide_pitfalls: twice,
           guide_worked_example: "a = 1\nb = 2\n\nA `closure` costs little; a closure is common and a closure is cheap." }.merge(overrides)
@@ -928,7 +1102,7 @@ RSpec.describe "Learn", type: :request do
         guided_reference
         submit_set_showing(user, "n_plus_one", date: Date.current - 3)
         FeaturedConcept.for(user)
-        RecognitionGuide.create!(group_key: "code_smell", questions: twice, contrast: twice, misfires: twice)
+        RecognitionGuide.create!(user: user, group_key: "code_smell", questions: twice, contrast: twice, misfires: twice)
       end
 
       it "wraps the recognition guide and the featured tagline" do

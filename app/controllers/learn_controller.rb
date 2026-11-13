@@ -15,16 +15,16 @@ class LearnController < ApplicationController
     @buckets    = learn_buckets.map do |bucket|
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
-    @ungenerated = ungenerated_concepts(@references).size
-    @recognition_guides = RecognitionGuide.where(group_key: recognition_group_keys).index_by(&:group_key)
-    @ungenerated_guides = recognition_group_keys.size - @recognition_guides.size
+    @ungenerated = ungenerated_concepts.size
+    @recognition_guides = RecognitionGuide.seen_by(current_user, recognition_group_keys)
+    @ungenerated_guides = missing_recognition_guides.size
   end
 
   # GET /learn/:bucket/:concept
   def show
     @bucket    = validated_bucket
     @concept   = validated_concept(@bucket)
-    @reference = ConceptReference.find_by(concept: @concept, language: @bucket)
+    @reference = ConceptReference.for(current_user, concept: @concept, language: @bucket)
     @ladder_targets = ladder_targets_for(@reference)
     @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
     @lesson_missing = @reference.present? && !@reference.lesson? && params[:lesson] == "missing"
@@ -45,7 +45,7 @@ class LearnController < ApplicationController
     return head :bad_request if predicate.nil?
     return head :bad_request if AWAITING_REWRITE.include?(awaiting) && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
-    reference = ConceptReference.find_by(concept: concept, language: bucket)
+    reference = ConceptReference.for(current_user, concept: concept, language: bucket)
     body = { ready: reference&.public_send(predicate) || false }
     if AWAITING_REWRITE.include?(awaiting)
       body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
@@ -59,22 +59,19 @@ class LearnController < ApplicationController
   def prepare_concept
     bucket  = validated_bucket
     concept = validated_concept(bucket)
+    return head :forbidden unless current_user.writes_learn_content?
 
     ConceptReferenceFailures.clear(user_id: current_user.id, concept: concept, language: bucket)
-    GenerateConceptReferenceJob.perform_later(
-      concept: concept, language: bucket, user_id: current_user.id, refresh: true
-    )
+    GenerateConceptReferenceJob.queue_rewrites(current_user, [ [ concept, bucket ] ])
 
     render json: { status: "queued" }
   end
 
   # POST /learn/prepare
   def prepare
-    references = references_by_key
+    return redirect_to learn_path unless current_user.writes_learn_content?
 
-    ungenerated_concepts(references).each do |concept, bucket|
-      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id)
-    end
+    GenerateConceptReferenceJob.queue_missing(current_user, learn_pairs, priority: JobPriority::BACKGROUND)
 
     missing_recognition_guides.each do |group_key|
       bulk(GenerateRecognitionGuideJob).perform_later(group_key: group_key, user_id: current_user.id)
@@ -85,18 +82,16 @@ class LearnController < ApplicationController
 
   # POST /learn/prepare_ladders
   def prepare_ladders
-    gaps = current_user.prepares_ladders? ? LadderCoverage.for(current_user).gaps : []
+    gaps = current_user.writes_learn_content? ? LadderCoverage.for(current_user).gaps : []
 
-    gaps.each do |concept, bucket|
-      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
-    end
+    GenerateConceptReferenceJob.queue_rewrites(current_user, gaps, priority: JobPriority::BACKGROUND)
 
     redirect_to setup_path(anchor: "exercise-mix"), notice: t("exercise_mix.ladders_preparing", count: gaps.size)
   end
 
   private
 
-  def bulk(job) = job.set(priority: JobPriority::BULK)
+  def bulk(job) = job.set(priority: JobPriority::BACKGROUND)
 
   def write_up_failure(concept, bucket)
     failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)
@@ -116,24 +111,21 @@ class LearnController < ApplicationController
   end
 
   def ladder_targets_for(reference)
-    return [] unless current_user.prepares_ladders? && reference&.guide? && !reference.ladder?
+    return [] unless current_user.writes_learn_content? && reference&.guide? && !reference.ladder?
 
     LadderCoverage.for(current_user).grounding_kinds(reference.concept, reference.language)
                   .map { |kind| t("sections.#{kind.key}.name") }
   end
 
   def references_by_key
-    ConceptReference.where(language: learn_buckets)
-                    .index_by { |reference| [ reference.concept, reference.language ] }
+    ConceptReference.seen_by(current_user, language: learn_buckets)
   end
 
-  def ungenerated_concepts(references)
-    learn_buckets.flat_map do |bucket|
-      ConceptBucket.vocabulary_for(bucket)
-                   .reject { |concept| references.key?([ concept, bucket ]) }
-                   .map { |concept| [ concept, bucket ] }
-    end
+  def learn_pairs
+    learn_buckets.flat_map { |bucket| ConceptBucket.vocabulary_for(bucket).map { |concept| [ concept, bucket ] } }
   end
+
+  def ungenerated_concepts = ConceptReference.missing_for(current_user, learn_pairs)
 
   def recognition_group_keys
     @recognition_group_keys ||= learn_buckets.flat_map do |bucket|
@@ -142,7 +134,7 @@ class LearnController < ApplicationController
   end
 
   def missing_recognition_guides
-    recognition_group_keys - RecognitionGuide.where(group_key: recognition_group_keys).pluck(:group_key)
+    RecognitionGuide.missing_for(current_user, recognition_group_keys)
   end
 
   def encountered?(concept, bucket)

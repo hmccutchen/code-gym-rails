@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe GenerateRecognitionGuideJob do
+RSpec.describe GenerateRecognitionGuideJob, type: :job do
   let(:user) { User.create!(email: "guide-job@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
 
   def stub_service
@@ -11,7 +11,7 @@ RSpec.describe GenerateRecognitionGuideJob do
     service
   end
 
-  it "creates the guide with the generated fields" do
+  it "creates the user's own guide with the generated fields" do
     stub_service
 
     expect {
@@ -21,6 +21,7 @@ RSpec.describe GenerateRecognitionGuideJob do
     guide = RecognitionGuide.last
     expect(guide.group_key).to eq("code_smell")
     expect(guide.questions).to eq(FakeService::RECOGNITION_GUIDE["questions"])
+    expect(guide.user).to eq(user)
   end
 
   it "dates its usage row on the user's own day, not the worker's" do
@@ -34,13 +35,43 @@ RSpec.describe GenerateRecognitionGuideJob do
     expect(ApiUsage.where(user: local, purpose: "generate_recognition_guide").sole.date).to eq(Date.new(2026, 9, 30))
   end
 
-  it "never rewrites a guide that exists" do
-    RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
+  it "never rewrites the user's own guide" do
+    RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", user: user)
     expect(AiService).not_to receive(:for)
 
     described_class.perform_now(group_key: "code_smell", user_id: user.id)
 
     expect(RecognitionGuide.sole.questions).to eq("q")
+  end
+
+  it "writes the user's own guide when only another user's guide exists" do
+    teammate = User.create!(email: "guide-teammate@example.com")
+    RecognitionGuide.create!(group_key: "code_smell", questions: "theirs", contrast: "c", misfires: "m", user: teammate)
+    stub_service
+
+    expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.to change(RecognitionGuide, :count).by(1)
+    expect(RecognitionGuide.find_by!(user: teammate).questions).to eq("theirs")
+    expect(RecognitionGuide.find_by!(user: user).questions).to eq(FakeService::RECOGNITION_GUIDE["questions"])
+  end
+
+  it "calls no provider for a trial account" do
+    trial = create_trial_user
+    expect(AiService).not_to receive(:for)
+
+    expect { described_class.perform_now(group_key: "code_smell", user_id: trial.id) }.not_to change(RecognitionGuide, :count)
+  end
+
+  it "writes nothing and finishes cleanly when the account is deleted during the provider call" do
+    service = instance_double(ClaudeService)
+    allow(service).to receive(:generate_recognition_guide) do
+      AccountDeletion.call(user)
+      FakeService::RECOGNITION_GUIDE.dup
+    end
+    allow(AiService).to receive(:for).with(user).and_return(service)
+
+    expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.not_to raise_error
+    expect(RecognitionGuide.count).to eq(0)
+    expect(User.exists?(user.id)).to be(false)
   end
 
   it "does nothing for a key outside the recognition groups" do

@@ -45,13 +45,63 @@ RSpec.describe RecognitionGuide do
     end
   end
 
+  let(:owner) { User.create!(email: "guide-owner@example.com") }
+  let(:other) { User.create!(email: "guide-other@example.com") }
+
   def guide(**overrides)
-    described_class.new(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", **overrides)
+    described_class.new(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", user: owner, **overrides)
   end
 
   it "refuses a key outside the recognition groups" do
     expect(guide(group_key: "core")).not_to be_valid
     expect(guide).to be_valid
+  end
+
+  it "requires an owner, in the model and in the database" do
+    ownerless = guide(user: nil)
+
+    expect(ownerless).not_to be_valid
+    expect { ownerless.save!(validate: false) }.to raise_error(ActiveRecord::NotNullViolation)
+  end
+
+  describe "ownership" do
+    def create_guide(**attributes)
+      described_class.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", **attributes)
+    end
+
+    it "lets each user hold the same group key once" do
+      create_guide(user: owner)
+
+      expect(guide(user: other)).to be_valid
+      expect(guide(user: owner)).not_to be_valid
+    end
+
+    it "indexes the user's own guides by group key, never another user's" do
+      own = create_guide(questions: "own", user: owner)
+      create_guide(questions: "theirs", user: other)
+      create_guide(group_key: "data_modeling", user: other)
+
+      expect(described_class.seen_by(owner, %w[code_smell architecture data_modeling])).to eq("code_smell" => own)
+      expect(described_class.seen_by(other, %w[architecture])).to be_empty
+      expect(described_class.visible_to(owner)).to contain_exactly(own)
+    end
+
+    it "says whether the user has their own guide for one key, ignoring other users' rows" do
+      create_guide(user: other)
+
+      expect(described_class.written_for?(owner, "code_smell")).to be(false)
+      expect(described_class.written_for?(other, "code_smell")).to be(true)
+    end
+
+    it "lists the group keys a user has no guide of their own for, in the order given" do
+      create_guide(group_key: "architecture", user: other)
+      create_guide(group_key: "data_modeling", user: other)
+      create_guide(user: owner)
+
+      expect(described_class.missing_for(owner, %w[code_smell data_modeling architecture oo_design]))
+        .to eq(%w[data_modeling architecture oo_design])
+      expect(described_class.missing_for(owner, [])).to eq([])
+    end
   end
 
   RecognitionGuide::FIELDS.each do |field|

@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe GenerateConceptReferenceJob do
+RSpec.describe GenerateConceptReferenceJob, type: :job do
   let(:user) { User.create!(email: "job@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" }) }
 
   let(:reference_hash) do
@@ -40,8 +40,8 @@ RSpec.describe GenerateConceptReferenceJob do
     expect(ref.generation_version).to eq(1)
   end
 
-  it "is a no-op when a reference already exists (does not call the provider)" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "existing")
+  it "is a no-op when the user already has their own reference (does not call the provider)" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "existing", user: user)
     expect(AiService).not_to receive(:for)
     expect {
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
@@ -121,6 +121,93 @@ RSpec.describe GenerateConceptReferenceJob do
     }.to raise_error(ActiveRecord::RecordInvalid)
   end
 
+  describe ".queue_missing" do
+    include ActiveJob::TestHelper
+
+    let(:pairs) { [ [ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ], [ "closures", "javascript" ] ] }
+
+    it "queues a write-up for each pair the user has no reference of their own for, at the priority given" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user)
+      teammate = User.create!(email: "x@example.com")
+      ConceptReference.create!(concept: "caching", language: "ruby_rails", user: teammate)
+      ConceptReference.create!(concept: "closures", language: "javascript", user: teammate)
+
+      described_class.queue_missing(user, pairs, priority: JobPriority::BACKGROUND)
+
+      queued = enqueued_jobs.select { |job| job["job_class"] == described_class.name }
+      expect(queued.map { |job| job["arguments"].first.slice("concept", "language", "user_id") })
+        .to contain_exactly({ "concept" => "caching", "language" => "ruby_rails", "user_id" => user.id },
+                            { "concept" => "closures", "language" => "javascript", "user_id" => user.id })
+      expect(queued.map { |job| job["priority"] }.uniq).to eq([ JobPriority::BACKGROUND ])
+    end
+
+    it "queues nothing for a trial account" do
+      expect { described_class.queue_missing(create_trial_user, pairs) }.not_to have_enqueued_job(described_class)
+    end
+  end
+
+  describe "ownership" do
+    let(:teammate) { User.create!(email: "teammate@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-other" }) }
+
+    it "writes the row as the user's own" do
+      stub_service
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+
+      expect(ConceptReference.sole.user).to eq(user)
+    end
+
+    it "writes a user's own row when only another user's row exists" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "theirs", user: teammate)
+      stub_service
+
+      expect {
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      }.to change(ConceptReference, :count).by(1)
+      expect(ConceptReference.find_by!(user: teammate).tagline).to eq("theirs")
+      expect(ConceptReference.find_by!(user: user).tagline).to eq("Avoid N+1 by eager loading.")
+    end
+
+    it "calls no provider for a trial account" do
+      trial = create_trial_user
+      expect(AiService).not_to receive(:for)
+
+      expect {
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: trial.id)
+      }.not_to change(ConceptReference, :count)
+    end
+
+    it "writes nothing and finishes cleanly when the account is deleted during the provider call" do
+      service = instance_double(ClaudeService)
+      allow(service).to receive(:generate_concept_reference) do
+        AccountDeletion.call(user)
+        reference_hash
+      end
+      allow(AiService).to receive(:for).with(user).and_return(service)
+
+      expect {
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      }.not_to raise_error
+      expect(ConceptReference.count).to eq(0)
+      expect(User.exists?(user.id)).to be(false)
+    end
+
+    it "does not rewrite the user's row when the account is deleted during a refresh" do
+      row = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old", user: user)
+      service = instance_double(ClaudeService)
+      allow(service).to receive(:generate_concept_reference) do
+        ConceptReference.where(id: row.id).delete_all
+        User.where(id: user.id).delete_all
+        reference_hash
+      end
+      allow(AiService).to receive(:for).with(user).and_return(service)
+
+      expect {
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+      }.not_to raise_error
+      expect(ConceptReference.count).to eq(0)
+    end
+  end
+
   describe "guide persistence" do
     it "persists the guide fields alongside the reference fields" do
       stub_service
@@ -150,10 +237,71 @@ RSpec.describe GenerateConceptReferenceJob do
     end
   end
 
+  describe ".queue_rewrites" do
+    include ActiveJob::TestHelper
+
+    it "queues a refresh per pair naming the version of the user's own row, 0 when they have none, at the priority given" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: User.create!(email: "rewrites-teammate@example.com"),
+                               generation_version: 2)
+      ConceptReference.create!(concept: "caching", language: "ruby_rails", user: user, generation_version: 5)
+
+      described_class.queue_rewrites(user, [ %w[n_plus_one ruby_rails], %w[caching ruby_rails], %w[closures javascript] ],
+                                     priority: JobPriority::BACKGROUND)
+
+      queued = enqueued_jobs.select { |job| job["job_class"] == described_class.name }
+      expect(queued.map { |job| job["arguments"].first.slice("concept", "refresh", "seen_version") })
+        .to contain_exactly({ "concept" => "n_plus_one", "refresh" => true, "seen_version" => 0 },
+                            { "concept" => "caching", "refresh" => true, "seen_version" => 5 },
+                            { "concept" => "closures", "refresh" => true, "seen_version" => 0 })
+      expect(queued.map { |job| job["priority"] }.uniq).to eq([ JobPriority::BACKGROUND ])
+    end
+  end
+
+  describe "seen_version" do
+    let(:incomplete) { reference_hash.except(*ConceptReference::LADDER_FIELDS) }
+
+    def own_row(version) = ConceptReference.create!(incomplete.merge(concept: "n_plus_one", language: "ruby_rails", user: user,
+                                                                      generation_version: version))
+
+    it "skips a rewrite asked for against an older version, since that attempt already ran" do
+      row = own_row(2)
+      expect(AiService).not_to receive(:for)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 1)
+
+      expect(row.reload.generation_version).to eq(2)
+    end
+
+    it "skips a first write asked for when the user saw no row, once a row exists" do
+      own_row(1)
+      expect(AiService).not_to receive(:for)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
+    end
+
+    it "rewrites when the version still matches" do
+      row = own_row(2)
+      stub_service
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 2)
+
+      expect(row.reload.generation_version).to eq(3)
+    end
+
+    it "still rewrites for a job queued by older code, which names no version" do
+      row = own_row(2)
+      stub_service
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+      expect(row.reload.generation_version).to eq(3)
+    end
+  end
+
   describe "refresh" do
     def legacy_row
       ConceptReference.create!(
-        concept: "n_plus_one", language: "ruby_rails",
+        concept: "n_plus_one", language: "ruby_rails", user: user,
         tagline: "old tagline", explanation: "old", code_example: "old", senior_lens: "old"
       )
     end
@@ -186,7 +334,7 @@ RSpec.describe GenerateConceptReferenceJob do
 
     it "advances the completion counter on every successful refresh even when nothing else changes" do
       attributes = reference_hash.except(*ConceptReference::LADDER_FIELDS)
-      row = ConceptReference.create!(attributes.merge(concept: "n_plus_one", language: "ruby_rails"))
+      row = ConceptReference.create!(attributes.merge(concept: "n_plus_one", language: "ruby_rails", user: user))
       stub_service(returning: attributes)
 
       freeze_time do
@@ -215,7 +363,7 @@ RSpec.describe GenerateConceptReferenceJob do
     end
 
     it "rewrites a guided row that has no ladder when asked to refresh" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old",
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old", user: user,
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
       stub_service
 
@@ -225,9 +373,9 @@ RSpec.describe GenerateConceptReferenceJob do
       expect(ConceptReference.last).to be_ladder
     end
 
-    it "keeps a valid shared reference when a ladder refresh returns malformed required prose" do
+    it "keeps a valid reference when a ladder refresh returns malformed required prose" do
       row = ConceptReference.create!(
-        reference_hash.except(*ConceptReference::LADDER_FIELDS).merge(concept: "n_plus_one", language: "ruby_rails")
+        reference_hash.except(*ConceptReference::LADDER_FIELDS).merge(concept: "n_plus_one", language: "ruby_rails", user: user)
       )
       before = row.attributes
       service = ClaudeService.new(user.api_key)
@@ -245,7 +393,7 @@ RSpec.describe GenerateConceptReferenceJob do
     end
 
     it "leaves a fully written row alone even when asked to refresh" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept", user: user,
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p",
                                lesson: { "definition" => "d" })
@@ -258,7 +406,7 @@ RSpec.describe GenerateConceptReferenceJob do
     end
 
     it "rewrites a row with a guide and ladder but no lesson when asked to refresh, and stores the lesson" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old",
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old", user: user,
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       stub_service(returning: reference_hash.merge("lesson" => { "definition" => "d" }))
@@ -270,7 +418,7 @@ RSpec.describe GenerateConceptReferenceJob do
     end
 
     it "leaves a row with a guide and ladder but no lesson alone without a refresh" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept",
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "kept", user: user,
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       expect(AiService).not_to receive(:for)
@@ -278,6 +426,45 @@ RSpec.describe GenerateConceptReferenceJob do
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
 
       expect(ConceptReference.last.tagline).to eq("kept")
+    end
+
+    describe "a row another writer adds during the provider call" do
+      let(:incomplete) { reference_hash.except(*ConceptReference::LADDER_FIELDS).merge("tagline" => "added meanwhile") }
+
+      def add_row_during_the_call
+        allow(stub_service).to receive(:generate_concept_reference) do
+          ConceptReference.create!(incomplete.merge(concept: "n_plus_one", language: "ruby_rails", user: user, generation_version: 1))
+          reference_hash
+        end
+      end
+
+      it "is left alone by a plain write-up, which asked for no rewrite" do
+        add_row_during_the_call
+
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+
+        row = ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails")
+        expect(row.tagline).to eq("added meanwhile")
+        expect(row.generation_version).to eq(1)
+      end
+
+      it "is left alone by a refresh asked for when the user saw no row" do
+        add_row_during_the_call
+
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
+
+        expect(ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(1)
+      end
+
+      it "is rewritten by a refresh from older code, which names no version, while it is incomplete" do
+        add_row_during_the_call
+
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+        row = ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails")
+        expect(row.tagline).to eq("Avoid N+1 by eager loading.")
+        expect(row.generation_version).to eq(2)
+      end
     end
 
     # Two jobs can both pass the fully_written? check; the second to write must discard its result.
@@ -303,6 +490,25 @@ RSpec.describe GenerateConceptReferenceJob do
       expect(row.guide_plain_language).to eq("winner plain")
       expect(row.tagline).to eq("old tagline")
       expect(row.generation_version).to eq(1)
+    end
+
+    it "logs a skip, not a generation, and keeps the failure note when the row became fully written during the call" do
+      row = legacy_row
+      service = stub_service
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      allow(service).to receive(:generate_concept_reference) do
+        ConceptReferenceFailures.record(user_id: user.id, concept: "n_plus_one", language: "ruby_rails",
+                                        error: ProviderError::RateLimitError.new("slow down"))
+        row.update!(reference_hash.merge("lesson" => { "definition" => "winner" }))
+        reference_hash
+      end
+      allow(Rails.logger).to receive(:info)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+      expect(Rails.logger).to have_received(:info).with(/Skipped concept reference for n_plus_one\/ruby_rails: the row changed during the call/)
+      expect(Rails.logger).not_to have_received(:info).with(/Generated concept reference/)
+      expect(ConceptReferenceFailures.read(user_id: user.id, concept: "n_plus_one", language: "ruby_rails")).to be_present
     end
   end
 end

@@ -22,9 +22,27 @@ class RecognitionGuide < ApplicationRecord
                     "judging it, and show how they fit into a single pass. Leave each concept's detail to its own reference."
   }.freeze
 
-  validates :group_key, presence: true, uniqueness: true, inclusion: { in: GROUP_KEYS }
+  belongs_to :user
+
+  validates :group_key, presence: true, uniqueness: { scope: :user_id }, inclusion: { in: GROUP_KEYS }
   # A row's existence stops the backfill retrying, so a partial one would stay blank forever.
   validates(*FIELDS, presence: true)
+
+  scope :visible_to, ->(user) { where(user_id: user.id) }
+
+  def self.seen_by(user, group_keys)
+    visible_to(user).where(group_key: group_keys).index_by(&:group_key)
+  end
+
+  def self.written_for?(user, group_key)
+    visible_to(user).exists?(group_key: group_key)
+  end
+
+  def self.missing_for(user, group_keys)
+    return [] if group_keys.empty?
+
+    group_keys - seen_by(user, group_keys).keys
+  end
 
   # Nil for a block with no guide.
   def self.key_for(bucket, group)

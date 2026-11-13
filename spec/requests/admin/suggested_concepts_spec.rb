@@ -17,7 +17,7 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
     it "writes nothing and answers as signed out" do
       login_as(admin)
       concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")
-      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker")
+      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker", user: member)
       delete_admin_once_the_request_is_past_sign_in
 
       patch public_send(:"#{action}_admin_suggested_concept_path", concept)
@@ -94,7 +94,7 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       login_as(admin)
       SuggestedConcept.record!(language: "ruby_rails", name: "has_ref")
       SuggestedConcept.record!(language: "ruby_rails", name: "no_ref")
-      ConceptReference.create!(language: "ruby_rails", concept: "has_ref")
+      ConceptReference.create!(language: "ruby_rails", concept: "has_ref", user: admin)
 
       get admin_suggested_concepts_path
 
@@ -111,7 +111,7 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
     it "marks the suggestion promoted when a matching ConceptReference exists" do
       login_as(admin)
       concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")
-      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker")
+      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker", user: admin)
 
       patch promote_admin_suggested_concept_path(concept)
 
@@ -120,6 +120,16 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       expect(concept.reviewed_at).to be_present
       expect(concept.reviewed_by).to eq(admin)
       expect(response).to redirect_to(admin_suggested_concepts_path)
+    end
+
+    it "counts a teammate's own write-up, since the check asks only whether the concept was ever written up" do
+      login_as(admin)
+      concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")
+      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker", user: member)
+
+      patch promote_admin_suggested_concept_path(concept)
+
+      expect(concept.reload.status).to eq("promoted")
     end
 
     it "refuses to promote when no matching ConceptReference exists, with no state change" do
@@ -137,7 +147,7 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
     it "is not accessible to a non-admin" do
       login_as(member)
       concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")
-      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker")
+      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker", user: member)
 
       patch promote_admin_suggested_concept_path(concept)
 

@@ -32,6 +32,7 @@ class RegenerateExerciseJob < ApplicationJob
     return keep_reviewed_set(user, exercise, kept_for, claim) if kept_for
 
     user.record_generation_success!
+    GenerateConceptReferenceJob.queue_missing(user, result.exercise.concept_pairs(before_submission: true), priority: JobPriority::BACKGROUND)
     Rails.logger.info("Regenerated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     release(user, exercise, claim, e) { user.record_generation_message!(KEPT_SET_MESSAGES.fetch(:all_rejected)) }

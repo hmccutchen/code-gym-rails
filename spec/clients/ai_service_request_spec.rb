@@ -115,7 +115,7 @@ RSpec.describe AiService, "request values" do
                             ai_review: { "code_review" => { "missed" => [ "The association is loaded per row" ] } })
     end
     let(:reference) do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
     end
 

@@ -6,7 +6,7 @@ module ConceptReferencesHelper
     # Memoized per request: one page repeats a concept across its sections and days.
     @concept_references ||= {}
     @concept_references.fetch([ concept, bucket ]) do |key|
-      @concept_references[key] = ConceptReference.find_by(concept: concept, language: bucket)
+      @concept_references[key] = ConceptReference.for(current_user, concept: concept, language: bucket)
     end
   end
 

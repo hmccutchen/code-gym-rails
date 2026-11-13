@@ -7,11 +7,11 @@ RSpec.describe "Learn layout", type: :system do
     user.update!(language: "ruby_rails", display_preferences: prefs)
     if featured
       submit_set_showing(user, "n_plus_one", date: Date.current - 1)
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "T",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "T",
                                explanation: "E", code_example: "x", senior_lens: "S")
       ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
     end
-    RecognitionGuide.create!(group_key: "code_smell", questions: "Q", contrast: "C", misfires: "M")
+    RecognitionGuide.create!(user: user, group_key: "code_smell", questions: "Q", contrast: "C", misfires: "M")
     visit_as(user)
     visit learn_path
     expect(page).to have_css(".learn-bucket-grouped h2")
