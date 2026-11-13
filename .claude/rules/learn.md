@@ -39,10 +39,11 @@ Each entry states what a change must not break. An entry that names a
 read it before changing that area.
 
 - **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
-  `concept_references` and `recognition_guides` carry a nullable `user_id`
-  that no code reads yet. It ships in five steps with deploy gates between
-  them; follow that doc's order. Until the last step, rows with no user are
-  the shared ones, kept unique by partial indexes, and deletion leaves them.
+  `concept_references` and `recognition_guides` carry a nullable `user_id`,
+  read only by account deletion until L2. It ships in five steps with deploy
+  gates between them; follow that doc's order and the obligations it lists
+  for each step. Until the last step, rows with no user are the shared ones,
+  kept unique by partial indexes, and deletion leaves them.
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
@@ -58,7 +59,8 @@ read it before changing that area.
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
   `ConceptReference` is a team-wide cache keyed on `(concept, language)`; its
-  `user_id` is not read yet. Guide, ladder and `lesson` come from the same
+  `user_id` is read only by account deletion until L2. Guide, ladder and
+  `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
   out, and "seen" reads `ConceptExposureIndex#count`, never `ConceptMastery`.

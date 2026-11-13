@@ -86,4 +86,18 @@ RSpec.describe AddUserToLearnContent do
 
     expect(index(:concept_references, %w[concept language])).to have_attributes(where: "(user_id IS NULL)")
   end
+
+  it "refuses to go down once any concept reference has an owner, and changes nothing" do
+    reference(nil)
+    reference(ana.id)
+
+    expect { savepoint { migrate(:down) } }.to raise_error(ActiveRecord::IrreversibleMigration, /concept_references.*L2/m)
+    expect(column(:concept_references, "user_id")).to be_present
+  end
+
+  it "refuses to go down once any recognition guide has an owner" do
+    guide(ben.id)
+
+    expect { savepoint { migrate(:down) } }.to raise_error(ActiveRecord::IrreversibleMigration, /recognition_guides/)
+  end
 end

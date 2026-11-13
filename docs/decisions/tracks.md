@@ -195,7 +195,9 @@ for per-kind coverage and deduplicated gaps across both languages.
 It writes nothing. Adding `--run` queues missing ladders through
 `GenerateConceptReferenceJob` with `refresh: true`, billed to that active
 operator's own key. A refresh rewrites the whole shared reference and guide,
-including rows that already have a guide, for every user. Since 2026-10-15
+including rows that already have a guide, for every user. That holds until
+Learn content becomes per user, which retires the script
+(`learn-content-per-user.md`). Since 2026-10-15
 the report reads every kind at junior, the unsaved user's default skill
 level, where it read the union of every rung before; the 2026-10-08 figures
 below were measured the old way, and only design comparison differs. It is
