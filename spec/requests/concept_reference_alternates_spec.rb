@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Concept reference alternate framings", type: :request do
   let(:user) { create_user_with_key }
   let(:reference) do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
   end
 
@@ -30,6 +30,17 @@ RSpec.describe "Concept reference alternate framings", type: :request do
 
     expect(response).to have_http_status(:not_found)
     expect(JSON.parse(response.body)).to include("error" => I18n.t("errors.concept_references.reference_missing"))
+  end
+
+  it "answers 404 for a shared reference, which no user reads any more" do
+    shared = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+                                      tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
+    expect(AiService).not_to receive(:for)
+    login_as(user)
+
+    post explain_differently_concept_reference_path(shared), params: { prior_alternates: [] }, as: :json
+
+    expect(response).to have_http_status(:not_found)
   end
 
   it "reframes the user's own reference" do
@@ -90,7 +101,7 @@ RSpec.describe "Concept reference alternate framings", type: :request do
     expect(DailyResponse.count).to eq(0)
   end
 
-  it "writes nothing anywhere, leaving the shared reference untouched" do
+  it "writes nothing anywhere, leaving the reference untouched" do
     stub_alternate
     login_as(user)
 

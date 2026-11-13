@@ -51,7 +51,7 @@ RSpec.describe GenerateDailyExercisesJob do
     end
 
     it "queues the user's missing write-ups at background priority once the set is saved" do
-      ConceptReference.create!(concept: "memoization", language: "ruby_rails", tagline: "shared")
+      ConceptReference.create!(user: user, concept: "memoization", language: "ruby_rails", tagline: "shared")
       stub_provider(problem_set: tagged_set)
 
       described_class.new.perform(user_id: user.id)

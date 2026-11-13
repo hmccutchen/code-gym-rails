@@ -13,15 +13,14 @@ The migration `ClearNonHashConceptLessons` cleared every non-object lesson once,
 
 ## `.for`, `.seen_by` and `.visible_to`
 
-The one answer to which reference a user sees: their own row, else the
-shared row (no `user_id`), never another user's. `.seen_by` indexes the rows
-by `[concept, language]` with the user's own row winning. The shared half
-is a fallback until L5 of `docs/decisions/learn-content-per-user.md` drops
-it.
+The one answer to which reference a user sees: their own row only. Since L5
+of `docs/decisions/learn-content-per-user.md` a shared row (no `user_id`) is
+never read, and neither is another user's. `.seen_by` indexes the user's rows
+by `[concept, language]`; the per-user unique index leaves one row per key.
 
 ## `.missing_for`
 
-The pairs a user sees no reference for, own or shared. Learn's prepare
+The pairs a user has no reference of their own for. Learn's prepare
 button and `GenerateConceptReferenceJob.queue_missing` both ask it, so the
 two never disagree on what is still missing.
 

@@ -1496,9 +1496,9 @@ RSpec.describe AiService do
     end
 
     it "renders the retried kind alone from the draft's plan, history and difficulty, with fresh ladders for that kind only" do
-      ConceptReference.create!(concept: "memoization", language: "ruby_rails", ladder_junior: "j", ladder_mid_level: "m",
+      ConceptReference.create!(user: draft.user, concept: "memoization", language: "ruby_rails", ladder_junior: "j", ladder_mid_level: "m",
                                ladder_senior: "a fresh senior rung", ladder_principal_engineer: "p")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
+      ConceptReference.create!(user: draft.user, concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
       expect(GenerationLadders).to receive(:for).with(draft.user, { ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
                                                       gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
@@ -2431,7 +2431,7 @@ RSpec.describe AiService do
       pin_code_review_mode(:application_code)
       allow(user).to receive(:concepts_needing_reinforcement).and_return([])
       user.update!(section_kind_levels: { "challenge" => "principal_engineer" }, locked_section_kinds: [ "challenge" ])
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
       set = full_problem_set("challenge" => { "concept" => "n_plus_one" })
 

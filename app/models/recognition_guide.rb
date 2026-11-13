@@ -28,10 +28,10 @@ class RecognitionGuide < ApplicationRecord
   # A row's existence stops the backfill retrying, so a partial one would stay blank forever.
   validates(*FIELDS, presence: true)
 
-  scope :visible_to, ->(user) { where(user_id: [ nil, user.id ]) }
+  scope :visible_to, ->(user) { where(user_id: user.id) }
 
   def self.seen_by(user, group_keys)
-    visible_to(user).where(group_key: group_keys).sort_by { |guide| guide.user_id ? 1 : 0 }.index_by(&:group_key)
+    visible_to(user).where(group_key: group_keys).index_by(&:group_key)
   end
 
   def self.missing_for(user, group_keys)

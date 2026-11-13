@@ -40,8 +40,8 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
     expect(ref.generation_version).to eq(1)
   end
 
-  it "is a no-op when the user already sees a reference, here the shared one (does not call the provider)" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "existing")
+  it "is a no-op when the user already has their own reference (does not call the provider)" do
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "existing", user: user)
     expect(AiService).not_to receive(:for)
     expect {
       described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
@@ -126,9 +126,10 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
 
     let(:pairs) { [ [ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ], [ "closures", "javascript" ] ] }
 
-    it "queues a write-up for each pair the user sees no reference for, at the priority given" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
+    it "queues a write-up for each pair the user has no reference of their own for, at the priority given" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user)
       ConceptReference.create!(concept: "caching", language: "ruby_rails", user: User.create!(email: "x@example.com"))
+      ConceptReference.create!(concept: "closures", language: "javascript")
 
       described_class.queue_missing(user, pairs, priority: JobPriority::BACKGROUND)
 
@@ -165,16 +166,16 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       expect(ConceptReference.find_by!(user: user).tagline).to eq("Avoid N+1 by eager loading.")
     end
 
-    it "leaves the shared row untouched and writes the user's own row on a refresh, past the shared row's counter" do
+    it "writes the user's own row, numbered 1, when only a shared row exists, and leaves the shared row alone" do
       shared = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared", generation_version: 3)
       stub_service
 
-      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
 
       expect(shared.reload.tagline).to eq("shared")
       own = ConceptReference.find_by!(user: user)
       expect(own).to be_complete
-      expect(own.generation_version).to eq(4)
+      expect(own.generation_version).to eq(1)
       expect(ConceptReference.for(user, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
     end
 

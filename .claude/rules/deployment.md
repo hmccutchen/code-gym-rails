@@ -56,7 +56,9 @@ paths:
   `concept_references` or `recognition_guides` row has a `user_id`, and
   after that the rollback floor is L2's code. L4's copy
   (`CopySharedLearnContent`) has a deploy gate, stated in step 5 of that
-  doc.
+  doc. The schema step after L5 (delete shared rows, drop the partial
+  indexes, make `user_id` NOT NULL) waits until L5 runs on web and worker,
+  as step 6 states.
 - Never rename a migration that has been pushed: the PR app has already run
   it under its old version (see "The preview migration version is
   reconciled" in `docs/decisions/tracks.md`).

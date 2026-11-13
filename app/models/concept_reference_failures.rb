@@ -1,4 +1,4 @@
-# Per user in the cache, not on the shared row; expires before any quota resets so a note never outlives its limit.
+# Per user in the cache, not on the reference row; expires before any quota resets so a note never outlives its limit.
 module ConceptReferenceFailures
   EXPIRY = 1.hour
 

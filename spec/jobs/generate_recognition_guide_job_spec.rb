@@ -44,11 +44,13 @@ RSpec.describe GenerateRecognitionGuideJob, type: :job do
     expect(RecognitionGuide.sole.questions).to eq("q")
   end
 
-  it "calls no provider when the user already sees the shared guide" do
-    RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
-    expect(AiService).not_to receive(:for)
+  it "writes the user's own guide even when a shared one exists, and leaves the shared one alone" do
+    shared = RecognitionGuide.create!(group_key: "code_smell", questions: "shared", contrast: "c", misfires: "m")
+    stub_service
 
-    expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.not_to change(RecognitionGuide, :count)
+    expect { described_class.perform_now(group_key: "code_smell", user_id: user.id) }.to change(RecognitionGuide, :count).by(1)
+    expect(shared.reload.questions).to eq("shared")
+    expect(RecognitionGuide.find_by!(user: user).questions).to eq(FakeService::RECOGNITION_GUIDE["questions"])
   end
 
   it "writes the user's own guide when only another user's guide exists" do

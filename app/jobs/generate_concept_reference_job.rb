@@ -51,7 +51,7 @@ class GenerateConceptReferenceJob < ApplicationJob
     return unless wanted?(seen, refresh)
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    case write_own(user, concept, language, reference, seen)
+    case write_own(user, concept, language, reference)
     when :account_deleted then log_deleted(user.id, concept, language)
     when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: already fully written")
     else
@@ -61,7 +61,7 @@ class GenerateConceptReferenceJob < ApplicationJob
   end
 
   # The owner is share-locked first, as AccountDeletion locks it, so a deletion during the call leaves nothing behind.
-  def write_own(user, concept, language, reference, seen)
+  def write_own(user, concept, language, reference)
     attributes = ConceptReference::WRITTEN_FIELDS.index_with { |field| reference[field] }
 
     User.transaction do
@@ -71,7 +71,7 @@ class GenerateConceptReferenceJob < ApplicationJob
       next rewrite(own, attributes) if own
 
       ConceptReference.create!(attributes.merge("user_id" => user.id, "concept" => concept, "language" => language,
-                                                "generation_version" => (seen&.generation_version || 0) + 1))
+                                                "generation_version" => 1))
       :written
     end
   end

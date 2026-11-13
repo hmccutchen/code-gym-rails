@@ -289,8 +289,8 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/recognition_guide.rb` — `RecognitionGuide`: the stored "how to
   look for these" piece per recognition group, which groups have one, and
   what the prompt says each group is about. `.seen_by` and `.visible_to`
-  answer which guide a user sees: their own, else the shared one;
-  `.missing_for` lists the group keys a user sees no guide for.
+  answer which guide a user sees: their own only;
+  `.missing_for` lists the group keys a user has no guide of their own for.
 - `app/jobs/generate_recognition_guide_job.rb` — writes one missing
   recognition guide as the user's own row; the same per-user permit and
   write under a share lock on the user as `GenerateConceptReferenceJob`.
@@ -352,7 +352,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/concept_mastery/daily_evidence.rb` — `ConceptMastery::DailyEvidence`: projects accepted same-concept/bucket daily assessment evidence and retryable siblings.
 - `app/models/concept_mastery/transition.rb` — `ConceptMastery::Transition`: pure current-policy mastery, countdown, skip and drill transitions with explicit clocks.
 - `app/models/concept_mastery/reconciliation.rb` — `ConceptMastery::Reconciliation`: validates and replaces versioned correction suffixes, compacts irrevocable prefixes and exposes restorable drill intent.
-- `app/models/concept_reference.rb` — `ConceptReference`: the stored reference, guide, ladder and lesson text for one concept and language. It is the authority for the field lists (`REFERENCE_FIELDS`, `GUIDE_FIELDS`, `LADDER_FIELDS`, and `WRITTEN_FIELDS`, all one call writes) and for when a row counts as `fully_written?`. `.for`, `.seen_by` and `.visible_to` answer which row a user sees: their own, else the shared one; `.missing_for` lists the pairs a user sees no row for, and `.written_up?` and `.written_up_keys` answer whether any user's row exists, for the admin promote check.
+- `app/models/concept_reference.rb` — `ConceptReference`: the stored reference, guide, ladder and lesson text for one concept and language. It is the authority for the field lists (`REFERENCE_FIELDS`, `GUIDE_FIELDS`, `LADDER_FIELDS`, and `WRITTEN_FIELDS`, all one call writes) and for when a row counts as `fully_written?`. `.for`, `.seen_by` and `.visible_to` answer which row a user sees: their own only; `.missing_for` lists the pairs a user has no row of their own for, and `.written_up?` and `.written_up_keys` answer whether any user's row exists, for the admin promote check.
 - `app/models/concerns/.keep` — empty placeholder that keeps the `concerns` directory in git.
 - `app/models/daily_exercise.rb` — `DailyExercise`: one user's generated problem set for a date. It holds the plan notes, the regeneration claim and its deadline constants, and the readers for the planned size, coverage, draft scope and the concept and bucket pairs its sections carry.
 - `app/models/daily_response.rb` — `DailyResponse`: one user's answers, ratings and AI review for a date's exercise. It is the authority for the rating vocabularies, the per-section caps on alternates and follow-ups, the `AI_REVIEW_FIELDS` shape, and what counts as submitted or reviewed.

@@ -41,15 +41,14 @@ read it before changing that area.
 - **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
   `concept_references` and `recognition_guides` carry a nullable `user_id`.
   It ships in six steps with deploy gates between them; follow that doc's
-  order and the obligations it lists for each step. Until the last step, rows
-  with no user are the shared ones, kept unique by partial indexes, and
-  deletion leaves them. Since L2 every concept reference is written as its
-  user's own row, and every reader asks `ConceptReference.for(user, ...)` or
-  `.seen_by(user, ...)`: the user's own row, else the shared one, never
-  another user's. The admin promote check alone counts any row. A trial
-  account writes no Learn content (`User#writes_learn_content?`).
-  Since L3 recognition guides follow the same rule: the job writes the
-  user's own row, and Learn reads `RecognitionGuide.seen_by(user, ...)`.
+  order and the obligations it lists for each step. Every reference and
+  guide is written as its user's own row, and since L5 every reader asks
+  `ConceptReference.for(user, ...)`, `.seen_by(user, ...)` or
+  `RecognitionGuide.seen_by(user, ...)`, which read the user's own rows
+  only: never a shared row and never another user's. The admin promote
+  check alone counts any row. Shared rows (no user) remain, unread and kept
+  unique by partial indexes, until the schema step after L5 deletes them.
+  A trial account writes no Learn content (`User#writes_learn_content?`).
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
@@ -65,10 +64,10 @@ read it before changing that area.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
-  `ConceptReference` is keyed on `(user_id, concept, language)`, with the
-  shared row as a fallback until L5. L4's `CopySharedLearnContent` copies
-  every shared reference and guide to each active account, inserting only
-  where the user has no row yet. Guide, ladder and
+  `ConceptReference` is keyed on `(user_id, concept, language)`. L4's
+  `CopySharedLearnContent` copied every shared reference and guide to each
+  active account, inserting only where the user had no row yet, and L5's
+  `CatchUpSharedLearnContentCopy` runs that copy again. Guide, ladder and
   `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
@@ -100,8 +99,8 @@ read it before changing that area.
   discard permit, since only a press queues a guide.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one
-  `RecognitionGuide` per user on how to look for that kind of problem, with
-  the shared row as a fallback until L5. It teaches a
+  `RecognitionGuide` per user on how to look for that kind of problem. It
+  teaches a
   process and never defines a concept or hints at a defect:
   `#generate_recognition_guide(user, group_key)` is handed no exercise,
   response or history. All three fields are required, rows are never

@@ -156,8 +156,8 @@ User browses /learn (independent of the daily flow above):
   └→ LearnController#index            → every concept in the user's vocabularies
        (their language plus the four language-independent buckets), whether or
        not they have ever been assigned one — a library, not a day's plan;
-       each group shows the recognition guide the user sees
-       (RecognitionGuide.seen_by: their own, else the shared one)
+       each group shows the user's own recognition guide
+       (RecognitionGuide.seen_by: their own row only)
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
   └→ LearnController#prepare / #prepare_ladders → queue the user's missing

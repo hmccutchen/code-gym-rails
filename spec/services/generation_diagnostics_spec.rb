@@ -35,7 +35,7 @@ RSpec.describe GenerationDiagnostics do
 
   it "measures the owned effective-rung ladders and reports grounding without changing configured targets" do
     gotcha = BugHuntGotchas.find("rb_delete_while_each")
-    ConceptReference.create!(concept: gotcha.concept, language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: gotcha.concept, language: "ruby_rails",
       ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "Senior edge.", ladder_principal_engineer: "Principal cost.")
     placed = { ExerciseSection::CodeReview => "principal_engineer", ExerciseSection::Challenge => "principal_engineer" }
     ladders = GenerationLadders.for(user, placed, "ruby_rails", :bug_hunt, gotcha: gotcha)

@@ -33,7 +33,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   before { login_as(user) }
 
   it "renders closed on the submitted dashboard, with its summary, the guide and a link to the concept" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current)
 
     block = short_version(root_path)
@@ -46,7 +46,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "builds the exposure index once for the submitted dashboard" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current)
 
     builds = 0
@@ -58,14 +58,14 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "renders on History too" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current - 1)
 
     expect(short_version(history_path)).to be_present
   end
 
   it "keeps the block but drops the Learn link for a bucket outside the user's current language" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current - 1)
     user.update!(language: "javascript")
 
@@ -82,7 +82,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "renders nothing on a later exposure with a solid grade" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current - 7, rating: "solid", gaps: [])
     reviewed_day(date: Date.current, rating: "solid", gaps: [])
 
@@ -90,7 +90,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "falls back to the explanation and code example for a row with no guide" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              **guide.except(:guide_plain_language, :guide_worked_example, :guide_pitfalls))
     reviewed_day(date: Date.current)
 
@@ -101,10 +101,10 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "shows pitfalls only when the section has an essential gap" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current - 1, rating: "developing", gaps: [ 0 ])
     reviewed_day(date: Date.current - 2, rating: "solid", gaps: [], concept: "n_plus_one_two")
-    ConceptReference.create!(concept: "n_plus_one_two", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one_two", language: "ruby_rails", **guide)
 
     get history_path
     blocks = Nokogiri::HTML(response.body).css(".review-block details.review-short-version")
@@ -134,7 +134,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "renders one block for two sections sharing a concept, with pitfalls when either has the gap" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     two_section_day(reviews: { "code_review" => { "rating" => "solid", "missed" => [], "essential_gaps" => [] },
                                "pattern" => { "rating" => "developing", "missed" => [ "m" ], "essential_gaps" => [ 0 ] } })
 
@@ -143,7 +143,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "renders the block on the later section when the earlier one's review failed" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", **guide)
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     two_section_day(reviews: { "pattern" => { "rating" => "developing", "missed" => [ "m" ], "essential_gaps" => [ 0 ] } })
 
     page = blocks_by_section
@@ -153,13 +153,13 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "escapes markup in every reference field it shows" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              **guide.merge(guide_worked_example: "<i>worked</i> example", guide_pitfalls: "<i>pitfall</i> text"))
     reviewed_day(date: Date.current)
     with_guide = short_version(root_path)
 
     ConceptReference.delete_all
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              **guide.except(:guide_plain_language, :guide_worked_example, :guide_pitfalls)
                                    .merge(explanation: "<i>explained</i>", code_example: "<i>code</i>"))
     without_guide = short_version(root_path)
@@ -170,7 +170,7 @@ RSpec.describe "The concept's short version in a review", type: :request do
   end
 
   it "underlines a glossary term once across the block and escapes markup in reference fields" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              **guide.merge(tagline: "<b>Bold</b> eager loading",
                                            guide_plain_language: "Use eager loading here."))
     reviewed_day(date: Date.current)

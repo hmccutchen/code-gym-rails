@@ -3,9 +3,10 @@
 ## Whose row it writes
 
 The job writes only the user's own row (`docs/decisions/learn-content-per-user.md`).
-It skips the call when the user already sees a guide for the group, their
-own or the shared one, because a guide is never rewritten. It never writes
-a shared row. A trial account writes nothing (`User#writes_learn_content?`),
+It skips the call when the user already has their own guide for the group,
+because a guide is never rewritten. Since L5 a shared guide does not count:
+a user with only the shared row gets their own. It never writes a shared
+row. A trial account writes nothing (`User#writes_learn_content?`),
 and neither does an anonymized one, which `User.active` leaves out.
 
 ## Concurrency

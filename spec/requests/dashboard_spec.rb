@@ -560,7 +560,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
           let(:day) { base_problem_set.merge(kind => sections.fetch(kind).merge("concept" => concept)) }
 
           before do
-            ConceptReference.create!(concept: concept, language: kind, tagline: "GAP-TAGLINE",
+            ConceptReference.create!(user: user, concept: concept, language: kind, tagline: "GAP-TAGLINE",
                                      explanation: "GAP-EXPLANATION", code_example: "c", senior_lens: "l")
           end
 
@@ -626,7 +626,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       ps["code_review"]["concept"] = "n_plus_one"
       @exercise = create_exercise(problem_set: ps)
       @exercise.update!(language: "ruby_rails")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
                                code_example: "closure = 1", senior_lens: twice)
       submit_set_showing(user, "n_plus_one", date: Date.current - 3)
       FeaturedConcept.for(user)
@@ -1062,7 +1062,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     it "renders a concept-reference dropdown before submission when a reference is cached" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1073,7 +1073,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     it "auto-expands the dropdown on a concept's first-ever exposure" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1088,7 +1088,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current,
                             concept_tags: { "code_review" => "n_plus_one" })
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1099,7 +1099,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     it "offers a different explanation from inside the dropdown, before submission" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
-      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      reference = ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                            tagline: "Avoid the loop query", explanation: "e",
                                            code_example: "c", senior_lens: "l")
 
@@ -1111,7 +1111,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     it "renders that control as a non-submitting button, since it sits inside #gym-form" do
       exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1123,7 +1123,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       exercise = exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "t", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1151,7 +1151,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       exercise = exercise_with(concept: "n_plus_one", scenario: "invoice processing workflow")
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "code_review" => "a" * 20 }, submitted_at: Time.current)
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                tagline: "Avoid the loop query", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1194,7 +1194,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
                               "reference" => { "tagline" => "Scale reads first", "explanation" => "e",
                                                "tradeoffs" => [ "cost vs latency", "complexity vs speed" ], "senior_lens" => "l" } }
         })
-      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+      ConceptReference.create!(user: user, concept: "scaling_bottlenecks", language: "architecture",
                                tagline: "Find the bottleneck", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1217,7 +1217,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
           "architecture" => { "title" => "Datastore choice", "scenario" => "10x traffic", "question" => "Pick an approach",
                               "options" => [ "Shard Postgres", "Add a cache" ], "concept" => "scaling_bottlenecks" }
         })
-      ConceptReference.create!(concept: "scaling_bottlenecks", language: "architecture",
+      ConceptReference.create!(user: user, concept: "scaling_bottlenecks", language: "architecture",
                                tagline: "Find the bottleneck", explanation: "e", code_example: "c", senior_lens: "l")
 
       get root_path
@@ -1265,7 +1265,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
           "concept" => "cache_invalidation"
         }
       ))
-      ConceptReference.create!(concept: "cache_invalidation", language: "plan_review",
+      ConceptReference.create!(user: user, concept: "cache_invalidation", language: "plan_review",
                                tagline: "Watch for stale reads", explanation: "e", code_example: "c", senior_lens: "l")
       create_response(exercise)
 

@@ -11,16 +11,14 @@ class ConceptReference < ApplicationRecord
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: %i[user_id language] }
 
-  # A row with no user is the shared one, read as a fallback until L5 (docs/decisions/learn-content-per-user.md).
-  scope :visible_to, ->(user) { where(user_id: [ nil, user.id ]) }
+  scope :visible_to, ->(user) { where(user_id: user.id) }
 
   def self.for(user, concept:, language:)
     seen_by(user, concept: concept, language: language)[[ concept, language ]]
   end
 
   def self.seen_by(user, **conditions)
-    visible_to(user).where(conditions).sort_by { |reference| reference.user_id ? 1 : 0 }
-                    .index_by { |reference| [ reference.concept, reference.language ] }
+    visible_to(user).where(conditions).index_by { |reference| [ reference.concept, reference.language ] }
   end
 
   def self.missing_for(user, pairs)

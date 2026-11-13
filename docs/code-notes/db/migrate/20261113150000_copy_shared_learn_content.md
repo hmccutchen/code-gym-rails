@@ -64,8 +64,9 @@ one user's copy, so this is rare.
 
 ## L5 runs it again
 
-L5's data migration copies again for every active account still missing a
-copy. The SQL lives here once, so L5 calls it rather than repeating it:
+L5's data migration (`CatchUpSharedLearnContentCopy`) copies again for every
+active account still missing a copy. The SQL lives here once, so L5 calls it
+rather than repeating it:
 
 ```ruby
 require_relative "20261113150000_copy_shared_learn_content"

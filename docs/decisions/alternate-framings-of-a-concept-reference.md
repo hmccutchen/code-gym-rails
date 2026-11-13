@@ -15,8 +15,9 @@ re-teaching a concept from zero, and that scoping is intentional.
 **Nothing is persisted** — not a row, not a column. The framings live in the
 tab that asked for them, exactly as the duck thread's turns do, and the cap is
 the same soft, request-level kind for the same reason (each user spends their
-own key). The shared `ConceptReference` row is read and never written, so one
-engineer asking for another angle cannot change what a teammate reads.
+own key). The user's `ConceptReference` row is read and never written, so
+asking for another angle never changes the stored reference. Each user reads
+only their own row (`learn-content-per-user.md`).
 Storing per user was considered and rejected as heavier than the value;
 storing on the reference itself would have made the cap a race between
 teammates and enlarged the cached artifact everyone reads. Accepted cost: a

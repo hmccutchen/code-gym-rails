@@ -60,7 +60,7 @@ RSpec.describe "Learn", type: :request do
 
     it "gives each entry its search words and keeps the reference text out of them" do
       user.update!(language: "ruby_rails")
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "Zanzibar loads every row.",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "Zanzibar loads every row.",
                                explanation: "One query per row.", code_example: "x", senior_lens: "y")
 
       get learn_path
@@ -138,6 +138,7 @@ RSpec.describe "Learn", type: :request do
     it "marks a concept with no row at all as not written yet, distinct from one with a reference but no guide" do
       user.update!(language: "ruby_rails")
       ConceptReference.create!(
+        user: user,
         concept: "memoization", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       )
@@ -194,7 +195,7 @@ RSpec.describe "Learn", type: :request do
     before { user.update!(language: "ruby_rails") }
 
     def create_guide(group_key)
-      RecognitionGuide.create!(group_key: group_key, questions: "Ask #{group_key} questions.",
+      RecognitionGuide.create!(user: user, group_key: group_key, questions: "Ask #{group_key} questions.",
                                contrast: "#{group_key} contrast.", misfires: "#{group_key} misfires.")
     end
 
@@ -231,15 +232,16 @@ RSpec.describe "Learn", type: :request do
       end
     end
 
-    it "renders the user's own guide over the shared one, and never another user's" do
-      create_guide("code_smell")
+    it "renders only the user's own guide, never a shared one or another user's" do
+      RecognitionGuide.create!(group_key: "code_smell", questions: "Shared questions.", contrast: "c", misfires: "m")
       RecognitionGuide.create!(group_key: "code_smell", questions: "My own questions.", contrast: "c", misfires: "m", user: user)
+      RecognitionGuide.create!(group_key: "data_modeling", questions: "Shared only questions.", contrast: "c", misfires: "m")
       teammate = User.create!(email: "guide-teammate@example.com")
       RecognitionGuide.create!(group_key: "architecture", questions: "Teammate questions.", contrast: "c", misfires: "m", user: teammate)
       get learn_path
 
       expect(group_block("ruby_rails", "code_smell").at_css(".learn-recognition").text).to include("My own questions.")
-      expect(response.body).not_to include("Ask code_smell questions.", "Teammate questions.")
+      expect(response.body).not_to include("Shared questions.", "Shared only questions.", "Teammate questions.")
     end
 
     it "renders no guide in a language bucket's core group" do
@@ -252,7 +254,7 @@ RSpec.describe "Learn", type: :request do
     it "offers the backfill when only guides are missing" do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
-          ConceptReference.create!(concept: concept, language: bucket,
+          ConceptReference.create!(user: user, concept: concept, language: bucket,
                                    tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
         end
       end
@@ -277,7 +279,7 @@ RSpec.describe "Learn", type: :request do
     it "offers no backfill once every concept and guide is written" do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
-          ConceptReference.create!(concept: concept, language: bucket,
+          ConceptReference.create!(user: user, concept: concept, language: bucket,
                                    tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
         end
       end
@@ -308,6 +310,7 @@ RSpec.describe "Learn", type: :request do
 
     def full_reference
       ConceptReference.create!(
+        user: user,
         concept: "n_plus_one", language: "ruby_rails",
         tagline: "TAGLINE", explanation: "EXPLANATION",
         code_example: "User.includes(:posts)", senior_lens: "SENIOR LENS",
@@ -370,6 +373,7 @@ RSpec.describe "Learn", type: :request do
 
     it "renders a legacy row's reference with a control to write the guide" do
       ConceptReference.create!(
+        user: user,
         concept: "n_plus_one", language: "ruby_rails",
         tagline: "TAGLINE", explanation: "EXPLANATION",
         code_example: "code", senior_lens: "SENIOR LENS"
@@ -482,7 +486,7 @@ RSpec.describe "Learn", type: :request do
       before { user.update!(language: "ruby_rails") }
 
       let!(:guided) do
-        ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+        ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
                                  guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
       end
@@ -547,7 +551,7 @@ RSpec.describe "Learn", type: :request do
     before { user.update!(language: "ruby_rails") }
 
     def reference(**attrs)
-      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!({ user: user, concept: "n_plus_one", language: "ruby_rails",
                                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s" }.merge(attrs))
     end
 
@@ -696,7 +700,7 @@ RSpec.describe "Learn", type: :request do
                                  code_example: "c", senior_lens: "s" }.merge(attrs))
     end
 
-    it "shows the user's own reference over the shared one, and never a teammate's" do
+    it "shows the user's own reference, never the shared one or a teammate's" do
       reference("SHARED TEXT")
       reference("TEAMMATE TEXT", user: teammate)
       reference("OWN TEXT", user: user)
@@ -707,14 +711,21 @@ RSpec.describe "Learn", type: :request do
       expect(response.body).not_to include("SHARED TEXT", "TEAMMATE TEXT")
     end
 
-    it "falls back to the shared reference while the user has none" do
+    it "shows no reference while the user has none, even when a shared row exists" do
       reference("SHARED TEXT")
       reference("TEAMMATE TEXT", user: teammate)
 
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
-      expect(response.body).to include("SHARED TEXT")
-      expect(response.body).not_to include("TEAMMATE TEXT")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("SHARED TEXT", "TEAMMATE TEXT")
+    end
+
+    it "offers to write up a concept only the shared row covers" do
+      reference("SHARED TEXT")
+
+      expect { post prepare_learn_path }
+        .to have_enqueued_job(GenerateConceptReferenceJob).with(hash_including(concept: "n_plus_one", user_id: user.id))
     end
 
     it "reports the user's own row on the write-up poll, not a teammate's" do
@@ -806,6 +817,7 @@ RSpec.describe "Learn", type: :request do
 
     it "skips a concept that already has a row" do
       ConceptReference.create!(
+        user: user,
         concept: "n_plus_one", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       )
@@ -818,6 +830,7 @@ RSpec.describe "Learn", type: :request do
 
     it "does not ask to refresh a guide-less row, since only a concept someone opens may be refreshed" do
       ConceptReference.create!(
+        user: user,
         concept: "memoization", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
       )
@@ -829,7 +842,7 @@ RSpec.describe "Learn", type: :request do
     end
 
     it "enqueues one job per recognition group with no guide" do
-      RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
+      RecognitionGuide.create!(user: user, group_key: "code_smell", questions: "q", contrast: "c", misfires: "m")
 
       expect {
         post prepare_learn_path
@@ -851,6 +864,7 @@ RSpec.describe "Learn", type: :request do
       (%w[ruby_rails] + ConceptBucket::LANGUAGE_INDEPENDENT).each do |bucket|
         ConceptBucket.vocabulary_for(bucket).each do |concept|
           ConceptReference.create!(
+            user: user,
             concept: concept, language: bucket,
             tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
           )
@@ -897,7 +911,7 @@ RSpec.describe "Learn", type: :request do
     it "enqueues only what remains after a partial run" do
       before_run = LadderCoverage.for(user).gaps
       concept, bucket = before_run.first
-      ConceptReference.create!(concept: concept, language: bucket,
+      ConceptReference.create!(user: user, concept: concept, language: bucket,
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
 
       expect {
@@ -921,7 +935,7 @@ RSpec.describe "Learn", type: :request do
 
     def guided_reference(**overrides)
       ConceptReference.create!(
-        { concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
+        { user: user, concept: "n_plus_one", language: "ruby_rails", tagline: twice, explanation: twice,
           code_example: "closure = 1", senior_lens: twice, guide_plain_language: twice,
           guide_pitfalls: twice,
           guide_worked_example: "a = 1\nb = 2\n\nA `closure` costs little; a closure is common and a closure is cheap." }.merge(overrides)
@@ -1044,7 +1058,7 @@ RSpec.describe "Learn", type: :request do
         guided_reference
         submit_set_showing(user, "n_plus_one", date: Date.current - 3)
         FeaturedConcept.for(user)
-        RecognitionGuide.create!(group_key: "code_smell", questions: twice, contrast: twice, misfires: twice)
+        RecognitionGuide.create!(user: user, group_key: "code_smell", questions: twice, contrast: twice, misfires: twice)
       end
 
       it "wraps the recognition guide and the featured tagline" do

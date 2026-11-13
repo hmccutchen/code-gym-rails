@@ -80,7 +80,7 @@ RSpec.describe "Learn write-up failures", type: :request do
 
     run_job_against(503, "<html>down</html>")
     expect(status_body["failed"]).to eq("outage")
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "t", explanation: "e", code_example: "c",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "t", explanation: "e", code_example: "c",
                              senior_lens: "s", guide_plain_language: "g", guide_worked_example: "w", guide_pitfalls: "p")
     expect(status_body).to eq("ready" => true)
   end

@@ -142,8 +142,9 @@ Each path writes nothing once the account is gone:
 - A recognition guide (`GenerateRecognitionGuideJob`) does the same: it
   share-locks the user before it writes its own row and writes nothing
   once the account is gone.
-- The one-time copy of shared Learn rows (`CopySharedLearnContent`, L4 of
-  `learn-content-per-user.md`) share-locks each user and checks the
+- The copy of shared Learn rows (`CopySharedLearnContent`, L4 of
+  `learn-content-per-user.md`, run again by L5's
+  `CatchUpSharedLearnContentCopy`) share-locks each user and checks the
   account is still active before copying to it, so a deletion either runs
   first and gets no copy, or waits and deletes the copies with the rest.
 

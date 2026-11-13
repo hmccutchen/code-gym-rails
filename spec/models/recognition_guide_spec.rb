@@ -71,25 +71,24 @@ RSpec.describe RecognitionGuide do
       expect(guide).not_to be_valid
     end
 
-    it "indexes the guides a user sees by group key, their own over the shared one, never another user's" do
+    it "indexes the user's own guides by group key, never the shared one or another user's" do
       create_guide(questions: "shared")
       own = create_guide(questions: "own", user: owner)
-      shared_only = create_guide(group_key: "architecture")
+      create_guide(group_key: "architecture")
       create_guide(group_key: "data_modeling", user: other)
 
-      expect(described_class.seen_by(owner, %w[code_smell architecture data_modeling]))
-        .to eq("code_smell" => own, "architecture" => shared_only)
-      expect(described_class.seen_by(other, %w[code_smell]).fetch("code_smell").questions).to eq("shared")
-      expect(described_class.visible_to(owner)).not_to include(described_class.find_by!(user: other))
+      expect(described_class.seen_by(owner, %w[code_smell architecture data_modeling])).to eq("code_smell" => own)
+      expect(described_class.seen_by(other, %w[code_smell])).to be_empty
+      expect(described_class.visible_to(owner)).to contain_exactly(own)
     end
 
-    it "lists the group keys a user sees no guide for, in the order given, ignoring another user's guide" do
+    it "lists the group keys a user has no guide of their own for, in the order given" do
       create_guide(group_key: "architecture")
       create_guide(group_key: "data_modeling", user: other)
       create_guide(user: owner)
 
       expect(described_class.missing_for(owner, %w[code_smell data_modeling architecture oo_design]))
-        .to eq(%w[data_modeling oo_design])
+        .to eq(%w[data_modeling architecture oo_design])
       expect(described_class.missing_for(owner, [])).to eq([])
     end
   end

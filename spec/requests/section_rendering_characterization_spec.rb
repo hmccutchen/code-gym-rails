@@ -246,7 +246,7 @@ RSpec.describe "section rendering", type: :request do
     let(:exercise) { exercise_for(:challenge, :plan_review) }
 
     before do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "SV-TAGLINE",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "SV-TAGLINE",
                                explanation: "SV-EXPLANATION", code_example: "SV-CODE", senior_lens: "SV-LENS")
       DailyResponse.create!(
         user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,

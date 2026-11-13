@@ -47,12 +47,13 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")).not_to be_valid
     end
 
-    it "gives a user their own row over the shared one, and the shared one when they have none" do
-      shared = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
+    it "gives a user only their own row, never the shared one" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
       own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: owner)
 
       expect(ConceptReference.for(owner, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
-      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to eq(shared)
+      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to be_nil
+      expect(ConceptReference.visible_to(other)).to be_empty
     end
 
     it "never gives one user another user's row" do
@@ -62,24 +63,25 @@ RSpec.describe ConceptReference do
       expect(ConceptReference.visible_to(other)).to be_empty
     end
 
-    it "indexes the rows a user sees by concept and language, own rows first" do
+    it "indexes the user's own rows by concept and language, leaving out shared and other users' rows" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
       own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: owner)
-      shared_only = ConceptReference.create!(concept: "caching", language: "ruby_rails")
+      ConceptReference.create!(concept: "caching", language: "ruby_rails")
       ConceptReference.create!(concept: "memoization", language: "ruby_rails", user: other)
 
       seen = ConceptReference.seen_by(owner, language: "ruby_rails")
 
-      expect(seen).to eq([ "n_plus_one", "ruby_rails" ] => own, [ "caching", "ruby_rails" ] => shared_only)
+      expect(seen).to eq([ "n_plus_one", "ruby_rails" ] => own)
     end
 
-    it "lists the pairs a user sees no reference for, in the order given, ignoring another user's row" do
+    it "lists the pairs a user has no reference of their own for, in the order given" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
       ConceptReference.create!(concept: "caching", language: "ruby_rails", user: other)
       ConceptReference.create!(concept: "closures", language: "javascript", user: owner)
       pairs = [ [ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ], [ "closures", "javascript" ], [ "memoization", "ruby_rails" ] ]
 
-      expect(ConceptReference.missing_for(owner, pairs)).to eq([ [ "caching", "ruby_rails" ], [ "memoization", "ruby_rails" ] ])
+      expect(ConceptReference.missing_for(owner, pairs))
+        .to eq([ [ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ], [ "memoization", "ruby_rails" ] ])
       expect(ConceptReference.missing_for(owner, [])).to eq([])
     end
 

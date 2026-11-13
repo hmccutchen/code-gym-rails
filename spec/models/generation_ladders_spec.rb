@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe GenerationLadders do
   let(:user) { User.create!(email: "ladders@example.com") }
 
-  it "reads the user's own ladder over the shared one, falls back to the shared one, and never reads another user's" do
+  it "reads only the user's own ladder, never the shared one or another user's" do
     rungs = { ladder_junior: "j", ladder_mid_level: "m", ladder_principal_engineer: "p" }
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "shared", **rungs)
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "own", user: user, **rungs)
@@ -14,15 +14,16 @@ RSpec.describe GenerationLadders do
     ladder = described_class.for(user, { ExerciseSection::Challenge => "senior" }, "ruby_rails", :application_code)
                             .fetch(ExerciseSection::Challenge)
 
-    expect(ladder).to include("n_plus_one" => "own", "caching" => "shared caching")
+    expect(ladder).to include("n_plus_one" => "own")
+    expect(ladder).not_to have_key("caching")
     expect(ladder).not_to have_key("memoization")
   end
 
   it "loads each kind's rungs at its level for the day's mode and retains their owners" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
     schema_concept = ConceptVocabulary::DATA_MODELING_CONCEPTS.first
-    ConceptReference.create!(concept: schema_concept, language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: schema_concept, language: "ruby_rails",
                              ladder_junior: "j2", ladder_mid_level: "m", ladder_senior: "s2", ladder_principal_engineer: "p2")
     rungs = { ExerciseSection::CodeReview => "senior", ExerciseSection::Challenge => "senior" }
 
@@ -37,7 +38,7 @@ RSpec.describe GenerationLadders do
   it "leaves the week's featured concept out of a kind that hides its concept, and keeps it for a kind that shows it" do
     hidden, shown = ConceptVocabulary::PLAN_REVIEW_CONCEPTS.first(2)
     [ [ hidden, "plan_review" ], [ shown, "plan_review" ], [ "n_plus_one", "ruby_rails" ] ].each do |concept, bucket|
-      ConceptReference.create!(concept: concept, language: bucket,
+      ConceptReference.create!(user: user, concept: concept, language: bucket,
                                ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
     end
     rungs = { ExerciseSection::PlanReview => "senior", ExerciseSection::Challenge => "senior" }
@@ -53,9 +54,9 @@ RSpec.describe GenerationLadders do
   end
 
   it "skips a row with no ladder and truncates a rung on read" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                              ladder_junior: "x" * 500, ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
-    ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_junior: "j")
+    ConceptReference.create!(user: user, concept: "caching", language: "ruby_rails", ladder_junior: "j")
     rungs = described_class.for(user, { ExerciseSection::CodeReview => "junior" }, "ruby_rails", :application_code).fetch(ExerciseSection::CodeReview)
 
     expect(rungs.fetch("n_plus_one").length).to eq(ConceptReference::MAX_LADDER_RUNG_LENGTH)
@@ -69,7 +70,7 @@ RSpec.describe GenerationLadders do
     let(:gotcha) { BugHuntGotchas.find("rb_delete_while_each") }
     let(:rungs) { { bug => principal, challenge => principal } }
     let(:reference) do
-      ConceptReference.create!(concept: gotcha.concept, language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: gotcha.concept, language: "ruby_rails",
         ladder_junior: "Find the visible removal during iteration.", ladder_mid_level: "Trace consecutive elements.",
         ladder_senior: "Account for adjacent even elements being skipped during traversal.",
         ladder_principal_engineer: "Weigh mutation against copying across service boundaries and their allocation costs.")
@@ -131,7 +132,7 @@ RSpec.describe GenerationLadders do
 
     it "keeps picked-gotcha and challenge-only guidance under their actual owners at the same effective rung" do
       reference
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
         ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "Trace the repeated query.", ladder_principal_engineer: "p")
       placed = { bug => "senior", challenge => "senior" }
       ladders = described_class.for(user, placed, "ruby_rails", :bug_hunt, gotcha: gotcha)

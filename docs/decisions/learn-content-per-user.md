@@ -35,7 +35,8 @@ A user's own rows go when the account is deleted
 read and write goes through `user_id`, so deletion finds the concept
 references a user has written. Since L3 the same holds for recognition
 guides. Shared rows have no
-`user_id`, so deletion leaves them alone until L5 removes them.
+`user_id`, so deletion leaves them alone. Since L5 nobody reads them, and
+the schema step after L5 removes them.
 
 ## Order and deploy gates
 
@@ -66,7 +67,11 @@ ships one release before any code reads it for Learn
      code note, since deletion starts removing a person's write-ups here.
      The privacy page is not on L2's base: it arrives with PR #785. These
      copy changes land in the first pull request opened after both #785
-     and L2 are merged, so this item is still open;
+     and L2 are merged, so this item is still open. Since L5 no user reads
+     a shared write-up, so that pull request also removes the sentence
+     "Concept write-ups your key wrote before Learn became personal are
+     shared with everyone and stay until they are retired" from the privacy
+     page. L5 does not edit the page, which is not on its branch;
    - update the locale strings that say the wording is shared: Learn's
      `ladder_offer` and `lesson_offer`, and the bulk preparation copy
      (`prepare_cost`, `ladders_cost`) that says what it writes is shared with
@@ -92,9 +97,9 @@ ships one release before any code reads it for Learn
    after the copy. L3b writes no shared row, so the gate does not name it;
    the branches stack, so L4 ships with L3b anyway. This is the one
    statement of the gate. "What L4 does" below has the details.
-6. **L5, drop the shared fallback, then tighten the schema.** The pull
-   request that removes the fallback also carries a data migration that
-   runs the L4 copy again for every active account still missing a copy.
+6. **L5, drop the shared fallback (done), then tighten the schema (not
+   started).** The pull request that removes the fallback also carries a
+   data migration that runs the L4 copy again for every active account still missing a copy.
    It runs in the web pre-deploy step, while the code still serving reads
    the shared rows, so every account that exists before the new code serves
    has its own copy first. Nobody loses text they could see. An account
@@ -103,9 +108,17 @@ ships one release before any code reads it for Learn
    its own. L5's migration must declare `disable_ddl_transaction!`, so the
    copy commits one user at a time; `copy_to_active_users` raises if it is
    called inside a transaction, which would hold every user's lock until
-   the end. A later migration then removes the shared rows, drops the
-   partial indexes and makes `user_id` non-null. It runs after L5's copy,
-   since the copy's SQL needs the per-user unique indexes.
+   the end. "What L5 does" below has the details.
+
+   The schema step is a later, separate pull request. Its migration deletes
+   the shared rows, drops the two partial unique indexes over rows with no
+   user, makes `user_id` NOT NULL on both tables, and makes `belongs_to
+   :user` required on both models. It keeps the per-user unique indexes. Its
+   deploy gate: L5 runs on both web and worker. Until then an L4 web or
+   worker still reads the shared rows, so deleting them earlier would take
+   text away from a page or skip a write-up on old code's say-so. It must
+   also run after L5's catch-up copy, which needs the shared rows to copy
+   from.
 
 ## What L2 does
 
@@ -115,7 +128,7 @@ ships one release before any code reads it for Learn
   user's. Learn, the dashboard and History inline reference, the featured
   callout, the review's short version, generation's ladders
   (`GenerationLadders.for(user, ...)`), `LadderCoverage` and
-  `explain_differently` read through them. L5 drops the shared half.
+  `explain_differently` read through them. L5 dropped the shared half.
 - `GenerateConceptReferenceJob` writes only the user's own row. A user with
   only the shared row who asks for a rewrite gets a new row of their own,
   numbered past the shared row's `generation_version` so the Learn poll sees
@@ -143,7 +156,8 @@ ships one release before any code reads it for Learn
   `GenerateConceptReferenceJob.queue_missing`.
 - "Own wins" is decided per row, not per field. A user whose own row has no
   ladder sees that row, so a shared row's ladder for the same concept stays
-  hidden from them until they refresh it or L5 removes the shared rows.
+  hidden from them until they refresh it. Since L5 the shared row is never
+  read, so this no longer arises.
   Mixing fields from two rows would show a ladder written for different
   text, so this is accepted.
 
@@ -153,7 +167,7 @@ ships one release before any code reads it for Learn
   guide a user sees: their own row, else the shared one, never another
   user's. Learn's index reads it, and `RecognitionGuide.missing_for(user,
   group_keys)` decides which guides the prepare button queues. No endpoint
-  finds a guide by id, so there is no cross-user path to close. L5 drops
+  finds a guide by id, so there is no cross-user path to close. L5 dropped
   the shared half.
 - The uniqueness validation on `group_key` is scoped to `user_id`.
 - `GenerateRecognitionGuideJob` keys its permit on user and group key. It
@@ -234,13 +248,53 @@ ships one release before any code reads it for Learn
 - An anonymized account gets nothing.
 - A row the user already owns stays as it is (the end of "The deploy window
   between L2 and L3").
-- It removes no shared row and leaves the fallback in place; that is L5.
+- It removes no shared row and leaves the fallback in place; L5 removes the
+  fallback, and the schema step after it removes the rows.
 - `down` does nothing: a copied row cannot be told apart from one the user
   wrote, and deleting it would delete user data.
 - Its deploy gate is step 5 above.
 - How it runs (one user at a time, the lock order with account deletion,
   the race with a write-up job, and how L5 calls it again) is in
   `docs/code-notes/db/migrate/20261113150000_copy_shared_learn_content.md`.
+
+## What L5 does
+
+- `ConceptReference.visible_to`, `.for`, `.seen_by` and `.missing_for`, and
+  `RecognitionGuide.visible_to`, `.seen_by` and `.missing_for`, read only
+  the user's own rows. A shared row and another user's row are never read.
+  The method names stay, so Learn, the inline references, the review's
+  short version, `explain_differently`, `GenerationLadders`,
+  `LadderCoverage` and the prepare buttons change nothing. With one row per
+  user and key, the "own wins over shared" sort is gone.
+- `GenerateConceptReferenceJob` writes a user's first row with
+  `generation_version` 1. A rewrite only asks for a row the page showed,
+  which is the user's own, and adds one to its number, so the Learn poll
+  still sees it land.
+- `GenerateRecognitionGuideJob` skips only when the user has their own
+  guide. A user with only the shared guide gets their own written.
+- The admin promote check (`ConceptReference.written_up?` and
+  `.written_up_keys`) still counts any row, as L2 decided.
+- The data migration `CatchUpSharedLearnContentCopy` runs L4's
+  `CopySharedLearnContent.copy_to_active_users` again, so an account created
+  after L4's copy, while L4 code served, gets its copy before the fallback
+  goes. Its code note is
+  `docs/code-notes/db/migrate/20261113170000_catch_up_shared_learn_content_copy.md`.
+- Learn's `ladder_offer`, `lesson_offer` and `ladders_cost` say the call
+  rewrites the reference, no longer that it writes "your own version",
+  since every reference a user sees is already theirs.
+
+## The deploy window between L4 and L5
+
+Railway does not order the web and worker deploys. During the rollout a web
+or worker still on L4 code reads the shared rows as a fallback, while L5
+code reads only own rows. The catch-up copy runs in the web pre-deploy, so by
+the time any L5 code serves, every account that existed then owns a copy,
+and both versions show it the same text. An account created during the
+deploy, after the catch-up and before the new code serves, gets no copy: L4
+code shows it the shared text, and L5 code shows it what any new account
+sees and writes its own. An L4 worker may also skip such an account's
+write-up because it sees the shared row; it is queued again on the next
+submit or Learn press. This lasts for one deploy, so it is accepted.
 
 ## The deploy window between L1 and L2
 

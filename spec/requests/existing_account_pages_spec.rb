@@ -115,10 +115,10 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
 
   it "renders learn with its featured concept, prepare box, drill and recognition guide unchanged" do
     submit_set_showing(user, "n_plus_one", date: Date.current - 1)
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "T",
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", tagline: "T",
                              explanation: "E", code_example: "x", senior_lens: "S")
     ConceptDrills.start!(user, concept: "n_plus_one", bucket: "ruby_rails")
-    RecognitionGuide.create!(group_key: "code_smell", questions: "Q", contrast: "C", misfires: "M")
+    RecognitionGuide.create!(user: user, group_key: "code_smell", questions: "Q", contrast: "C", misfires: "M")
     get learn_path
     expect_snapshot("learn")
   end

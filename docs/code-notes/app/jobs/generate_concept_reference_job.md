@@ -3,12 +3,13 @@
 ## Whose row it writes
 
 The job writes only the user's own row (`docs/decisions/learn-content-per-user.md`).
-It skips the call when the reference the user sees, their own or the shared
-one, is fully written, or when it exists and this is not a refresh. A user
-who sees only the shared row and asks for a rewrite gets a new row of their
-own. Its `generation_version` starts one past the shared row's, because the
-Learn poll compares against the version the page showed and would otherwise
-never see the rewrite land. The shared row is never written.
+It skips the call when the user's own reference is fully written, or when it
+exists and this is not a refresh. Since L5 no shared row is read, so a user
+with no row of their own gets a new one with `generation_version` 1, the
+first write. A rewrite only ever asks for a row the page already showed,
+which is the user's own; it adds one to that row's number, and the Learn poll
+compares against the number the page showed, so it sees the rewrite land. A
+shared row is never written.
 
 ## Concurrency
 

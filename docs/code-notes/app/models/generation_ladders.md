@@ -4,9 +4,9 @@ Moved out of `AiService` (#431).
 
 ## `.for`
 
-Reads the ladders of the reference the user sees (`ConceptReference.seen_by`):
-their own row, else the shared one. A user whose own row has no ladder gets
-none for that concept, even when the shared row has one. It reads nothing of
+Reads the ladders of the user's own reference (`ConceptReference.seen_by`).
+A user whose row has no ladder gets none for that concept, whatever another
+row holds. It reads nothing of
 the user but the id, so `level_suggestion_isolation_spec` and
 `trial_isolation_spec` hold.
 
