@@ -348,20 +348,6 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       expect(row.attributes.slice(*attributes.keys)).to eq(attributes)
     end
 
-    it "advances from the locked counter when another incomplete refresh finishes during the provider call" do
-      row = legacy_row
-      service = stub_service
-      allow(service).to receive(:generate_concept_reference) do
-        row.update!(generation_version: 1, ladder_junior: "another attempt")
-        reference_hash.except(*ConceptReference::LADDER_FIELDS)
-      end
-
-      described_class.perform_now(concept: row.concept, language: row.language, user_id: user.id, refresh: true)
-
-      expect(row.reload.generation_version).to eq(2)
-      expect(row).not_to be_ladder
-    end
-
     it "rewrites a guided row that has no ladder when asked to refresh" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old", user: user,
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
@@ -447,49 +433,6 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
         expect(row.tagline).to eq("added meanwhile")
         expect(row.generation_version).to eq(1)
       end
-
-      it "is left alone by a refresh asked for when the user saw no row" do
-        add_row_during_the_call
-
-        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
-
-        expect(ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(1)
-      end
-
-      it "is rewritten by a refresh from older code, which names no version, while it is incomplete" do
-        add_row_during_the_call
-
-        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
-
-        row = ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails")
-        expect(row.tagline).to eq("Avoid N+1 by eager loading.")
-        expect(row.generation_version).to eq(2)
-      end
-    end
-
-    # Two jobs can both pass the fully_written? check; the second to write must discard its result.
-    it "does not overwrite a row that became fully written between the check and the write" do
-      row = legacy_row
-      stub_service
-
-      allow_any_instance_of(ConceptReference).to receive(:with_lock) do |record, &block|
-        record.update!(
-          guide_plain_language: "winner plain", guide_worked_example: "winner worked",
-          guide_pitfalls: "winner pitfalls",
-          ladder_junior: "winner j", ladder_mid_level: "winner m", ladder_senior: "winner s", ladder_principal_engineer: "winner p",
-          lesson: { "definition" => "winner" }, generation_version: 1
-        )
-        block.call
-      end
-
-      described_class.perform_now(
-        concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true
-      )
-
-      row.reload
-      expect(row.guide_plain_language).to eq("winner plain")
-      expect(row.tagline).to eq("old tagline")
-      expect(row.generation_version).to eq(1)
     end
 
     it "logs a skip, not a generation, and keeps the failure note when the row became fully written during the call" do

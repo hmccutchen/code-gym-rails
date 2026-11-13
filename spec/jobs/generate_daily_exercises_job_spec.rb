@@ -549,6 +549,19 @@ RSpec.describe GenerateDailyExercisesJob do
       end
     end
 
+    it "still enqueues one, and finishes cleanly, when queueing the set's write-ups fails after the set is saved" do
+      stub_generation_for(pac)
+      allow(GenerateConceptReferenceJob).to receive(:queue_missing).and_raise(SolidQueue::Job::EnqueueError, "PG::ConnectionBad")
+      allow(Rails.logger).to receive(:warn)
+
+      travel_to(Time.utc(2026, 7, 13, 15, 0)) do
+        expect { described_class.new.perform(user_id: pac.id, scheduled: true) }
+          .to have_enqueued_job(SendPushReminderJob).with(user_id: pac.id).once
+      end
+      expect(pac.daily_exercises.count).to eq(1)
+      expect(Rails.logger).to have_received(:warn).with(/Could not queue concept write-ups for user #{pac.id}.*PG::ConnectionBad/)
+    end
+
     it "records a scheduled job's provider failure as today's and enqueues none" do
       stub_provider_failure(ProviderError::RateLimitError, "rate limited", pac)
       allow(Rails.logger).to receive(:error)

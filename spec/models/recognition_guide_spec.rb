@@ -115,4 +115,34 @@ RSpec.describe RecognitionGuide do
       expect { described_class.update_all(field => nil) }.to raise_error(ActiveRecord::NotNullViolation)
     end
   end
+
+  describe ".write_for" do
+    let(:writer) { User.create!(email: "guide-writer@example.com") }
+    let(:reply) { { "questions" => "q", "contrast" => "c", "misfires" => "m", "extra" => "dropped" } }
+
+    def write = described_class.write_for(writer, group_key: "code_smell", guide: reply)
+
+    it "creates the user's own guide from the guide's fields" do
+      expect(write).to eq(:written)
+
+      row = described_class.sole
+      expect([ row.user, row.group_key, row.questions, row.contrast, row.misfires ]).to eq([ writer, "code_smell", "q", "c", "m" ])
+    end
+
+    it "writes nothing for an account deleted before the write" do
+      User.where(id: writer.id).delete_all
+
+      expect(write).to eq(:account_deleted)
+      expect(described_class.count).to eq(0)
+    end
+
+    it "share-locks the owner before it inserts" do
+      pattern = /FOR SHARE|INSERT INTO "recognition_guides"/
+      statements = []
+      subscriber = ->(*, payload) { statements << payload[:sql][pattern] if payload[:sql].match?(pattern) }
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { write }
+
+      expect(statements).to eq([ "FOR SHARE", 'INSERT INTO "recognition_guides"' ])
+    end
+  end
 end

@@ -291,10 +291,11 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
   what the prompt says each group is about. `.seen_by` and `.visible_to`
   answer which guide a user sees: their own only;
   `.missing_for` lists the group keys a user has no guide of their own for,
-  and `.written_for?` asks about one key.
+  and `.written_for?` asks about one key. `.write_for` saves a reply as the
+  user's own guide under a share lock on the user.
 - `app/jobs/generate_recognition_guide_job.rb` — writes one missing
-  recognition guide as the user's own row; the same per-user permit and
-  write under a share lock on the user as `GenerateConceptReferenceJob`.
+  recognition guide as the user's own row through `RecognitionGuide.write_for`,
+  with a per-user permit like `GenerateConceptReferenceJob`'s.
 - `app/models/concept_group.rb` — `ConceptGroup`: which display group a
   concept renders under on the Learn index, and the order groups appear in.
   Display-only, its groups and their order derived from `ConceptVocabulary::GROUPS`
@@ -343,7 +344,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/clients/unfinished_jobs.rb` — `UnfinishedJobs`: deletes the Solid Queue jobs that have not started and whose arguments name a given user or record
 - `app/clients/lazy_cache_store.rb` — `LazyCacheStore`: forwards `increment` to `Rails.cache` at call time, so `rate_limit` (which binds its store at class load) still sees a store that specs swap in.
 - `app/jobs/application_job.rb` — `ApplicationJob`: the base class every background job inherits from; `#unless_account_deleted` stops a job quietly when its account is deleted mid-run.
-- `app/jobs/generate_concept_reference_job.rb` — `GenerateConceptReferenceJob`: asks the user's provider for a concept's reference, guide, ladder and lesson, and writes or completes that user's own `ConceptReference` row, under the user's share lock so a deleted account gets nothing. It queues one job per priority, user, concept and language, lets one running job per user, concept and language make the call (`AdvisoryLock`, keyed by `.claim_key`), records provider and setup failures through `ConceptReferenceFailures`, `.queue_missing` queues the write-ups a set's concepts lack, and `.queue_rewrites` queues Learn's refreshes with the version each one was asked against.
+- `app/jobs/generate_concept_reference_job.rb` — `GenerateConceptReferenceJob`: asks the user's provider for a concept's reference, guide, ladder and lesson, and saves it through `ConceptReference.write_for`. It queues one job per priority, user, concept and language, lets one running job per user, concept and language make the call (`AdvisoryLock`, keyed by `.claim_key`), records provider and setup failures through `ConceptReferenceFailures`, `.queue_missing` queues the write-ups a set's concepts lack, `.queue_for_new_set` does so for a just-saved set and logs an enqueue failure instead of failing the set's job, and `.queue_rewrites` queues Learn's refreshes with the version each one was asked against.
 - `app/mailers/application_mailer.rb` — `ApplicationMailer`: base mailer that sets the `from` address (`MAIL_FROM`, with a default) and the shared mailer layout, and ends a queued mail whose records were deleted instead of failing the job.
 - `app/mailers/review_mailer.rb` — `ReviewMailer`: `#send_review` emails a completed AI review to the response owner's own address on request, with the date in the subject.
 - `app/mailers/user_mailer.rb` — `UserMailer`: sends the login code email, minting the code inside the mailer so it never becomes a job argument, and the notice that a second factor changed (`SECOND_FACTOR_CHANGES` lists the allowed changes).
@@ -353,7 +354,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/concept_mastery/daily_evidence.rb` — `ConceptMastery::DailyEvidence`: projects accepted same-concept/bucket daily assessment evidence and retryable siblings.
 - `app/models/concept_mastery/transition.rb` — `ConceptMastery::Transition`: pure current-policy mastery, countdown, skip and drill transitions with explicit clocks.
 - `app/models/concept_mastery/reconciliation.rb` — `ConceptMastery::Reconciliation`: validates and replaces versioned correction suffixes, compacts irrevocable prefixes and exposes restorable drill intent.
-- `app/models/concept_reference.rb` — `ConceptReference`: the stored reference, guide, ladder and lesson text for one concept and language. It is the authority for the field lists (`REFERENCE_FIELDS`, `GUIDE_FIELDS`, `LADDER_FIELDS`, and `WRITTEN_FIELDS`, all one call writes) and for when a row counts as `fully_written?`. `.for`, `.seen_by` and `.visible_to` answer which row a user sees: their own only; `.missing_for` lists the pairs a user has no row of their own for, and `.written_up?` and `.written_up_keys` answer whether any user's row exists, for the admin promote check.
+- `app/models/concept_reference.rb` — `ConceptReference`: the stored reference, guide, ladder and lesson text for one concept and language. It is the authority for the field lists (`REFERENCE_FIELDS`, `GUIDE_FIELDS`, `LADDER_FIELDS`, and `WRITTEN_FIELDS`, all one call writes) and for when a row counts as `fully_written?`. `.for`, `.seen_by` and `.visible_to` answer which row a user sees: their own only; `.missing_for` lists the pairs a user has no row of their own for, and `.written_up?` and `.written_up_keys` answer whether any user's row exists, for the admin promote check. `.write_for` saves a reply as the user's own row under the user's share lock, then the row lock, and `.write_wanted?` says when a write is still wanted.
 - `app/models/concerns/.keep` — empty placeholder that keeps the `concerns` directory in git.
 - `app/models/daily_exercise.rb` — `DailyExercise`: one user's generated problem set for a date. It holds the plan notes, the regeneration claim and its deadline constants, and the readers for the planned size, coverage, draft scope and the concept and bucket pairs its sections carry.
 - `app/models/daily_response.rb` — `DailyResponse`: one user's answers, ratings and AI review for a date's exercise. It is the authority for the rating vocabularies, the per-section caps on alternates and follow-ups, the `AI_REVIEW_FIELDS` shape, and what counts as submitted or reviewed.

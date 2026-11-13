@@ -24,8 +24,9 @@ click ever waits behind a queued guide.
 
 ## An account deleted during the call
 
-The provider call runs outside any lock. Before writing, the job share-locks
-the user row, the lock `AccountDeletion` takes for update. If deletion
+The provider call runs outside any lock. The save is
+`RecognitionGuide.write_for` (issue #790), which share-locks the user row
+before it inserts, the lock `AccountDeletion` takes for update. If deletion
 committed first, the user is gone and the job writes nothing, so the insert
 never fails on the foreign key. If the write committed first, deletion waits
 for it and then deletes the new row with the rest of the account. Either way

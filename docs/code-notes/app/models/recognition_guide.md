@@ -14,3 +14,11 @@ about one key without loading the row, for `GenerateRecognitionGuideJob`.
 The validation on `group_key` is scoped to `user_id`, matching the unique
 index on `(user_id, group_key)`. `user_id` is NOT NULL, so that index
 covers every row.
+
+## `.write_for`
+
+Saves one provider reply as the user's own guide, keeping only `FIELDS`,
+and returns `:written` or `:account_deleted`. It share-locks the user row
+first, as `AccountDeletion` locks it, so a deleted account gets no guide.
+A guide is never rewritten, so a second insert fails on the unique index
+and `GenerateRecognitionGuideJob` logs the skip.

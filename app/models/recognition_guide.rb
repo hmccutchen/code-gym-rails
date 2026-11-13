@@ -38,6 +38,15 @@ class RecognitionGuide < ApplicationRecord
     visible_to(user).exists?(group_key: group_key)
   end
 
+  def self.write_for(user, group_key:, guide:)
+    User.transaction do
+      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
+
+      create!(guide.slice(*FIELDS).merge("group_key" => group_key, "user_id" => user.id))
+      :written
+    end
+  end
+
   def self.missing_for(user, group_keys)
     return [] if group_keys.empty?
 

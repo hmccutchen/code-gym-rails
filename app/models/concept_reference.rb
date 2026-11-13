@@ -37,6 +37,37 @@ class ConceptReference < ApplicationRecord
     where(language: languages).distinct.pluck(:language, :concept).to_set
   end
 
+  def self.write_wanted?(seen, refresh:, seen_version:)
+    return false unless seen_version.nil? || seen_version == (seen&.generation_version || 0)
+
+    seen.nil? || (refresh && !seen.fully_written?)
+  end
+
+  # The owner is share-locked before the row, as AccountDeletion locks it, so a deleted account gets nothing.
+  def self.write_for(user, concept:, language:, attributes:, refresh:, seen_version:)
+    written = WRITTEN_FIELDS.index_with { |field| attributes[field] }
+
+    User.transaction do
+      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
+
+      own = self.for(user, concept: concept, language: language)
+      next rewrite(own, written, refresh:, seen_version:) if own
+
+      create!(written.merge("user_id" => user.id, "concept" => concept, "language" => language, "generation_version" => 1))
+      :written
+    end
+  end
+
+  def self.rewrite(own, written, refresh:, seen_version:)
+    own.with_lock do
+      next :skipped unless write_wanted?(own, refresh:, seen_version:)
+
+      own.update!(written.merge(generation_version: own.generation_version + 1))
+      :written
+    end
+  end
+  private_class_method :rewrite
+
   # Derived from the field list; a partly blank guide answers false so the row is regenerated whole.
   def guide?
     GUIDE_FIELDS.all? { |field| public_send(field).present? }

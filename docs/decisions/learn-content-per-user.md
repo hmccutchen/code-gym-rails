@@ -244,7 +244,7 @@ ships one release before any code reads it for Learn
 - During the deploy, an L3 worker can run a job beside an L3b one for the
   same concept, and the L3 job takes no claim, so both may call. That is
   one extra write-up call at most, for one deploy, and the row lock in
-  `#rewrite` and the unique index still keep one row. It needs no gate.
+  `ConceptReference.write_for` and the unique index still keep one row. It needs no gate.
 - `GenerateRecognitionGuideJob` keeps its permit with discard and takes no
   claim. Only the bulk press queues a guide, so no click waits on one, and
   its unique index stops a second row when the permit is bypassed.

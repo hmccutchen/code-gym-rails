@@ -63,11 +63,11 @@ CONFLICT` skips that row and the job's row stays. If the copy inserts first,
 the outcome depends on the job:
 
 - `GenerateConceptReferenceJob` reads the user's own row again under its
-  claim and again inside `write_own`. Once it sees the copy, a plain job
+  claim and again inside `ConceptReference.write_for`. Once it sees the copy, a plain job
   skips it, and a refresh skips a fully written copy or rewrites an
   incomplete one and raises its `generation_version` by one. Its provider
   call is wasted unless it rewrites. Only a copy that commits between
-  `write_own`'s read and its insert makes the insert raise
+  `ConceptReference.write_for`'s read and its insert makes the insert raise
   `RecordNotUnique`, which the job rescues and logs.
 - `GenerateRecognitionGuideJob` checks for a guide only before its provider
   call and inserts without reading again, so a copy that commits during the

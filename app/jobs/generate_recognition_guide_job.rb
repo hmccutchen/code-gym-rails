@@ -16,7 +16,7 @@ class GenerateRecognitionGuideJob < ApplicationJob
 
     # ApiUsage dates the call with Date.current, which must be the user's day.
     guide = Time.use_zone(user.effective_time_zone) { AiService.for(user).generate_recognition_guide(user, group_key) }
-    if write_own(user, group_key, guide)
+    if RecognitionGuide.write_for(user, group_key: group_key, guide: guide) == :written
       Rails.logger.info("Generated recognition guide for #{group_key}")
     else
       Rails.logger.info("Stopped recognition guide #{group_key} for user #{user_id}: the account was deleted")
@@ -30,16 +30,5 @@ class GenerateRecognitionGuideJob < ApplicationJob
     Rails.logger.warn("Failed to generate recognition guide for #{group_key}: #{e.message}")
   rescue SetupError => e
     Rails.logger.error("Setup error generating recognition guide #{group_key} for user #{user_id}: #{e.message}")
-  end
-
-  private
-
-  def write_own(user, group_key, guide)
-    User.transaction do
-      next false unless User.active.lock("FOR SHARE").exists?(id: user.id)
-
-      RecognitionGuide.create!(guide.slice(*RecognitionGuide::FIELDS).merge("group_key" => group_key, "user_id" => user.id))
-      true
-    end
   end
 end

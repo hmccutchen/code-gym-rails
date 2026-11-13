@@ -7,6 +7,13 @@ says why it was removed in #792). A press is paid for with the account's own
 key; a trial account is refused before anything is queued
 (`User#writes_learn_content?`).
 
+## `@writes_learn_content`
+
+A `before_action` asks `User#writes_learn_content?` once per request, and
+the actions and the `learn/index` and `learn/show` views read the answer, so
+one page never asks the trial question twice (#790). `#status` skips it,
+since a poll never needs it.
+
 ## `#bulk`
 
 One press of `#prepare` or `#prepare_ladders` can queue about 90 jobs on

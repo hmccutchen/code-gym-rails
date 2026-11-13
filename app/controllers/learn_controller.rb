@@ -3,6 +3,8 @@ class LearnController < ApplicationController
 
   helper_method :encountered?
 
+  before_action :decide_learn_writes, except: :status
+
   def index
     @references = references_by_key
     @drills     = ConceptDrills.for(current_user)
@@ -53,7 +55,7 @@ class LearnController < ApplicationController
   def prepare_concept
     bucket  = validated_bucket
     concept = validated_concept(bucket)
-    return head :forbidden unless current_user.writes_learn_content?
+    return head :forbidden unless @writes_learn_content
 
     ConceptReferenceFailures.clear(user_id: current_user.id, concept: concept, language: bucket)
     GenerateConceptReferenceJob.queue_rewrites(current_user, [ [ concept, bucket ] ])
@@ -63,7 +65,7 @@ class LearnController < ApplicationController
 
   # POST /learn/prepare
   def prepare
-    return redirect_to learn_path unless current_user.writes_learn_content?
+    return redirect_to learn_path unless @writes_learn_content
 
     GenerateConceptReferenceJob.queue_missing(current_user, learn_pairs, priority: JobPriority::BACKGROUND)
 
@@ -76,7 +78,7 @@ class LearnController < ApplicationController
 
   # POST /learn/prepare_ladders
   def prepare_ladders
-    gaps = current_user.writes_learn_content? ? LadderCoverage.for(current_user).gaps : []
+    gaps = @writes_learn_content ? LadderCoverage.for(current_user).gaps : []
 
     GenerateConceptReferenceJob.queue_rewrites(current_user, gaps, priority: JobPriority::BACKGROUND)
 
@@ -84,6 +86,10 @@ class LearnController < ApplicationController
   end
 
   private
+
+  def decide_learn_writes
+    @writes_learn_content = current_user.writes_learn_content?
+  end
 
   def bulk(job) = job.set(priority: JobPriority::BACKGROUND)
 
@@ -98,7 +104,7 @@ class LearnController < ApplicationController
   end
 
   def ladder_targets_for(reference)
-    return [] unless current_user.writes_learn_content? && reference&.guide? && !reference.ladder?
+    return [] unless @writes_learn_content && reference&.guide? && !reference.ladder?
 
     LadderCoverage.for(current_user).grounding_kinds(reference.concept, reference.language)
                   .map { |kind| t("sections.#{kind.key}.name") }
