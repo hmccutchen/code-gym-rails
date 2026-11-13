@@ -12,7 +12,7 @@ The owner decided:
 - **Content is per user.** Each user has their own `ConceptReference` rows,
   keyed on user, concept and language.
 - **Recognition guides are per user too**, keyed on user and group key.
-- **Existing shared rows are copied to every current user once, then
+- **Existing shared rows are copied to every current user, then
   removed.** Nobody loses text they can see today, and nobody pays for it
   again. The copy goes to active accounts only, never to an anonymized one.
 - **The automatic write-up on submit stays.** Submitting a day still queues
@@ -77,11 +77,16 @@ ships one release before any code reads it for Learn
 4. **L4, copy shared rows.** Copies every shared row to every active
    account. Waits until L2 (and L3 for guides) is deployed on both web and
    worker, so no old writer creates a shared row after the copy.
-5. **L5, drop the shared fallback, then tighten the schema.** The code stops
-   reading shared rows first. Immediately before the shared rows are
-   removed, the L4 copy runs again for accounts created since L4, so nobody
-   loses text they could see. A later migration then removes the shared
-   rows, drops the partial indexes and makes `user_id` non-null.
+5. **L5, drop the shared fallback, then tighten the schema.** The pull
+   request that removes the fallback also carries a data migration that
+   runs the L4 copy again for every active account still missing a copy.
+   It runs in the web pre-deploy step, while the code still serving reads
+   the shared rows, so every account that exists before the new code serves
+   has its own copy first. Nobody loses text they could see. An account
+   created during that deploy, after the copy and before the new code
+   serves, gets no copy; it sees what any new account sees and generates
+   its own. A later migration then removes the shared rows, drops the
+   partial indexes and makes `user_id` non-null.
 
 ## The deploy window between L1 and L2
 
