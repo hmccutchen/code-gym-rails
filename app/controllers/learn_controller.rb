@@ -62,9 +62,7 @@ class LearnController < ApplicationController
     return head :forbidden unless current_user.writes_learn_content?
 
     ConceptReferenceFailures.clear(user_id: current_user.id, concept: concept, language: bucket)
-    GenerateConceptReferenceJob.perform_later(
-      concept: concept, language: bucket, user_id: current_user.id, refresh: true
-    )
+    GenerateConceptReferenceJob.queue_rewrites(current_user, [ [ concept, bucket ] ])
 
     render json: { status: "queued" }
   end
@@ -86,9 +84,7 @@ class LearnController < ApplicationController
   def prepare_ladders
     gaps = current_user.writes_learn_content? ? LadderCoverage.for(current_user).gaps : []
 
-    gaps.each do |concept, bucket|
-      bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id, refresh: true)
-    end
+    GenerateConceptReferenceJob.queue_rewrites(current_user, gaps, priority: JobPriority::BACKGROUND)
 
     redirect_to setup_path(anchor: "exercise-mix"), notice: t("exercise_mix.ladders_preparing", count: gaps.size)
   end

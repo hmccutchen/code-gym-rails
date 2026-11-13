@@ -39,6 +39,32 @@ not clear it, so without `uncached` the second read would return the
 first read's answer. A job that took the claim just after another job
 wrote the row would then call the provider again.
 
+## A rewrite another job already answered
+
+The claim alone stops two calls at once, not one after another. A ladder
+press queues a refresh for every gap. If the user then clicks one of those
+concepts, the click runs first at its higher priority, and its reply can be
+valid prose that still lacks a complete ladder or lesson. The press's job
+would then find the row not fully written and call again, a second billed
+call the shared permit used to prevent before L3b.
+
+So a refresh carries `seen_version`: the `generation_version` of the row the
+user saw when it was asked for, or 0 when they saw none. Under the claim,
+after the uncached read, a job whose `seen_version` no longer matches the
+row skips the call, because a write has landed since the request and that is
+the attempt it asked for. A later press or click reads the new version and
+still retries. The skip writes nothing, so Learn's poll, which compares the
+row's version with the one the page showed, sees the write that answered it.
+
+`.queue_rewrites` is the one place that reads the version, with one query
+for all of a press's pairs; Learn's single-concept click and its ladder press
+both use it. `.queue_missing` passes no version. It queues only pairs the
+user sees no row for, without `refresh`, and such a job already skips once
+any row exists. A job queued by older code has no `seen_version` and runs as
+before, since the keyword defaults to `nil` and `nil` skips the check. The
+permit key reads only the user, language, concept and priority, so the new
+argument never splits a permit.
+
 ## Why an advisory lock and not a `Claimable` column
 
 The user's own row may not exist until this job creates it, so there is no
@@ -69,12 +95,15 @@ front of every set still waiting. It queues nothing for a trial account
 (`User#writes_learn_content?`). Which pairs still need a write-up is
 `ConceptReference.missing_for`, the same answer Learn's prepare button uses.
 
-## A row finished by another job during the call
+## A row written by another writer during the call
 
 A direct `perform_now`, or a permit that expired while its job was still
 running, bypasses only the queue's permit. Both still run `perform`, so they
 take the claim and never overlap another job's call. An older worker during
 a deploy takes no claim, so its call can overlap a new job's call for the
-same row. That is why `#rewrite` keeps its row lock: it checks the row again under that lock and
-writes nothing when it is already fully written. The job then logs a skip, and it leaves any
+same row, and a migration that copies rows writes without the claim too. That is why `#rewrite`
+keeps its row lock: under it, the job asks the same question it asked before the call
+(`#wanted?`, with its `refresh` and `seen_version`) of the locked row. A plain write-up that
+finds a row it did not see, a rewrite whose version the row has moved past, and any job that
+finds the row fully written all write nothing. The job then logs a skip, and it leaves any
 failure note alone, since this call wrote nothing.
