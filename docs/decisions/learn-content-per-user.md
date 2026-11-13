@@ -182,6 +182,33 @@ run L1 code while the other runs L2.
 
 Both cases last for the length of one deploy, so they are accepted.
 
+## The deploy window between L2 and L3
+
+L3 does for recognition guides what L2 did for concept references, so the
+same window opens again, with either service on L2 while the other runs L3.
+
+- **Worker still on L2.** An L2 worker can run a guide job the L3 web
+  service queued. It checks `RecognitionGuide.exists?(group_key:)` across
+  all users, so it may skip this user's guide because a teammate already has
+  their own row. It may also create a shared row, with no `user_id`, paid for
+  by this user's key. A skipped guide is queued again on the user's next
+  Learn press. A shared row written here is one the L4 copy picks up.
+- **Web still on L2.** An L2 web service reads guides by
+  `where(group_key:)` alone, so after an L3 worker has written a user's own
+  row it may show that row to a teammate, and its prepare press leaves out
+  a guide a teammate owns. A guide teaches how to look for a kind of problem
+  in general and holds nothing private.
+
+Both cases last for the length of one deploy, so they are accepted. L4's
+gate waits for L3 on both web and worker, as well as L2, so no old writer
+creates a shared guide after the copy.
+
+L4's copy, and L5's second run of it, must insert a user's copy only where
+that user has no row yet: no `(user_id, concept, language)` for a reference
+and no `(user_id, group_key)` for a guide (for example with `ON CONFLICT DO
+NOTHING` on those unique indexes). Since L2 and L3, a user can already own
+rows written with their key, and those stay as they are.
+
 ## Rollback
 
 L1 can be reverted only until L2 ships. Its `down` raises

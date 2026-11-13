@@ -17,7 +17,7 @@ class LearnController < ApplicationController
     end
     @ungenerated = ungenerated_concepts.size
     @recognition_guides = RecognitionGuide.seen_by(current_user, recognition_group_keys)
-    @ungenerated_guides = recognition_group_keys.size - @recognition_guides.size
+    @ungenerated_guides = missing_recognition_guides.size
   end
 
   # GET /learn/:bucket/:concept

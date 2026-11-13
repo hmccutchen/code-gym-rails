@@ -45,8 +45,8 @@ submitted, and the dashboard leaves its callout off then too (#680).
 ## Prepare prompt
 
 The prompt quotes the counts and says whose key pays, because the backfill
-spends the user's own provider key and the rows it writes are shared with the
-whole team.
+spends the user's own provider key and the rows it writes are the user's own,
+which no teammate sees.
 
 ## Prepare form script
 
