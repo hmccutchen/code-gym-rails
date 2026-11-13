@@ -400,9 +400,9 @@ no set was started with the new key.
   at the old one, and the message is the only thing that says why.
 - **A key changed after the failure was written.** Removing a key clears a
   failure recorded against the removed provider. Saving a key clears one
-  too; see "Saving a key clears that provider's failure" below. Switching
-  between stored keys with the "Provider in use" choice leaves the failure
-  in place.
+  too, and so does switching between stored keys; see "Saving a key
+  clears that provider's failure" and "Switching providers clears the old
+  provider's failure" below.
 
 ## Saving a key clears that provider's failure
 
@@ -425,7 +425,74 @@ and `User#store_api_key` touched no failure column.
   failed key: the problem is dealt with, start a set.
 - **Anything else stays**: a failure recorded against a provider that is
   neither the one saved nor the one that was in use, and a message that
-  names no provider.
+  names no provider. The quality-check message names the provider whose
+  drafts failed, so it is cleared like that provider's failure; see "The
+  quality-check message carries its provider" below.
+
+## Switching providers clears the old provider's failure
+
+Decided by the owner on 2026-11-12. After "Claude didn't accept your API
+key", a person who chose their stored GPT key under "Provider in use" still
+saw the Claude card, and a failure today ranks ahead of starting a
+generation, so no set started on the key they had just chosen.
+
+- **A switch that changes the provider clears a failure recorded against
+  the provider it leaves**, in the same save, through the method the key
+  save and the removal use (`User#forget_generation_failure_from`, called
+  from `User#use_provider`).
+- **A rate-limit wait goes with it.** "Claude is limiting requests, try
+  again in about 2 minutes" says nothing about a call to GPT, and the next
+  set runs on GPT. The cost is that the person is no longer told when
+  Claude would answer again; they would see that only by switching back
+  and trying.
+- **A choice of the provider already in use changes nothing.** Setup posts
+  the current provider with every preferences save, and that must not
+  clear a failure the person has done nothing about.
+- **Anything else stays**: a failure recorded against a third provider, one
+  recorded against the provider being switched to, and a message that
+  names no provider. The quality-check message for the provider left is
+  cleared, since it carries that provider.
+- **The failure line still names the provider that was tried.** A failure
+  stores its provider, and `User#generation_failure_message` words the
+  line from that and not from the provider in use when it is read
+  (`docs/decisions/what-a-person-is-told-when-a-provider-fails.md`). That
+  still matters wherever a failure outlives a change of provider: the
+  third-provider case above, and an account whose provider was changed
+  without going through the model's key methods.
+
+## The quality-check message carries its provider
+
+Decided by the owner on 2026-11-13 (#782, item 1, option A). When every
+section of a daily set fails its quality check,
+`GenerateDailyExercisesJob` records "every section failed its quality
+check" with no set for the day, and a failure today ranks ahead of
+starting a generation. The drafts were written by one provider, and a
+person who moved to another provider was still held behind that message.
+
+- **Stored with the provider whose drafts failed.**
+  `User#record_generation_message!` takes an optional `provider:` and
+  writes it to `users.last_generation_failure_provider`;
+  `last_generation_failure`, the failure kind, stays nil. No column was
+  added.
+- **Why that shape.** Every reader of the kind treats a nil kind as a plain
+  message: `User#generation_failure_message` returns the stored text, and
+  `GenerationFailureHelper#regeneration_failure_line` wraps it in the same
+  "Couldn't generate" sentence as before. The key-hold count is raised only
+  by `#record_generation_failure!`, so the message never counts toward the
+  hold and never reads as "check your key". Every reader of the provider
+  column is about which provider a failure belongs to:
+  `#forget_generation_failure_from` (a key saved, removed or switched away
+  from) and `#report_call_failure`'s "own provider" check. Both now treat
+  the message as that provider's, which is the decision.
+  `#forget_generation_failure_from` clears the message text with the
+  provider.
+- **What stays provider-less.** `GenerateDailyExercisesJob::SUPERSEDED_MESSAGE`
+  ("Settings or another set changed…") is about the account's settings, not
+  a provider, and a key change does not clear it (option B was declined).
+  `RegenerateExerciseJob`'s "today's set was kept" messages stay
+  provider-less too: a set exists, so they never hold back a generation.
+- **Rows written before this change** hold the message with no provider and
+  behave as they did: nothing a key change does clears them.
 
 ### Open items
 

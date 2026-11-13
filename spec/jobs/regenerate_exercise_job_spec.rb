@@ -550,7 +550,7 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.reload.last_generation_failure).to eq("short_rate_limit")
   end
 
-  it "stores the provider tried and its wait, so the line survives a key switch" do
+  it "stores the provider tried and its wait, so the line names that provider and not the one in use when it is read" do
     claimed_exercise
     stub_provider(ProviderError::RateLimitError.new("rate limited", retry_after: 120).tap { |e| e.provider = "anthropic" })
 

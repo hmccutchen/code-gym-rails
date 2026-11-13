@@ -134,8 +134,15 @@ read it before changing that area.
   "ready". A
   regeneration also reports only while the exercise's claim is still its
   own, checked under the user row lock. `#store_api_key` clears a failure
-  recorded against the provider saved or the one it switches away from, and
-  `#remove_api_key` one recorded against the provider removed. At
+  recorded against the provider saved or the one it switches away from,
+  `#remove_api_key` one recorded against the provider removed, and
+  `#use_provider` one recorded against the provider it leaves when the
+  provider changes. The daily job's "every section failed its quality
+  check" message is stored with its provider (`#record_generation_message!`
+  with `provider:`, kind nil), so it counts as that provider's for these
+  clears and for `#report_call_failure`; it never counts toward the hold.
+  `SUPERSEDED_MESSAGE` and the regeneration's "set was kept" messages stay
+  provider-less. At
   `KeyHold::AFTER` in a row `ScheduledGeneration.users` drops the account,
   so the hand-out and any queued scheduled job stop calling its key. `KeyHold`
   (pure) owns the kinds and the count; `User` and `ScheduledGeneration` read

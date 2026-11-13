@@ -165,8 +165,9 @@ class User < ApplicationRecord
     clear_attribute_changes([ :generation_account_failures ])
   end
 
-  def record_generation_message!(message)
-    write_generation_status!(last_generation_error_date: Date.current, last_generation_error: message, **NO_GENERATION_FAILURE)
+  def record_generation_message!(message, provider: nil)
+    write_generation_status!(last_generation_error_date: Date.current, last_generation_error: message,
+                             **NO_GENERATION_FAILURE, last_generation_failure_provider: provider)
   end
 
   def key_in_use = [ provider, api_key ]
@@ -310,7 +311,10 @@ class User < ApplicationRecord
   end
 
   def use_provider(name)
-    put_key_in_use(name) unless name == provider
+    return if name == provider
+
+    forget_generation_failure_from(provider)
+    put_key_in_use(name)
   end
 
   def suggests_level_moves? = level_suggestions?
@@ -514,7 +518,7 @@ class User < ApplicationRecord
   def forget_generation_failure_from(*providers)
     return unless last_generation_failure_provider.present? && providers.include?(last_generation_failure_provider)
 
-    assign_attributes(last_generation_error_date: nil, **NO_GENERATION_FAILURE)
+    assign_attributes(last_generation_error_date: nil, last_generation_error: nil, **NO_GENERATION_FAILURE)
   end
 
   def write_keys(keys, saved_times)
