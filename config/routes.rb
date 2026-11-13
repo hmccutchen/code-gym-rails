@@ -18,6 +18,8 @@ Rails.application.routes.draw do
   post   "login/second-factor", to: "second_factor_challenges#create"
   delete "logout",       to: "sessions#destroy", as: :logout
 
+  get "privacy", to: "privacy#show"
+
   get   "setup", to: "api_keys#edit"
   patch "setup", to: "api_keys#update"
   delete "setup/keys/:provider", to: "api_keys#destroy", as: :setup_key
