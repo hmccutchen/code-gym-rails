@@ -8,7 +8,7 @@ class SuggestedConcept < ApplicationRecord
   validates :normalized_name, :display_name, presence: true
   validates :status, inclusion: { in: STATUSES }
 
-  # The only write entry point; skips "other", AiService's own catch-all.
+  # The only way a suggestion is recorded; skips "other", AiService's own catch-all.
   def self.record!(language:, name:)
     normalized = name.to_s.strip.downcase.squeeze(" ")
     return nil if normalized.blank? || normalized == "other"
@@ -40,4 +40,13 @@ class SuggestedConcept < ApplicationRecord
     record_suggestion(language, normalized, display_name, attempt: attempt + 1)
   end
   private_class_method :record_suggestion
+
+  # The reviewer first, as AccountDeletion locks it: reviewed_by_id has no foreign key to stop a deleted id coming back.
+  def review!(status, reviewer_id:)
+    transaction do
+      next false if User.lock("FOR SHARE").where(id: reviewer_id).ids.empty?
+
+      update!(status: status, reviewed_at: Time.current, reviewed_by_id: reviewer_id)
+    end
+  end
 end

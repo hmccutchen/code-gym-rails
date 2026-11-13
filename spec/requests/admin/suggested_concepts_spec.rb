@@ -7,6 +7,32 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
   before { ENV["ADMIN_EMAILS"] = "admin@example.com" }
   after  { ENV.delete("ADMIN_EMAILS") }
 
+  def delete_admin_once_the_request_is_past_sign_in
+    allow(SuggestedConcept).to receive(:find).and_wrap_original do |original, *args|
+      original.call(*args).tap { AccountDeletion.call(admin) }
+    end
+  end
+
+  shared_examples "a review that lands after the admin's account is deleted" do |action|
+    it "writes nothing and answers as signed out" do
+      login_as(admin)
+      concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")
+      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker")
+      delete_admin_once_the_request_is_past_sign_in
+
+      patch public_send(:"#{action}_admin_suggested_concept_path", concept)
+
+      expect(concept.reload.attributes.values_at("status", "reviewed_at", "reviewed_by_id")).to eq([ "pending", nil, nil ])
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.application.login_required"))
+    end
+  end
+
+  describe "a review racing the admin's own account deletion" do
+    it_behaves_like "a review that lands after the admin's account is deleted", :promote
+    it_behaves_like "a review that lands after the admin's account is deleted", :dismiss
+  end
+
   describe "GET /admin/suggested_concepts" do
     it "redirects a non-admin to root with an alert" do
       login_as(member)

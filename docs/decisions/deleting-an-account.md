@@ -32,7 +32,7 @@ two cannot disagree.
 | `invite_codes` | keep the code, give the seat back (`redeemed_count` down by one) | the code is shared |
 | `suggested_concepts.reviewed_by_id` | set to NULL | the concept stays for the team |
 | `concept_references`, `recognition_guides` | keep | shared text with no user link |
-| `solid_queue_jobs` | delete the person's unfinished, unclaimed jobs | their arguments name the person |
+| `solid_queue_jobs` | delete the person's unfinished jobs that no worker has claimed or is claiming | their arguments name the person |
 | the Solid Queue execution tables | go with their job row | the foreign key cascades |
 | `solid_cache_entries` | keep | entries expire through `max_age` |
 
@@ -82,9 +82,39 @@ person once deletion has started, and one that started first finishes
 before deletion reads. `review_follow_ups` points only at
 `daily_responses`, so the responses are locked too: a follow-up insert that
 began first is seen and deleted, and one that comes after waits and then
-finds its response gone. `suggested_concepts.reviewed_by_id` has no foreign
-key; an admin reviewing a concept at the moment their own account is
-deleted could leave their id there.
+finds its response gone.
+
+`suggested_concepts.reviewed_by_id` has no foreign key, so nothing in the
+database stops a deleted admin's id from being written back. An admin
+request signed in before its own account was deleted could promote or
+dismiss a concept afterwards and leave the id there. `SuggestedConcept#review!`
+takes the reviewer's row `FOR SHARE` before it writes, the same user-first
+order deletion uses. A review that started first finishes, and deletion
+then clears its id; one that comes after finds no reviewer, writes nothing,
+and the request is sent to the login page.
+
+## Unfinished jobs and Solid Queue workers
+
+A Solid Queue worker claims a job in one transaction
+(`ReadyExecution.select_and_lock` in solid_queue 1.7.2): it selects ready
+executions `FOR UPDATE SKIP LOCKED`, inserts claimed executions for them, and
+deletes the ready rows. The dispatcher moves scheduled jobs the same way,
+and a blocked job is released under the same kind of lock.
+
+`UnfinishedJobs` first scans the unfinished jobs for the person's id or
+GlobalIDs. Between that scan and the delete a worker can claim one of them,
+and the first version deleted it anyway, removing a running job's claimed
+execution with it. Now, in one transaction, it locks the ready, scheduled,
+blocked and failed execution rows of the matched jobs `FOR UPDATE SKIP
+LOCKED`, drops any that already have a claimed execution, and deletes only
+the jobs whose rows it locked. A worker that reaches a locked row skips it,
+and the job is gone when the deletion commits.
+
+A job deletion could not lock slips past: a worker was claiming or
+dispatching it at that moment. It runs like a job that was already running.
+A job that takes a user id finds no user and exits; a mailer job fails to
+deserialize its arguments and sends nothing. Its finished row, which still
+names the person, is cleared by the hourly cleanup a day later.
 
 ## Work in flight
 
