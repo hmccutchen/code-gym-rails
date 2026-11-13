@@ -11,6 +11,7 @@ RSpec.describe AiService, "request values" do
     "review_response"             => defaults.merge(cache_system: true, read_timeout: CallProfiles::REVIEW_READ_TIMEOUT),
     "assess_difficulty"           => defaults.merge(max_tokens: CallProfiles::DIFFICULTY_ASSESSMENT_MAX_TOKENS),
     "generate_concept_reference"  => defaults.merge(read_timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT),
+    "generate_concept_ladder"     => defaults.merge(read_timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT),
     "generate_recognition_guide"  => defaults.merge(read_timeout: CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT),
     "explain_concept_differently" => defaults.merge(max_tokens: CallProfiles::CONCEPT_ALTERNATE_MAX_TOKENS),
     "explain_differently"         => defaults,
@@ -139,6 +140,7 @@ RSpec.describe AiService, "request values" do
       when "review_response"             then service.review_sections(user, exercise, response, sections: %w[code_review])
       when "assess_difficulty"           then service.send(:assess_difficulty, user, exercise, sections: %w[code_review])
       when "generate_concept_reference"  then service.generate_concept_reference(user, "n_plus_one", "ruby_rails")
+      when "generate_concept_ladder"     then service.generate_concept_ladder(user, reference)
       when "generate_recognition_guide"  then service.generate_recognition_guide(user, "code_smell")
       when "explain_concept_differently" then service.explain_concept_differently(user, reference)
       when "explain_differently"         then service.explain_differently(user, exercise, response, section: "code_review")

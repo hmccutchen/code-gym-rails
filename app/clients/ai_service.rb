@@ -189,6 +189,20 @@ class AiService
     reference
   end
 
+  def generate_concept_ladder(user, reference)
+    result = call_and_log(user, AiService.request_for("generate_concept_ladder",
+      **ConceptReferencePrompt.ladder(concept: reference.concept, coach: LanguagePrompts.for(reference.language)[:coach],
+                                      tagline: reference.tagline, explanation: reference.explanation)))
+
+    reply = parse_json_object(result[:text], subject: "concept ladder")
+    ladder = ConceptReference::LADDER_FIELDS.index_with { |field| usable_optional_text(reply[field], ConceptReference::MAX_LADDER_RUNG_LENGTH) }
+
+    missing = ladder.select { |_field, rung| rung.nil? }.keys
+    raise ProviderError::InvalidResponseError, "Concept ladder missing usable rung(s): #{missing.join(', ')}" if missing.any?
+
+    ladder
+  end
+
   def generate_recognition_guide(user, group_key)
     result = call_and_log(user, AiService.request_for("generate_recognition_guide",
       **RecognitionGuidePrompt.generate(group_key: group_key, subject: recognition_subject(group_key))))

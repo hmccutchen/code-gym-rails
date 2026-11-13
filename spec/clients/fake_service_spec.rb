@@ -145,7 +145,7 @@ RSpec.describe FakeService do
     # The purposes whose AiService caller hands the reply to parse_json_object; every other caller reads it as prose.
     let(:json_purposes) do
       %w[generate_exercise retry_section review_response assess_difficulty generate_concept_reference
-         generate_recognition_guide pseudocode_critique judge_section judge_review]
+         generate_concept_ladder generate_recognition_guide pseudocode_critique judge_section judge_review]
     end
     let(:prompts_with_markers) do
       { "review_response"   => 'Grade ONLY the "code_review" section from the day\'s context above.',
@@ -217,6 +217,16 @@ RSpec.describe FakeService do
       ConceptReference::REFERENCE_FIELDS.each do |field|
         expect(reference[field].to_s.strip).to be_present
       end
+    end
+  end
+
+  describe "#generate_concept_ladder" do
+    it "returns every rung, each within the stored bound" do
+      reference = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails", tagline: "t", explanation: "e")
+      ladder = described_class.new(user.api_key).generate_concept_ladder(user, reference)
+
+      expect(ladder.keys).to eq(ConceptReference::LADDER_FIELDS)
+      expect(ladder.values.map(&:length)).to all(be <= ConceptReference::MAX_LADDER_RUNG_LENGTH)
     end
   end
 

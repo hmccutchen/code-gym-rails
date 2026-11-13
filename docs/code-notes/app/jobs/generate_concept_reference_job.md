@@ -150,3 +150,39 @@ same row, and a migration that copies rows writes without the claim too. That is
 finds a row it did not see, a rewrite whose version the row has moved past, and any job that
 finds the row fully written all write nothing. The job then logs a skip, and it leaves any
 failure note alone, since this call wrote nothing.
+
+## The ladder part
+
+`part: "ladder"` (`LADDER_PART`) asks for the ladder alone. Learn's ladder
+press and Setup's bulk button pass it through `.queue_rewrites`; every other
+caller passes nothing, and a job queued by older code has no `part`, so it
+runs the full rewrite as before. The permit key does not read `part`, so a
+ladder press and a lesson press for one concept at the same priority share a
+permit and the second is discarded while the first is queued. Learn shows
+one of those offers at a time, so a person cannot make both presses on one
+page.
+
+Before the claim and again under it, the job reads the row once and asks
+`ConceptReference.wanted_write`, which answers `:ladder`, `:full` or nil;
+the job only dispatches on the answer. The second read is uncached, and the
+row it returns is the one handed to the provider call. `:ladder` comes back
+when the row has its reference text and `.ladder_wanted?` holds; the job
+then calls `AiService#generate_concept_ladder` with the row and saves
+through `ConceptReference.write_ladder_for`. A ladder press on a row with no
+reference text, or with no row, gets `:full`, since there is no text to keep. Both paths
+keep the permit, the claim, `seen_version`, the failure notes, the deletion
+race and the lock order. A reply with a missing rung raises
+`ProviderError::InvalidResponseError`, which the `rescue` records like any
+other write-up failure, and the row is left as it was.
+
+## Deploying the ladder part
+
+A worker running code from before the ladder part has no `part:` keyword on
+`#perform`. During a deploy where the web service starts first, a ladder
+press queued by new web code and picked up by an old worker raises
+`ArgumentError`. Solid Queue records the failed job; no failure note is
+written, so Learn's poll runs out and tells the person to reload. Pressing
+again once the worker is on the new code writes the ladder. No cheap guard
+closes that window, since the old worker's code is already fixed, so it is
+accepted: at most one failed job per press made during the deploy, and no
+row is changed.

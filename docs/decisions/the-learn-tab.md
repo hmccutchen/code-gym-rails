@@ -51,14 +51,16 @@ into the essay the guide exists not to be. Three triggers, not one: a
 user-initiated backfill for
 concepts with no row at all, on-demand regeneration — only when someone
 opens that concept's Learn entry — for a legacy row that has a reference but
-no guide, and `POST /learn/prepare_ladders`, which rewrites the ungrounded
+no guide, and `POST /learn/prepare_ladders`, which writes ladders for the ungrounded
 concepts behind each section's level, its target or else the skill level
 (see `difficulty-targets-and-locks.md`). Bulk-rewriting legacy rows would change inline reference
 wording nobody asked to change; confining the first two to on-demand accepts
 that **an inline reference's wording can change once, for a concept someone
-deliberately opens.** `prepare_ladders` is the one scoped exception to that
-rule: it rewrites rows on demand, but only for concepts some section of the
-user's is pitched at, from a click whose own copy says the wording may change.
+deliberately opens.** A ladder press changes no wording: since 2026-11-13
+(#800) `prepare_ladders` and a concept page's "Prepare AI guidance" write
+only the ladder through `#generate_concept_ladder`, keeping the reference's
+text, and write a full reference only for a concept with no row yet
+(`difficulty-targets-and-locks.md`, "The ladder is written on its own").
 
 **The short lesson.** The same call also writes `lesson`: a definition, an
 everyday comparison and where it stops, the common mix-up, two to four

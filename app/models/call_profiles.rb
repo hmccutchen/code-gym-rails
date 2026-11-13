@@ -53,6 +53,7 @@ module CallProfiles
     "review_response"             => { cache_system: true, read_timeout: REVIEW_READ_TIMEOUT },
     "assess_difficulty"           => { max_tokens: DIFFICULTY_ASSESSMENT_MAX_TOKENS },
     "generate_concept_reference"  => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
+    "generate_concept_ladder"     => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
     "generate_recognition_guide"  => { read_timeout: CONCEPT_REFERENCE_READ_TIMEOUT },
     "explain_concept_differently" => { max_tokens: CONCEPT_ALTERNATE_MAX_TOKENS },
     "explain_differently"         => {},

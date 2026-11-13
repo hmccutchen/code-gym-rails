@@ -311,6 +311,8 @@ class FakeService < AiService
     }
   }.freeze
 
+  CONCEPT_LADDER = CONCEPT_REFERENCE.slice(*ConceptReference::LADDER_FIELDS).freeze
+
   RECOGNITION_GUIDE = {
     "questions" => "Ask what the code is trying to guarantee, then whether anything on the page actually enforces it.",
     "contrast" => "Two methods of the same shape: in one a check stands between the input and the write, and in the other " \
@@ -395,6 +397,7 @@ class FakeService < AiService
     "review_response"             => ->(prompt) { review_section(prompt) },
     "assess_difficulty"           => ->(prompt) { difficulty_assessment(prompt).to_json },
     "generate_concept_reference"  => CONCEPT_REFERENCE.to_json,
+    "generate_concept_ladder"     => CONCEPT_LADDER.to_json,
     "generate_recognition_guide"  => RECOGNITION_GUIDE.to_json,
     "explain_concept_differently" => CONCEPT_ALTERNATE_TEXT,
     "explain_differently"         => EXPLAIN_DIFFERENTLY_TEXT,

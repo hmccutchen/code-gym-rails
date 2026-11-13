@@ -22,6 +22,7 @@ RSpec.describe "provider request characterization" do
     "review_response"             => {},
     "assess_difficulty"           => {},
     "generate_concept_reference"  => {},
+    "generate_concept_ladder"     => {},
     "generate_recognition_guide"  => {},
     "explain_concept_differently" => {},
     "explain_differently"         => {},

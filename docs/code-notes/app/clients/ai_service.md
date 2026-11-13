@@ -119,6 +119,15 @@ every per-section rule live there; this class keeps the prompts and the calls.
 A reference is cached by (concept, language) forever, so an unusable required
 field rejects the reply and keeps any existing reference for a later retry.
 
+## `#generate_concept_ladder`
+
+The ladder-only call a ladder press makes once a reference exists (#800).
+Unlike the full write-up, where the ladder is optional, every rung is
+required here: a ladder is all this call is for, so a missing, blank or
+overlong rung raises `ProviderError::InvalidResponseError` and the job records
+it as a visible failure. It returns exactly `ConceptReference::LADDER_FIELDS`,
+so nothing else in the reply can reach the row.
+
 ## `#explain_concept_differently`
 
 `reference.language` is a `ConceptBucket`, so `LanguagePrompts.for` also resolves the

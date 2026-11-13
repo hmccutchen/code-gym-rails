@@ -64,7 +64,8 @@
   <% if @ladder_missing %>
     <p class="learn-ladder-missing"><%= t("learn.ladder_missing") %></p>
   <% end %>
-  <%= render "learn/write_up_control", awaiting: "ladder", generation_version: @reference.generation_version,
+  <%= render "learn/write_up_control", awaiting: "ladder", part: GenerateConceptReferenceJob::LADDER_PART,
+             generation_version: @reference.generation_version,
              message: t("learn.ladder_offer", targets: @ladder_targets.to_sentence),
              button: t("learn.write_ladder") %>
 <% elsif !@reference.lesson? %>

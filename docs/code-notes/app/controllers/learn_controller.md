@@ -56,8 +56,11 @@ guess how long a provider call with thinking on will take.
 ## `#prepare_concept`
 
 Answers JSON for the page's script. It queues the job through
-`GenerateConceptReferenceJob.queue_rewrites`, with `refresh: true`, which
-permits a rewrite of the whole row, and the version of the row the user sees.
+`GenerateConceptReferenceJob.queue_rewrites`, with `refresh: true` and the
+version of the row the user sees. The guide and lesson presses ask for a
+rewrite of the whole row. The ladder press also passes `part: "ladder"`
+(`#ladder_part`), so the job writes only the ladder and keeps the text above
+it.
 
 It clears any earlier failure note before queueing. Otherwise that old note
 would answer this attempt's first poll before the job had run.
@@ -67,10 +70,18 @@ would answer this attempt's first poll before the job had run.
 Pressing it twice is safe: each job re-checks whether its row exists, so a
 second press enqueues only what is still missing.
 
+## `#ladder_part`
+
+Passes the ladder part on only when the request names it exactly. Any other
+value queues the whole-row rewrite, as a press with no part does.
+
 ## `#ladder_targets_for`
 
-An empty list means the page offers no rewrite, because a ladder would ground
-nothing for this user.
+An empty list means the page offers no ladder, either because a ladder would
+ground nothing for this user or because the row is not
+`ConceptReference#ladder_addable?`. That is the predicate the job's
+ladder-only write checks, so an offered press never turns into a whole-row
+rewrite.
 
 ## `#references_by_key`
 

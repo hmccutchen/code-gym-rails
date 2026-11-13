@@ -9,6 +9,16 @@ class ConceptReferencePrompt
   DATA_MODELING_NOTE = "It is a database schema concept: tables, columns, keys, indexes, constraints and the " \
                        "migrations that change them, whatever language the application is written in.".freeze
 
+  LADDER_INSTRUCTION = <<~TEXT.chomp
+    for each of #{KindDifficulty::LEVELS.join(', ')}, what a
+    problem about THIS concept looks like at that level. Name its concrete form, never a
+    description of the level in general. For missing_index, for example: junior is an
+    unindexed foreign key, mid_level is an index the query can't use because it wraps the
+    column in a function, senior is composite index column order, principal_engineer is
+    the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
+    #{ConceptReference::MAX_LADDER_RUNG_LENGTH} characters.
+  TEXT
+
   def self.generate(concept:, language:, coach:, label:)
     medium = ConceptVocabulary.language_agnostic?(language) ? nil : label
 
@@ -26,13 +36,7 @@ class ConceptReferencePrompt
         This standard applies to the guide fields and the lesson:
         #{PromptStandards::PLAIN_LANGUAGE_STANDARD}
 
-        Then write a difficulty ladder: for each of #{KindDifficulty::LEVELS.join(', ')}, what a
-        problem about THIS concept looks like at that level. Name its concrete form, never a
-        description of the level in general. For missing_index, for example: junior is an
-        unindexed foreign key, mid_level is an index the query can't use because it wraps the
-        column in a function, senior is composite index column order, principal_engineer is
-        the write-cost tradeoff of adding an index. Each rung is one or two sentences, under
-        #{ConceptReference::MAX_LADDER_RUNG_LENGTH} characters.
+        Then write a difficulty ladder: #{LADDER_INSTRUCTION}
 
         #{lesson_instruction(concept)}
 
@@ -45,8 +49,27 @@ class ConceptReferencePrompt
           "guide_plain_language": "string — what this actually is, for a competent engineer who has never met the term",
           "guide_worked_example": "#{worked_example_description(concept, medium)}",
           "guide_pitfalls":       "string — what people get wrong about this, and why the wrong idea is appealing",
-        #{ConceptReference::LADDER_FIELD_FOR.map { |level, field| %(  "#{field}": "string — a #{level}-level problem about this concept",) }.join("\n")}
+        #{ladder_schema_entries.map { |entry| "  #{entry}," }.join("\n")}
           "lesson": #{JSON.generate(ConceptLesson.schema)}
+        }
+      PROMPT
+  end
+
+  def self.ladder(concept:, coach:, tagline:, explanation:)
+    { system: "You are a senior #{coach} engineer writing a difficulty ladder for one concept. Return ONLY valid JSON.",
+      prompt: <<~PROMPT }
+        The #{coach} concept: "#{concept}".#{data_modeling_note(concept)}
+
+        An engineer has already read this reference for it, and it stays as written:
+        tagline: #{tagline}
+        explanation: #{explanation}
+
+        Write a difficulty ladder: #{LADDER_INSTRUCTION}
+        Keep every rung consistent with the reference above.
+
+        Return JSON matching this schema exactly:
+        {
+        #{ladder_schema_entries.map { |entry| "  #{entry}" }.join(",\n")}
         }
       PROMPT
   end
@@ -71,6 +94,10 @@ class ConceptReferencePrompt
 
   def self.data_modeling_note(concept)
     ConceptVocabulary::DATA_MODELING_CONCEPTS.include?(concept) ? " #{DATA_MODELING_NOTE}" : ""
+  end
+
+  def self.ladder_schema_entries
+    ConceptReference::LADDER_FIELD_FOR.map { |level, field| %("#{field}": "string — a #{level}-level problem about this concept") }
   end
 
   def self.senior_lens_description(concept)
@@ -128,6 +155,6 @@ class ConceptReferencePrompt
     end
   end
 
-  private_class_method :data_modeling_note, :senior_lens_description, :lesson_instruction, :code_example_description,
+  private_class_method :data_modeling_note, :ladder_schema_entries, :senior_lens_description, :lesson_instruction, :code_example_description,
                        :worked_example_description
 end

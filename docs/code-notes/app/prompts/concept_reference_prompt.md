@@ -1,6 +1,15 @@
 # `ConceptReferencePrompt`
 
-The concept reference prompt and its reframe, moved out of `AiService` (#431). They are one family, since both work on the same reference and state the same `SCOPE`. `AiService#generate_concept_reference` and `#explain_concept_differently` still make the calls and check the replies.
+The concept reference prompt, its ladder-only prompt and its reframe, moved out of `AiService` (#431). They are one family, since all three work on the same reference. `AiService#generate_concept_reference`, `#generate_concept_ladder` and `#explain_concept_differently` still make the calls and check the replies.
+
+## `.ladder` and `LADDER_INSTRUCTION`
+
+`.ladder` asks for the four rungs of a concept that already has a reference
+(#800). It takes the tagline and explanation as values, never the row, and no
+exercise or response. They are context, so the rungs fit the text the person
+reads. `LADDER_INSTRUCTION` is the rung instruction both `.generate` and
+`.ladder` send, so the two ask for a ladder in the same words; `.generate`
+renders it byte for byte as before it was shared, which its snapshots hold.
 
 ## `.reframe`
 

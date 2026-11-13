@@ -256,10 +256,29 @@ RSpec.describe ConceptReference do
     end
 
     it "rewrites an incomplete row on a refresh, replacing every written field and advancing its version" do
-      row = own_row(version: 2, tagline: "old", ladder_junior: "j")
+      row = own_row(version: 2, tagline: "old", guide_pitfalls: "x")
 
       expect(write(refresh: true, seen_version: 2)).to eq(:written)
-      expect([ row.reload.tagline, row.ladder_junior, row.generation_version ]).to eq([ "new tagline", nil, 3 ])
+      expect([ row.reload.tagline, row.guide_pitfalls, row.generation_version ]).to eq([ "new tagline", nil, 3 ])
+    end
+
+    it "keeps a stored ladder when the rewrite's reply has no complete ladder, so a ladder written on its own survives" do
+      stored = described_class::LADDER_FIELDS.index_with { |field| "stored #{field}" }
+      row = own_row(version: 2, tagline: "old", **stored)
+      reply.merge!("ladder_junior" => "a lone new rung")
+
+      expect(write(refresh: true, seen_version: 2)).to eq(:written)
+      expect(row.reload.attributes.slice(*described_class::LADDER_FIELDS)).to eq(stored)
+      expect([ row.tagline, row.generation_version ]).to eq([ "new tagline", 3 ])
+    end
+
+    it "replaces the stored ladder when the rewrite's reply carries a complete one" do
+      row = own_row(version: 2, **described_class::LADDER_FIELDS.index_with { "stored" })
+      fresh = described_class::LADDER_FIELDS.index_with { |field| "new #{field}" }
+      reply.merge!(fresh)
+
+      expect(write(refresh: true, seen_version: 2)).to eq(:written)
+      expect(row.reload.attributes.slice(*described_class::LADDER_FIELDS)).to eq(fresh)
     end
 
     it "advances from the row's current version when a refresh names none" do
@@ -332,6 +351,151 @@ RSpec.describe ConceptReference do
 
       expect(write).to eq(:written)
       expect(described_class.find_by!(user: other).tagline).to eq("theirs")
+    end
+  end
+
+  describe ".write_ladder_for" do
+    let(:ladder) { described_class::LADDER_FIELDS.index_with { |field| "new #{field}" } }
+
+    def write_ladder(user = owner, seen_version: 2)
+      described_class.write_ladder_for(user, concept: "n_plus_one", language: "ruby_rails", ladder: ladder, seen_version: seen_version)
+    end
+
+    def own_row(version: 2, **fields)
+      described_class.create!({ tagline: "kept tagline", explanation: "kept explanation", code_example: "kept code",
+                                senior_lens: "kept lens", guide_plain_language: "p", guide_worked_example: "w",
+                                guide_pitfalls: "x", lesson: { "definition" => "kept" } }
+                                .merge(fields, user: owner, concept: "n_plus_one", language: "ruby_rails", generation_version: version))
+    end
+
+    def locks_taken(&)
+      statements = []
+      subscriber = ->(*, payload) { statements << payload[:sql] if payload[:sql].match?(/FOR (SHARE|UPDATE)/) }
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record", &)
+      statements.map { |sql| "#{sql[/FROM "(\w+)"/, 1]} #{sql[/FOR (SHARE|UPDATE)/]}" }
+    end
+
+    it "writes only the ladder, keeping every other field as it was, and advances the version" do
+      row = own_row
+      before = row.attributes.except(*described_class::LADDER_FIELDS, "generation_version", "updated_at")
+
+      expect(write_ladder).to eq(:written)
+      row.reload
+      expect(row.attributes.except(*described_class::LADDER_FIELDS, "generation_version", "updated_at")).to eq(before)
+      expect(described_class::LADDER_FIELDS.map { |field| row.public_send(field) }).to eq(ladder.values)
+      expect(row.generation_version).to eq(3)
+    end
+
+    it "writes nothing for an account deleted before the write" do
+      row = own_row
+      owner.update_columns(anonymized_at: Time.current)
+
+      expect(write_ladder).to eq(:account_deleted)
+      expect([ row.reload.ladder_junior, row.generation_version ]).to eq([ nil, 2 ])
+    end
+
+    it "share-locks the owner before it locks the row" do
+      own_row
+
+      expect(locks_taken { write_ladder }).to eq([ "users FOR SHARE", "concept_references FOR UPDATE" ])
+    end
+
+    it "leaves the row alone when it was asked for against another version" do
+      row = own_row(version: 3)
+
+      expect(write_ladder(seen_version: 2)).to eq(:skipped)
+      expect([ row.reload.ladder_junior, row.generation_version ]).to eq([ nil, 3 ])
+    end
+
+    it "leaves a row that already has a ladder alone" do
+      row = own_row(ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
+
+      expect(write_ladder).to eq(:skipped)
+      expect([ row.reload.ladder_junior, row.generation_version ]).to eq([ "j", 2 ])
+    end
+
+    it "asks again under the row lock, so a ladder written after the read is left alone" do
+      row = own_row
+      allow_any_instance_of(described_class).to receive(:with_lock) do |record, &block|
+        record.update!(ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p",
+                       generation_version: 3)
+        block.call
+      end
+
+      expect(write_ladder(seen_version: nil)).to eq(:skipped)
+      expect([ row.reload.ladder_junior, row.generation_version ]).to eq([ "j", 3 ])
+    end
+
+    it "writes nothing when the row has gone" do
+      expect(write_ladder).to eq(:skipped)
+      expect(described_class.count).to eq(0)
+    end
+
+    it "never writes another user's row" do
+      theirs = described_class.create!(user: other, concept: "n_plus_one", language: "ruby_rails", tagline: "theirs",
+                                       explanation: "theirs", generation_version: 2)
+
+      expect(write_ladder).to eq(:skipped)
+      expect(theirs.reload.ladder_junior).to be_nil
+    end
+  end
+
+  describe ".ladder_wanted?" do
+    let(:written) { described_class.new(tagline: "t", explanation: "e", code_example: "c", senior_lens: "s", generation_version: 2) }
+
+    it "wants a ladder for a written-up row without one, against its version or naming none" do
+      expect(described_class.ladder_wanted?(written, seen_version: 2)).to be(true)
+      expect(described_class.ladder_wanted?(written, seen_version: nil)).to be(true)
+      expect(described_class.ladder_wanted?(written, seen_version: 1)).to be(false)
+    end
+
+    it "wants none for a missing row, a row with no reference text or a row that has a ladder" do
+      laddered = written.dup.tap { |row| described_class::LADDER_FIELDS.each { |field| row[field] = "rung" } }
+
+      expect(described_class.ladder_wanted?(nil, seen_version: nil)).to be(false)
+      expect(described_class.ladder_wanted?(described_class.new(generation_version: 2), seen_version: 2)).to be(false)
+      expect(described_class.ladder_wanted?(laddered, seen_version: 2)).to be(false)
+    end
+  end
+
+  describe ".wanted_write" do
+    let(:written) { described_class.new(tagline: "t", explanation: "e", code_example: "c", senior_lens: "s", generation_version: 2) }
+
+    def wanted(own, ladder_asked: true, refresh: true, seen_version: 2)
+      described_class.wanted_write(own, ladder_asked:, refresh:, seen_version:)
+    end
+
+    it "answers the ladder alone for a ladder press on a row with its reference text and no ladder" do
+      expect(wanted(written)).to eq(:ladder)
+    end
+
+    it "answers nothing for a ladder press on a row that has a ladder or was asked against another version" do
+      laddered = written.dup.tap { |row| described_class::LADDER_FIELDS.each { |field| row[field] = "rung" } }
+
+      expect(wanted(laddered)).to be_nil
+      expect(wanted(written, seen_version: 1)).to be_nil
+    end
+
+    it "answers the full write for a ladder press with no row or no reference text, since there is no text to keep" do
+      expect(wanted(nil, seen_version: 0)).to eq(:full)
+      expect(wanted(described_class.new(generation_version: 2))).to eq(:full)
+    end
+
+    it "answers as .write_wanted? does when no ladder was asked for" do
+      expect(wanted(written, ladder_asked: false)).to eq(:full)
+      expect(wanted(written, ladder_asked: false, refresh: false)).to be_nil
+      expect(wanted(nil, ladder_asked: false, seen_version: 1)).to be_nil
+    end
+  end
+
+  describe "#ladder_addable?" do
+    it "holds only for a row with its reference text and no complete ladder, the one the Learn offer and the ladder write share" do
+      text = described_class::REFERENCE_FIELDS.index_with { "text" }
+      ladder = described_class::LADDER_FIELDS.index_with { "rung" }
+
+      expect(described_class.new(text)).to be_ladder_addable
+      expect(described_class.new(text.merge(ladder))).not_to be_ladder_addable
+      expect(described_class.new(text.except("senior_lens"))).not_to be_ladder_addable
     end
   end
 

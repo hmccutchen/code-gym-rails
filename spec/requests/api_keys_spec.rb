@@ -540,7 +540,8 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
       expect(response.body).to include(prepare_learn_ladders_path)
       expect(Nokogiri::HTML(response.body).at_css("#mix-ladder-preparation[hidden]")).to be_nil
-      expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.ladders_explanation")))
+      expect(response.body).to include(ERB::Util.h(I18n.t("exercise_mix.ladders_explanation")),
+                                       ERB::Util.h(I18n.t("exercise_mix.ladders_cost")))
 
       LadderCoverage.for(user).gaps.each do |concept, bucket|
         ConceptReference.create!(user: user, concept: concept, language: bucket, ladder_junior: "j", ladder_mid_level: "m",

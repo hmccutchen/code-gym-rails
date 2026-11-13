@@ -175,6 +175,7 @@ RSpec.describe AiService do
       review_response
       assess_difficulty
       generate_concept_reference
+      generate_concept_ladder
       generate_recognition_guide
       explain_concept_differently
       explain_differently
@@ -228,6 +229,9 @@ RSpec.describe AiService do
       spy_class.new(canned_text: review_json).review_sections(user, exercise, response, sections: %w[code_review])
       spy_class.new(canned_text: reference_json).generate_concept_reference(user, "n_plus_one", "ruby_rails")
       spy_class.new(canned_text: FakeService::RECOGNITION_GUIDE.to_json).generate_recognition_guide(user, "code_smell")
+      spy_class.new(canned_text: FakeService::CONCEPT_LADDER.to_json)
+               .generate_concept_ladder(user, ConceptReference.new(concept: "n_plus_one", language: "ruby_rails",
+                                                                    tagline: "t", explanation: "e"))
       spy_class.new(canned_text: "Another framing.")
                .explain_differently(user, exercise, response, section: "code_review")
       spy_class.new(canned_text: "A different angle on the same concept.")
@@ -4252,6 +4256,77 @@ RSpec.describe AiService do
       expect {
         service.generate_concept_reference(user, "n_plus_one", "mixed")
       }.to raise_error(SetupError, /Unsupported generation language/)
+    end
+  end
+
+  describe "#generate_concept_ladder" do
+    let(:reference) do
+      ConceptReference.new(concept: "n_plus_one", language: "ruby_rails", tagline: "One query per row is the smell",
+                           explanation: "The association loads once per iteration.", code_example: "Post.all.each { }",
+                           senior_lens: "Reach for includes.")
+    end
+    let(:rungs) { ConceptReference::LADDER_FIELDS.index_with { |field| "A #{field} problem." } }
+
+    let(:capturing_class) do
+      Class.new(double_class) do
+        attr_reader :sent
+
+        def call(request) = (@sent = request) && super
+      end
+    end
+
+    it "is handed only the user and the reference, never an exercise, response or history" do
+      expect(AiService.instance_method(:generate_concept_ladder).parameters).to eq([ [ :req, :user ], [ :req, :reference ] ])
+    end
+
+    it "returns exactly the four rungs, trimmed" do
+      reply = rungs.merge("ladder_junior" => "  A junior problem.  ", "tagline" => "a rewrite nobody asked for")
+
+      result = double_class.new(canned_text: reply.to_json).generate_concept_ladder(user, reference)
+
+      expect(result.keys).to eq(ConceptReference::LADDER_FIELDS)
+      expect(result["ladder_junior"]).to eq("A junior problem.")
+    end
+
+    it "sends the recorded prompt, carrying the tagline and explanation the rungs must fit" do
+      svc = capturing_class.new(canned_text: rungs.to_json)
+
+      svc.generate_concept_ladder(user, reference)
+
+      expect(svc.sent.purpose).to eq("generate_concept_ladder")
+      expect(svc.sent.read_timeout).to eq(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT)
+      expect_prompt_snapshot("concept_ladder__n_plus_one__ruby_rails__system", svc.sent.system)
+      expect_prompt_snapshot("concept_ladder__n_plus_one__ruby_rails__prompt", svc.sent.prompt)
+    end
+
+    it "logs usage with the generate_concept_ladder purpose" do
+      expect {
+        double_class.new(canned_text: rungs.to_json).generate_concept_ladder(user, reference)
+      }.to change { ApiUsage.where(purpose: "generate_concept_ladder").count }.by(1)
+    end
+
+    ConceptReference::LADDER_FIELDS.each do |field|
+      [ nil, 3, [ "rung" ], "", "  ", "x" * (ConceptReference::MAX_LADDER_RUNG_LENGTH + 1) ].each do |unusable|
+        it "raises InvalidResponseError naming #{field} when it comes back as #{unusable.inspect[0, 20]}" do
+          reply = rungs.merge(field => unusable)
+
+          expect {
+            double_class.new(canned_text: reply.to_json).generate_concept_ladder(user, reference)
+          }.to raise_error(ProviderError::InvalidResponseError, /#{field}/)
+        end
+      end
+
+      it "raises InvalidResponseError naming #{field} when it is left out" do
+        expect {
+          double_class.new(canned_text: rungs.except(field).to_json).generate_concept_ladder(user, reference)
+        }.to raise_error(ProviderError::InvalidResponseError, /#{field}/)
+      end
+    end
+
+    it "raises InvalidResponseError when the provider returns a non-object" do
+      expect {
+        double_class.new(canned_text: "[1]").generate_concept_ladder(user, reference)
+      }.to raise_error(ProviderError::InvalidResponseError)
     end
   end
 
