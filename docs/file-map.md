@@ -185,6 +185,9 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
 - `app/controllers/sessions_controller.rb` — code request, the code page, verification and starting again, with rate limits; an account with the authenticator on goes from its address to the second step
+- `app/controllers/privacy_controller.rb` — `GET /privacy`: the privacy page, open to anyone signed out or signed in, with or without a key; hands the view `PrivacyNotice.facts`
+- `app/models/privacy_notice.rb` — `PrivacyNotice`: the numbers the privacy page states, read from the code that sets them (`DuckThread::KEPT_FOR`, `UnopenedSets::PAUSE_AFTER`, the session cookie's `expire_after`) or, for Railway's log retention, held as `LOG_DAYS`; see `docs/code-notes/app/models/privacy_notice.md`
+- `app/views/privacy/show.html.erb` — the privacy page's markup; its text is `privacy.show` in `config/locales/en.yml`
 - `app/controllers/second_factor_challenges_controller.rb` — `/login/second-factor`: the authenticator or recovery code asked for in place of the emailed code, when the account has the authenticator on
 - `app/controllers/authenticators_controller.rb` — `/account/authenticator`: the setup page, turning the authenticator on and off, and the sign-in-again page for an old session
 - `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once
@@ -214,10 +217,10 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/assets/stylesheets/display.css` / `display_light.css` — text size, spacing and the reading font; the light palette. Linked only where `DisplayPreferencesHelper#display_stylesheets?` says so
 - `app/assets/stylesheets/phone_cards.css` — cards and collapsible cards, the full-width button, the switch and its status line, value rows, segmented controls and the card heading tag, used by Account and Settings, and the `.phone-page` and `.card-page` wrappers. Linked on every page, each rule scoped to its own class
 - `app/assets/stylesheets/desktop.css` — the shared layout at 900px and wider: the wide container and the nav's cap. Every rule sits inside one `@media (min-width: 900px)` block (`docs/decisions/desktop-layout.md`)
-- `app/assets/stylesheets/pages/history.css`, `progress.css`, `learn.css`, `account.css`, `settings.css`, `today.css` — each page's own styles, phone rules first and any 900px rules last, linked only on that page by `page_stylesheet` (`docs/decisions/page-stylesheets.md`)
+- `app/assets/stylesheets/pages/history.css`, `progress.css`, `learn.css`, `account.css`, `settings.css`, `today.css`, `privacy.css` — each page's own styles, phone rules first and any 900px rules last, linked only on that page by `page_stylesheet` (`docs/decisions/page-stylesheets.md`)
 - `app/assets/stylesheets/components/authenticator.css` — the authenticator setup, sign-in-again and recovery codes pages' shared styles, linked by `component_stylesheet "authenticator"` on each
 - `app/assets/stylesheets/components/form_field.css` — the field, label and text-input rules every page with a `.form-field` shares, apart from Settings; linked before the page group's own component sheet
-- `app/assets/stylesheets/components/login.css` — the sign-in, enter-code and second-factor pages' shared styles
+- `app/assets/stylesheets/components/login.css` — the sign-in, enter-code and second-factor pages' shared styles, and the sign-in page's privacy link
 - `app/assets/stylesheets/components/trial.css` — the trial start and trial pages' shared styles
 - `app/assets/stylesheets/components/table_scroll.css` — `.table-scroll`, the box each admin table scrolls sideways in on a phone, linked by `component_stylesheet "table_scroll"` on the judge solves and suggested concepts pages
 - `app/views/api_keys/_display_preferences.html.erb` — the Display disclosure on Setup; applies a choice to the page at once, then saves it

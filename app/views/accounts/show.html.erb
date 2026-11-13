@@ -37,7 +37,10 @@
 
   <section class="card danger-zone">
     <h2><%= t("accounts.show.danger_heading") %></h2>
-    <p class="card-note"><%= t("accounts.show.danger_body") %></p>
+    <p class="card-note">
+      <%= t("accounts.show.danger_body") %>
+      <%= t("accounts.show.danger_privacy_html", link: link_to(t("accounts.show.privacy_link"), privacy_path)) %>
+    </p>
     <% unless signed_in_recently? %>
       <p class="card-note"><%= t("accounts.show.delete_needs_sign_in", minutes: User::RECENT_SIGN_IN.in_minutes.to_i) %></p>
     <% end %>
