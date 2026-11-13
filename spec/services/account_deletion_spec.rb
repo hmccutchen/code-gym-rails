@@ -76,13 +76,31 @@ RSpec.describe AccountDeletion, type: :model do
     expect(invite.reload.redeemed_count).to eq(0)
   end
 
+  def learn_text(user, concept: "open_closed")
+    reference = ConceptReference.new(user_id: user&.id, concept: concept, language: "ruby_rails", tagline: "t", explanation: "e",
+                                     code_example: "c", senior_lens: "s", generation_version: 1)
+    reference.save!(validate: false)
+    guide = RecognitionGuide.new(user_id: user&.id, group_key: "data_modeling", questions: "q", contrast: "c", misfires: "m")
+    guide.save!(validate: false)
+    [ reference, guide ]
+  end
+
   it "keeps the shared text that names no one" do
-    ConceptReference.create!(concept: "open_closed", language: "ruby_rails", tagline: "t", explanation: "e", code_example: "c",
-                             senior_lens: "s", generation_version: 1)
+    shared = learn_text(nil)
 
     described_class.call(leaving)
 
-    expect(ConceptReference.count).to eq(1)
+    expect(shared.map { |row| row.class.exists?(row.id) }).to eq([ true, true ])
+  end
+
+  it "deletes the account's own Learn text and leaves the shared rows and another account's" do
+    owned = learn_text(leaving)
+    kept = learn_text(nil) + learn_text(staying)
+
+    described_class.call(leaving)
+
+    expect(owned.map { |row| row.class.exists?(row.id) }).to eq([ false, false ])
+    expect(kept.map { |row| row.class.exists?(row.id) }).to eq([ true, true, true, true ])
   end
 
   it "deletes the account's unfinished jobs and leaves a running one and another account's jobs" do

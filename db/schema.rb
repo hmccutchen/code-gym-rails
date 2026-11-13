@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_040000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,7 +76,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_040000) do
     t.datetime "updated_at", null: false
     t.jsonb "lesson"
     t.text "ladder_mid_level"
-    t.index ["concept", "language"], name: "index_concept_references_on_concept_and_language", unique: true
+    t.bigint "user_id"
+    t.index ["concept", "language"], name: "index_concept_references_shared_on_concept_and_language", unique: true, where: "(user_id IS NULL)"
+    t.index ["user_id", "concept", "language"], name: "index_concept_references_on_user_id_and_concept_and_language", unique: true
   end
 
   create_table "daily_exercises", force: :cascade do |t|
@@ -240,7 +242,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_040000) do
     t.text "misfires", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["group_key"], name: "index_recognition_guides_on_group_key", unique: true
+    t.bigint "user_id"
+    t.index ["group_key"], name: "index_recognition_guides_shared_on_group_key", unique: true, where: "(user_id IS NULL)"
+    t.index ["user_id", "group_key"], name: "index_recognition_guides_on_user_id_and_group_key", unique: true
   end
 
   create_table "review_follow_ups", force: :cascade do |t|
@@ -462,6 +466,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_040000) do
 
   add_foreign_key "api_usages", "users"
   add_foreign_key "concept_masteries", "users"
+  add_foreign_key "concept_references", "users"
   add_foreign_key "daily_exercises", "users"
   add_foreign_key "daily_kind_swaps", "users"
   add_foreign_key "daily_responses", "daily_exercises"
@@ -473,6 +478,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_040000) do
   add_foreign_key "judge_solves", "users"
   add_foreign_key "level_suggestion_events", "users"
   add_foreign_key "push_subscriptions", "users"
+  add_foreign_key "recognition_guides", "users"
   add_foreign_key "review_follow_ups", "daily_responses"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
