@@ -2,12 +2,10 @@
 
 ## Prepare actions
 
-The prepare actions have no hourly limit. One used to skip any account with
-a key of its own, and since L2 of `docs/decisions/learn-content-per-user.md`
-the only accounts it reached, trials on the house key, are refused before
-anything is queued (`User#writes_learn_content?`). It held back no work, so
-it was removed (#792). A press by an own-key account is paid for with that
-account's key.
+The prepare actions have no hourly limit (`docs/decisions/per-user-request-limits.md`
+says why it was removed in #792). A press is paid for with the account's own
+key; a trial account is refused before anything is queued
+(`User#writes_learn_content?`).
 
 ## `#bulk`
 

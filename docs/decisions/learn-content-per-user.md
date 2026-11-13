@@ -248,11 +248,8 @@ ships one release before any code reads it for Learn
 - `GenerateRecognitionGuideJob` keeps its permit with discard and takes no
   claim. Only the bulk press queues a guide, so no click waits on one, and
   its unique index stops a second row when the permit is bypassed.
-- The hourly Learn prepare limit (`LearnController::PREPARE_PER_HOUR`)
-  skipped accounts with a key of their own (`unless: :own_key?`), and since
-  L2 the accounts left, trials on the house key, are refused a write-up
-  before anything is queued. It limited no queued work, so the owner chose
-  to remove it (#792).
+- After L2 the hourly Learn prepare limit limited no queued work, so it was
+  removed (#792); `docs/decisions/per-user-request-limits.md` says why.
 
 ## What L4 does
 

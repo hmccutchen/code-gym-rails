@@ -26,7 +26,7 @@ that page or measure with the probe, not a fact this document asserts.
 
 What the audit already landed: `ProviderCallLimits` (60/hour, 300/day per
 user across the duck, follow-ups, both explain-differently routes and the
-pseudocode critique), `/generate` at 3/hour, Learn prepares at 10/hour, one
+pseudocode critique), `/generate` at 3/hour, Learn prepares at 10/hour (removed in #792), one
 generation job per user at a time, `raise_if_key_rejected` on every provider
 (401/403 fixed message, body never logged), and the anchored `code` filter.
 This document builds on those.

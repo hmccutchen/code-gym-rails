@@ -25,7 +25,7 @@ The three Learn prepare actions have no hourly cap. The one they had
 own, and since L2 of `docs/decisions/learn-content-per-user.md` a trial
 account on the house key writes no Learn content, so the cap reached only
 presses refused before anything was queued. It was removed as dead code
-(#792).
+(#792), under the owner's go-ahead to follow the recommendation.
 Saving a key in Setup allows `ApiKeysController::KEY_SAVES_PER_HOUR` (10)
 saves an hour per account and `KEY_SAVES_PER_HOUR_BY_IP` (30) per address.
 Each such save asks a provider about the key
