@@ -7,10 +7,13 @@ user, exercise and response locks before anything is written. A
 superseded or blocked set writes nothing, so the transaction ends without a
 rollback.
 
-## `#release` and `#record_provider_failure`
+## `#release`, `#release_after_failure` and `#record_provider_failure`
 
 `#release` takes the user row lock, releases the exercise's claim with this
-job's token, and runs its block only when that release took effect. A claim
+job's token, and runs its block only when that release took effect.
+`#release_after_failure` logs the error first; the rescue paths use it, and
+`#keep_reviewed_set` calls `#release` directly, so a "set was kept" message
+is recorded only while the claim is still this job's own. A claim
 that went stale and was retaken belongs to a newer attempt, which writes
 the outcome, so this job then records nothing and clears nothing. The lock
 order is user, then exercise, and the lock reloads the account.

@@ -405,6 +405,23 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(user.last_generation_error_date).to eq(Date.current)
   end
 
+  it "records no kept-set message once its claim was retaken after the commit kept a reviewed set" do
+    exercise = claimed_exercise
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
+                          submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
+                          ai_review: { "code_review" => { "rating" => "developing" } })
+    stub_provider({ "code_review" => { "question" => "new" } })
+    retaken = exercise.regenerating_since + 90.seconds
+    allow(PracticeGeneration).to receive(:commit_replacement).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).tap { exercise.update_columns(regenerating_since: retaken) }
+    end
+
+    described_class.new.perform(user_id: user.id)
+
+    expect(user.reload).to have_attributes(generation_failed_today?: false, last_generation_error: nil)
+    expect(exercise.reload.regenerating_since).to eq(retaken)
+  end
+
   it "distinguishes a review still running from one that landed" do
     exercise = claimed_exercise
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
