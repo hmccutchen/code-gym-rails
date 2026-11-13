@@ -85,9 +85,10 @@ ships one release before any code reads it for Learn
    moves that work behind the scheduled sets and lets a single-concept
    click jump the queue (issue #777). It needs no deploy gate. "What L3b
    does" below has the details.
-5. **L4, copy shared rows.** Copies every shared row to every active
-   account. Waits until L2 (and L3 for guides) is deployed on both web and
-   worker, so no old writer creates a shared row after the copy.
+5. **L4, copy shared rows (done).** Copies every shared row to every active
+   account. Waits until L2, L3 and L3b are deployed on both web and worker,
+   so no old writer creates a shared row after the copy. "What L4 does"
+   below has the details.
 6. **L5, drop the shared fallback, then tighten the schema.** The pull
    request that removes the fallback also carries a data migration that
    runs the L4 copy again for every active account still missing a copy.
@@ -212,6 +213,33 @@ ships one release before any code reads it for Learn
   refused a write-up before anything is queued. So it limits no queued
   work today. Whether it should go, or start counting own-key accounts'
   presses, is the owner's call.
+
+## What L4 does
+
+- The data migration `CopySharedLearnContent` copies every shared
+  `concept_references` row and every shared `recognition_guides` row to
+  each account with no `anonymized_at`. It copies every column but `id` and
+  `user_id`, `generation_version` and the timestamps included, so a user
+  sees the same text and the Learn poll sees no rewrite.
+- Trial accounts get copies too. The owner's rule is active accounts, a
+  trial reads the shared text through the fallback today, and a copy calls
+  no provider, so it is not Learn generation.
+- It inserts only where the user has no row yet (`ON CONFLICT DO NOTHING`
+  on the per-user unique indexes), so a row the user's key already wrote
+  stays as it is, and a second run adds nothing.
+- It works one user at a time, each in its own transaction that first
+  share-locks the user and checks it is still active, the order the
+  write-up jobs use, so an account deleted during the copy keeps no copied
+  rows.
+- It removes no shared row and leaves the fallback in place; that is L5.
+- L5 runs the same copy again by calling
+  `CopySharedLearnContent.copy_to_active_users(connection)`, so the SQL has
+  one home. It stays in the migration, not `lib/`, so the copy L5 repeats is
+  the one L4 shipped.
+- `down` does nothing: a copied row cannot be told apart from one the user
+  wrote, and deleting it would delete user data.
+- `docs/code-notes/db/migrate/20261113150000_copy_shared_learn_content.md`
+  has the lock order, the size and the race with a running write-up job.
 
 ## The deploy window between L1 and L2
 

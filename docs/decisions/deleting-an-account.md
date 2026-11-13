@@ -142,6 +142,10 @@ Each path writes nothing once the account is gone:
 - A recognition guide (`GenerateRecognitionGuideJob`) does the same: it
   share-locks the user before it writes its own row and writes nothing
   once the account is gone.
+- The one-time copy of shared Learn rows (`CopySharedLearnContent`, L4 of
+  `learn-content-per-user.md`) share-locks each user and checks the
+  account is still active before copying to it, so a deletion either runs
+  first and gets no copy, or waits and deletes the copies with the rest.
 
 A mailer job enqueued with a record that is gone fails to deserialize its
 arguments. Deletion removes the unfinished ones it can match, so this

@@ -66,7 +66,9 @@ read it before changing that area.
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
   `ConceptReference` is keyed on `(user_id, concept, language)`, with the
-  shared row as a fallback until L5. Guide, ladder and
+  shared row as a fallback until L5. L4's `CopySharedLearnContent` copies
+  every shared reference and guide to each active account, inserting only
+  where the user has no row yet. Guide, ladder and
   `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written
