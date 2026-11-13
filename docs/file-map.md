@@ -290,7 +290,8 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
   look for these" piece per recognition group, which groups have one, and
   what the prompt says each group is about. `.seen_by` and `.visible_to`
   answer which guide a user sees: their own only;
-  `.missing_for` lists the group keys a user has no guide of their own for.
+  `.missing_for` lists the group keys a user has no guide of their own for,
+  and `.written_for?` asks about one key.
 - `app/jobs/generate_recognition_guide_job.rb` — writes one missing
   recognition guide as the user's own row; the same per-user permit and
   write under a share lock on the user as `GenerateConceptReferenceJob`.

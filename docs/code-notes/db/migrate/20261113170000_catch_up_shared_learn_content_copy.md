@@ -12,7 +12,14 @@ L4 code was still serving, read the shared rows through the fallback but got
 no copy. L5 removes the fallback, so without a second copy that account
 would lose text it could see. The migration runs in the web pre-deploy step,
 while the L4 code still serving reads the shared rows, so no account goes
-without its text before the new code serves.
+without its text before the new web code serves.
+
+The worker is not gated on it. Its pre-deploy waits for a schema, not for
+pending migrations, so an L5 worker can run before the copy reaches a user,
+make a billed call for a concept the copy was about to supply, and write a
+row at version 1 that makes the copy skip it. The cost is extra provider
+calls during one deploy. Deploy web first and let the worker follow once the
+pre-deploy has succeeded.
 
 ## How it calls the copy
 

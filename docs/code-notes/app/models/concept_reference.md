@@ -15,8 +15,8 @@ The migration `ClearNonHashConceptLessons` cleared every non-object lesson once,
 
 The one answer to which reference a user sees: their own row only. Since L5
 of `docs/decisions/learn-content-per-user.md` a shared row (no `user_id`) is
-never read, and neither is another user's. `.seen_by` indexes the user's rows
-by `[concept, language]`; the per-user unique index leaves one row per key.
+never read, and neither is another user's. `.for` finds the one row by user, concept and language, and `.seen_by` indexes the
+user's rows by `[concept, language]`; the per-user unique index leaves one row per key.
 
 ## `.missing_for`
 

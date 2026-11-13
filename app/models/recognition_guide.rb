@@ -34,6 +34,10 @@ class RecognitionGuide < ApplicationRecord
     visible_to(user).where(group_key: group_keys).index_by(&:group_key)
   end
 
+  def self.written_for?(user, group_key)
+    visible_to(user).exists?(group_key: group_key)
+  end
+
   def self.missing_for(user, group_keys)
     return [] if group_keys.empty?
 

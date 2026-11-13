@@ -14,7 +14,7 @@ class ConceptReference < ApplicationRecord
   scope :visible_to, ->(user) { where(user_id: user.id) }
 
   def self.for(user, concept:, language:)
-    seen_by(user, concept: concept, language: language)[[ concept, language ]]
+    find_by(user_id: user.id, concept: concept, language: language)
   end
 
   def self.seen_by(user, **conditions)

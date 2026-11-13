@@ -82,6 +82,14 @@ RSpec.describe RecognitionGuide do
       expect(described_class.visible_to(owner)).to contain_exactly(own)
     end
 
+    it "says whether the user has their own guide for one key, ignoring the shared and other users' rows" do
+      create_guide
+      create_guide(user: other)
+
+      expect(described_class.written_for?(owner, "code_smell")).to be(false)
+      expect(described_class.written_for?(other, "code_smell")).to be(true)
+    end
+
     it "lists the group keys a user has no guide of their own for, in the order given" do
       create_guide(group_key: "architecture")
       create_guide(group_key: "data_modeling", user: other)

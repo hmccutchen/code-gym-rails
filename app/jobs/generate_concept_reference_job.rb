@@ -67,7 +67,7 @@ class GenerateConceptReferenceJob < ApplicationJob
     User.transaction do
       next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
 
-      own = ConceptReference.find_by(user_id: user.id, concept: concept, language: language)
+      own = ConceptReference.for(user, concept: concept, language: language)
       next rewrite(own, attributes) if own
 
       ConceptReference.create!(attributes.merge("user_id" => user.id, "concept" => concept, "language" => language,

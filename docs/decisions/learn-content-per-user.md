@@ -101,11 +101,12 @@ ships one release before any code reads it for Learn
    started).** The pull request that removes the fallback also carries a
    data migration that runs the L4 copy again for every active account still missing a copy.
    It runs in the web pre-deploy step, while the code still serving reads
-   the shared rows, so every account that exists before the new code serves
-   has its own copy first. Nobody loses text they could see. An account
+   the shared rows, so every account that exists before the new web code
+   serves has its own copy first. Nobody loses text they could see. An account
    created during that deploy, after the copy and before the new code
    serves, gets no copy; it sees what any new account sees and generates
-   its own. L5's migration must declare `disable_ddl_transaction!`, so the
+   its own. The worker is not held back by the copy; "The deploy window
+   between L4 and L5" below says what that costs. L5's migration must declare `disable_ddl_transaction!`, so the
    copy commits one user at a time; `copy_to_active_users` raises if it is
    called inside a transaction, which would hold every user's lock until
    the end. "What L5 does" below has the details.
@@ -118,21 +119,25 @@ ships one release before any code reads it for Learn
    worker still reads the shared rows, so deleting them earlier would take
    text away from a page or skip a write-up on old code's say-so. It must
    also run after L5's catch-up copy, which needs the shared rows to copy
-   from.
+   from. It also changes `app/models/account_data.rb`, whose fate text says
+   shared rows "stay", and the fate table in `deleting-an-account.md`, which
+   says the same, because no shared row will exist to stay.
 
 ## What L2 does
 
 - `ConceptReference.for(user, concept:, language:)` and
   `ConceptReference.seen_by(user, ...)` are the one answer to which
-  reference a user sees: their own row, else the shared one, never another
-  user's. Learn, the dashboard and History inline reference, the featured
+  reference a user sees. Until L5 that was their own row, else the shared one,
+  never another user's. Learn, the dashboard and History inline reference, the featured
   callout, the review's short version, generation's ladders
   (`GenerationLadders.for(user, ...)`), `LadderCoverage` and
-  `explain_differently` read through them. L5 dropped the shared half.
+  `explain_differently` read through them. "What L5 does" below gives the
+  current read.
 - `GenerateConceptReferenceJob` writes only the user's own row. A user with
-  only the shared row who asks for a rewrite gets a new row of their own,
-  numbered past the shared row's `generation_version` so the Learn poll sees
-  the rewrite land; the shared row is never written again.
+  only the shared row who asked for a rewrite got a new row of their own,
+  numbered past the shared row's `generation_version` so the Learn poll saw
+  the rewrite land; the shared row was never written again. L5 changed the
+  numbering.
 - The admin promote check (`ConceptReference.written_up?` and
   `.written_up_keys`) counts any row, a teammate's included. It asks
   only whether the concept has ever been written up and shows no text, and
@@ -154,25 +159,20 @@ ships one release before any code reads it for Learn
 - Which pairs still lack a write-up is `ConceptReference.missing_for(user,
   pairs)`, asked by both Learn's prepare button and
   `GenerateConceptReferenceJob.queue_missing`.
-- "Own wins" is decided per row, not per field. A user whose own row has no
-  ladder sees that row, so a shared row's ladder for the same concept stays
-  hidden from them until they refresh it. Since L5 the shared row is never
-  read, so this no longer arises.
-  Mixing fields from two rows would show a ladder written for different
-  text, so this is accepted.
+- Until L5, "own wins" was decided per row, not per field: mixing fields
+  from two rows would have shown a ladder written for different text.
 
 ## What L3 does
 
 - `RecognitionGuide.seen_by(user, group_keys)` is the one answer to which
-  guide a user sees: their own row, else the shared one, never another
-  user's. Learn's index reads it, and `RecognitionGuide.missing_for(user,
+  guide a user sees (until L5, their own row, else the shared one). Learn's
+  index reads it, and `RecognitionGuide.missing_for(user,
   group_keys)` decides which guides the prepare button queues. No endpoint
-  finds a guide by id, so there is no cross-user path to close. L5 dropped
-  the shared half.
+  finds a guide by id, so there is no cross-user path to close.
 - The uniqueness validation on `group_key` is scoped to `user_id`.
-- `GenerateRecognitionGuideJob` keys its permit on user and group key. It
-  skips the call when the user already sees a guide, their own or the
-  shared one, since guides are never rewritten. It calls the provider
+- `GenerateRecognitionGuideJob` keys its permit on user and group key. Until
+  L5 it skipped the call when the user already saw a guide, their own or the
+  shared one; guides are never rewritten. It calls the provider
   outside any lock, then writes the user's own row inside a transaction that
   share-locks the user, and writes nothing once the account is gone. It
   never writes a shared row, and a trial account writes nothing
@@ -243,7 +243,7 @@ ships one release before any code reads it for Learn
   `user_id`, so a user sees the same text and the Learn poll sees no
   rewrite.
 - Trial accounts get copies too. The owner's rule is active accounts, a
-  trial reads the shared text through the fallback today, and a copy calls
+  trial read the shared text through the fallback until L5, and a copy calls
   no provider, so it is not Learn generation.
 - An anonymized account gets nothing.
 - A row the user already owns stays as it is (the end of "The deploy window
@@ -288,13 +288,27 @@ ships one release before any code reads it for Learn
 Railway does not order the web and worker deploys. During the rollout a web
 or worker still on L4 code reads the shared rows as a fallback, while L5
 code reads only own rows. The catch-up copy runs in the web pre-deploy, so by
-the time any L5 code serves, every account that existed then owns a copy,
-and both versions show it the same text. An account created during the
-deploy, after the catch-up and before the new code serves, gets no copy: L4
-code shows it the shared text, and L5 code shows it what any new account
-sees and writes its own. An L4 worker may also skip such an account's
-write-up because it sees the shared row; it is queued again on the next
-submit or Learn press. This lasts for one deploy, so it is accepted.
+the time any L5 web code serves, every account that existed then owns a
+copy, and both versions show it the same text. That holds for web only. The
+worker's pre-deploy (`db:wait_for_schema`) waits for a schema, not for
+pending migrations, so an L5 worker can run before the copy reaches a
+user. It sees no own row, so a queued write-up or guide job makes a billed
+call on the user's key and writes a fresh row at version 1, and the copy
+then skips that concept (`ON CONFLICT DO NOTHING`). Nothing visible is
+lost; the cost is extra provider calls during one deploy. Deploy web first
+and let the worker follow once the web pre-deploy has succeeded. The worker
+is not gated on the migration (`.claude/rules/deployment.md` says why).
+
+An account created during the deploy, after the catch-up and before the new
+code serves, gets no copy: L4 code shows it the shared text, and L5 code
+shows it what any new account sees and writes its own. An L4 worker may
+also skip such an account's write-up because it sees the shared row; it is
+queued again on the next submit or Learn press. A Learn page that account
+rendered under L4 shows the shared row. After L5 its ladder and lesson poll
+(`LearnController#status`, `version > param`) does not report the first
+own row, written at version 1, and "explain differently" with the shared
+row's id answers 404. A reload fixes both. This lasts for one deploy, so it
+is accepted.
 
 ## The deploy window between L1 and L2
 

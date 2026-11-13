@@ -60,8 +60,8 @@ spec that pins it opens an ordinary caller transaction explicitly.
 
 **Selects and displays — it never calls a provider.** No provider call and no
 `ApiUsage` row (a spec pins that). Generation reads the pick for one reason,
-which the section below explains. Shared `ConceptReference` rows are read,
-never written. A featured concept whose guide was never written, or with no
+which the section below explains. The callout reads the user's own
+`ConceptReference` row and never writes one. A featured concept whose guide was never written, or with no
 reference row at all, still links to the ordinary `LearnController#show`
 page, which offers the on-demand "Write this up" control.
 

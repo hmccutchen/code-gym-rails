@@ -12,7 +12,7 @@ class GenerateRecognitionGuideJob < ApplicationJob
 
     user = User.active.find_by(id: user_id)
     return unless user&.writes_learn_content?
-    return if RecognitionGuide.seen_by(user, [ group_key ]).key?(group_key)
+    return if RecognitionGuide.written_for?(user, group_key)
 
     # ApiUsage dates the call with Date.current, which must be the user's day.
     guide = Time.use_zone(user.effective_time_zone) { AiService.for(user).generate_recognition_guide(user, group_key) }

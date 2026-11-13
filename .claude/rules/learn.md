@@ -46,8 +46,8 @@ read it before changing that area.
   `ConceptReference.for(user, ...)`, `.seen_by(user, ...)` or
   `RecognitionGuide.seen_by(user, ...)`, which read the user's own rows
   only: never a shared row and never another user's. The admin promote
-  check alone counts any row. Shared rows (no user) remain, unread and kept
-  unique by partial indexes, until the schema step after L5 deletes them.
+  check alone counts any row. Shared rows (no user) remain, unread, until
+  the schema step (`docs/decisions/learn-content-per-user.md`).
   A trial account writes no Learn content (`User#writes_learn_content?`).
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
