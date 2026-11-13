@@ -29,6 +29,18 @@ the job finishes cleanly and leaves no failed execution naming the user.
 ## `.queue_missing`
 
 The one way write-ups are queued for a set's concepts: on submit, at click
-priority, and when a set is generated or regenerated, at bulk priority. It
-queues nothing for a trial account (`User#writes_learn_content?`), and
-nothing for a pair the user already sees a reference for.
+priority, and when a set is generated or regenerated, at scheduled priority.
+Those write-ups are enqueued after that hour's scheduled sets, and Solid
+Queue breaks a priority tie by job id, so they never run ahead of a
+teammate's daily set. `JobPriority::BULK` would have put them in front of
+every set still waiting. It queues nothing for a trial account
+(`User#writes_learn_content?`). Which pairs still need a write-up is
+`ConceptReference.missing_for`, the same answer Learn's prepare button uses.
+
+## A row finished by another job during the call
+
+Queue concurrency control can be bypassed (an expired permit, a direct
+`perform_now`), so two calls for one row can overlap. `#rewrite` checks the
+row again under its lock and writes nothing when it is already fully
+written. The job then logs a skip, and it leaves any failure note alone,
+since this call wrote nothing.

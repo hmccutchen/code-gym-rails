@@ -67,7 +67,7 @@ GenerateDailyExercisesJob(user_id:), from the hand-out or the dashboard:
   reminder)
   a job that saved a set (this one or RegenerateExerciseJob) queues the
   user's missing concept write-ups (GenerateConceptReferenceJob.queue_missing,
-  JobPriority::BULK), leaving out concepts the set hides until submission
+  JobPriority::SCHEDULED, behind that hour's sets), leaving out concepts the set hides until submission
     └→ AiService.for(user) → ClaudeService | GeminiService | OpenaiService
          reads: user.recent_performance (latest qualifying assessed answers)
                 user.recent_delivered_content (repetition-only notes)

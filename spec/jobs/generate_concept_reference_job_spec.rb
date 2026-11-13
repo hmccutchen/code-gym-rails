@@ -402,5 +402,24 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       expect(row.tagline).to eq("old tagline")
       expect(row.generation_version).to eq(1)
     end
+
+    it "logs a skip, not a generation, and keeps the failure note when the row became fully written during the call" do
+      row = legacy_row
+      service = stub_service
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+      allow(service).to receive(:generate_concept_reference) do
+        ConceptReferenceFailures.record(user_id: user.id, concept: "n_plus_one", language: "ruby_rails",
+                                        error: ProviderError::RateLimitError.new("slow down"))
+        row.update!(reference_hash.merge("lesson" => { "definition" => "winner" }))
+        reference_hash
+      end
+      allow(Rails.logger).to receive(:info)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+
+      expect(Rails.logger).to have_received(:info).with(/Skipped concept reference for n_plus_one\/ruby_rails: already fully written/)
+      expect(Rails.logger).not_to have_received(:info).with(/Generated concept reference/)
+      expect(ConceptReferenceFailures.read(user_id: user.id, concept: "n_plus_one", language: "ruby_rails")).to be_present
+    end
   end
 end

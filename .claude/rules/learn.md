@@ -40,7 +40,7 @@ read it before changing that area.
 
 - **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
   `concept_references` and `recognition_guides` carry a nullable `user_id`.
-  It ships in five steps with deploy gates between them; follow that doc's
+  It ships in six steps with deploy gates between them; follow that doc's
   order and the obligations it lists for each step. Until the last step, rows
   with no user are the shared ones, kept unique by partial indexes, and
   deletion leaves them. Since L2 every concept reference is written as its

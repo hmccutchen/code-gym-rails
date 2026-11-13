@@ -72,6 +72,33 @@ RSpec.describe ConceptReference do
 
       expect(seen).to eq([ "n_plus_one", "ruby_rails" ] => own, [ "caching", "ruby_rails" ] => shared_only)
     end
+
+    it "lists the pairs a user sees no reference for, in the order given, ignoring another user's row" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
+      ConceptReference.create!(concept: "caching", language: "ruby_rails", user: other)
+      ConceptReference.create!(concept: "closures", language: "javascript", user: owner)
+      pairs = [ [ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ], [ "closures", "javascript" ], [ "memoization", "ruby_rails" ] ]
+
+      expect(ConceptReference.missing_for(owner, pairs)).to eq([ [ "caching", "ruby_rails" ], [ "memoization", "ruby_rails" ] ])
+      expect(ConceptReference.missing_for(owner, [])).to eq([])
+    end
+
+    it "counts any user's row as a concept written up, for the admin promote check" do
+      ConceptReference.create!(concept: "circuit_breaker", language: "ruby_rails", user: other)
+      ConceptReference.create!(concept: "debounce", language: "javascript")
+
+      expect(ConceptReference.written_up?(language: "ruby_rails", concept: "circuit_breaker")).to be(true)
+      expect(ConceptReference.written_up?(language: "javascript", concept: "circuit_breaker")).to be(false)
+      expect(ConceptReference.written_up_keys(languages: [ "ruby_rails", "javascript" ]))
+        .to eq(Set[[ "ruby_rails", "circuit_breaker" ], [ "javascript", "debounce" ]])
+      expect(ConceptReference.written_up_keys(languages: [ "javascript" ])).to eq(Set[[ "javascript", "debounce" ]])
+    end
+  end
+
+  it "lists every field a write-up fills: the reference, guide, ladder and lesson" do
+    expect(ConceptReference::WRITTEN_FIELDS).to eq(
+      ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS + ConceptReference::LADDER_FIELDS + [ "lesson" ]
+    )
   end
 
   describe "#guide?" do

@@ -83,16 +83,15 @@ class DailyExercise < ApplicationRecord
   def concept_pairs(before_submission: false)
     withheld = before_submission ? concepts_withheld_before_submission : []
     active_section_keys.filter_map do |key|
-      concept = problem_set.dig(key, "concept")
-      [ concept, ConceptBucket.for(key, language) ] if concept.present? && concept != "other" && withheld.exclude?(concept)
+      concept = tagged_concept(key)
+      [ concept, ConceptBucket.for(key, language) ] if concept && withheld.exclude?(concept)
     end.uniq
   end
 
   def concepts_withheld_before_submission
     active_section_keys.filter_map do |key|
-      section = problem_set[key]
-      concept = section&.dig("concept")
-      concept if concept.present? && concept != "other" && !ExerciseSection.for(key).concept_shown_before_submission?(section)
+      concept = tagged_concept(key)
+      concept if concept && !ExerciseSection.for(key).concept_shown_before_submission?(problem_set[key])
     end
   end
 
@@ -116,5 +115,12 @@ class DailyExercise < ApplicationRecord
       lock!
       yield DailyResponse.lock.find_by(daily_exercise_id: id)
     end
+  end
+
+  private
+
+  def tagged_concept(key)
+    concept = problem_set.dig(key, "concept")
+    concept if concept.present? && concept != "other"
   end
 end

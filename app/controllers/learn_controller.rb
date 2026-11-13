@@ -15,7 +15,7 @@ class LearnController < ApplicationController
     @buckets    = learn_buckets.map do |bucket|
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
-    @ungenerated = ungenerated_concepts(@references).size
+    @ungenerated = ungenerated_concepts.size
     @recognition_guides = RecognitionGuide.where(group_key: recognition_group_keys).index_by(&:group_key)
     @ungenerated_guides = recognition_group_keys.size - @recognition_guides.size
   end
@@ -73,9 +73,7 @@ class LearnController < ApplicationController
   def prepare
     return redirect_to learn_path unless current_user.writes_learn_content?
 
-    references = references_by_key
-
-    ungenerated_concepts(references).each do |concept, bucket|
+    ungenerated_concepts.each do |concept, bucket|
       bulk(GenerateConceptReferenceJob).perform_later(concept: concept, language: bucket, user_id: current_user.id)
     end
 
@@ -129,12 +127,9 @@ class LearnController < ApplicationController
     ConceptReference.seen_by(current_user, language: learn_buckets)
   end
 
-  def ungenerated_concepts(references)
-    learn_buckets.flat_map do |bucket|
-      ConceptBucket.vocabulary_for(bucket)
-                   .reject { |concept| references.key?([ concept, bucket ]) }
-                   .map { |concept| [ concept, bucket ] }
-    end
+  def ungenerated_concepts
+    pairs = learn_buckets.flat_map { |bucket| ConceptBucket.vocabulary_for(bucket).map { |concept| [ concept, bucket ] } }
+    ConceptReference.missing_for(current_user, pairs)
   end
 
   def recognition_group_keys
