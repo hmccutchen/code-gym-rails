@@ -74,14 +74,34 @@ of that user wait. An advisory lock needs no schema and belongs to the
 database session, so a worker that dies mid-call drops it with its
 connection and nothing goes stale.
 
+## What the job keeps and what the model does
+
+The job keeps the provider call, the claim, the failure notes and the
+logging. The save is `ConceptReference.write_for`, which returns
+`:written`, `:skipped` or `:account_deleted`, and the job logs each one
+(issue #790). The claim stays here because `AdvisoryLock` is in
+`app/clients`, which `Archspec.rb` bars models from using. The question
+"is a write still wanted?" is `ConceptReference.write_wanted?`, which the
+job asks before the claim and again under it, and `.write_for` asks a
+third time, under the row lock when the row exists and before its insert
+when it does not. The model's code note has the lock order, the skip rules
+and the creation race this job's `rescue` answers.
+
 ## An account deleted during the call
 
-The provider call runs outside any lock. Before writing, the job share-locks
-the user row, the lock `AccountDeletion` takes for update. If deletion
-committed first, the user is gone and the job writes nothing, so the insert
-never fails on the foreign key. If the write committed first, deletion waits
-for it and then deletes the new row with the rest of the account. Either way
-the job finishes cleanly and leaves no failed execution naming the user.
+The provider call runs outside any lock. `.write_for` share-locks the user
+row before it writes, the lock `AccountDeletion` takes for update. If
+deletion took that lock first, the write waits for it to commit, then finds
+the user gone and writes nothing, so the insert never fails on the foreign
+key. If the write took it first, deletion waits for it and then deletes the
+new row with the rest of the account. Either way the job finishes cleanly
+and leaves no failed execution naming the user.
+
+`generate_concept_reference_account_deletion_concurrency_spec.rb` runs the
+job and the deletion on two connections. It covers three cases: the write
+holds the lock first, for a new row and for a refresh's rewrite, and
+deletion holds it first while a new row's write waits. The job spec covers
+a deletion that commits during the provider call, before the write starts.
 
 ## `.queue_missing`
 
@@ -96,15 +116,37 @@ front of every set still waiting. It queues nothing for a trial account
 (`User#writes_learn_content?`). Which pairs still need a write-up is
 `ConceptReference.missing_for`, the same answer Learn's prepare button uses.
 
+## `.queue_for_new_set`
+
+`GenerateDailyExercisesJob` and `RegenerateExerciseJob` queue a new set's
+write-ups through it, after the set is saved. An enqueue can raise there:
+Solid Queue turns a database error during the insert into
+`SolidQueue::Job::EnqueueError`, which is not the `ActiveJob::EnqueueError`
+that `perform_later` catches, and `ConceptReference.missing_for` reads the
+database first, so a lost connection can raise from that read. Before #790
+either error failed the set's job although the set had landed, and a
+scheduled job then skipped the reminder push.
+
+It rescues only those failures: `SolidQueue::Job::EnqueueError`, and
+connection loss, which Rails raises as `ActiveRecord::ConnectionNotEstablished`
+(with `ConnectionTimeoutError`, a subclass, when the pool has no free
+connection) or as `ActiveRecord::ConnectionFailed` when the connection drops
+during a query. It logs them at error level and the set's job goes on. The
+missing write-ups are queued again on submit, or by Learn's prepare button.
+Any other database error, such as a `StatementInvalid` from a broken query
+in `missing_for`, is a defect, so it is not rescued and fails the job where
+it can be seen. The job spec holds both sides, and the daily job's spec
+raises `SolidQueue::Job::EnqueueError` from the queue adapter itself.
+
 ## A row written by another writer during the call
 
 A direct `perform_now`, or a permit that expired while its job was still
 running, bypasses only the queue's permit. Both still run `perform`, so they
 take the claim and never overlap another job's call. An older worker during
 a deploy takes no claim, so its call can overlap a new job's call for the
-same row, and a migration that copies rows writes without the claim too. That is why `#rewrite`
-keeps its row lock: under it, the job asks the same question it asked before the call
-(`#wanted?`, with its `refresh` and `seen_version`) of the locked row. A plain write-up that
+same row, and a migration that copies rows writes without the claim too. That is why
+`ConceptReference.write_for` keeps its row lock: under it, it asks the same question the job asked before the call
+(`.write_wanted?`, with its `refresh` and `seen_version`) of the locked row. A plain write-up that
 finds a row it did not see, a rewrite whose version the row has moved past, and any job that
 finds the row fully written all write nothing. The job then logs a skip, and it leaves any
 failure note alone, since this call wrote nothing.

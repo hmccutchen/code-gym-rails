@@ -146,6 +146,33 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
     end
   end
 
+  describe ".queue_for_new_set" do
+    let(:exercise) { instance_double(DailyExercise, date: Date.new(2026, 7, 13), concept_pairs: [ %w[n_plus_one ruby_rails] ]) }
+
+    before { allow(Rails.logger).to receive(:error) }
+
+    it "logs a lost connection as an error and returns" do
+      allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::ConnectionNotEstablished, "connection lost")
+
+      expect { described_class.queue_for_new_set(user, exercise) }.not_to raise_error
+      expect(Rails.logger).to have_received(:error).with(/Could not queue concept write-ups for user #{user.id}.*ConnectionNotEstablished/)
+    end
+
+    it "logs a connection dropped mid-query as an error and returns" do
+      allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::ConnectionFailed, "server closed the connection")
+
+      expect { described_class.queue_for_new_set(user, exercise) }.not_to raise_error
+      expect(Rails.logger).to have_received(:error).with(/ConnectionFailed/)
+    end
+
+    it "raises a query error from reading the missing pairs, which is a defect and not a failed enqueue" do
+      allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::StatementInvalid, "PG::UndefinedColumn")
+
+      expect { described_class.queue_for_new_set(user, exercise) }.to raise_error(ActiveRecord::StatementInvalid)
+      expect(Rails.logger).not_to have_received(:error)
+    end
+  end
+
   describe "ownership" do
     let(:teammate) { User.create!(email: "teammate@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-other" }) }
 
@@ -348,20 +375,6 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       expect(row.attributes.slice(*attributes.keys)).to eq(attributes)
     end
 
-    it "advances from the locked counter when another incomplete refresh finishes during the provider call" do
-      row = legacy_row
-      service = stub_service
-      allow(service).to receive(:generate_concept_reference) do
-        row.update!(generation_version: 1, ladder_junior: "another attempt")
-        reference_hash.except(*ConceptReference::LADDER_FIELDS)
-      end
-
-      described_class.perform_now(concept: row.concept, language: row.language, user_id: user.id, refresh: true)
-
-      expect(row.reload.generation_version).to eq(2)
-      expect(row).not_to be_ladder
-    end
-
     it "rewrites a guided row that has no ladder when asked to refresh" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "old", user: user,
                                guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
@@ -447,49 +460,6 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
         expect(row.tagline).to eq("added meanwhile")
         expect(row.generation_version).to eq(1)
       end
-
-      it "is left alone by a refresh asked for when the user saw no row" do
-        add_row_during_the_call
-
-        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
-
-        expect(ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails").generation_version).to eq(1)
-      end
-
-      it "is rewritten by a refresh from older code, which names no version, while it is incomplete" do
-        add_row_during_the_call
-
-        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
-
-        row = ConceptReference.find_by!(user: user, concept: "n_plus_one", language: "ruby_rails")
-        expect(row.tagline).to eq("Avoid N+1 by eager loading.")
-        expect(row.generation_version).to eq(2)
-      end
-    end
-
-    # Two jobs can both pass the fully_written? check; the second to write must discard its result.
-    it "does not overwrite a row that became fully written between the check and the write" do
-      row = legacy_row
-      stub_service
-
-      allow_any_instance_of(ConceptReference).to receive(:with_lock) do |record, &block|
-        record.update!(
-          guide_plain_language: "winner plain", guide_worked_example: "winner worked",
-          guide_pitfalls: "winner pitfalls",
-          ladder_junior: "winner j", ladder_mid_level: "winner m", ladder_senior: "winner s", ladder_principal_engineer: "winner p",
-          lesson: { "definition" => "winner" }, generation_version: 1
-        )
-        block.call
-      end
-
-      described_class.perform_now(
-        concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true
-      )
-
-      row.reload
-      expect(row.guide_plain_language).to eq("winner plain")
-      expect(row.tagline).to eq("old tagline")
-      expect(row.generation_version).to eq(1)
     end
 
     it "logs a skip, not a generation, and keeps the failure note when the row became fully written during the call" do

@@ -54,9 +54,9 @@ RSpec.describe ConceptReference do
     it "never gives one user another user's row" do
       own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
 
-      expect(ConceptReference.for(owner, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
-      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to be_nil
-      expect(ConceptReference.visible_to(other)).to be_empty
+      expect(owner.concept_references.find_by(concept: "n_plus_one", language: "ruby_rails")).to eq(own)
+      expect(other.concept_references.find_by(concept: "n_plus_one", language: "ruby_rails")).to be_nil
+      expect(other.concept_references).to be_empty
     end
 
     it "indexes the user's own rows by concept and language, leaving out other users' rows" do
@@ -64,9 +64,9 @@ RSpec.describe ConceptReference do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "theirs", user: other)
       ConceptReference.create!(concept: "memoization", language: "ruby_rails", user: other)
 
-      seen = ConceptReference.seen_by(owner, language: "ruby_rails")
+      owned = ConceptReference.indexed_for(owner, language: "ruby_rails")
 
-      expect(seen).to eq([ "n_plus_one", "ruby_rails" ] => own)
+      expect(owned).to eq([ "n_plus_one", "ruby_rails" ] => own)
     end
 
     it "lists the pairs a user has no reference of their own for, in the order given" do
@@ -202,6 +202,156 @@ RSpec.describe ConceptReference do
       independent.combination(2).each do |a, b|
         expect(ConceptBucket.vocabulary_for(a) & ConceptBucket.vocabulary_for(b)).to be_empty
       end
+    end
+  end
+
+  describe ".write_for" do
+    let(:reply) { { "tagline" => "new tagline", "explanation" => "new", "guide_plain_language" => "p" } }
+
+    def write(user = owner, refresh: false, seen_version: nil)
+      described_class.write_for(user, concept: "n_plus_one", language: "ruby_rails", attributes: reply,
+                                      refresh: refresh, seen_version: seen_version)
+    end
+
+    def own_row(version: 0, **fields)
+      described_class.create!(fields.merge(user: owner, concept: "n_plus_one", language: "ruby_rails", generation_version: version))
+    end
+
+    def locks_taken(&)
+      statements = []
+      subscriber = ->(*, payload) { statements << payload[:sql] if payload[:sql].match?(/FOR (SHARE|UPDATE)/) }
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record", &)
+      statements.map { |sql| "#{sql[/FROM "(\w+)"/, 1]} #{sql[/FOR (SHARE|UPDATE)/]}" }
+    end
+
+    it "creates the user's own row at version 1 from the reply's written fields, leaving the rest blank" do
+      expect(write).to eq(:written)
+
+      row = described_class.sole
+      expect([ row.user, row.tagline, row.generation_version, row.ladder_junior ]).to eq([ owner, "new tagline", 1, nil ])
+    end
+
+    it "writes nothing for an account deleted before the write" do
+      User.where(id: owner.id).delete_all
+
+      expect(write).to eq(:account_deleted)
+      expect(described_class.count).to eq(0)
+    end
+
+    it "writes nothing for an anonymized account" do
+      owner.update_columns(anonymized_at: Time.current)
+
+      expect(write).to eq(:account_deleted)
+      expect(described_class.count).to eq(0)
+    end
+
+    it "share-locks the owner before it inserts" do
+      expect(locks_taken { write }).to eq([ "users FOR SHARE" ])
+    end
+
+    it "share-locks the owner before it locks the row it rewrites" do
+      own_row(tagline: "old")
+
+      expect(locks_taken { write(refresh: true) }).to eq([ "users FOR SHARE", "concept_references FOR UPDATE" ])
+    end
+
+    it "rewrites an incomplete row on a refresh, replacing every written field and advancing its version" do
+      row = own_row(version: 2, tagline: "old", ladder_junior: "j")
+
+      expect(write(refresh: true, seen_version: 2)).to eq(:written)
+      expect([ row.reload.tagline, row.ladder_junior, row.generation_version ]).to eq([ "new tagline", nil, 3 ])
+    end
+
+    it "advances from the row's current version when a refresh names none" do
+      row = own_row(version: 1, tagline: "old")
+
+      expect(write(refresh: true)).to eq(:written)
+      expect(row.reload.generation_version).to eq(2)
+    end
+
+    it "leaves a row it did not see alone on a plain write-up" do
+      row = own_row(version: 1, tagline: "added meanwhile")
+
+      expect(write).to eq(:skipped)
+      expect([ row.reload.tagline, row.generation_version ]).to eq([ "added meanwhile", 1 ])
+    end
+
+    it "leaves a row alone on a refresh asked for against another version" do
+      row = own_row(version: 1, tagline: "added meanwhile")
+
+      expect(write(refresh: true, seen_version: 0)).to eq(:skipped)
+      expect(row.reload.generation_version).to eq(1)
+    end
+
+    it "leaves a fully written row alone even on a refresh" do
+      row = own_row(tagline: "kept", guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
+                    ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p",
+                    lesson: { "definition" => "d" })
+
+      expect(write(refresh: true)).to eq(:skipped)
+      expect([ row.reload.tagline, row.generation_version ]).to eq([ "kept", 0 ])
+    end
+
+    it "asks again under the row lock, so a row fully written after the read is left alone" do
+      row = own_row(tagline: "old")
+      allow_any_instance_of(described_class).to receive(:with_lock) do |record, &block|
+        record.update!(guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x",
+                       ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p",
+                       lesson: { "definition" => "winner" }, generation_version: 1)
+        block.call
+      end
+
+      expect(write(refresh: true)).to eq(:skipped)
+      expect([ row.reload.tagline, row.generation_version ]).to eq([ "old", 1 ])
+    end
+
+    it "writes nothing when a refresh asked against a row that has since gone" do
+      expect(write(refresh: true, seen_version: 2)).to eq(:skipped)
+      expect(described_class.count).to eq(0)
+    end
+
+    it "creates the row on a refresh asked when the user saw none" do
+      expect(write(refresh: true, seen_version: 0)).to eq(:written)
+      expect(described_class.sole.generation_version).to eq(1)
+    end
+
+    it "reads the user's own row past the caller's query cache" do
+      cached_reads = []
+      subscriber = ->(*, payload) { cached_reads << payload[:sql] if payload[:cached] && payload[:sql].include?("concept_references") }
+
+      described_class.cache do
+        owner.concept_references.find_by(concept: "n_plus_one", language: "ruby_rails")
+        ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { write }
+      end
+
+      expect(cached_reads).to be_empty
+    end
+
+    it "is written for a user with only another user's row" do
+      described_class.create!(user: other, concept: "n_plus_one", language: "ruby_rails", tagline: "theirs")
+
+      expect(write).to eq(:written)
+      expect(described_class.find_by!(user: other).tagline).to eq("theirs")
+    end
+  end
+
+  describe ".write_wanted?" do
+    let(:incomplete) { described_class.new(generation_version: 2) }
+
+    it "wants a first write when the user has no row and saw none" do
+      expect(described_class.write_wanted?(nil, refresh: false, seen_version: nil)).to be(true)
+      expect(described_class.write_wanted?(nil, refresh: true, seen_version: 0)).to be(true)
+    end
+
+    it "wants a rewrite of an incomplete row only on a refresh against its version, or naming none" do
+      expect(described_class.write_wanted?(incomplete, refresh: false, seen_version: nil)).to be(false)
+      expect(described_class.write_wanted?(incomplete, refresh: true, seen_version: 2)).to be(true)
+      expect(described_class.write_wanted?(incomplete, refresh: true, seen_version: nil)).to be(true)
+      expect(described_class.write_wanted?(incomplete, refresh: true, seen_version: 1)).to be(false)
+    end
+
+    it "wants no first write when the request names a version the missing row no longer has" do
+      expect(described_class.write_wanted?(nil, refresh: true, seen_version: 1)).to be(false)
     end
   end
 end

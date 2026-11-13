@@ -48,6 +48,19 @@ RSpec.describe RegenerateExerciseJob, type: :job do
       .at_priority(JobPriority::BACKGROUND)
   end
 
+  it "keeps the replacement set and finishes cleanly when queueing its write-ups fails" do
+    exercise = claimed_exercise
+    stub_provider({ "code_review" => { "question" => "new", "concept" => "n_plus_one" } })
+    allow(ConceptReference).to receive(:missing_for).and_raise(ActiveRecord::ConnectionNotEstablished, "connection lost")
+    allow(Rails.logger).to receive(:error)
+
+    expect { described_class.new.perform(user_id: user.id) }.not_to raise_error
+
+    expect(exercise.reload.problem_set.dig("code_review", "question")).to eq("new")
+    expect(user.reload.last_generation_error).to be_nil
+    expect(Rails.logger).to have_received(:error).with(/Could not queue concept write-ups for user #{user.id}.*connection lost/)
+  end
+
   it "leaves the replacement set's write-ups behind a scheduled set enqueued later, in Solid Queue's claim order" do
     claimed_exercise
     stub_provider({ "code_review" => { "question" => "new", "concept" => "n_plus_one" } })

@@ -123,6 +123,11 @@ from the same value once the removal has run. `#store_api_key` and
 `docs/decisions/per-user-api-keys.md` ("A stored key can be removed") has
 the rules.
 
+## `has_many :concept_references` and `:recognition_guides`
+
+Neither association has `dependent:`, unlike the associations around them,
+because `AccountData::FATES` is the one place that deletes a user's rows.
+
 ## `#carry_held_set_forward!`
 
 The read of `held_exercise` before the lock only avoids taking a lock when

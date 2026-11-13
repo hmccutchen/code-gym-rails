@@ -12,6 +12,8 @@ class User < ApplicationRecord
   has_many :featured_concepts, dependent: :destroy
   has_many :level_suggestion_events, dependent: :destroy
   has_many :daily_kind_swap_events, dependent: :destroy
+  has_many :concept_references
+  has_many :recognition_guides
   belongs_to :invite_code, optional: true
 
   self.ignored_columns += %w[learning_track]

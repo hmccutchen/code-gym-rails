@@ -28,20 +28,27 @@ class RecognitionGuide < ApplicationRecord
   # A row's existence stops the backfill retrying, so a partial one would stay blank forever.
   validates(*FIELDS, presence: true)
 
-  scope :visible_to, ->(user) { where(user_id: user.id) }
-
-  def self.seen_by(user, group_keys)
-    visible_to(user).where(group_key: group_keys).index_by(&:group_key)
+  def self.indexed_for(user, group_keys)
+    user.recognition_guides.where(group_key: group_keys).index_by(&:group_key)
   end
 
   def self.written_for?(user, group_key)
-    visible_to(user).exists?(group_key: group_key)
+    user.recognition_guides.exists?(group_key: group_key)
+  end
+
+  def self.write_for(user, group_key:, guide:)
+    User.transaction do
+      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
+
+      create!(guide.slice(*FIELDS).merge("group_key" => group_key, "user_id" => user.id))
+      :written
+    end
   end
 
   def self.missing_for(user, group_keys)
     return [] if group_keys.empty?
 
-    group_keys - seen_by(user, group_keys).keys
+    group_keys - indexed_for(user, group_keys).keys
   end
 
   # Nil for a block with no guide.
