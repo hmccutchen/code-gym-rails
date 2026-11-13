@@ -20,6 +20,7 @@ class ResponsesController < ApplicationController
     return head :not_found unless exercise
 
     outcome = save_answers_under_lock(exercise)
+    return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
     return render_stale_answers if outcome == :stale
 
     enqueue_concept_references(exercise) if outcome == :newly_submitted
@@ -183,6 +184,10 @@ class ResponsesController < ApplicationController
 
       newly_submitted ? :newly_submitted : :saved
     end || :failed
+  rescue ActiveRecord::RecordNotFound
+    raise if User.exists?(current_user.id)
+
+    :deleted
   end
 
   def refuse_unsubmittable

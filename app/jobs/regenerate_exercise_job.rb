@@ -6,7 +6,7 @@ class RegenerateExerciseJob < ApplicationJob
     user = User.active.find_by(id: user_id)
     return unless user
 
-    Time.use_zone(user.effective_time_zone) { regenerate(user) }
+    Time.use_zone(user.effective_time_zone) { unless_account_deleted(user) { regenerate(user) } }
   end
 
   private

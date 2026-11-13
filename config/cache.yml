@@ -1,6 +1,8 @@
 default: &default
   store_options:
     max_size: <%= 256.megabytes %>
+    # Entries hold emails, IP addresses and user ids; the longest window reading one is a day.
+    max_age: <%= 2.days.to_i %>
     namespace: <%= Rails.env %>
 
 development:

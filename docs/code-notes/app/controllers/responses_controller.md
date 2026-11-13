@@ -103,6 +103,11 @@ Takes both locks through `DailyExercise#with_response_locked`, which yields
 the exercise's one response, or nil when there is none yet, in which case
 it is found or created, then locked.
 
+When the account was deleted between sign-in and the lock, the exercise is
+gone and the lock raises `RecordNotFound`. The method returns `:deleted` for
+that, only when the user row is gone too, and `#create` answers it the way
+`require_login` answers a signed-out request: a redirect to the login page.
+
 A refused submit raises `ActiveRecord::Rollback` instead of returning
 `:failed` early. `#persisted_response_for` has already created the row by
 then, and returning early would commit it. The rollback makes the transaction

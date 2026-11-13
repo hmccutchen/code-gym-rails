@@ -68,6 +68,10 @@ class ApiKeysController < ApplicationController
   # The check can take seconds, so the lock reloads the row: another tab's change is seen, and a deleted account gets no write.
   def with_account_locked
     current_user.with_lock { current_user.anonymized? ? false : yield }
+  rescue ActiveRecord::RecordNotFound
+    raise if User.exists?(current_user.id)
+
+    false
   end
 
   def store_key(provider)

@@ -1,4 +1,3 @@
-# Preserved through User#anonymize!, like answers and ai_review.
 class ReviewFollowUp < ApplicationRecord
   belongs_to :daily_response
 

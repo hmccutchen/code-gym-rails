@@ -41,7 +41,7 @@ RSpec.describe "Forms that show a loading state", type: :system do
     expect(page).to have_current_path(account_path)
     expect(delete_button).not_to be_disabled
     expect(delete_button[:class]).not_to include("btn-loading")
-    expect(user.reload.anonymized_at).to be_nil
+    expect(User.exists?(user.id)).to be(true)
   end
 
   it "submits the delete once the confirmation is accepted" do
@@ -52,8 +52,8 @@ RSpec.describe "Forms that show a loading state", type: :system do
 
     delete_button.click
 
-    wait_for { user.reload.anonymized_at }
-    expect(user.reload.anonymized_at).to be_present
+    wait_for { !User.exists?(user.id) }
+    expect(User.exists?(user.id)).to be(false)
   end
 
   it "shows the loading label on an accepted submit and restores the button when the page comes back from the cache" do

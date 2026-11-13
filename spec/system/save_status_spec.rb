@@ -132,7 +132,7 @@ RSpec.describe "Save status", type: :system do
     visit setup_path
     find("#exercise-mix summary").click
 
-    user.anonymize!
+    AccountDeletion.call(user)
     find("#weight-challenge").set(0)
 
     expect(page).to have_css("#save-status", exact_text: I18n.t("request.signed_out"))

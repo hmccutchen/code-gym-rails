@@ -66,7 +66,9 @@ stop, by design. `spec/services/trial_isolation_spec.rb` pins
 byte-identical generation and judge calls for a trial and an own-key twin,
 and that nothing under `app/models`, `app/services`, `app/jobs`,
 `app/prompts` or `app/clients` reads trial state, apart from the trial and
-key models and `User`, which the spec names. A trial account's failures read in the
+key models, `User` and `AccountData`, which the spec names; `AccountData`
+only names the `invite_codes` table in the list of what account deletion
+does (`docs/decisions/deleting-an-account.md`). A trial account's failures read in the
 `trial` variant (`ProviderFailureText.variant_for`): the two trial kinds
 only exist there, and `daily_limit`, `bad_key` and `out_of_credit` name
 the trial's key rather than the reader's, while the rest fall back to the

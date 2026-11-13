@@ -88,9 +88,7 @@ renders it after submit, and the duck refuses to run or clear once the day is
 submitted. `SweepDuckThreadsJob` runs daily at 03:17 UTC and deletes rows
 whose exercise is dated more than `DuckThread::KEPT_FOR` ago. Start over
 empties the day's thread, as it deletes the response, and account deletion
-deletes every row. A rolled-back release has no cleanup in
-`User#anonymize!`, so an account deleted during a rollback keeps its threads
-until the sweep runs on a release that has it. At a heavy rate (three sections, six exchanges each, every
+deletes every row (`AccountDeletion`, `docs/decisions/deleting-an-account.md`). At a heavy rate (three sections, six exchanges each, every
 weekday) a year is about 1.9 MB and 260 rows per account; a light user stores
 about 160 KB. The worst case, every turn at the byte cap on four sections
 every day, is about 60 MB a year, and the trial limit bounds it for house-key
@@ -112,13 +110,13 @@ filtered from logs and `inspect` (`threads` matches the `thread` entry in
 provider prompt but the duck's own. `duck_thread_isolation_spec` holds that
 for generation, review, the judges, mastery and planning (everything under
 `app/models`, `app/services`, `app/jobs`, `app/prompts` and `app/clients`
-but `DuckThread`, `DailyExercise`, `User` and the sweep job); the dashboard's duck partial
+but `DuckThread`, `DailyExercise`, `User`, `AccountData`, which only names the table, and the sweep job); the dashboard's duck partial
 is the only other reader. Giving them a
 reader, or a longer window, is a new decision, not an extension of this one.
 
 **User-facing text.** The app has no privacy page. The account page's danger
-zone ("Your exercise history is kept anonymously for team statistics") stays
-true, because threads are deleted with the account. Nothing tells someone that
+zone says deleting the account removes everything in it, which threads are
+part of. Nothing tells someone that
 what they type to the duck is now kept for a year, and a chat box that used to
 vanish on reload invites the opposite assumption. This change adds no copy,
 since it changes no markup. A one-line disclosure near the duck or on the

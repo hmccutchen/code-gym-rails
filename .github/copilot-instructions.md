@@ -220,7 +220,7 @@ weekday — but flag it regardless of current volume; the habit is the point.
 
 **Is a synchronous external HTTP call added directly in a controller action?**
 The convention is Solid Queue for anything provider- or email-facing, unless
-blocking is explicitly by design (the AI review and anonymize-on-delete flows
+blocking is explicitly by design (the AI review and account deletion flows
 are the standing exceptions).
 
 ## Architecture — this project's conventions, not generic advice

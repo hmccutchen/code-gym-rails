@@ -2,11 +2,11 @@
 paths:
   - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes}_controller.rb"
   - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes,pending_trial_session}.rb"
-  - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user}.rb"
+  - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user,account_data}.rb"
   - "app/models/concerns/signed_in_sessions.rb"
   - "app/models/user/authenticator.rb"
-  - "app/clients/{preview_environment,preview_mail,lazy_cache_store}.rb"
-  - "app/services/preview_seed.rb"
+  - "app/clients/{preview_environment,preview_mail,lazy_cache_store,unfinished_jobs}.rb"
+  - "app/services/{preview_seed,account_deletion}.rb"
   - "app/views/{sessions,trials,user_mailer,second_factor_challenges,authenticators,recovery_codes}/**"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
   - "app/views/accounts/_authenticator.html.erb"
@@ -17,7 +17,7 @@ paths:
   - "lib/boot/app_host.rb"
   - "script/mint_invite_code.rb"
   - "railway.toml"
-  - "spec/**/*{session,login,trial,invite,preview,app_host}*"
+  - "spec/**/*{session,login,trial,invite,preview,app_host,account_deletion,user_data_coverage}*"
 ---
 
 # Sign-in, trials and preview apps
@@ -34,6 +34,17 @@ read it before changing that area.
   never read trial state (`trial_isolation_spec`); trial branches render only
   for `User#on_trial?`. Trials are paused: the login page carries no trial
   link, while the routes and gates stay in place.
+- **Deleting an account** (`docs/decisions/deleting-an-account.md`):
+  `AccountDeletion` removes the `users` row and every row that belongs to
+  the person, usage rows included, and gives back the invite seat
+  (`User#give_back_invite_seat!`). `AccountData::FATES` is the one list of
+  each table's fate, read by the service and by
+  `user_data_coverage_spec`, which fails on a table or column that refers
+  to a user with no entry; a new one needs the owner's decision before it
+  gets a fate. Locks go user, exercises, responses, mastery rows. Work in
+  flight writes nothing once the row is gone. `User#anonymize!`,
+  `anonymized_at` and `User.active` stay, uncalled by deletion, until the
+  accounts anonymized before 2026-11-11 are cleaned up.
 - **Account usage card**: `/account` shows this calendar month's own-key spend in dollars, a weekday projection held until the 4th, while generation is paused, and whenever a provider has no priced rows, and per-provider dollars from `ApiUsage.own_key_totals` and `MonthlySpend`, in the user's zone. House-key rows stay out, since the account's key did not pay for them, and rows with no price are counted as unpriced (`docs/code-notes/app/models/monthly_spend.md`).
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): an
   account signs in with its address and then the emailed code, or the
@@ -109,4 +120,4 @@ read it before changing that area.
   gone, `PATCH /profile` ignores a posted `name`, the emails and the
   welcome-back notice greet no one by name, and the generation prompt
   leaves it out. The `users.name` column is gone (#686): sign-up creates the
-  account from the email alone, and account deletion has no name to overwrite.
+  account from the email alone.

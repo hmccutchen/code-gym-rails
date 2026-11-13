@@ -571,8 +571,8 @@
 
   <section class="card danger-zone">
     <h2>Danger zone</h2>
-    <p class="card-note">Deleting your account permanently removes your email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone.</p>
-    <form id="delete-account-form" data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-confirm-message-value="Delete your account? This permanently removes your email and logs you out. It cannot be undone." class="button_to" method="post" action="/account"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button class="btn btn-danger btn-block" disabled="disabled" type="submit">Delete my account</button></form>
+    <p class="card-note">Deleting your account permanently removes it and everything in it: your email, API keys, exercises, answers, reviews and usage history. It also logs you out. This cannot be undone. Copies held outside Coding Gym, such as email you were sent and what your AI provider keeps, are not affected.</p>
+    <form id="delete-account-form" data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-confirm-message-value="Delete your account? This permanently removes your email, exercises, answers, reviews and usage history, and logs you out. It cannot be undone." class="button_to" method="post" action="/account"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button class="btn btn-danger btn-block" disabled="disabled" type="submit">Delete my account</button></form>
   </section>
 </div>
 

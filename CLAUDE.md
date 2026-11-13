@@ -264,10 +264,14 @@ rather than only catching it afterward:
 - No comment left false by the change that touched it.
 - No read across an isolation boundary. Each is pinned by a spec:
   - Nothing under `app/models`, `app/services`, `app/jobs`, `app/prompts` or
-    `app/clients` reads trial state, apart from the trial and key models and
-    `User` (`trial_isolation_spec`, which names them).
+    `app/clients` reads trial state, apart from the trial and key models,
+    `User` and `AccountData` (`trial_isolation_spec`, which names them).
   - Generation, review, both judges, `ConceptMastery` and `KindDifficulty`
     never read track or suggestion state (`level_suggestion_isolation_spec`).
+  - `AccountData`, the account-deletion fate map, names tables only to
+    delete them, so the trial, level-suggestion and duck-thread isolation
+    specs allow it; `user_data_coverage_spec` lets only `AccountDeletion`
+    use it.
   - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.
   - `#assess_difficulty` is handed no response or history, and
     `#explain_concept_differently`, `#generate_concept_reference` and

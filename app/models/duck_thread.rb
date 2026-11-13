@@ -46,7 +46,8 @@ class DuckThread < ApplicationRecord
   # The owner first, as User#carry_forward does: an account deleted while a reply was on its way stays deleted.
   def self.under_locks(exercise, expected_scope)
     transaction do
-      next :deleted if User.lock("FOR SHARE").find(exercise.user_id).anonymized?
+      owner = User.lock("FOR SHARE").find_by(id: exercise.user_id)
+      next :deleted if owner.nil? || owner.anonymized?
 
       exercise.with_response_locked do |response|
         next :submitted if response&.submitted?

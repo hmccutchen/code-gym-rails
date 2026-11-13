@@ -65,8 +65,8 @@ hear from us"; `PushSubscription` rows are the endpoints that can
 currently reach them. iOS drops subscriptions on its own, so an endpoint has to be able
 to die without taking the user's answer with it — that is what lets the next
 launch re-register silently instead of asking again for a permission the
-browser already granted. Turning reminders off clears both; anonymizing an
-account clears both, since a home-screen install keeps its browser-side
+browser already granted. Turning reminders off clears both; deleting an
+account deletes both, since a home-screen install keeps its browser-side
 subscription after the account is gone.
 
 **Only Turn on enrolls the account.** Its registration sends `enroll: true`;

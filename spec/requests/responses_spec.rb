@@ -91,6 +91,19 @@ RSpec.describe "Responses", type: :request do
       expect(response.parsed_body["submitted"]).to be(true)
       expect(user.daily_responses.sole.answers).to eq("code_review" => "Submitted elsewhere")
     end
+
+    it "answers a save for an account deleted after sign-in as a signed-out request" do
+      allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
+        AccountDeletion.call(user)
+        method.call(*args, &block)
+      end
+
+      post responses_path, params: { response: { answers: { code_review: "A late autosave" } } }, as: :json
+
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.application.login_required"))
+      expect(DailyResponse.where(user_id: user.id)).to be_empty
+    end
   end
 
   describe "partial submission finalization" do

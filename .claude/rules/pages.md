@@ -101,8 +101,8 @@ read it before changing that area.
 - **Push reminders** (`docs/decisions/push-reminders.md`): Optional weekday
   ready and afternoon nudge notifications. Intent (`User#reminder_level`) and
   transport (`PushSubscription`) are separate: an endpoint can die without
-  losing the user's answer, and turning reminders off or anonymizing clears
-  both. Only submission stops the day's nudges; `PushNudgePlan` owns the
+  losing the user's answer. Turning reminders off clears both, and deleting the account
+  deletes both. Only submission stops the day's nudges; `PushNudgePlan` owns the
   window and `QUIET_PERIOD`, which must cover a full production tick
   (`push_nudge_plan_spec`), and `DailyResponse#submit_blocker` gates the copy.
   Neither kind has a cron entry of its own: the hourly hand-out,
