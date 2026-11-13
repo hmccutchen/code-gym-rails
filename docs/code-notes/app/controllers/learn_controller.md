@@ -1,13 +1,26 @@
 # app/controllers/learn_controller.rb
 
-## `PREPARE_PER_HOUR`
+## Prepare actions
 
-The limit counts presses, not jobs. Each press queues one billed job per
-missing concept, so a single press can cost many provider calls. It skips
-an account with a key of its own (`unless: :own_key?`), and since L2 of
-`docs/decisions/learn-content-per-user.md` the accounts left, trials on the
-house key, are refused before anything is queued. So it holds back no queued
-work today.
+The prepare actions have no hourly limit (`docs/decisions/per-user-request-limits.md`
+says why it was removed in #792). A press is paid for with the account's own
+key; a trial account is refused before anything is queued
+(`User#writes_learn_content?`).
+
+## `#writes_learn_content?`
+
+The private `#writes_learn_content?` asks `User#writes_learn_content?` the
+first time a request needs it and keeps the answer, so one page never asks
+the trial question twice (#790). The actions call it, and the `learn/index`
+and `learn/show` views reach it through `helper_method`. It guards the memo
+with `defined?`, because a trial account's answer is `false` and `||=` would
+ask again. `#status` never calls it, since a poll never needs it.
+
+It replaced a `before_action` that set an instance variable for every
+action but `#status`. An action added later and left out of that hook would
+have read `nil`, which looks like a trial account, so it would have refused
+the user without any error. Asking on demand has no list of actions to keep
+in step.
 
 ## `#bulk`
 

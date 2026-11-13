@@ -14,7 +14,7 @@ class LadderCoverage
   end
 
   def self.laddered_pairs(user, pairs)
-    ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+    ConceptReference.indexed_for(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
                     .select { |_key, reference| reference.ladder? }.keys
   end
   private_class_method :laddered_pairs

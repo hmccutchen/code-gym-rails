@@ -461,7 +461,6 @@ en:
       reload_now: "Reload now"
       controls_not_ready: "Part of this page didn't finish loading, so your answers weren't submitted. Reload the page and submit again."
   learn:
-    preparing_limited: "You've started several write-ups in the last hour. Try again later."
     title: "Learn"
     intro: "Every concept your sets can draw from — read up on one whenever you like."
     encountered: "in your sets"

@@ -42,17 +42,18 @@ read it before changing that area.
   `ConceptReference` is keyed on `(user_id, concept, language)` and
   `RecognitionGuide` on `(user_id, group_key)`; every row has an owner
   (`user_id` is NOT NULL). Every reference and guide is written as its
-  user's own row, and every reader asks
-  `ConceptReference.for(user, ...)`, `.seen_by(user, ...)` or
-  `RecognitionGuide.seen_by(user, ...)`, which read the user's own rows
-  only, never another user's. The admin promote check alone counts any
+  user's own row, and every reader goes through `user.concept_references`
+  or `user.recognition_guides`, directly or through
+  `ConceptReference.indexed_for(user, ...)` or
+  `RecognitionGuide.indexed_for(user, ...)`, which index the user's own rows
+  by key, never another user's. The admin promote check alone counts any
   row. A trial account writes no Learn content (`User#writes_learn_content?`).
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
   `ConceptReferencesController#explain_differently` for another explanation,
-  capped at `MAX_ALTERNATES_PER_CONCEPT`. It reaches only a row the user
-  sees (`ConceptReference.visible_to`), and a teammate's row answers 404.
+  capped at `MAX_ALTERNATES_PER_CONCEPT`. It reaches only the user's own
+  row (`current_user.concept_references`), and a teammate's row answers 404.
   Nothing is persisted and the `ConceptReference` row is never written.
   `AiService#explain_concept_differently(user, reference, prior_alternates:)`
   takes no exercise, response or section, since it runs before submission; a

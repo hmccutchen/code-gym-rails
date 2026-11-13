@@ -15,11 +15,18 @@ class GenerateConceptReferenceJob < ApplicationJob
     end
   end
 
+  # The set is already saved, so a failed enqueue must not fail its job; submit and Learn's prepare queue the rest.
+  def self.queue_for_new_set(user, exercise)
+    queue_missing(user, exercise.concept_pairs(before_submission: true), priority: JobPriority::BACKGROUND)
+  rescue SolidQueue::Job::EnqueueError, ActiveRecord::ConnectionNotEstablished, ActiveRecord::ConnectionFailed => e
+    Rails.logger.error("Could not queue concept write-ups for user #{user.id} on #{exercise.date}: #{e.class}: #{e.message}")
+  end
+
   def self.queue_rewrites(user, pairs, priority: JobPriority::CLICK)
-    seen = ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+    owned = ConceptReference.indexed_for(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
     pairs.each do |concept, language|
       set(priority: priority).perform_later(concept: concept, language: language, user_id: user.id, refresh: true,
-                                            seen_version: seen[[ concept, language ]]&.generation_version || 0)
+                                            seen_version: owned[[ concept, language ]]&.generation_version || 0)
     end
   end
 
@@ -30,7 +37,7 @@ class GenerateConceptReferenceJob < ApplicationJob
     return if concept == "other"
 
     user = User.active.find_by(id: user_id)
-    return unless user&.writes_learn_content? && wanted?(ConceptReference.for(user, concept: concept, language: language), refresh, seen_version)
+    return unless user&.writes_learn_content? && wanted?(user, concept, language, refresh:, seen_version:)
 
     claimed = AdvisoryLock.hold(self.class.claim_key(user_id: user.id, language: language, concept: concept)) do
       write_up(user, concept, language, refresh, seen_version)
@@ -52,48 +59,20 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   private
 
-  def wanted?(seen, refresh, seen_version)
-    return false unless seen_version.nil? || seen_version == (seen&.generation_version || 0)
-
-    seen.nil? || (refresh && !seen.fully_written?)
+  def wanted?(user, concept, language, refresh:, seen_version:)
+    ConceptReference.write_wanted?(user.concept_references.find_for(concept:, language:), refresh:, seen_version:)
   end
 
   def write_up(user, concept, language, refresh, seen_version)
-    seen = ConceptReference.uncached { ConceptReference.for(user, concept: concept, language: language) }
-    return unless wanted?(seen, refresh, seen_version)
+    return unless ConceptReference.uncached { wanted?(user, concept, language, refresh:, seen_version:) }
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    case write_own(user, concept, language, reference, refresh:, seen_version:)
+    case ConceptReference.write_for(user, concept:, language:, attributes: reference, refresh:, seen_version:)
     when :account_deleted then log_deleted(user.id, concept, language)
     when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: the row changed during the call")
     else
       ConceptReferenceFailures.clear(user_id: user.id, concept: concept, language: language)
       Rails.logger.info("Generated concept reference for #{concept}/#{language}")
-    end
-  end
-
-  # The owner is share-locked first, as AccountDeletion locks it, so a deletion during the call leaves nothing behind.
-  def write_own(user, concept, language, reference, refresh:, seen_version:)
-    attributes = ConceptReference::WRITTEN_FIELDS.index_with { |field| reference[field] }
-
-    User.transaction do
-      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
-
-      own = ConceptReference.for(user, concept: concept, language: language)
-      next rewrite(own, attributes, refresh, seen_version) if own
-
-      ConceptReference.create!(attributes.merge("user_id" => user.id, "concept" => concept, "language" => language,
-                                                "generation_version" => 1))
-      :written
-    end
-  end
-
-  def rewrite(own, attributes, refresh, seen_version)
-    own.with_lock do
-      next :skipped unless wanted?(own, refresh, seen_version)
-
-      own.update!(attributes.merge(generation_version: own.generation_version + 1))
-      :written
     end
   end
 

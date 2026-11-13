@@ -1,13 +1,7 @@
 class LearnController < ApplicationController
   include LearnScope
 
-  helper_method :encountered?
-
-  PREPARE_PER_HOUR = 10
-
-  rate_limit to: PREPARE_PER_HOUR, within: 1.hour, by: -> { current_user.id }, with: -> { preparing_limited },
-             store: LazyCacheStore.new, name: "prepare", only: [ :prepare, :prepare_ladders, :prepare_concept ],
-             unless: :own_key?
+  helper_method :encountered?, :writes_learn_content?
 
   def index
     @references = references_by_key
@@ -16,7 +10,7 @@ class LearnController < ApplicationController
       { key: bucket, groups: ConceptGroup.grouped(ConceptBucket.vocabulary_for(bucket)) }
     end
     @ungenerated = ungenerated_concepts.size
-    @recognition_guides = RecognitionGuide.seen_by(current_user, recognition_group_keys)
+    @recognition_guides = RecognitionGuide.indexed_for(current_user, recognition_group_keys)
     @ungenerated_guides = missing_recognition_guides.size
   end
 
@@ -24,7 +18,7 @@ class LearnController < ApplicationController
   def show
     @bucket    = validated_bucket
     @concept   = validated_concept(@bucket)
-    @reference = ConceptReference.for(current_user, concept: @concept, language: @bucket)
+    @reference = current_user.concept_references.find_for(concept: @concept, language: @bucket)
     @ladder_targets = ladder_targets_for(@reference)
     @ladder_missing = @ladder_targets.any? && params[:ladder] == "missing"
     @lesson_missing = @reference.present? && !@reference.lesson? && params[:lesson] == "missing"
@@ -45,7 +39,7 @@ class LearnController < ApplicationController
     return head :bad_request if predicate.nil?
     return head :bad_request if AWAITING_REWRITE.include?(awaiting) && !params[:generation_version].to_s.match?(GENERATION_VERSION_FORMAT)
 
-    reference = ConceptReference.for(current_user, concept: concept, language: bucket)
+    reference = current_user.concept_references.find_for(concept:, language: bucket)
     body = { ready: reference&.public_send(predicate) || false }
     if AWAITING_REWRITE.include?(awaiting)
       body[:rewritten] = reference.present? && reference.generation_version > params[:generation_version].to_i
@@ -59,7 +53,7 @@ class LearnController < ApplicationController
   def prepare_concept
     bucket  = validated_bucket
     concept = validated_concept(bucket)
-    return head :forbidden unless current_user.writes_learn_content?
+    return head :forbidden unless writes_learn_content?
 
     ConceptReferenceFailures.clear(user_id: current_user.id, concept: concept, language: bucket)
     GenerateConceptReferenceJob.queue_rewrites(current_user, [ [ concept, bucket ] ])
@@ -69,7 +63,7 @@ class LearnController < ApplicationController
 
   # POST /learn/prepare
   def prepare
-    return redirect_to learn_path unless current_user.writes_learn_content?
+    return redirect_to learn_path unless writes_learn_content?
 
     GenerateConceptReferenceJob.queue_missing(current_user, learn_pairs, priority: JobPriority::BACKGROUND)
 
@@ -82,7 +76,7 @@ class LearnController < ApplicationController
 
   # POST /learn/prepare_ladders
   def prepare_ladders
-    gaps = current_user.writes_learn_content? ? LadderCoverage.for(current_user).gaps : []
+    gaps = writes_learn_content? ? LadderCoverage.for(current_user).gaps : []
 
     GenerateConceptReferenceJob.queue_rewrites(current_user, gaps, priority: JobPriority::BACKGROUND)
 
@@ -90,6 +84,12 @@ class LearnController < ApplicationController
   end
 
   private
+
+  def writes_learn_content?
+    return @writes_learn_content if defined?(@writes_learn_content)
+
+    @writes_learn_content = current_user.writes_learn_content?
+  end
 
   def bulk(job) = job.set(priority: JobPriority::BACKGROUND)
 
@@ -103,22 +103,15 @@ class LearnController < ApplicationController
     { failed: text.kind, message: text.brief }
   end
 
-  def preparing_limited
-    message = t("learn.preparing_limited")
-    return render_json_error(message, status: :too_many_requests) if request.format.json?
-
-    redirect_back fallback_location: learn_path, alert: message
-  end
-
   def ladder_targets_for(reference)
-    return [] unless current_user.writes_learn_content? && reference&.guide? && !reference.ladder?
+    return [] unless writes_learn_content? && reference&.guide? && !reference.ladder?
 
     LadderCoverage.for(current_user).grounding_kinds(reference.concept, reference.language)
                   .map { |kind| t("sections.#{kind.key}.name") }
   end
 
   def references_by_key
-    ConceptReference.seen_by(current_user, language: learn_buckets)
+    ConceptReference.indexed_for(current_user, language: learn_buckets)
   end
 
   def learn_pairs
