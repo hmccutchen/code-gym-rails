@@ -32,6 +32,17 @@ RSpec.describe "Authenticator setup", type: :request do
       expect(user.reload.otp_secret).to be_nil
     end
 
+    it "states the window the recent sign-in check uses" do
+      login_as(user)
+      stub_const("SignedInSessions::RECENT_SIGN_IN", 7.minutes)
+
+      travel 8.minutes do
+        get account_authenticator_path
+      end
+
+      expect(response.body).to include("signed in within the last 7 minutes")
+    end
+
     it "brings the sign-in-again button back to the setup page" do
       login_as(user)
       delete sign_in_again_account_authenticator_path

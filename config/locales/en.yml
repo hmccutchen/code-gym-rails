@@ -887,7 +887,7 @@ en:
     sign_in_again:
       page_title: "Sign in again"
       heading: "Sign in again first"
-      body: "To add an authenticator app, you need to have signed in within the last 15 minutes. Sign in again, and you'll come back here."
+      body: "To add an authenticator app, you need to have signed in within the last %{minutes} minutes. Sign in again, and you'll come back here."
       button: "Sign in again"
       notice: "Sign in again to add an authenticator app."
     copy:

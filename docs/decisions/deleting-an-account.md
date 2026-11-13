@@ -31,6 +31,12 @@ person is back on the Account page and presses Delete again. The refused
 DELETE is never replayed: the return address is a page, the way
 `require_login` saves one only for an HTML GET.
 
+The window counts from the sign-in, not from the click, as it does for the
+authenticator. Resetting the session ends it only in this browser: sessions
+live in a cookie store, so a copied cookie stays valid elsewhere until it
+expires or `sessions_valid_after` moves. That copy still carries the old
+signed stamp, so the same check refuses it a deletion.
+
 The Account page says, when the sign-in is already older than the window,
 that deleting will ask for a sign-in first. The server still decides at the
 click, so a page left open past the window gets the same redirect.
