@@ -101,11 +101,12 @@ ships one release before any code reads it for Learn
    started).** The pull request that removes the fallback also carries a
    data migration that runs the L4 copy again for every active account still missing a copy.
    It runs in the web pre-deploy step, while the code still serving reads
-   the shared rows, so every account that exists before the new web code
-   serves has its own copy first. Nobody loses text they could see. An account
-   created during that deploy, after the copy and before the new code
-   serves, gets no copy; it sees what any new account sees and generates
-   its own. The worker is not held back by the copy; "The deploy window
+   the shared rows, so every account that exists when the copy reads its
+   list of accounts has its own copy before the new web code serves. An
+   account created during that deploy, after that read and before the new
+   code serves, gets no copy; it sees what any new account sees and
+   generates its own, and the schema step's final copy covers a trial,
+   which cannot. The worker is not held back by the copy; "The deploy window
    between L4 and L5" below says what that costs. L5's migration must declare `disable_ddl_transaction!`, so the
    copy commits one user at a time; `copy_to_active_users` raises if it is
    called inside a transaction, which would hold every user's lock until
@@ -303,8 +304,9 @@ ships one release before any code reads it for Learn
 Railway does not order the web and worker deploys. During the rollout a web
 or worker still on L4 code reads the shared rows as a fallback, while L5
 code reads only own rows. The catch-up copy runs in the web pre-deploy, so by
-the time any L5 web code serves, every account that existed then owns a
-copy, and both versions show it the same text. That holds for web only. The
+the time any L5 web code serves, every account that existed when the copy
+read its list of accounts owns a copy, and both versions show it the same
+text. That holds for web only. The
 worker's pre-deploy (`db:wait_for_schema`) waits for a schema, not for
 pending migrations, so an L5 worker can run before the copy reaches a
 user. It sees no own row, so a queued write-up or guide job makes a billed
@@ -314,9 +316,13 @@ lost; the cost is extra provider calls during one deploy. Deploy web first
 and let the worker follow once the web pre-deploy has succeeded. The worker
 is not gated on the migration (`.claude/rules/deployment.md` says why).
 
-An account created during the deploy, after the catch-up and before the new
-code serves, gets no copy: L4 code shows it the shared text, and L5 code
-shows it what any new account sees and writes its own. An L4 worker may
+An account created during the deploy, after the catch-up has read its list
+of accounts and before the new code serves, gets no copy: L4 code shows it
+the shared text, and L5 code shows it what any new account sees and writes
+its own. A trial account cannot write its own, and trials can still start
+through `/trial/start` with an invite code while the login page hides the
+link, so the schema step runs the copy again before deleting the shared rows.
+Such an account is without the shared text only between L5 and that step. An L4 worker may
 also skip such an account's write-up because it sees the shared row; it is
 queued again on the next submit or Learn press. A Learn page that account
 rendered under L4 shows the shared row. After L5 its ladder and lesson poll

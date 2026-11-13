@@ -2,8 +2,9 @@
 
 Step L5 of making Learn content per user
 (`docs/decisions/learn-content-per-user.md`, "Order and deploy gates", step 6).
-It runs L4's copy again, so every active account that existed before the L5
-code serves owns a copy of each shared reference and guide.
+It runs L4's copy again, so every active account that existed when it read
+its list of accounts owns a copy of each shared reference and guide before
+the L5 code serves.
 
 ## Why it runs again
 
@@ -13,6 +14,14 @@ no copy. L5 removes the fallback, so without a second copy that account
 would lose text it could see. The migration runs in the web pre-deploy step,
 while the L4 code still serving reads the shared rows, so no account goes
 without its text before the new web code serves.
+
+The copy reads the list of active accounts once, before its loop. An account
+created after that read, while the deploy is still running, gets no copy.
+Most such accounts write their own text with their key, but a trial account
+cannot (`User#writes_learn_content?`), and trials can still start through
+`/trial/start` with an invite code even though the login page hides the
+link. The schema step runs the copy once more, before it deletes the shared
+rows, so such an account is without its text only between L5 and that step.
 
 The worker is not gated on it. Its pre-deploy waits for a schema, not for
 pending migrations, so an L5 worker can run before the copy reaches a user,
