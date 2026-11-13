@@ -37,7 +37,10 @@
 
   <section class="card danger-zone">
     <h2><%= t("accounts.show.danger_heading") %></h2>
-    <p class="card-note"><%= t("accounts.show.danger_body") %></p>
+    <p class="card-note">
+      <%= t("accounts.show.danger_body") %>
+      <%= t("accounts.show.danger_privacy_html", link: link_to(t("accounts.show.privacy_link"), privacy_path)) %>
+    </p>
     <%= button_to t("accounts.show.delete"), account_path, method: :delete,
           class: "btn btn-danger btn-block", disabled: true,
           form: { id: "delete-account-form", data: loading_form_data(confirm_message: t("accounts.show.delete_confirm")) } %>
