@@ -219,6 +219,23 @@ RSpec.describe "Checking a key when it is saved", :real_key_check, type: :reques
     end
   end
 
+  describe "an account whose row is deleted while the save is in flight" do
+    before { user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-old" }, language: "ruby_rails") }
+
+    it "writes nothing and answers as to a signed-out browser" do
+      allow_any_instance_of(GeminiService).to receive(:check_key) do
+        AccountDeletion.call(user)
+        :accepted
+      end
+
+      patch setup_path, params: { api_key: "AIzaSyPastedSecret12345", language: "javascript" }
+
+      expect(User.exists?(user.id)).to be(false)
+      expect(response).to redirect_to(login_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.application.login_required"))
+    end
+  end
+
   describe "a language changed in another tab while the check is running" do
     before do
       user.update!(provider: "anthropic", api_keys: { "anthropic" => "sk-ant-old" })

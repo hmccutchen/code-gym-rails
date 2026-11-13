@@ -120,6 +120,13 @@ every dashboard load while the user is paused.
 
 ## `#anonymize!`
 
+Account deletion no longer calls this method: since 2026-11-11 it deletes
+the row and everything that belongs to it through `AccountDeletion`
+(`docs/decisions/deleting-an-account.md`). The method, `#anonymized?`,
+`anonymized_at` and `User.active` stay until a separate run has cleaned up
+the accounts anonymized before then, and a later change drops them. What
+follows describes the method as it still stands.
+
 `with_lock` makes the method idempotent: a second call sees `anonymized?` and
 returns without overwriting `anonymized_at`.
 
@@ -129,6 +136,13 @@ The authenticator's columns come from
 them. `sessions_valid_after` stays listed here because `SignedInSessions` owns
 it. `disable!` isn't used: turning the authenticator off keeps the sign-in
 challenge and the daily cap's count, which deletion erases.
+
+## `#give_back_invite_seat!`
+
+Account deletion gives back the seat the account's invite code gave it.
+It lives here, and the seat count on `InviteCode#give_back_seat!`, because
+`trial_isolation_spec` allows only the trial models and `User` to read
+invite state; `AccountDeletion` calls it without naming the code.
 
 ## `#stored_providers`
 

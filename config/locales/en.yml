@@ -934,9 +934,9 @@ en:
       practice_heading: "Daily practice"
       reminders_heading: "Reminders"
       session_heading: "Session"
-      danger_body: "Deleting your account permanently removes your email and API key, and logs you out. Your exercise history is kept anonymously for team statistics. This cannot be undone."
+      danger_body: "Deleting your account permanently removes it and everything in it: your email, API keys, exercises, answers, reviews and usage history. It also logs you out. This cannot be undone."
       delete: "Delete my account"
-      delete_confirm: "Delete your account? This permanently removes your email and logs you out. It cannot be undone."
+      delete_confirm: "Delete your account? This permanently removes your email, exercises, answers, reviews and usage history, and logs you out. It cannot be undone."
     api_usage:
       heading: "AI usage"
       spent_label: "Spent in %{month}"

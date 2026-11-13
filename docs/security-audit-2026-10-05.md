@@ -162,7 +162,8 @@ Sizes: XS = a few lines, S = under a day, M = a few days.
   - Logout calls `reset_session` (`sessions_controller.rb:102-105`), but a
     copied cookie stays valid until it expires. Account deletion does end
     every session, because `current_user` is `User.active.find_by`
-    (`application_controller.rb:51`).
+    (`application_controller.rb:51`); since 2026-11-11 deletion removes the
+    row, so the lookup finds nothing.
   - `config.hosts` is commented out (`production.rb:94`), though the mailers
     use a fixed host.
 - **Fix:** optional. Add a per-user `session_version` checked in
@@ -629,7 +630,7 @@ bundler and actions, daily (`.github/dependabot.yml`).
 | Database not public | `postgres` has no TCP proxy and no domain (Railway, read-only query) |
 | Public services | Only `web`: `web-production-246e40.up.railway.app` and `coding-gym.pro`. `worker`, `postgres` and `temp-user-reset` have none. The open PR environment `code-gym-rails-pr-282` has a public preview URL with auto-login, an accepted tradeoff in CLAUDE.md ("Preview apps") |
 | No secrets in build or deploy logs | Searched the latest web build and recent web and worker deploy logs for `sk-ant`, `sk-`, `KEY`, `MASTER_KEY`, `ENCRYPTION_PRIMARY`, `RESEND_API_KEY` and `VAPID_PRIVATE`. The only hit was `SECRET_KEY_BASE_DUMMY=1` in the asset precompile step, which is a placeholder |
-| Account deletion | `anonymize!` (`user.rb:259-282`), under a row lock: deletes push subscriptions; clears the legacy key column; sets email to `deleted-user-<id>@anonymized.local` and name to "Deleted user"; clears `api_keys` and the login code digest, time and attempts; sets reminders to none; stamps `anonymized_at`. Keeps exercises, responses (answers and reviews), follow-ups, usage rows and mastery by design (`spec/models/user_spec.rb:1012-1030`). Every other session ends because `current_user` requires `active` (spec `sessions_spec.rb:330`), except the unused ActionCable connection (L6) |
+| Account deletion | **Changed 2026-11-11:** deletion now removes the `users` row and every row that belongs to it, usage rows included, and gives back the invite seat (`AccountDeletion`, `docs/decisions/deleting-an-account.md`); what follows describes the audited behavior. `anonymize!` (`user.rb:259-282`), under a row lock: deletes push subscriptions; clears the legacy key column; sets email to `deleted-user-<id>@anonymized.local` and name to "Deleted user"; clears `api_keys` and the login code digest, time and attempts; sets reminders to none; stamps `anonymized_at`. Keeps exercises, responses (answers and reviews), follow-ups, usage rows and mastery by design (`spec/models/user_spec.rb:1012-1030`). Every other session ends because `current_user` requires `active` (spec `sessions_spec.rb:330`), except the unused ActionCable connection (L6) |
 
 ---
 

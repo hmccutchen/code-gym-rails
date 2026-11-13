@@ -41,4 +41,8 @@ class InviteCode < ApplicationRecord
     reload if taken == 1
     taken == 1
   end
+
+  def give_back_seat!
+    self.class.where(id: id).where("redeemed_count > 0").update_all("redeemed_count = redeemed_count - 1") == 1
+  end
 end

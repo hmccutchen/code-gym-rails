@@ -16,7 +16,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     # Only a scheduled job re-checks pause and the hour; a click generates either way.
     candidates = scheduled ? ScheduledGeneration.users : User.active
     candidates.where(id: user_id).find_each do |user|
-      Time.use_zone(user.effective_time_zone) { generate_under_claim(user, scheduled: scheduled) }
+      Time.use_zone(user.effective_time_zone) { unless_account_deleted(user) { generate_under_claim(user, scheduled: scheduled) } }
     end
   end
 

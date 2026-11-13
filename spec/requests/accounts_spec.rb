@@ -76,7 +76,7 @@ RSpec.describe "Accounts", type: :request do
   end
 
   describe "DELETE /account" do
-    it "anonymizes the user, clears the session and redirects to login" do
+    it "deletes the user, clears the session and redirects to login" do
       user = create_user_with_key(email: "leaving@example.com")
       login_as(user)
 
@@ -85,13 +85,9 @@ RSpec.describe "Accounts", type: :request do
       expect(response).to redirect_to(login_path)
       follow_redirect!
       expect(response.body).to include("Your account has been deleted.")
+      expect(User.exists?(user.id)).to be(false)
+      expect(User.exists?(email: "leaving@example.com")).to be(false)
 
-      user.reload
-      expect(user).to be_anonymized
-      expect(user.email).to eq("deleted-user-#{user.id}@anonymized.local")
-      expect(user.api_key).to be_nil
-
-      # Session is gone: a follow-up request is no longer authenticated.
       get history_path
       expect(response).to redirect_to(login_path)
     end
@@ -102,20 +98,27 @@ RSpec.describe "Accounts", type: :request do
       delete account_path
 
       expect(response).to redirect_to(login_path)
-      expect(user.reload).not_to be_anonymized
+      expect(User.exists?(user.id)).to be(true)
     end
 
-    it "is a safe redirect, not an error, when submitted twice" do
+    it "signs the browser out with the same message when another tab deleted the account first" do
       user = create_user_with_key(email: "twice@example.com")
       login_as(user)
-
-      delete account_path
-      first_stamp = user.reload.anonymized_at
+      allow(AccountDeletion).to receive(:call).and_return(AccountDeletion::Outcome.new(status: :already_deleted))
 
       delete account_path
 
       expect(response).to redirect_to(login_path)
-      expect(user.reload.anonymized_at).to eq(first_stamp)
+      expect(flash[:notice]).to eq("Your account has been deleted.")
+      get history_path
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "raises on an outcome it does not handle" do
+      login_as(create_user_with_key(email: "odd@example.com"))
+      allow(AccountDeletion).to receive(:call).and_return(AccountDeletion::Outcome.new(status: :unheard_of))
+
+      expect { delete account_path }.to raise_error(ArgumentError, /unheard_of/)
     end
   end
 

@@ -68,7 +68,8 @@ RSpec.describe "Track choice and level suggestion isolation" do
 
   it "keeps track and suggestion state out of generation, review, judges, ConceptMastery, KindDifficulty and DailyKinds" do
     own = %w[app/models/level_suggestion.rb app/models/level_suggestion/evidence.rb app/models/level_suggestion_event.rb
-             app/models/level_suggestion_step.rb app/models/level_change.rb app/models/track_change.rb app/models/user.rb]
+             app/models/level_suggestion_step.rb app/models/level_change.rb app/models/track_change.rb app/models/user.rb
+             app/models/account_data.rb]
 
     readers = (isolation_scope - own).select { |file| File.read(Rails.root.join(file)).match?(state_readers) }
     expect(readers).to eq([])

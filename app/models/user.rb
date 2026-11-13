@@ -240,6 +240,8 @@ class User < ApplicationRecord
     true
   end
 
+  def give_back_invite_seat! = invite_code&.give_back_seat!
+
   def api_key = api_keys&.dig(provider)
 
   def api_key_present?

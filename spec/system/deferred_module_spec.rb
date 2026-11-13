@@ -457,7 +457,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
 
     sleep 1
-    expect(user.reload.anonymized_at).to be_nil
+    expect(User.exists?(user.id)).to be(true)
     wait_for { !page.driver.with_playwright_page { |pw| pw.evaluate(%(document.querySelector("#delete-account-form button").disabled)) } }
     expect(errors).to be_empty
   end

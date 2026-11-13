@@ -13,7 +13,9 @@ class AccountsController < ApplicationController
 
   # DELETE /account
   def destroy
-    current_user.anonymize!
+    status = AccountDeletion.call(current_user).status
+    raise ArgumentError, "Unhandled account deletion outcome: #{status}" unless AccountDeletion::STATUSES.include?(status)
+
     reset_session
     redirect_to login_path, notice: t("flash.accounts.deleted")
   end

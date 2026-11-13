@@ -140,8 +140,9 @@ User interacts:
        for, or by #index's own out-of-range correction. Each entry's
        problems fold by default and the newest entry's review opens, since the
        review is what someone opening the page came for.
-  └→ AccountsController#show/destroy  → log out, or permanently delete (anonymize)
-       the account in place while preserving all exercise/response/usage history
+  └→ AccountsController#show/destroy  → log out, or permanently delete the account:
+       AccountDeletion removes the users row and every row that belongs to it,
+       usage rows included, gives back its invite seat, and signs the browser out
   └→ AccountsController#toggle_generation → pauses as manual, or resumes, by
        the state the button posts; a resume also stamps opened_at on the
        sets that count as unopened, so the run of three starts again; a repeated pause keeps the pause time and

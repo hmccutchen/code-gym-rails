@@ -30,8 +30,8 @@ form.
 
 The confirmation lives in `submit()`, and this controller arrives with the
 rest of the page's JavaScript. A click landing before it connected submitted
-the form with no confirmation at all. On the account delete that anonymized
-the account, the one irreversible action in the app; on the dashboard's
+the form with no confirmation at all. On the account delete that removed
+the account and everything in it, the one irreversible action in the app; on the dashboard's
 Generate new set and Start over it destroyed the day's draft answers. So every
 form with a confirm message renders its button `disabled`, and `connect()`
 enables it. Awaiting readiness would not do: there is no safe way to replay an

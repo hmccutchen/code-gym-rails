@@ -51,7 +51,7 @@ RSpec.describe "The queue each job runs on" do
   end
 
   it "runs the hourly hand-out, which calls no provider, on the general queue in every environment that schedules it" do
-    hand_outs = recurring_tasks.select { |_key, options| options.fetch("class") == "EnqueueDueGenerationsJob" }
+    hand_outs = recurring_tasks.select { |_key, options| options["class"] == "EnqueueDueGenerationsJob" }
 
     expect(EnqueueDueGenerationsJob.queue_name).to eq(general_queue)
     expect(hand_outs.size).to eq(parsed("recurring.yml").size)
@@ -60,7 +60,17 @@ RSpec.describe "The queue each job runs on" do
   end
 
   it "schedules no provider job directly, so a recurring task never lands on the provider queue" do
-    expect(recurring_tasks.map { |_key, options| options.fetch("class") } & provider_job_classes.map(&:name)).to eq([])
+    expect(recurring_tasks.map { |_key, options| options["class"] } & provider_job_classes.map(&:name)).to eq([])
+  end
+
+  it "clears finished jobs in production about a day after they finish, on the general queue" do
+    key, options = parsed("recurring.yml").fetch("production").find { |_key, task| task["command"].to_s.include?("clear_finished_in_batches") }
+
+    expect(key).to be_present, "production has no recurring task that clears finished jobs"
+    expect(SolidQueue::RecurringTask.from_configuration(key, **options.symbolize_keys)).to be_valid
+    expect(recurring_queue([ key, options ])).to eq(general_queue)
+    expect(SolidQueue.clear_finished_jobs_after).to eq(1.day)
+    expect(SolidQueue.preserve_finished_jobs).to be(true)
   end
 
   it "gives each queue a worker of its own, so no worker takes both and none takes a wildcard" do

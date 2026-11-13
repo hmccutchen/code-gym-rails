@@ -7,6 +7,11 @@ production:
     class: SweepDuckThreadsJob
     schedule: "17 3 * * *"
     description: "Delete duck threads past DuckThread::KEPT_FOR"
+  clear_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    queue: default
+    schedule: "12 * * * *"
+    description: "Delete finished jobs a day after they finish, since their arguments name users"
 
 development:
   generate_daily_exercises:

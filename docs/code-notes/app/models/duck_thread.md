@@ -14,9 +14,10 @@ Called after the provider replies, never around it, so no lock is held during
 the call. Through `.under_locks` it takes the owner's user row (`FOR SHARE`),
 then `DailyExercise#with_response_locked`, then the row lock: the order
 `User#carry_forward` already uses. The user lock is there because
-`User#anonymize!` deletes threads under its own lock on that row; holding it
-means a reply that lands after the account was deleted finds the owner
-anonymized and writes nothing, instead of recreating the row. Under them it refuses the reply when the day was submitted, when the set
+`AccountDeletion` deletes threads under its own lock on that row; holding it
+means a reply that lands after the account was deleted finds no owner (or,
+for an account anonymized before real deletion, an anonymized one) and
+writes nothing, instead of recreating the row. Under them it refuses the reply when the day was submitted, when the set
 was regenerated (the committed scope differs from the one the turn was read
 under), or when the section's version moved. The caller passes the version of
 the thread it sent the provider, not the page's number, so a stored reply
@@ -48,7 +49,7 @@ nothing when there is no row.
 ## `.under_locks`
 
 `FOR SHARE` rather than `FOR UPDATE`, so two duck writes for one user don't
-queue behind each other, while `#anonymize!`'s update still waits for both.
+queue behind each other, while `AccountDeletion`'s `FOR UPDATE` still waits for both.
 
 ## `.row_for`
 

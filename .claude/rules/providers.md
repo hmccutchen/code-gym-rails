@@ -33,7 +33,7 @@ read it before changing that area.
   stores NULL. Setup removes one stored key at a time
   (`DELETE /setup/keys/:provider`). The key save, the removal and the
   preferences save all write through `ApiKeysController#with_account_locked`:
-  the user row lock, and nothing written for an anonymized account. `#remove_api_key` returns one of
+  the user row lock, and nothing written for an anonymized or deleted account. `#remove_api_key` returns one of
   `User::KEY_REMOVAL_OUTCOMES`, which the action maps to its message. The
   key in use, once removed, hands over to the most recently saved key that
   remains (`users.key_saved_times`, written with `api_keys` in one
