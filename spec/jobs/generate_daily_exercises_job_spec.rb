@@ -43,6 +43,41 @@ RSpec.describe GenerateDailyExercisesJob do
       last_generation_error: "Settings or another set changed while this set was being prepared. Generate again when ready.")
   end
 
+  describe "concept write-ups for the new set" do
+    let(:tagged_set) do
+      { "code_review" => { "question" => "q", "concept" => "n_plus_one" },
+        "design_comparison" => { "question" => "q", "concept" => "memoization" } }
+    end
+
+    it "queues the user's missing write-ups at bulk priority once the set is saved" do
+      ConceptReference.create!(concept: "memoization", language: "ruby_rails", tagline: "shared")
+      stub_provider(problem_set: tagged_set)
+
+      described_class.new.perform(user_id: user.id)
+
+      expect(user.daily_exercises.count).to eq(1)
+      queued = enqueued_jobs.select { |job| job["job_class"] == "GenerateConceptReferenceJob" }
+      expect(queued.map { |job| job["arguments"].first.slice("concept", "language", "user_id") })
+        .to eq([ { "concept" => "n_plus_one", "language" => "ruby_rails", "user_id" => user.id } ])
+      expect(queued.sole["priority"]).to eq(JobPriority::BULK)
+    end
+
+    it "queues none for a concept the set hides until it is submitted" do
+      stub_provider(problem_set: { "code_review" => { "question" => "q", "concept" => "n_plus_one", "purpose" => "Find the trap." } })
+
+      expect { described_class.new.perform(user_id: user.id) }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+    end
+
+    it "queues none when no set is saved" do
+      existing = user.daily_exercises.create!(date: Date.current, language: "ruby_rails",
+                                                               problem_set: tagged_set, generated_at: Time.current)
+      stub_provider(problem_set: tagged_set)
+
+      expect { described_class.new.perform(user_id: user.id) }.not_to have_enqueued_job(GenerateConceptReferenceJob)
+      expect(existing.reload).to be_persisted
+    end
+  end
+
   describe "the user named in log lines" do
     let(:logged) { StringIO.new }
 

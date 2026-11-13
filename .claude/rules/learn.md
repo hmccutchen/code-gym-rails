@@ -39,17 +39,23 @@ Each entry states what a change must not break. An entry that names a
 read it before changing that area.
 
 - **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
-  `concept_references` and `recognition_guides` carry a nullable `user_id`,
-  read only by account deletion until L2. It ships in five steps with deploy
-  gates between them; follow that doc's order and the obligations it lists
-  for each step. Until the last step, rows with no user are the shared ones,
-  kept unique by partial indexes, and deletion leaves them.
+  `concept_references` and `recognition_guides` carry a nullable `user_id`.
+  It ships in five steps with deploy gates between them; follow that doc's
+  order and the obligations it lists for each step. Until the last step, rows
+  with no user are the shared ones, kept unique by partial indexes, and
+  deletion leaves them. Since L2 every concept reference is written as its
+  user's own row, and every reader asks `ConceptReference.for(user, ...)` or
+  `.seen_by(user, ...)`: the user's own row, else the shared one, never
+  another user's. The admin promote check alone counts any row. A trial
+  account writes no Learn content (`User#writes_learn_content?`).
+  Recognition guides stay shared until L3.
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
   `ConceptReferencesController#explain_differently` for another explanation,
-  capped at `MAX_ALTERNATES_PER_CONCEPT`. Nothing is persisted and the shared
-  `ConceptReference` row is never written.
+  capped at `MAX_ALTERNATES_PER_CONCEPT`. It reaches only a row the user
+  sees (`ConceptReference.visible_to`), and a teammate's row answers 404.
+  Nothing is persisted and the `ConceptReference` row is never written.
   `AiService#explain_concept_differently(user, reference, prior_alternates:)`
   takes no exercise, response or section, since it runs before submission; a
   spec pins that signature. The reply carries the framing as plain text and as
@@ -58,8 +64,8 @@ read it before changing that area.
 - **The Learn tab** (`docs/decisions/the-learn-tab.md`): `/learn` lists every
   concept in the user's slice by `user.language`, never `#language_for_today`,
   and shows explanations before first exposure on this tab only.
-  `ConceptReference` is a team-wide cache keyed on `(concept, language)`; its
-  `user_id` is read only by account deletion until L2. Guide, ladder and
+  `ConceptReference` is keyed on `(user_id, concept, language)`, with the
+  shared row as a fallback until L5. Guide, ladder and
   `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written

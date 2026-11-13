@@ -4,6 +4,12 @@ Moved out of `AiService` (#431).
 
 ## `.for`
 
+Reads the ladders of the reference the user sees (`ConceptReference.seen_by`):
+their own row, else the shared one. A user whose own row has no ladder gets
+none for that concept, even when the shared row has one. It reads nothing of
+the user but the id, so `level_suggestion_isolation_spec` and
+`trial_isolation_spec` hold.
+
 Returns concept guidance keyed by the owning kind. The kind's
 `difficulty_definition` supplies the effective reference rung; vocabulary
 selection still receives the configured rung and the original gotcha and

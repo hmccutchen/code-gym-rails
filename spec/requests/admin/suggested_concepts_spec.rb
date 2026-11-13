@@ -122,6 +122,16 @@ RSpec.describe "Admin::SuggestedConcepts", type: :request do
       expect(response).to redirect_to(admin_suggested_concepts_path)
     end
 
+    it "counts a teammate's own write-up, since the check asks only whether the concept was ever written up" do
+      login_as(admin)
+      concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")
+      ConceptReference.create!(language: "ruby_rails", concept: "circuit_breaker", user: member)
+
+      patch promote_admin_suggested_concept_path(concept)
+
+      expect(concept.reload.status).to eq("promoted")
+    end
+
     it "refuses to promote when no matching ConceptReference exists, with no state change" do
       login_as(admin)
       concept = SuggestedConcept.record!(language: "ruby_rails", name: "circuit_breaker")

@@ -34,6 +34,46 @@ RSpec.describe ConceptReference do
     expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
   end
 
+  describe "ownership" do
+    let(:owner) { User.create!(email: "owner@example.com") }
+    let(:other) { User.create!(email: "other@example.com") }
+
+    it "lets each user and the shared row hold the same concept and language" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
+
+      expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails", user: other)).to be_valid
+      expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails", user: owner)).not_to be_valid
+      expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")).not_to be_valid
+    end
+
+    it "gives a user their own row over the shared one, and the shared one when they have none" do
+      shared = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
+      own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: owner)
+
+      expect(ConceptReference.for(owner, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
+      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to eq(shared)
+    end
+
+    it "never gives one user another user's row" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
+
+      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to be_nil
+      expect(ConceptReference.visible_to(other)).to be_empty
+    end
+
+    it "indexes the rows a user sees by concept and language, own rows first" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
+      own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: owner)
+      shared_only = ConceptReference.create!(concept: "caching", language: "ruby_rails")
+      ConceptReference.create!(concept: "memoization", language: "ruby_rails", user: other)
+
+      seen = ConceptReference.seen_by(owner, language: "ruby_rails")
+
+      expect(seen).to eq([ "n_plus_one", "ruby_rails" ] => own, [ "caching", "ruby_rails" ] => shared_only)
+    end
+  end
+
   describe "#guide?" do
     def reference(**guide_fields)
       ConceptReference.new(

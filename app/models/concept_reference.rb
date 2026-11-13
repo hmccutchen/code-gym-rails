@@ -5,8 +5,22 @@ class ConceptReference < ApplicationRecord
   LADDER_FIELDS    = LADDER_FIELD_FOR.values.freeze
   MAX_LADDER_RUNG_LENGTH = 300
 
+  belongs_to :user, optional: true
+
   validates :concept, :language, presence: true
-  validates :concept, uniqueness: { scope: :language }
+  validates :concept, uniqueness: { scope: %i[user_id language] }
+
+  # A row with no user is the shared one, read as a fallback until L5 (docs/decisions/learn-content-per-user.md).
+  scope :visible_to, ->(user) { where(user_id: [ nil, user.id ]) }
+
+  def self.for(user, concept:, language:)
+    seen_by(user, concept: concept, language: language)[[ concept, language ]]
+  end
+
+  def self.seen_by(user, **conditions)
+    visible_to(user).where(conditions).sort_by { |reference| reference.user_id ? 1 : 0 }
+                    .index_by { |reference| [ reference.concept, reference.language ] }
+  end
 
   # Derived from the field list; a partly blank guide answers false so the row is regenerated whole.
   def guide?

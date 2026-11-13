@@ -37,6 +37,16 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     fake_service
   end
 
+  it "queues the user's missing write-ups for the replacement set at bulk priority" do
+    claimed_exercise
+    stub_provider({ "code_review" => { "question" => "new", "concept" => "n_plus_one" } })
+
+    expect { described_class.new.perform(user_id: user.id) }
+      .to have_enqueued_job(GenerateConceptReferenceJob)
+      .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      .at_priority(JobPriority::BULK)
+  end
+
   describe "the count of account failures that holds the schedule" do
     it "is left alone when a regeneration's key is rejected, since today's set exists and its nudges still need the schedule" do
       claimed_exercise

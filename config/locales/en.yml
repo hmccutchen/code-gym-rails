@@ -476,11 +476,11 @@ en:
     write_guide: "Write this up"
     writing_guide: "Writing it up — this takes a few seconds."
     write_guide_failed: "Still working on it. Reload this page in a minute to check."
-    ladder_offer: "Optional: prepare concept-specific guidance to help the AI pitch this concept at each section's level in %{targets}. Generation works without it. This uses your API key and may change the shared reference's wording."
+    ladder_offer: "Optional: prepare concept-specific guidance to help the AI pitch this concept at each section's level in %{targets}. Generation works without it. This uses your API key and writes your own version of this reference, so its wording may change."
     write_ladder: "Prepare AI guidance"
     ladder_missing: "The reference was rewritten, but the AI difficulty guidance didn't come back. You can try again."
     code_examples: "Code examples"
-    lesson_offer: "There's a shorter lesson format for this one. Writing it uses your API key and may change the shared reference's wording."
+    lesson_offer: "There's a shorter lesson format for this one. Writing it uses your API key and writes your own version of this reference, so its wording may change."
     write_lesson: "Write the short lesson"
     lesson_missing: "The reference was rewritten, but the short lesson didn't come back. You can try again."
     lesson:
@@ -537,7 +537,7 @@ en:
     prepare_guides_prompt:
       one: "1 guide on how to look for a group's problems hasn't been written yet."
       other: "%{count} guides on how to look for each group's problems haven't been written yet."
-    prepare_cost: "Writing these up runs against your own API key, and what it writes is shared with everyone on the team."
+    prepare_cost: "Writing these up runs against your own API key. The concept write-ups are yours alone, and the guides on how to look for each group's problems are shared with everyone on the team."
     prepare_button: "Write up the rest"
     preparing: "Writing them up now — they'll appear as each one finishes."
     buckets:
@@ -679,7 +679,7 @@ en:
       one: "Prepare AI guidance for 1 concept"
       other: "Prepare AI guidance for %{count} concepts"
     ladders_explanation: "Optional: prepare concept-specific guidance that tells the AI what problems at each section's level should look like. Your levels work without it. The count is the concepts behind your sections' levels that still need guidance; this does not generate a new exercise set."
-    ladders_cost: "One provider call per concept, on your API key. What it writes is shared with everyone on the team, and rewrites those concepts' references, so their wording may change."
+    ladders_cost: "One provider call per concept, on your API key. It writes your own version of those concepts' references, so their wording may change, and no one else sees it."
     ladders_preparing:
       zero: "AI difficulty guidance is already prepared for the concepts behind your sections' levels."
       one: "Preparing AI guidance for one concept. Reload this page later to see updated coverage."

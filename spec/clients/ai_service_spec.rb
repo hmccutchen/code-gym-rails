@@ -1500,7 +1500,7 @@ RSpec.describe AiService do
                                ladder_senior: "a fresh senior rung", ladder_principal_engineer: "p")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_junior: "j", ladder_senior: "s",
                                ladder_mid_level: "a mid-level pattern rung", ladder_principal_engineer: "p")
-      expect(GenerationLadders).to receive(:for).with({ ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
+      expect(GenerationLadders).to receive(:for).with(draft.user, { ExerciseSection::Challenge => "senior" }, "ruby_rails", plan.code_review_mode,
                                                       gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
                                                .and_call_original
 
@@ -1616,7 +1616,7 @@ RSpec.describe AiService do
 
       FakeService.new("fake-key").then { |svc| ExerciseDraft.call(user, language: "javascript", provider: svc.exercise_draft_provider) }
 
-      expect(GenerationLadders).to have_received(:for).with(anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
+      expect(GenerationLadders).to have_received(:for).with(anything, anything, "javascript", :schema_review, gotcha: nil, featured_concept: nil)
     end
 
     describe "MAX_LADDER_GUIDANCE_CHARS" do
@@ -4099,6 +4099,12 @@ RSpec.describe AiService do
   end
 
   describe "#generate_concept_reference" do
+    it "is handed only the user, the concept and its language, never an exercise, response or history" do
+      params = AiService.instance_method(:generate_concept_reference).parameters
+
+      expect(params).to eq([ [ :req, :user ], [ :req, :concept ], [ :req, :language ] ])
+    end
+
     let(:valid_json) do
       {
         tagline:      "Avoid N+1 by eager loading.",

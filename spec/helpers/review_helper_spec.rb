@@ -37,6 +37,11 @@ RSpec.describe ReviewHelper, type: :helper do
   end
 
   describe "#review_short_version" do
+    before do
+      reader = user
+      helper.define_singleton_method(:current_user) { reader }
+    end
+
     let(:guide) do
       { tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
         guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "f" }

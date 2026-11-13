@@ -74,6 +74,26 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#concept_pairs" do
+    def exercise_with(code_review)
+      DailyExercise.new(user: user, date: Date.current, language: "ruby_rails", problem_set: {
+                          "code_review" => code_review, "design_comparison" => { "concept" => "god_object" },
+                          "plan_review" => { "concept" => "other" } })
+    end
+
+    it "pairs each tagged section's concept with its bucket, skipping untagged sections" do
+      expect(exercise_with({ "concept" => "memoization" }).concept_pairs)
+        .to contain_exactly([ "memoization", "ruby_rails" ], [ "god_object", ConceptBucket.for("design_comparison", "ruby_rails") ])
+    end
+
+    it "leaves out a concept withheld until submission when asked for what a fresh set may show" do
+      exercise = exercise_with({ "concept" => "memoization", "purpose" => "Sum the prices." })
+
+      expect(exercise.concept_pairs.map(&:first)).to include("memoization")
+      expect(exercise.concept_pairs(before_submission: true).map(&:first)).to eq(%w[god_object])
+    end
+  end
+
   describe "#active_section_keys" do
     it "returns the four sections a current exercise presents" do
       exercise = DailyExercise.new(problem_set: {

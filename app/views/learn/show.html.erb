@@ -55,7 +55,9 @@
   </ul>
 <% end %>
 
-<% if !@reference&.guide? %>
+<% if !current_user.writes_learn_content? %>
+  <% unless @reference&.guide? %><p class="learn-no-guide"><%= t("learn.no_guide") %></p><% end %>
+<% elsif !@reference&.guide? %>
   <%= render "learn/write_up_control", awaiting: "guide", generation_version: nil,
              message: t("learn.no_guide"), button: t("learn.write_guide") %>
 <% elsif @ladder_targets.any? %>

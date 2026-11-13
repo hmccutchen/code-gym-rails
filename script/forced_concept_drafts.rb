@@ -26,7 +26,7 @@ class ForcedConceptDrafts
   def self.rung_draft(user, language, rung, kind: KIND, plan: todays_plan(user, language))
     difficulty = KindDifficulty.new(levels: { kind.key => rung }, locked: [ kind.key ])
     kinds      = plan.kinds
-    ladders    = GenerationLadders.for(difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
+    ladders    = GenerationLadders.for(user, difficulty.rungs_for(kinds, skill_level: user.skill_level), language,
                                        plan.code_review_mode, gotcha: plan.code_review_gotcha, featured_concept: plan.featured_concept)
     history    = user.recent_performance
 

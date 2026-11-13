@@ -1,35 +1,34 @@
+# Design notes: docs/code-notes/app/jobs/generate_concept_reference_job.md
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :provider_calls
 
-  limits_concurrency key: ->(args) { "#{args.fetch(:language)}/#{args.fetch(:concept)}" },
+  limits_concurrency key: ->(args) { "#{args.fetch(:user_id)}/#{args.fetch(:language)}/#{args.fetch(:concept)}" },
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
+  WRITTEN_FIELDS = (ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS + ConceptReference::LADDER_FIELDS + [ "lesson" ]).freeze
+
+  def self.queue_missing(user, pairs, priority: JobPriority::CLICK)
+    return if pairs.empty? || !user.writes_learn_content?
+
+    seen = ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+    pairs.reject { |pair| seen.key?(pair) }.each do |concept, language|
+      set(priority: priority).perform_later(concept: concept, language: language, user_id: user.id)
+    end
+  end
+
   # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
-  def perform(concept:, language:, user_id:, refresh: false) # rubocop:disable Metrics/MethodLength
+  def perform(concept:, language:, user_id:, refresh: false)
     return if concept == "other"
 
-    # Another job may have generated it in the enqueue/run gap.
-    existing = ConceptReference.find_by(concept: concept, language: language)
-    return if existing && (existing.fully_written? || !refresh)
+    user = User.active.find_by(id: user_id)
+    return unless user&.writes_learn_content?
 
-    user = User.find_by(id: user_id)
-    return unless user
+    seen = ConceptReference.for(user, concept: concept, language: language)
+    return if seen && (seen.fully_written? || !refresh)
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    attributes = (ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS + ConceptReference::LADDER_FIELDS + [ "lesson" ])
-                   .index_with { |field| reference[field] }
-
-    if existing
-      # An expired permit or a direct perform_now bypasses queue concurrency control, so keep the lock.
-      existing.with_lock do
-        next if existing.fully_written?
-
-        existing.update!(attributes.merge(generation_version: existing.generation_version + 1))
-      end
-    else
-      ConceptReference.create!(attributes.merge("concept" => concept, "language" => language, "generation_version" => 1))
-    end
+    return log_deleted(user_id, concept, language) if write_own(user, concept, language, reference, seen) == :account_deleted
 
     ConceptReferenceFailures.clear(user_id: user_id, concept: concept, language: language)
     Rails.logger.info("Generated concept reference for #{concept}/#{language}")
@@ -39,12 +38,43 @@ class GenerateConceptReferenceJob < ApplicationJob
 
     Rails.logger.info("Skipped duplicate concept reference for #{concept}/#{language}")
   rescue ProviderError => e
-    # Noted per user because the row is shared; an error raised after the call has no provider stamp of its own.
     e.provider ||= user&.provider
     ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)
     Rails.logger.warn("Failed to generate concept reference for #{concept}/#{language} (#{ProviderFailure.classify(e)}): #{e.message}")
   rescue SetupError => e
     ConceptReferenceFailures.record(user_id: user_id, concept: concept, language: language, error: e)
     Rails.logger.error("Setup error generating concept reference #{concept}/#{language} for user #{user_id}: #{e.message}")
+  end
+
+  private
+
+  # The owner is share-locked first, as AccountDeletion locks it, so a deletion during the call leaves nothing behind.
+  def write_own(user, concept, language, reference, seen)
+    attributes = WRITTEN_FIELDS.index_with { |field| reference[field] }
+
+    User.transaction do
+      next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
+
+      own = ConceptReference.find_by(user_id: user.id, concept: concept, language: language)
+      next rewrite(own, attributes) if own
+
+      ConceptReference.create!(attributes.merge("user_id" => user.id, "concept" => concept, "language" => language,
+                                                "generation_version" => (seen&.generation_version || 0) + 1))
+      :written
+    end
+  end
+
+  # An expired permit or a direct perform_now bypasses queue concurrency control, so keep the lock.
+  def rewrite(own, attributes)
+    own.with_lock do
+      next :skipped if own.fully_written?
+
+      own.update!(attributes.merge(generation_version: own.generation_version + 1))
+      :written
+    end
+  end
+
+  def log_deleted(user_id, concept, language)
+    Rails.logger.info("Stopped concept reference #{concept}/#{language} for user #{user_id}: the account was deleted")
   end
 end

@@ -663,6 +663,76 @@ RSpec.describe "Learn", type: :request do
     end
   end
 
+  describe "whose reference a user sees" do
+    let(:teammate) { User.create!(email: "learn-teammate@example.com") }
+
+    before { user.update!(language: "ruby_rails") }
+
+    def reference(tagline, **attrs)
+      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails", tagline: tagline, explanation: "e",
+                                 code_example: "c", senior_lens: "s" }.merge(attrs))
+    end
+
+    it "shows the user's own reference over the shared one, and never a teammate's" do
+      reference("SHARED TEXT")
+      reference("TEAMMATE TEXT", user: teammate)
+      reference("OWN TEXT", user: user)
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.body).to include("OWN TEXT")
+      expect(response.body).not_to include("SHARED TEXT", "TEAMMATE TEXT")
+    end
+
+    it "falls back to the shared reference while the user has none" do
+      reference("SHARED TEXT")
+      reference("TEAMMATE TEXT", user: teammate)
+
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+
+      expect(response.body).to include("SHARED TEXT")
+      expect(response.body).not_to include("TEAMMATE TEXT")
+    end
+
+    it "reports the user's own row on the write-up poll, not a teammate's" do
+      reference("TEAMMATE TEXT", user: teammate, guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x")
+
+      get learn_concept_status_path(bucket: "ruby_rails", concept: "n_plus_one", awaiting: "guide")
+
+      expect(response.parsed_body["ready"]).to be(false)
+    end
+
+    it "offers to write up a concept only a teammate has written" do
+      reference("TEAMMATE TEXT", user: teammate)
+
+      expect { post prepare_learn_path }
+        .to have_enqueued_job(GenerateConceptReferenceJob).with(hash_including(concept: "n_plus_one", user_id: user.id))
+    end
+  end
+
+  describe "a trial account" do
+    let(:trial) { create_trial_user }
+
+    before do
+      trial.update!(language: "ruby_rails")
+      login_as(trial)
+    end
+
+    it "is offered no write-up and queues none from any Learn action" do
+      get learn_path
+      expect(response.body).not_to include(I18n.t("learn.prepare_button"))
+      get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      expect(response.body).not_to include(I18n.t("learn.write_guide"))
+
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+        post prepare_learn_path
+        post prepare_learn_ladders_path
+      }.not_to have_enqueued_job
+      expect(response).to redirect_to(setup_path(anchor: "exercise-mix"))
+    end
+  end
+
   describe "the priority of a bulk press" do
     before { user.update!(language: "ruby_rails") }
 
