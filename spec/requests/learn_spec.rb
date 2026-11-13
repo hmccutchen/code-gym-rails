@@ -667,10 +667,19 @@ RSpec.describe "Learn", type: :request do
       expect {
         post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
       }.to have_enqueued_job(GenerateConceptReferenceJob)
-        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 0)
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["status"]).to eq("queued")
+    end
+
+    it "names the version of the reference the user sees, so a rewrite that lands first ends the request" do
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user, generation_version: 3)
+
+      expect {
+        post prepare_learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
+      }.to have_enqueued_job(GenerateConceptReferenceJob)
+        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true, seen_version: 3)
     end
 
     it "404s on an off-vocabulary pair" do
@@ -883,7 +892,7 @@ RSpec.describe "Learn", type: :request do
       }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(expected.size).times
 
       expect(GenerateConceptReferenceJob).to have_been_enqueued
-        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true)
+        .with(concept: expected.first.first, language: expected.first.last, user_id: user.id, refresh: true, seen_version: 0)
     end
 
     it "enqueues nothing for a trial account, whose house key must not fund shared rewrites" do
@@ -904,6 +913,51 @@ RSpec.describe "Learn", type: :request do
         post prepare_learn_ladders_path
       }.to have_enqueued_job(GenerateConceptReferenceJob).exactly(before_run.size - 1).times
       expect(GenerateConceptReferenceJob).not_to have_been_enqueued.with(hash_including(concept: concept))
+    end
+  end
+
+  describe "a ladder press and then a click for one concept, run on Solid Queue" do
+    include SolidQueueOrderHelpers
+
+    let(:incomplete) { ConceptReference::REFERENCE_FIELDS.index_with { "Reference text." } }
+    let(:service) { instance_double(FakeService, generate_concept_reference: incomplete) }
+
+    before do
+      user.update!(language: "ruby_rails")
+      allow(AiService).to receive(:for).and_return(service)
+    end
+
+    def run_every_provider_job
+      move_to_solid_queue(provider_jobs)
+      worker = SolidQueue::Process.create!(kind: "Worker", name: SecureRandom.uuid, pid: Process.pid,
+                                           hostname: "localhost", last_heartbeat_at: Time.current)
+      while (execution = SolidQueue::ReadyExecution.claim([ "provider_calls" ], 1, worker.id).first)
+        execution.perform
+      end
+    end
+
+    it "calls the provider once for the concept when the click's reply leaves the ladder incomplete" do
+      post prepare_learn_ladders_path
+      concept, bucket = LadderCoverage.for(user).gaps.first
+      post prepare_learn_concept_path(bucket: bucket, concept: concept)
+
+      run_every_provider_job
+
+      expect(service).to have_received(:generate_concept_reference).with(user, concept, bucket).once
+      expect(ConceptReference.find_by!(user: user, concept: concept, language: bucket).generation_version).to eq(1)
+    end
+
+    it "still rewrites on a later press made after the click's write" do
+      concept, bucket = LadderCoverage.for(user).gaps.first
+      post prepare_learn_concept_path(bucket: bucket, concept: concept)
+      run_every_provider_job
+      clear_enqueued_jobs
+
+      post prepare_learn_ladders_path
+      run_every_provider_job
+
+      expect(service).to have_received(:generate_concept_reference).with(user, concept, bucket).twice
+      expect(ConceptReference.find_by!(user: user, concept: concept, language: bucket).generation_version).to eq(2)
     end
   end
 

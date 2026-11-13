@@ -107,7 +107,11 @@ concurrency permit with `on_conflict: :discard`. One user's refresh modes
 share the permit because they write the same row; another user's job has a
 permit of its own, since it writes that user's row. A click and a bulk press
 for the same row hold separate permits, and the job's run-time claim
-(`AdvisoryLock`) keeps the two from both calling the provider. Overlapping jobs at one priority are
+(`AdvisoryLock`) keeps the two from both calling the provider. A refresh
+carries the `generation_version` the user saw when it was queued
+(`seen_version`, from `.queue_rewrites`); under the claim, one whose version
+the row has moved past skips the call, so a press queued before a click does
+not call again after the click's write. Overlapping jobs at one priority are
 discarded rather than blocked: a blocked job could make another billed call
 immediately after an incomplete result. Finishing or failing releases the
 permit, so a later explicit retry remains possible. Its expiry derives from
