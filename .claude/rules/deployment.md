@@ -55,8 +55,8 @@ paths:
   reverted only until L2 ships: its `down` refuses once any
   `concept_references` or `recognition_guides` row has a `user_id`, and
   after that the rollback floor is L2's code. L4's copy
-  (`CopySharedLearnContent`) deploys only once L2, L3 and L3b run on both
-  web and worker.
+  (`CopySharedLearnContent`) has a deploy gate, stated in step 5 of that
+  doc.
 - Never rename a migration that has been pushed: the PR app has already run
   it under its old version (see "The preview migration version is
   reconciled" in `docs/decisions/tracks.md`).

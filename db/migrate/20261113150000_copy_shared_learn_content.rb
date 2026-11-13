@@ -3,6 +3,8 @@ class CopySharedLearnContent < ActiveRecord::Migration[8.1]
   disable_ddl_transaction!
 
   def self.copy_to_active_users(connection)
+    raise ArgumentError, "#{name} must run outside a transaction: declare disable_ddl_transaction!" if connection.transaction_open?
+
     connection.select_values("SELECT id FROM users WHERE anonymized_at IS NULL ORDER BY id").each do |user_id|
       connection.transaction { copy_to(connection, Integer(user_id)) }
     end
@@ -18,6 +20,8 @@ class CopySharedLearnContent < ActiveRecord::Migration[8.1]
     { "concept_references" => %w[user_id concept language], "recognition_guides" => %w[user_id group_key] }
   end
 
+  private_class_method :owner_keys
+
   def self.copy_sql(connection, table, key, user_id)
     columns = (connection.columns(table).map(&:name) - %w[id user_id]).map { |name| connection.quote_column_name(name) }.join(", ")
 
@@ -27,6 +31,8 @@ class CopySharedLearnContent < ActiveRecord::Migration[8.1]
       ON CONFLICT (#{key.join(', ')}) DO NOTHING
     SQL
   end
+
+  private_class_method :copy_sql
 
   def up
     self.class.copy_to_active_users(connection)
