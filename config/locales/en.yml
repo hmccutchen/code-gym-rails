@@ -185,6 +185,7 @@ en:
         refused: "That call doesn't fit this record. Nothing was saved."
     accounts:
       deleted: "Your account has been deleted."
+      sign_in_to_delete: "Sign in again to delete your account. You'll come back to the Account page to confirm."
       generation_resumed_with_held_set: "Automatic daily generation resumed. The set you had waiting is on your dashboard."
       generation_resumed: "Automatic daily generation resumed."
       generation_paused: "Automatic daily generation paused."
@@ -936,6 +937,7 @@ en:
       session_heading: "Session"
       danger_body: "Deleting your account permanently removes it and everything in it: your email, API keys, exercises, answers, reviews and usage history. It also logs you out. This cannot be undone. Copies held outside Coding Gym, such as email you were sent and what your AI provider keeps, are not affected."
       delete: "Delete my account"
+      delete_needs_sign_in: "You signed in more than %{minutes} minutes ago, so you'll be asked to sign in again before the account is deleted."
       delete_confirm: "Delete your account? This permanently removes your email, exercises, answers, reviews and usage history, and logs you out. It cannot be undone."
     api_usage:
       heading: "AI usage"

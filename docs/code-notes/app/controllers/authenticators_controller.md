@@ -10,7 +10,7 @@ Turning the authenticator on or off sets `users.sessions_valid_after` to the tim
 
 ## The recent sign-in check
 
-`show` and `create` need `session[:signed_in_at]` within `User::RECENT_SIGN_IN`. A stolen session older than that can't add an authenticator the owner doesn't have. The sign-in-again page's button is `DELETE /account/authenticator/sign_in_again`, which signs out and saves this page as `return_to`, so the next sign-in comes straight back here.
+`show` and `create` need a sign-in within `User::RECENT_SIGN_IN`, checked through `RecentSignIn#signed_in_recently?`, the same check account deletion uses. A stolen session older than that can't add an authenticator the owner doesn't have. The sign-in-again page's button is `DELETE /account/authenticator/sign_in_again`, which calls `RecentSignIn#send_through_sign_in`: it signs out and saves this page as `return_to`, so the next sign-in comes straight back here.
 
 ## `no-store`
 

@@ -44,7 +44,10 @@ read it before changing that area.
   gets a fate. Locks go user, exercises, responses, mastery rows. Work in
   flight writes nothing once the row is gone. `User#anonymize!`,
   `anonymized_at` and `User.active` stay, uncalled by deletion, until the
-  accounts anonymized before 2026-11-11 are cleaned up.
+  accounts anonymized before 2026-11-11 are cleaned up. Deleting needs a
+  sign-in within `User::RECENT_SIGN_IN`, the authenticator's check
+  (`RecentSignIn`); an older session deletes nothing, is signed out and
+  comes back to Account after the next sign-in, never replaying the DELETE.
 - **Account usage card**: `/account` shows this calendar month's own-key spend in dollars, a weekday projection held until the 4th, while generation is paused, and whenever a provider has no priced rows, and per-provider dollars from `ApiUsage.own_key_totals` and `MonthlySpend`, in the user's zone. House-key rows stay out, since the account's key did not pay for them, and rows with no price are counted as unpriced (`docs/code-notes/app/models/monthly_spend.md`).
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): an
   account signs in with its address and then the emailed code, or the
