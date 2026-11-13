@@ -42,9 +42,25 @@ RSpec.describe "Privacy page", type: :request do
     expect(text).to include(I18n.t("privacy.show.stored.retention", duck_days: DuckThread::KEPT_FOR.in_days.to_i))
     expect(text).to include(I18n.t("privacy.show.cost.pause", count: UnopenedSets::PAUSE_AFTER))
     expect(text).to include(I18n.t("privacy.show.deleting.rate_limits", days: PrivacyNotice.cache_days))
+    expect(text).to include(I18n.t("privacy.show.device.cookie", days: PrivacyNotice.session_days))
     expect(text).to include("Database backups keep a copy for up to #{PrivacyNotice::BACKUP_DAYS} days.")
     expect(text).to include("Railway keeps them for #{PrivacyNotice::LOG_DAYS} days.")
     expect(text).not_to include("%{")
+  end
+
+  it "speaks for the app, with no first person, no channel to message and no Gemini aside" do
+    get privacy_path
+    text = page.at_css("main").text.gsub(I18n.t("accounts.show.delete"), "")
+
+    expect(text).not_to match(/\b(I|me|my|I'd|I'm)\b/)
+    expect(text).not_to include("Gemini")
+    expect(text).not_to include("channel")
+  end
+
+  it "says the Account page prices only Anthropic keys and counts requests for the others" do
+    get privacy_path
+
+    expect(page.at_css("main").text).to include("an estimate of this month's spend for Anthropic keys, and a request count for the others")
   end
 
   it "is linked from the login page" do
@@ -57,6 +73,9 @@ RSpec.describe "Privacy page", type: :request do
     login_as(create_user_with_key)
     get account_path
 
-    expect(page.css(".danger-zone a[href='#{privacy_path}']").map(&:text)).to eq([ I18n.t("accounts.show.privacy_link") ])
+    note = page.css(".danger-zone p").find { |paragraph| paragraph.at_css("a[href='#{privacy_path}']") }
+
+    expect(note.css("a").map(&:text)).to eq([ I18n.t("accounts.show.privacy_link") ])
+    expect(note.text.squish).to end_with(I18n.t("accounts.show.danger_privacy_html", link: I18n.t("accounts.show.privacy_link")))
   end
 end
