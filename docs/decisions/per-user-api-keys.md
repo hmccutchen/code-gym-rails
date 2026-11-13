@@ -425,7 +425,9 @@ and `User#store_api_key` touched no failure column.
   failed key: the problem is dealt with, start a set.
 - **Anything else stays**: a failure recorded against a provider that is
   neither the one saved nor the one that was in use, and a message that
-  names no provider.
+  names no provider. The quality-check message names the provider whose
+  drafts failed, so it is cleared like that provider's failure; see "The
+  quality-check message carries its provider" below.
 
 ## Switching providers clears the old provider's failure
 
@@ -448,7 +450,8 @@ generation, so no set started on the key they had just chosen.
   clear a failure the person has done nothing about.
 - **Anything else stays**: a failure recorded against a third provider, one
   recorded against the provider being switched to, and a message that
-  names no provider.
+  names no provider. The quality-check message for the provider left is
+  cleared, since it carries that provider.
 - **The failure line still names the provider that was tried.** A failure
   stores its provider, and `User#generation_failure_message` words the
   line from that and not from the provider in use when it is read
@@ -456,6 +459,40 @@ generation, so no set started on the key they had just chosen.
   still matters wherever a failure outlives a change of provider: the
   third-provider case above, and an account whose provider was changed
   without going through the model's key methods.
+
+## The quality-check message carries its provider
+
+Decided by the owner on 2026-11-13 (#782, item 1, option A). When every
+section of a daily set fails its quality check,
+`GenerateDailyExercisesJob` records "every section failed its quality
+check" with no set for the day, and a failure today ranks ahead of
+starting a generation. The drafts were written by one provider, and a
+person who moved to another provider was still held behind that message.
+
+- **Stored with the provider whose drafts failed.**
+  `User#record_generation_message!` takes an optional `provider:` and
+  writes it to `users.last_generation_failure_provider`;
+  `last_generation_failure`, the failure kind, stays nil. No column was
+  added.
+- **Why that shape.** Every reader of the kind treats a nil kind as a plain
+  message: `User#generation_failure_message` returns the stored text, and
+  `GenerationFailureHelper#regeneration_failure_line` wraps it in the same
+  "Couldn't generate" sentence as before. The key-hold count is raised only
+  by `#record_generation_failure!`, so the message never counts toward the
+  hold and never reads as "check your key". Every reader of the provider
+  column is about which provider a failure belongs to:
+  `#forget_generation_failure_from` (a key saved, removed or switched away
+  from) and `#report_call_failure`'s "own provider" check. Both now treat
+  the message as that provider's, which is the decision.
+  `#forget_generation_failure_from` clears the message text with the
+  provider.
+- **What stays provider-less.** `GenerateDailyExercisesJob::SUPERSEDED_MESSAGE`
+  ("Settings or another set changed…") is about the account's settings, not
+  a provider, and a key change does not clear it (option B was declined).
+  `RegenerateExerciseJob`'s "today's set was kept" messages stay
+  provider-less too: a set exists, so they never hold back a generation.
+- **Rows written before this change** hold the message with no provider and
+  behave as they did: nothing a key change does clears them.
 
 ### Open items
 

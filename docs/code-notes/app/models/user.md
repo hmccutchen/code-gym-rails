@@ -92,6 +92,15 @@ with `#clear_generation_failure!`, which writes at once with
 `update_columns` and would land outside that save. `#store_api_key` calls
 the same method with the provider saved and the provider in use before the
 save, read before `#put_key_in_use` changes it.
+
+`#record_generation_message!` takes an optional `provider:`, which only the
+daily job's quality-check message passes. It fills
+`last_generation_failure_provider` and leaves `last_generation_failure`
+nil, so `#generation_failure_message` still returns the text as written
+and nothing counts toward the key hold. Because the provider column is
+set, `#forget_generation_failure_from` and `#report_call_failure` treat the
+message as that provider's; the first clears `last_generation_error` with
+the rest.
 `#key_removal_outcome` names what a removal would do without doing it;
 Setup words its confirmation from it and the controller words its notice
 from the same value once the removal has run. `#store_api_key` and

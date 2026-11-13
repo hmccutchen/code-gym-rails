@@ -109,6 +109,7 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
     end
 
     it "takes the removed key's failure off the dashboard once the app has switched keys" do
+      travel_to(Time.utc(2026, 7, 13, 13, 0))
       user.record_generation_failure!(ProviderError::AuthenticationError.new("invalid x-api-key"))
       login_as(user)
       get root_path
@@ -317,6 +318,17 @@ RSpec.describe "Removing a stored key on Setup", type: :request do
         expect(page_text).to include("Generating your personalized exercise set")
         expect(page_text).not_to include("didn't accept your API key")
         expect(user.reload).to have_attributes(provider: "openai", generation_failed_today?: false)
+      end
+
+      it "starts a set after a switch away from the provider whose drafts all failed their quality check" do
+        user.record_generation_message!("every section failed its quality check", provider: "anthropic")
+        get root_path
+        expect(page_text).to include("every section failed its quality check")
+
+        patch setup_path, params: { api_key: "", provider: "openai" }
+        follow_redirect!
+
+        expect(page_text).to include("Generating your personalized exercise set")
       end
 
       it "keeps the failure when the choice posted is the provider already in use" do

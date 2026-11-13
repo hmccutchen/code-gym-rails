@@ -62,7 +62,7 @@ class GenerateDailyExercisesJob < ApplicationJob
     Rails.logger.info(result.status == :duplicate ? skipped_duplicate(user) : "Generated exercise for user #{user.id} on #{Date.current}")
   rescue ProviderError::AllSectionsRejectedError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id}: #{e.message}")
-    persist_failure(user, claim) { report_failure(user, key_used) { user.record_generation_message!(e.message) } }
+    persist_failure(user, claim) { report_failure(user, key_used) { user.record_generation_message!(e.message, provider: user.provider) } }
   rescue ProviderError, SetupError => e
     Rails.logger.error("Failed to generate exercise for user #{user.id} (#{ProviderFailure.classify(e)}): #{e.message}")
     persist_failure(user, claim) { report_failure(user, key_used) { user.record_generation_failure!(e) } }

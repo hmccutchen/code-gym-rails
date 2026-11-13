@@ -327,8 +327,21 @@ RSpec.describe "Holding scheduled generation for an account whose key keeps fail
 
       GenerateDailyExercisesJob.new.perform(user_id: user.id)
 
-      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_error: "every section failed its quality check")
+      expect(user.reload).to have_attributes(generation_failed_today?: true, last_generation_error: "every section failed its quality check",
+                                             last_generation_failure_provider: "anthropic", last_generation_failure: nil,
+                                             generation_account_failures: 0)
+      expect(user.generation_failure_message(surface: :generation)).to eq("every section failed its quality check")
       expect(missing_set_state).to eq(:generation_failed)
+    end
+
+    it "lets a switch to another stored key clear the quality-check message, so the dashboard starts a set" do
+      user.update!(api_keys: user.api_keys.merge("openai" => "sk-proj-Ab8RN6J5yPUsY9SwLxAS2DYq"))
+      provider_raising_after(ProviderError::AllSectionsRejectedError.new("every section failed its quality check")) { }
+      GenerateDailyExercisesJob.new.perform(user_id: user.id)
+
+      User.find(user.id).tap { |fresh| fresh.use_provider("openai") }.save!
+
+      expect(missing_set_state).to eq(:start_generation)
     end
 
     it "still counts a failure when the key in use did not change" do

@@ -88,6 +88,71 @@ RSpec.describe User, "removing a stored key" do
     end
   end
 
+  describe "a quality-check message recorded with the provider whose drafts failed" do
+    let(:rejected) { "every section failed its quality check" }
+
+    def record_rejection(on) = user.tap { |account| account.record_generation_message!(rejected, provider: on) }.reload
+
+    it "stores the provider, no failure kind, and renders the message unchanged" do
+      record_rejection("anthropic")
+
+      expect(user).to have_attributes(last_generation_error: rejected, last_generation_failure_provider: "anthropic",
+                                      last_generation_failure: nil, generation_account_failures: 0)
+      expect(user.generation_failure_message(surface: :generation)).to eq(rejected)
+    end
+
+    {
+      "saving a key for that provider" => ->(account) { account.store_api_key("sk-ant-new", provider: "anthropic") },
+      "switching away from that provider" => ->(account) { account.use_provider("openai") },
+      "removing that provider's key" => ->(account) { account.remove_api_key("anthropic") }
+    }.each do |name, change|
+      it "is cleared by #{name}" do
+        record_rejection("anthropic")
+
+        change.call(user)
+        user.save!
+
+        expect(user.reload).to have_attributes(generation_failed_today?: false, last_generation_error: nil)
+      end
+    end
+
+    {
+      "saving a key for another provider" => ->(account) { account.store_api_key("sk-proj-new", provider: "openai") },
+      "switching between two other providers" => ->(account) { account.use_provider("openai") },
+      "removing another provider's key" => ->(account) { account.remove_api_key("openai") }
+    }.each do |name, change|
+      it "stays after #{name}" do
+        record_rejection("gemini")
+        user.update!(provider: "anthropic") if name.start_with?("switching")
+
+        change.call(user)
+        user.save!
+
+        expect(user.reload).to have_attributes(last_generation_error: rejected, last_generation_failure_provider: "gemini")
+      end
+    end
+
+    it "keeps a message recorded before it carried a provider, as it was" do
+      user.record_generation_message!(rejected)
+      user.reload
+
+      user.use_provider("openai")
+      user.save!
+
+      expect(user.reload.last_generation_error).to eq(rejected)
+    end
+
+    it "keeps the settings-changed message, which names no provider, through a key change" do
+      user.record_generation_message!(GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
+      user.reload
+
+      user.store_api_key("sk-ant-new", provider: "anthropic")
+      user.save!
+
+      expect(user.reload.last_generation_error).to eq(GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
+    end
+  end
+
   describe "#use_provider and a failure recorded earlier" do
     def rate_limited_on(provider) = ProviderError::RateLimitError.new("slow down", http_status: 429, retry_after: 120).tap { |e| e.provider = provider }
 
