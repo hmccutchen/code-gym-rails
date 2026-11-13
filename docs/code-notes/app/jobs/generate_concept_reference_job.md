@@ -29,11 +29,13 @@ the job finishes cleanly and leaves no failed execution naming the user.
 ## `.queue_missing`
 
 The one way write-ups are queued for a set's concepts: on submit, at click
-priority, and when a set is generated or regenerated, at scheduled priority.
-Those write-ups are enqueued after that hour's scheduled sets, and Solid
-Queue breaks a priority tie by job id, so they never run ahead of a
-teammate's daily set. `JobPriority::BULK` would have put them in front of
-every set still waiting. It queues nothing for a trial account
+priority, and when a set is generated or regenerated, at
+`JobPriority::BACKGROUND`, one step below the scheduled sets, so they never
+run ahead of a teammate's daily set. At `JobPriority::SCHEDULED` they would
+tie with the sets, and Solid Queue breaks a tie by job id, so a write-up
+enqueued in an earlier hour, or early in the hourly hand-out, would run
+before a set enqueued after it. `JobPriority::BULK` would have put them in
+front of every set still waiting. It queues nothing for a trial account
 (`User#writes_learn_content?`). Which pairs still need a write-up is
 `ConceptReference.missing_for`, the same answer Learn's prepare button uses.
 

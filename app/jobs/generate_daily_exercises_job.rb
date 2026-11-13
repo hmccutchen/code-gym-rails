@@ -80,7 +80,7 @@ class GenerateDailyExercisesJob < ApplicationJob
   end
 
   def queue_write_ups(user, exercise)
-    GenerateConceptReferenceJob.queue_missing(user, exercise.concept_pairs(before_submission: true), priority: JobPriority::SCHEDULED)
+    GenerateConceptReferenceJob.queue_missing(user, exercise.concept_pairs(before_submission: true), priority: JobPriority::BACKGROUND)
   end
 
   def skipped_duplicate(user) = "Skipped duplicate generation for user #{user.id} on #{Date.current} (already generated concurrently)"
