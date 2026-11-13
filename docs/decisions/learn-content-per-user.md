@@ -33,8 +33,8 @@ The owner decided:
 A user's own rows go when the account is deleted
 (`AccountData::FATES`, `deleting-an-account.md`). Since L2, every reference
 read and write goes through `user_id`, so deletion finds the concept
-references a user has written. Recognition guides gain owned rows only at
-L3, so until then deletion finds none of those. Shared rows have no
+references a user has written. Since L3 the same holds for recognition
+guides. Shared rows have no
 `user_id`, so deletion leaves them alone until L5 removes them.
 
 ## Order and deploy gates
@@ -71,7 +71,8 @@ ships one release before any code reads it for Learn
      `ladder_offer` and `lesson_offer`, and the bulk preparation copy
      (`prepare_cost`, `ladders_cost`) that says what it writes is shared with
      everyone on the team.
-3. **L3, per-user recognition guides.** The same for guides, with the same
+3. **L3, per-user recognition guides (done, apart from any privacy copy,
+   which follows the same note as L2's).** The same for guides, with the same
    obligations: scope `RecognitionGuide`'s `uniqueness: true` on `group_key`
    to `user_id`; key `GenerateRecognitionGuideJob`'s `limits_concurrency`
    (today `recognition_guide/<group_key>`, with discard) on `user_id` too;
@@ -137,6 +138,26 @@ ships one release before any code reads it for Learn
   text, so this is accepted.
 - Until L3b ships, Learn's bulk prepare presses still run at
   `JobPriority::BULK`, ahead of the scheduled sets.
+
+## What L3 does
+
+- `RecognitionGuide.seen_by(user, group_keys)` is the one answer to which
+  guide a user sees: their own row, else the shared one, never another
+  user's. Learn's index reads it, and `RecognitionGuide.missing_for(user,
+  group_keys)` decides which guides the prepare button queues. No endpoint
+  finds a guide by id, so there is no cross-user path to close. L5 drops
+  the shared half.
+- The uniqueness validation on `group_key` is scoped to `user_id`.
+- `GenerateRecognitionGuideJob` keys its permit on user and group key. It
+  skips the call when the user already sees a guide, their own or the
+  shared one, since guides are never rewritten. It calls the provider
+  outside any lock, then writes the user's own row inside a transaction that
+  share-locks the user, and writes nothing once the account is gone. It
+  never writes a shared row, and a trial account writes nothing
+  (`User#writes_learn_content?`).
+- Learn's `prepare_cost` copy no longer says the guides are shared.
+- The recognition guide prompt is unchanged: it still takes only the group,
+  and no exercise, response or history.
 
 ## The deploy window between L1 and L2
 

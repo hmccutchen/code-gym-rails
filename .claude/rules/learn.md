@@ -48,7 +48,8 @@ read it before changing that area.
   `.seen_by(user, ...)`: the user's own row, else the shared one, never
   another user's. The admin promote check alone counts any row. A trial
   account writes no Learn content (`User#writes_learn_content?`).
-  Recognition guides stay shared until L3.
+  Since L3 recognition guides follow the same rule: the job writes the
+  user's own row, and Learn reads `RecognitionGuide.seen_by(user, ...)`.
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
   inside a concept reference asks
@@ -87,8 +88,9 @@ read it before changing that area.
   its missable requirements are stated in the problem statement, so a
   definition can't reveal one.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
-  `ConceptGroup` or language-independent bucket gets one shared
-  `RecognitionGuide` on how to look for that kind of problem. It teaches a
+  `ConceptGroup` or language-independent bucket gets one
+  `RecognitionGuide` per user on how to look for that kind of problem, with
+  the shared row as a fallback until L5. It teaches a
   process and never defines a concept or hints at a defect:
   `#generate_recognition_guide(user, group_key)` is handed no exercise,
   response or history. All three fields are required, rows are never

@@ -68,7 +68,7 @@ reads and writes each column:
 | `ApiUsage`      | user_id, tokens_in, tokens_out, purpose, date, model, cache_read_tokens, cache_write_tokens (the last three null on rows written before they existed) |
 | `ConceptMastery` | user_id, concept, language, tier (standard/reduced/paused), streak, last_rating, mastered_at, retention_interval_days, next_retention_check_on, drilled_at, drill_group, cooldown_remaining, practice_requests (non-null jsonb, default {}, per-kind mode/source/time), review_reconciliation (non-null jsonb, default {}: v1 nine-field or v2 extended baseline and ordered review/session/skip/drill correction suffix, retained from the earliest pending contribution) — one user's standing on one concept; `record_review!` and `ConceptDrills` route every write through pure policy dispatch and reconciliation |
 | `ReviewFollowUp` | daily_response_id, section, role (user/assistant), content — one message of a follow-up conversation under a review; deleted with the account (`AccountData::FATES`) |
-| `RecognitionGuide` | user_id (nullable fk; read only by account deletion until L2, see `docs/decisions/learn-content-per-user.md`), group_key (unique per user; unique among rows with no user_id through a partial index), questions, contrast, misfires — a shared guide that teaches a way of looking, written once for every teammate |
+| `RecognitionGuide` | user_id (nullable fk; the owner, or null for a shared row read as a fallback until L5, see `docs/decisions/learn-content-per-user.md`), group_key (unique per user; unique among rows with no user_id through a partial index), questions, contrast, misfires — a guide that teaches a way of looking, one per group for each user |
 | `SuggestedConcept` | language, normalized_name, display_name, occurrences, first_seen_at, last_seen_at, status (pending/promoted/dismissed), reviewed_by_id, reviewed_at — a concept tag the provider invented, held for an admin and never added to a vocabulary on its own |
 | `InviteCode`    | code_digest (SHA-256 of the raw code, unique), label, seats, redeemed_count, expires_at, trial_days, daily_request_cap |
 | `PushSubscription` | user_id, endpoint (unique), p256dh_key, auth_key, last_delivered_at — one browser install; transport for the reminder, never intent |
@@ -113,6 +113,8 @@ the reference call budget, and the dispatcher recovers expired permits after
 an interrupted worker. That lease includes queue time; it does not guarantee
 deduplication beyond its expiry. The existing row lock still guards writes
 after expiry or for direct `perform_now` calls, which bypass queue controls.
+`GenerateRecognitionGuideJob` keys its permit on user and group key the same
+way, so one user's overlapping job is discarded and a teammate's never is.
 
 Exercise mix autosaves update the open form without navigating.
 `ExerciseMixLadders` supplies the same guidance counts and labels to the initial

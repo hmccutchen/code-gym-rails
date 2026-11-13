@@ -231,6 +231,17 @@ RSpec.describe "Learn", type: :request do
       end
     end
 
+    it "renders the user's own guide over the shared one, and never another user's" do
+      create_guide("code_smell")
+      RecognitionGuide.create!(group_key: "code_smell", questions: "My own questions.", contrast: "c", misfires: "m", user: user)
+      teammate = User.create!(email: "guide-teammate@example.com")
+      RecognitionGuide.create!(group_key: "architecture", questions: "Teammate questions.", contrast: "c", misfires: "m", user: teammate)
+      get learn_path
+
+      expect(group_block("ruby_rails", "code_smell").at_css(".learn-recognition").text).to include("My own questions.")
+      expect(response.body).not_to include("Ask code_smell questions.", "Teammate questions.")
+    end
+
     it "renders no guide in a language bucket's core group" do
       RecognitionGuide::GROUP_KEYS.each { |key| create_guide(key) }
       get learn_path
@@ -799,6 +810,15 @@ RSpec.describe "Learn", type: :request do
       }.to have_enqueued_job(GenerateRecognitionGuideJob).exactly(RecognitionGuide::GROUP_KEYS.size - 1).times
 
       expect(GenerateRecognitionGuideJob).not_to have_been_enqueued.with(group_key: "code_smell", user_id: user.id)
+    end
+
+    it "enqueues a guide that only another user has" do
+      teammate = User.create!(email: "guide-prepare-teammate@example.com")
+      RecognitionGuide.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", user: teammate)
+
+      expect {
+        post prepare_learn_path
+      }.to have_enqueued_job(GenerateRecognitionGuideJob).with(group_key: "code_smell", user_id: user.id)
     end
 
     it "enqueues nothing once every concept has a row" do

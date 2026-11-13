@@ -285,12 +285,14 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/learn_lessons.rb` — `LearnLessons`: hand-written Learn-only lessons, outside every vocabulary; rendered by `LearnLessonsController` at `/learn/lessons/:lesson`
 - `app/models/section_kind_guide.rb` — `SectionKindGuide`: each kind's hand-written summary, example and one-line `short`. `responses/_kind_guide` renders the summary and example (through `_kind_about` in Setup and on the answer form); each row of a daily card's swap sheet shows the `short` line and, when checked, the example
 - `app/models/hand_written_learn_text.rb` — `HandWrittenLearnText::MODULES`: every module of static reader-facing text, which the plain-language spec checks
-- `app/models/recognition_guide.rb` — `RecognitionGuide`: the cached "how to
+- `app/models/recognition_guide.rb` — `RecognitionGuide`: the stored "how to
   look for these" piece per recognition group, which groups have one, and
-  what the prompt says each group is about.
+  what the prompt says each group is about. `.seen_by` and `.visible_to`
+  answer which guide a user sees: their own, else the shared one;
+  `.missing_for` lists the group keys a user sees no guide for.
 - `app/jobs/generate_recognition_guide_job.rb` — writes one missing
-  recognition guide; same permit and race handling as
-  `GenerateConceptReferenceJob`.
+  recognition guide as the user's own row; the same per-user permit and
+  write under a share lock on the user as `GenerateConceptReferenceJob`.
 - `app/models/concept_group.rb` — `ConceptGroup`: which display group a
   concept renders under on the Learn index, and the order groups appear in.
   Display-only, its groups and their order derived from `ConceptVocabulary::GROUPS`

@@ -54,6 +54,46 @@ RSpec.describe RecognitionGuide do
     expect(guide).to be_valid
   end
 
+  describe "ownership" do
+    let(:owner) { User.create!(email: "guide-owner@example.com") }
+    let(:other) { User.create!(email: "guide-other@example.com") }
+
+    def create_guide(**attributes)
+      described_class.create!(group_key: "code_smell", questions: "q", contrast: "c", misfires: "m", **attributes)
+    end
+
+    it "lets each user and the shared row hold the same group key" do
+      create_guide
+      create_guide(user: owner)
+
+      expect(guide(user: other)).to be_valid
+      expect(guide(user: owner)).not_to be_valid
+      expect(guide).not_to be_valid
+    end
+
+    it "indexes the guides a user sees by group key, their own over the shared one, never another user's" do
+      create_guide(questions: "shared")
+      own = create_guide(questions: "own", user: owner)
+      shared_only = create_guide(group_key: "architecture")
+      create_guide(group_key: "data_modeling", user: other)
+
+      expect(described_class.seen_by(owner, %w[code_smell architecture data_modeling]))
+        .to eq("code_smell" => own, "architecture" => shared_only)
+      expect(described_class.seen_by(other, %w[code_smell]).fetch("code_smell").questions).to eq("shared")
+      expect(described_class.visible_to(owner)).not_to include(described_class.find_by!(user: other))
+    end
+
+    it "lists the group keys a user sees no guide for, in the order given, ignoring another user's guide" do
+      create_guide(group_key: "architecture")
+      create_guide(group_key: "data_modeling", user: other)
+      create_guide(user: owner)
+
+      expect(described_class.missing_for(owner, %w[code_smell data_modeling architecture oo_design]))
+        .to eq(%w[data_modeling oo_design])
+      expect(described_class.missing_for(owner, [])).to eq([])
+    end
+  end
+
   RecognitionGuide::FIELDS.each do |field|
     it "refuses a guide with no #{field}" do
       expect(guide(field => " ")).not_to be_valid
