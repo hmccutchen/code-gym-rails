@@ -21,6 +21,9 @@ covers every row.
 Saves one provider reply as the user's own guide, keeping only `FIELDS`,
 and returns `:written` or `:account_deleted`. It share-locks the user row
 first, as `AccountDeletion` locks it, so a deleted account gets no guide.
+A deletion that holds the user row makes the insert wait, and the insert
+then finds the account gone; an insert that holds it first makes the
+deletion wait. The job's code note says which spec covers each order.
 A guide is never rewritten, and `.write_for` does not read before it
 inserts, so a second writer loses the race by raising:
 `ActiveRecord::RecordNotUnique` from the unique index, or

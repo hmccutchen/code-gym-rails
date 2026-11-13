@@ -27,7 +27,13 @@ click ever waits behind a queued guide.
 The provider call runs outside any lock. The save is
 `RecognitionGuide.write_for` (issue #790), which share-locks the user row
 before it inserts, the lock `AccountDeletion` takes for update. If deletion
-committed first, the user is gone and the job writes nothing, so the insert
-never fails on the foreign key. If the write committed first, deletion waits
-for it and then deletes the new row with the rest of the account. Either way
-the job finishes cleanly and leaves no failed execution naming the user.
+took that lock first, the insert waits for it to commit, then finds the user
+gone and writes nothing, so it never fails on the foreign key. If the write
+took it first, deletion waits for it and then deletes the new row with the
+rest of the account. Either way the job finishes cleanly and leaves no
+failed execution naming the user.
+
+`generate_recognition_guide_account_deletion_concurrency_spec.rb` runs the
+job and the deletion on two connections, once with the write holding the
+lock first and once with deletion holding it first. The job spec covers a
+deletion that commits during the provider call, before the write starts.

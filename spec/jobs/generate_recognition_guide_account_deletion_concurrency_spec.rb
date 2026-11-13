@@ -29,7 +29,7 @@ RSpec.describe "A recognition guide racing account deletion on PostgreSQL", type
   def wait_until_blocked(thread, backend_pid)
     Timeout.timeout(10) do
       loop do
-        raise "deletion finished without waiting" unless thread.alive?
+        raise "the other connection finished without waiting" unless thread.alive?
         break if backend_pid.any? && blocked?(backend_pid.first)
 
         Thread.pass
@@ -41,6 +41,36 @@ RSpec.describe "A recognition guide racing account deletion on PostgreSQL", type
     ActiveRecord::Base.uncached do
       ActiveRecord::Base.connection.select_value("SELECT cardinality(pg_blocking_pids(#{Integer(pid)}))").positive?
     end
+  end
+
+  def save_in_another_connection(backend_pid, &save)
+    Thread.new do
+      Thread.current.report_on_exception = false
+      ActiveRecord::Base.connection_pool.with_connection do |connection|
+        backend_pid << connection.select_value("SELECT pg_backend_pid()")
+        connection.execute("SET lock_timeout = '10s'")
+        save.call
+        nil
+      rescue StandardError => e
+        e
+      ensure
+        connection.execute("RESET lock_timeout")
+      end
+    end
+  end
+
+  def delete_account_while_save_waits(&save)
+    saving = nil
+    deleted = User.transaction do
+      User.lock.find_by!(id: user.id)
+      backend_pid = []
+      saving = save_in_another_connection(backend_pid, &save)
+      ActiveSupport::Dependencies.interlock.permit_concurrent_loads { wait_until_blocked(saving, backend_pid) }
+      AccountDeletion.call(user)
+    end
+    [ deleted, ActiveSupport::Dependencies.interlock.permit_concurrent_loads { saving.value } ]
+  ensure
+    ActiveSupport::Dependencies.interlock.permit_concurrent_loads { saving&.join }
   end
 
   def start_deletion_after_owner_check
@@ -67,5 +97,15 @@ RSpec.describe "A recognition guide racing account deletion on PostgreSQL", type
     expect([ User.exists?(user.id), own_rows.exists? ]).to eq([ false, false ])
   ensure
     deletion&.call&.join
+  end
+
+  it "makes a guide that starts after deletion's user lock wait, then write nothing for the deleted account" do
+    allow(Rails.logger).to receive(:info).and_call_original
+
+    deleted, save_error = delete_account_while_save_waits { GenerateRecognitionGuideJob.perform_now(group_key: "code_smell", user_id: user.id) }
+
+    expect([ deleted.status, save_error ]).to eq([ :deleted, nil ])
+    expect(Rails.logger).to have_received(:info).with(/the account was deleted/)
+    expect([ User.exists?(user.id), own_rows.exists? ]).to eq([ false, false ])
   end
 end
