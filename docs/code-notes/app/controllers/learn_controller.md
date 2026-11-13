@@ -3,22 +3,27 @@
 ## `PREPARE_PER_HOUR`
 
 The limit counts presses, not jobs. Each press queues one billed job per
-missing concept, so a single press can cost many provider calls.
+missing concept, so a single press can cost many provider calls. It skips
+an account with a key of its own (`unless: :own_key?`), and since L2 of
+`docs/decisions/learn-content-per-user.md` the accounts left, trials on the
+house key, are refused before anything is queued. So it holds back no queued
+work today.
 
 ## `#bulk`
 
 One press of `#prepare` or `#prepare_ladders` can queue about 90 jobs on
 `provider_calls`, the queue the day's sets run on. At the default priority 0
 they ran ahead of a dashboard click made after the press and ahead of every
-scheduled set. The three bulk enqueues go through `#bulk`, which sets
-`JobPriority::BULK`, so a click (`JobPriority::CLICK`) runs first and a
-scheduled set (`JobPriority::SCHEDULED`) still waits behind them: a person
-pressed the button and may be watching the list fill in, while nobody is
-waiting on a scheduled set at that moment. `#prepare_concept` sets no
-priority, because its page polls for that one write-up, and neither does
-the write-up `ResponsesController#enqueue_concept_references` queues for a
-concept just submitted. `job_priority_spec` holds the ordering, whatever
-the numbers are.
+scheduled set. The bulk enqueues go through `#bulk`, which sets
+`JobPriority::BACKGROUND`, so a click (`JobPriority::CLICK`) and every
+scheduled set (`JobPriority::SCHEDULED`) run first, even a set enqueued
+after the press. Nobody is waiting on any one job of a press.
+`#prepare_concept` sets no priority, because its page polls for that one
+write-up, and neither does the write-up
+`ResponsesController#enqueue_concept_references` queues for a concept just
+submitted. A click for a concept a press already queued still gets its own
+job; `GenerateConceptReferenceJob`'s claim keeps the two to one call.
+`job_priority_spec` holds the ordering, whatever the numbers are.
 
 ## `AWAITING`
 

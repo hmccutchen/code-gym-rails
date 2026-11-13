@@ -11,16 +11,75 @@ RSpec.describe GenerateConceptReferenceJob do
 
   before { allow(AiService).to receive(:for).and_return(service) }
 
-  def enqueue_reference(**overrides)
+  def enqueue_reference(priority: nil, **overrides)
     job = described_class.new(**{ concept: "n_plus_one", language: "ruby_rails", user_id: user.id, refresh: true }.merge(overrides))
+    job.priority = priority
     SolidQueue::Job.enqueue(job)
   end
 
-  def perform_next
-    SolidQueue::ReadyExecution.claim([ described_class.queue_name ], 1, worker.id).sole.perform
+  def enqueue_bulk_press = enqueue_reference(priority: JobPriority::BACKGROUND, refresh: false)
+
+  def claim_next = SolidQueue::ReadyExecution.claim([ described_class.queue_name ], 1, worker.id).sole
+
+  def perform_next = claim_next.perform
+
+  def holding_claim_elsewhere(key)
+    other = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(ActiveRecord::Base.connection_pool.db_config.configuration_hash)
+    other.select_value(AdvisoryLock.statement("pg_advisory_lock", key))
+    yield
+  ensure
+    other&.disconnect!
   end
 
-  it "discards one user's overlapping queued requests across refresh modes" do
+  describe "a click for a concept a bulk press already queued (#777)" do
+    it "queues the click beside the press, claims it first at click priority, and calls the provider once" do
+      enqueue_bulk_press
+
+      expect { enqueue_reference }.to change(SolidQueue::ReadyExecution, :count).by(1)
+
+      first = claim_next
+      expect(first.job.priority).to eq(JobPriority::CLICK)
+      first.perform
+      perform_next
+
+      expect(service).to have_received(:generate_concept_reference).once
+      expect(ConceptReference.where(user: user, concept: "n_plus_one", language: "ruby_rails").count).to eq(1)
+      expect(SolidQueue::ReadyExecution.count).to eq(0)
+    end
+
+    it "makes no provider call while a running press holds the concept's claim, and writes nothing" do
+      enqueue_reference
+      allow(Rails.logger).to receive(:info)
+
+      holding_claim_elsewhere(described_class.claim_key(user_id: user.id, language: "ruby_rails", concept: "n_plus_one")) do
+        perform_next
+      end
+
+      expect(service).not_to have_received(:generate_concept_reference)
+      expect(ConceptReference.count).to eq(0)
+      expect(Rails.logger).to have_received(:info).with(/Skipped concept reference for n_plus_one\/ruby_rails: another job is writing it/)
+    end
+
+    it "keeps another concept's claim apart, so a press on one concept never holds back another" do
+      holding_claim_elsewhere(described_class.claim_key(user_id: user.id, language: "ruby_rails", concept: "memoization")) do
+        described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      end
+
+      expect(service).to have_received(:generate_concept_reference).once
+    end
+
+    it "releases the claim when the job ends, even after a provider failure" do
+      allow(service).to receive(:generate_concept_reference).and_raise(ProviderError::RateLimitError, "slow down")
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+      allow(service).to receive(:generate_concept_reference).and_return(reference)
+
+      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
+
+      expect(ConceptReference.where(user: user).count).to eq(1)
+    end
+  end
+
+  it "discards one user's overlapping queued requests at one priority, across refresh modes" do
     enqueue_reference
 
     expect {

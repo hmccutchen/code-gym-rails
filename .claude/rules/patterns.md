@@ -136,7 +136,10 @@ says what a deviation from one requires.
   stale may now belong to another caller. The pseudocode critique claim is a
   key inside a JSON column, so it lives on `DailyResponse`
   (`#claim_pseudocode_critique!`) and keeps the same token rule under the row
-  lock. The generation claim on `User` (`generating_since`) is re-checked
+  lock. A claim on work whose row the job itself creates has no row to
+  hold it, so `GenerateConceptReferenceJob` takes a PostgreSQL advisory
+  lock instead (`AdvisoryLock.hold`), which ends with the session and so
+  never goes stale. The generation claim on `User` (`generating_since`) is re-checked
   that way before a failure is written; the set itself is guarded by its
   date under the user lock in `PracticeGeneration.commit_new`, so a job whose
   stale claim was taken over still lands its set when the day has none.

@@ -757,21 +757,35 @@ RSpec.describe "Learn", type: :request do
   end
 
   describe "the priority of a bulk press" do
+    include SolidQueueOrderHelpers
+
     before { user.update!(language: "ruby_rails") }
 
     let(:bulk_priorities) { provider_jobs.map { |job| job["priority"] }.uniq }
 
-    it "gives every write-up and guide job of POST /learn/prepare that priority" do
+    it "gives every write-up and guide job of POST /learn/prepare background priority" do
       post prepare_learn_path
 
       expect(provider_jobs.map { |job| job["job_class"] }.uniq).to contain_exactly("GenerateConceptReferenceJob", "GenerateRecognitionGuideJob")
-      expect(bulk_priorities).to eq([ JobPriority::BULK ])
+      expect(bulk_priorities).to eq([ JobPriority::BACKGROUND ])
     end
 
-    it "gives every job of POST /learn/prepare_ladders that priority" do
+    it "gives every job of POST /learn/prepare_ladders background priority" do
       post prepare_learn_ladders_path
 
-      expect(bulk_priorities).to eq([ JobPriority::BULK ])
+      expect(bulk_priorities).to eq([ JobPriority::BACKGROUND ])
+    end
+
+    it "leaves an earlier press behind a scheduled set the hand-out enqueues later, in Solid Queue's claim order" do
+      post prepare_learn_path
+      teammate = User.create!(email: "learn-scheduled@example.com", provider: "anthropic", api_keys: { "anthropic" => "sk-ant-test" })
+      GenerateDailyExercisesJob.set(priority: JobPriority::SCHEDULED).perform_later(user_id: teammate.id, scheduled: true)
+
+      move_to_solid_queue(provider_jobs)
+
+      order = solid_queue_claim_order("provider_calls")
+      expect(order.first).to eq("GenerateDailyExercisesJob")
+      expect(order.drop(1)).to be_present.and(all(match(/\AGenerate(ConceptReference|RecognitionGuide)Job\z/)))
     end
   end
 

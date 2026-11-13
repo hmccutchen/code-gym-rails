@@ -87,6 +87,15 @@ read it before changing that area.
   new keyed kind until it has one. `pseudocode_to_code` keeps its tooltips:
   its missable requirements are stated in the problem statement, so a
   definition can't reveal one.
+- **Write-up jobs and the queue** (`docs/decisions/learn-content-per-user.md`,
+  L3b): Learn's bulk presses queue at `JobPriority::BACKGROUND`, never ahead
+  of a scheduled set, and a single-concept click at `JobPriority::CLICK`.
+  `GenerateConceptReferenceJob`'s permit key starts with the priority, so a
+  click is never discarded for a queued press, and the job takes an
+  `AdvisoryLock` claim on user, language and concept before its call, so
+  the two make one provider call. A job that finds the claim held or the
+  row written calls nothing. `GenerateRecognitionGuideJob` keeps its
+  discard permit, since only a press queues a guide.
 - **Recognition guides** (`docs/decisions/recognition-guides.md`): Each named
   `ConceptGroup` or language-independent bucket gets one
   `RecognitionGuide` per user on how to look for that kind of problem, with

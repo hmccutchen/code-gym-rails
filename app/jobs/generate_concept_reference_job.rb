@@ -2,7 +2,8 @@
 class GenerateConceptReferenceJob < ApplicationJob
   queue_as :provider_calls
 
-  limits_concurrency key: ->(args) { "#{args.fetch(:user_id)}/#{args.fetch(:language)}/#{args.fetch(:concept)}" },
+  # One queued job per priority, so a click is never discarded for a bulk press; the claim stops the second call.
+  limits_concurrency key: ->(args) { "#{priority || JobPriority::CLICK}/#{args.fetch(:user_id)}/#{args.fetch(:language)}/#{args.fetch(:concept)}" },
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
@@ -14,24 +15,19 @@ class GenerateConceptReferenceJob < ApplicationJob
     end
   end
 
+  def self.claim_key(user_id:, language:, concept:) = "concept_reference/#{user_id}/#{language}/#{concept}"
+
   # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
   def perform(concept:, language:, user_id:, refresh: false)
     return if concept == "other"
 
     user = User.active.find_by(id: user_id)
-    return unless user&.writes_learn_content?
+    return unless user&.writes_learn_content? && wanted?(ConceptReference.for(user, concept: concept, language: language), refresh)
 
-    seen = ConceptReference.for(user, concept: concept, language: language)
-    return if seen && (seen.fully_written? || !refresh)
-
-    reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    case write_own(user, concept, language, reference, seen)
-    when :account_deleted then log_deleted(user_id, concept, language)
-    when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: already fully written")
-    else
-      ConceptReferenceFailures.clear(user_id: user_id, concept: concept, language: language)
-      Rails.logger.info("Generated concept reference for #{concept}/#{language}")
+    claimed = AdvisoryLock.hold(self.class.claim_key(user_id: user.id, language: language, concept: concept)) do
+      write_up(user, concept, language, refresh)
     end
+    Rails.logger.info("Skipped concept reference for #{concept}/#{language}: another job is writing it") unless claimed
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
     # The validation can see a concurrent job's committed row before the index does, so both errors mean it won.
     raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:concept].blank?
@@ -47,6 +43,22 @@ class GenerateConceptReferenceJob < ApplicationJob
   end
 
   private
+
+  def wanted?(seen, refresh) = seen.nil? || (refresh && !seen.fully_written?)
+
+  def write_up(user, concept, language, refresh)
+    seen = ConceptReference.for(user, concept: concept, language: language)
+    return unless wanted?(seen, refresh)
+
+    reference = AiService.for(user).generate_concept_reference(user, concept, language)
+    case write_own(user, concept, language, reference, seen)
+    when :account_deleted then log_deleted(user.id, concept, language)
+    when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: already fully written")
+    else
+      ConceptReferenceFailures.clear(user_id: user.id, concept: concept, language: language)
+      Rails.logger.info("Generated concept reference for #{concept}/#{language}")
+    end
+  end
 
   # The owner is share-locked first, as AccountDeletion locks it, so a deletion during the call leaves nothing behind.
   def write_own(user, concept, language, reference, seen)
@@ -64,7 +76,6 @@ class GenerateConceptReferenceJob < ApplicationJob
     end
   end
 
-  # An expired permit or a direct perform_now bypasses queue concurrency control, so keep the lock.
   def rewrite(own, attributes)
     own.with_lock do
       next :skipped if own.fully_written?

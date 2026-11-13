@@ -14,11 +14,16 @@ so a request those checks refuse still counts. `/generate` allows
 `DailyExercisesController::GENERATE_PER_HOUR` (3) and the three Learn
 prepare actions `LearnController::PREPARE_PER_HOUR` (10) presses an hour.
 A bulk press (`prepare`, `prepare_ladders`) enqueues its jobs at
-`JobPriority::BULK` (5): behind a dashboard click and the single-concept
-write-up a person waits on (`JobPriority::CLICK`, 0, the default), and
-ahead of scheduled sets (`JobPriority::SCHEDULED`, 10). One press can
-queue about 90 jobs, and at 0 they held up a click made after it.
-`JobPriority` is the one place the priority numbers live.
+`JobPriority::BACKGROUND` (20): behind a dashboard click and the
+single-concept write-up a person waits on (`JobPriority::CLICK`, 0, the
+default), and behind scheduled sets (`JobPriority::SCHEDULED`, 10). One
+press can queue about 90 jobs, and at 0 they held up a click made after it;
+until L3b of `docs/decisions/learn-content-per-user.md` they ran at 5, ahead
+of the scheduled sets. `JobPriority` is the one place the priority numbers
+live.
+Since L2 a trial account on the house key writes no Learn content, and the
+Learn prepare cap skips accounts with a key of their own, so the cap now
+reaches only presses that are refused before anything is queued.
 Saving a key in Setup allows `ApiKeysController::KEY_SAVES_PER_HOUR` (10)
 saves an hour per account and `KEY_SAVES_PER_HOUR_BY_IP` (30) per address.
 Each such save asks a provider about the key
@@ -30,8 +35,9 @@ These caps are starting values, not measured ones. All of them use
 `LazyCacheStore`, so the test env's `:null_store` never trips them and a
 spec that exercises one swaps in a real store.
 
-The `/generate`, Learn prepare and key-save caps and the generation claim
-and permit below apply to every account. `GenerateDailyExercisesJob` takes a claim on its user
+The key-save caps and the generation claim and permit below apply to every
+account; the `/generate` and Learn prepare caps skip an account with a key
+of its own, like the shared provider-call count. `GenerateDailyExercisesJob` takes a claim on its user
 (`users.generating_since`, declared with `Claimable`) when it starts running
 and releases it when it ends, because every dashboard load with no set
 enqueues a job and each would run a full billed generation before the unique

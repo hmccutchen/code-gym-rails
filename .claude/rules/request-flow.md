@@ -160,6 +160,13 @@ User browses /learn (independent of the daily flow above):
        (RecognitionGuide.seen_by: their own, else the shared one)
   └→ LearnController#show              → one concept's cached reference plus its
        guide, generating either on demand when the row is missing or stale
+  └→ LearnController#prepare / #prepare_ladders → queue the user's missing
+       write-ups and guides at JobPriority::BACKGROUND, behind every
+       scheduled set; #prepare_concept queues one write-up at click priority
+       even when a press already queued that concept
+  └→ GenerateConceptReferenceJob       → skips a row already written, else
+       takes the user, language and concept claim (AdvisoryLock) for the
+       call and the write; a job that finds the claim held calls nothing
 
 Every dashboard, /learn and /history load, any day of the week:
   └→ FeaturedConcept.for(user)        → this user's concept for the week, from

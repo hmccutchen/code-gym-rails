@@ -130,13 +130,13 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
       ConceptReference.create!(concept: "caching", language: "ruby_rails", user: User.create!(email: "x@example.com"))
 
-      described_class.queue_missing(user, pairs, priority: JobPriority::BULK)
+      described_class.queue_missing(user, pairs, priority: JobPriority::BACKGROUND)
 
       queued = enqueued_jobs.select { |job| job["job_class"] == described_class.name }
       expect(queued.map { |job| job["arguments"].first.slice("concept", "language", "user_id") })
         .to contain_exactly({ "concept" => "caching", "language" => "ruby_rails", "user_id" => user.id },
                             { "concept" => "closures", "language" => "javascript", "user_id" => user.id })
-      expect(queued.map { |job| job["priority"] }.uniq).to eq([ JobPriority::BULK ])
+      expect(queued.map { |job| job["priority"] }.uniq).to eq([ JobPriority::BACKGROUND ])
     end
 
     it "queues nothing for a trial account" do

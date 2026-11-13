@@ -79,12 +79,12 @@ ships one release before any code reads it for Learn
    make its write survive a deletion mid-call, with the same spec, and add
    it to "Work in flight"; and update any privacy or locale copy that still
    calls a guide shared.
-4. **L3b, scheduled sets ahead of Learn's bulk prepare.** Learn's
-   prepare and prepare-ladders presses queue at `JobPriority::BULK`, ahead
-   of `JobPriority::SCHEDULED`, so a press can still delay a morning set.
-   L3b moves that click-driven bulk work behind the scheduled sets and
-   lets a single-concept click jump the queue (issue #777). It needs no
-   deploy gate.
+4. **L3b, scheduled sets ahead of Learn's bulk prepare (done).** Learn's
+   prepare and prepare-ladders presses queued at `JobPriority::BULK`, ahead
+   of `JobPriority::SCHEDULED`, so a press could delay a morning set. L3b
+   moves that work behind the scheduled sets and lets a single-concept
+   click jump the queue (issue #777). It needs no deploy gate. "What L3b
+   does" below has the details.
 5. **L4, copy shared rows.** Copies every shared row to every active
    account. Waits until L2 (and L3 for guides) is deployed on both web and
    worker, so no old writer creates a shared row after the copy.
@@ -138,8 +138,6 @@ ships one release before any code reads it for Learn
   hidden from them until they refresh it or L5 removes the shared rows.
   Mixing fields from two rows would show a ladder written for different
   text, so this is accepted.
-- Until L3b ships, Learn's bulk prepare presses still run at
-  `JobPriority::BULK`, ahead of the scheduled sets.
 
 ## What L3 does
 
@@ -160,6 +158,53 @@ ships one release before any code reads it for Learn
 - Learn's `prepare_cost` copy no longer says the guides are shared.
 - The recognition guide prompt is unchanged: it still takes only the group,
   and no exercise, response or history.
+
+## What L3b does
+
+- Learn's bulk presses (`LearnController#prepare` and `#prepare_ladders`)
+  queue at `JobPriority::BACKGROUND`, the priority a saved set's write-ups
+  already use. `JobPriority::BULK` is gone, so nothing a press queues runs
+  ahead of a scheduled set, even one the hand-out enqueues after the press.
+  A step of its own between `SCHEDULED` and `BACKGROUND` would have ordered
+  a press ahead of a set's write-ups, and no case needs that order.
+  `job_priority_spec` holds the three steps, and a request spec reads
+  Solid Queue's claim order to show a later scheduled set is claimed first.
+- `GenerateConceptReferenceJob` no longer lets one queued job discard
+  another across priorities. Its permit key starts with the job's priority,
+  so a click (`JobPriority::CLICK`) for a concept a bulk press already
+  queued gets a job of its own and runs at click priority. Two jobs at one
+  priority still share a permit, so pressing a button twice queues nothing
+  new.
+- The job takes a claim when it runs, before the provider call: a
+  PostgreSQL advisory lock on the user, language and concept, held through
+  `AdvisoryLock.hold` for the call and the write. A job that finds the claim
+  held logs a skip and calls nothing, and the job holding it writes the row.
+  A job that finds the row already written calls nothing either. So when
+  the click runs first, the press's job finds the row written; when the
+  press's job is already running, the click finds the claim. Either way
+  the concept gets one call.
+- The claim needs no column. A claim column would have to sit on a row
+  that may not exist yet (the user's own reference is created by the job),
+  and a claim on `users` would hold back every other concept of that user.
+  An advisory lock belongs to the database session, so a worker that dies
+  mid-call loses its connection and the lock with it: there is no stale
+  claim to wait out. A job only tries the lock and never waits on it, and
+  the share lock on the user and the row lock come after it in the same
+  order as before (user, then the user's own row), so it adds no lock
+  cycle with `AccountDeletion`.
+- During the deploy, an L3 worker can run a job beside an L3b one for the
+  same concept, and the L3 job takes no claim, so both may call. That is
+  one extra write-up call at most, for one deploy, and the row lock in
+  `#rewrite` and the unique index still keep one row. It needs no gate.
+- `GenerateRecognitionGuideJob` keeps its permit with discard and takes no
+  claim. Only the bulk press queues a guide, so no click waits on one, and
+  its unique index stops a second row when the permit is bypassed.
+- The hourly Learn prepare limit (`LearnController::PREPARE_PER_HOUR`) is
+  unchanged. It skips accounts with a key of their own (`unless:
+  :own_key?`), and since L2 the accounts left, trials on the house key, are
+  refused a write-up before anything is queued. So it limits no queued
+  work today. Whether it should go, or start counting own-key accounts'
+  presses, is the owner's call.
 
 ## The deploy window between L1 and L2
 

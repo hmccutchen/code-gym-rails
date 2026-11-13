@@ -18,6 +18,10 @@ permit is bypassed (an expired permit, a direct `perform_now`), the unique
 index on user and group key catches the second insert, and the job logs a
 skip.
 
+It keeps the discard and takes no claim, unlike `GenerateConceptReferenceJob`.
+Only Learn's bulk press queues a guide, at `JobPriority::BACKGROUND`, so no
+click ever waits behind a queued guide.
+
 ## An account deleted during the call
 
 The provider call runs outside any lock. Before writing, the job share-locks

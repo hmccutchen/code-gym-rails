@@ -97,7 +97,7 @@ class LearnController < ApplicationController
 
   private
 
-  def bulk(job) = job.set(priority: JobPriority::BULK)
+  def bulk(job) = job.set(priority: JobPriority::BACKGROUND)
 
   def write_up_failure(concept, bucket)
     failure = ConceptReferenceFailures.read(user_id: current_user.id, concept: concept, language: bucket)
