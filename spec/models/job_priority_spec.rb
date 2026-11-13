@@ -1,9 +1,10 @@
 require "rails_helper"
 
 RSpec.describe JobPriority do
-  it "runs a click ahead of a bulk press, and a bulk press ahead of a scheduled set" do
+  it "runs a click ahead of a bulk press, a bulk press ahead of a scheduled set, and a scheduled set ahead of background work" do
     expect(described_class::CLICK).to be < described_class::BULK
     expect(described_class::BULK).to be < described_class::SCHEDULED
+    expect(described_class::SCHEDULED).to be < described_class::BACKGROUND
   end
 
   it "names as CLICK the priority a job gets when none is set" do

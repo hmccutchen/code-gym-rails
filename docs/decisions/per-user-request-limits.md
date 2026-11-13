@@ -18,7 +18,7 @@ A bulk press (`prepare`, `prepare_ladders`) enqueues its jobs at
 write-up a person waits on (`JobPriority::CLICK`, 0, the default), and
 ahead of scheduled sets (`JobPriority::SCHEDULED`, 10). One press can
 queue about 90 jobs, and at 0 they held up a click made after it.
-`JobPriority` is the one place the three numbers live.
+`JobPriority` is the one place the priority numbers live.
 Saving a key in Setup allows `ApiKeysController::KEY_SAVES_PER_HOUR` (10)
 saves an hour per account and `KEY_SAVES_PER_HOUR_BY_IP` (30) per address.
 Each such save asks a provider about the key
