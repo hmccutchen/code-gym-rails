@@ -35,9 +35,10 @@ trial cannot write its own Learn content (`User#writes_learn_content?`).
 Running `CopySharedLearnContent.copy_to_active_users` again right before the
 delete gives every account that exists then its copy. The copy inserts only
 where the user has no row yet, so an account that already has its copy, or
-has written its own rows, gains nothing. The only accounts left without a
-copy are those created between L5's catch-up and this migration, which L5
-code already shows no shared text.
+has written its own rows, gains nothing. This run reads its own list of
+accounts once, before its loop, so the accounts it misses are those created
+after that read and before the delete. L5 code already shows them no shared
+text, so they lose nothing they saw; a trial among them gets no Learn text.
 
 The copy raises inside an open transaction and commits one user at a time,
 so the migration declares `disable_ddl_transaction!`. The delete, the index
@@ -46,8 +47,10 @@ own (`.require_owner`): either the shared rows are gone and the constraints
 are in place, or nothing in the schema changed. If that transaction fails,
 the copies stay; running the migration again copies nothing new and retries
 the schema change. `require_user_on_learn_content_spec` covers that rerun
-and an up, down, up round trip. An account created between the copy and the delete gets
-no copy, which is the same gap L5 accepted, a few milliseconds long here.
+and an up, down, up round trip. The gap between this run's read of the
+account list and the delete lasts as long as the whole per-user copy loop
+plus any wait for the schema lock (up to the lock timeout below), not a few
+milliseconds.
 
 ## Locking
 

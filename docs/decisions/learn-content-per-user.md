@@ -326,9 +326,10 @@ ships one release before any code reads it for Learn
   `/trial/start` with an invite code: trials are paused only by hiding the
   link, and a trial cannot write its own Learn content
   (`User#writes_learn_content?`). Copying again just before the shared rows
-  go gives every account that exists then its copy, so the only accounts
-  left without one are those created between L5's catch-up and this step,
-  which L5 code already shows no shared text. The copy commits one user at
+  go gives every account that exists when this run reads its own list of
+  accounts its copy. The accounts it misses are those created after that
+  read and before the delete, a window as long as the copy loop plus the
+  schema lock wait. L5 code already shows them no shared text. The copy commits one user at
   a time, so the migration declares `disable_ddl_transaction!` and runs the
   delete, the index drops and the NOT NULL change together in a transaction
   of their own.
