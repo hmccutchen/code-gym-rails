@@ -7,6 +7,7 @@ RSpec.describe "page stylesheets" do
     "progress" => [ DESKTOP_QUERY, "@media (min-width: 600px)" ],
     "learn" => [ DESKTOP_QUERY ],
     "account" => [ DESKTOP_QUERY ],
+    "privacy" => [],
     "settings" => [ DESKTOP_QUERY, "@media (forced-colors: active)" ],
     "today" => [ DESKTOP_QUERY, "@media (min-height: 640px)", "@media (prefers-reduced-motion: reduce)", "@media (max-width: 599.98px)" ]
   }.freeze
