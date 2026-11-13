@@ -49,7 +49,7 @@ RSpec.describe GenerateDailyExercisesJob do
         "design_comparison" => { "question" => "q", "concept" => "memoization" } }
     end
 
-    it "queues the user's missing write-ups at bulk priority once the set is saved" do
+    it "queues the user's missing write-ups at scheduled priority once the set is saved, behind that hour's sets" do
       ConceptReference.create!(concept: "memoization", language: "ruby_rails", tagline: "shared")
       stub_provider(problem_set: tagged_set)
 
@@ -59,7 +59,7 @@ RSpec.describe GenerateDailyExercisesJob do
       queued = enqueued_jobs.select { |job| job["job_class"] == "GenerateConceptReferenceJob" }
       expect(queued.map { |job| job["arguments"].first.slice("concept", "language", "user_id") })
         .to eq([ { "concept" => "n_plus_one", "language" => "ruby_rails", "user_id" => user.id } ])
-      expect(queued.sole["priority"]).to eq(JobPriority::BULK)
+      expect(queued.sole["priority"]).to eq(JobPriority::SCHEDULED)
     end
 
     it "queues none for a concept the set hides until it is submitted" do

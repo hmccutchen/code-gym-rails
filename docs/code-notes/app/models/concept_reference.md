@@ -17,4 +17,26 @@ The one answer to which reference a user sees: their own row, else the
 shared row (no `user_id`), never another user's. `.seen_by` indexes the rows
 by `[concept, language]` with the user's own row winning. The shared half
 is a fallback until L5 of `docs/decisions/learn-content-per-user.md` drops
-it. The admin promote check is the one reader that counts any user's row.
+it.
+
+## `.missing_for`
+
+The pairs a user sees no reference for, own or shared. Learn's prepare
+button and `GenerateConceptReferenceJob.queue_missing` both ask it, so the
+two never disagree on what is still missing.
+
+## `.written_up?` and `.written_up_keys`
+
+The admin suggested-concepts page is the one reader that counts any user's
+row, a teammate's included. It asks only whether a concept has ever been
+written up, to decide whether a suggestion can be promoted, and shows no
+text. A reference for a concept outside the vocabulary exists only once
+someone's set was tagged with it.
+
+## `WRITTEN_FIELDS`
+
+Every column one `#generate_concept_reference` call fills: the reference,
+guide and ladder fields and the lesson. The job writes all of them together
+so a row's parts always come from one response. `#fully_written?` does not
+read this list: it asks for the guide, the ladder and a lesson
+`#usable_lesson` can show, and checks no reference field.

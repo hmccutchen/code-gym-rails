@@ -6,13 +6,10 @@ class GenerateConceptReferenceJob < ApplicationJob
                      to: 1, on_conflict: :discard,
                      duration: CallProfiles.call_budget_seconds(CallProfiles::CONCEPT_REFERENCE_READ_TIMEOUT).seconds
 
-  WRITTEN_FIELDS = (ConceptReference::REFERENCE_FIELDS + ConceptReference::GUIDE_FIELDS + ConceptReference::LADDER_FIELDS + [ "lesson" ]).freeze
-
   def self.queue_missing(user, pairs, priority: JobPriority::CLICK)
-    return if pairs.empty? || !user.writes_learn_content?
+    return unless user.writes_learn_content?
 
-    seen = ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
-    pairs.reject { |pair| seen.key?(pair) }.each do |concept, language|
+    ConceptReference.missing_for(user, pairs).each do |concept, language|
       set(priority: priority).perform_later(concept: concept, language: language, user_id: user.id)
     end
   end
@@ -28,10 +25,13 @@ class GenerateConceptReferenceJob < ApplicationJob
     return if seen && (seen.fully_written? || !refresh)
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    return log_deleted(user_id, concept, language) if write_own(user, concept, language, reference, seen) == :account_deleted
-
-    ConceptReferenceFailures.clear(user_id: user_id, concept: concept, language: language)
-    Rails.logger.info("Generated concept reference for #{concept}/#{language}")
+    case write_own(user, concept, language, reference, seen)
+    when :account_deleted then log_deleted(user_id, concept, language)
+    when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: already fully written")
+    else
+      ConceptReferenceFailures.clear(user_id: user_id, concept: concept, language: language)
+      Rails.logger.info("Generated concept reference for #{concept}/#{language}")
+    end
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
     # The validation can see a concurrent job's committed row before the index does, so both errors mean it won.
     raise if e.is_a?(ActiveRecord::RecordInvalid) && e.record.errors[:concept].blank?
@@ -50,7 +50,7 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   # The owner is share-locked first, as AccountDeletion locks it, so a deletion during the call leaves nothing behind.
   def write_own(user, concept, language, reference, seen)
-    attributes = WRITTEN_FIELDS.index_with { |field| reference[field] }
+    attributes = ConceptReference::WRITTEN_FIELDS.index_with { |field| reference[field] }
 
     User.transaction do
       next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)

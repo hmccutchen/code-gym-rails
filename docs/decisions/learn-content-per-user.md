@@ -31,25 +31,26 @@ The owner decided:
 ## Account deletion
 
 A user's own rows go when the account is deleted
-(`AccountData::FATES`, `deleting-an-account.md`). Until L2 ships, account
-deletion is the only code that reads `user_id`, and it finds no rows to
-delete. Shared rows have no `user_id`, so deletion leaves them alone until
-L5 removes them.
+(`AccountData::FATES`, `deleting-an-account.md`). Since L2, every reference
+read and write goes through `user_id`, so deletion finds the concept
+references a user has written. Recognition guides gain owned rows only at
+L3, so until then deletion finds none of those. Shared rows have no
+`user_id`, so deletion leaves them alone until L5 removes them.
 
 ## Order and deploy gates
 
 The worker can start before the web service has migrated, so a new column
 ships one release before any code reads it for Learn
-(`.claude/rules/deployment.md`, Migrations). The change ships in five steps:
+(`.claude/rules/deployment.md`, Migrations). The change ships in six steps:
 
 1. **L1, schema and deletion fate.** Adds a nullable `user_id` (foreign key
    to `users`) to both tables, unique indexes on `(user_id, concept,
    language)` and `(user_id, group_key)`, and turns the old unique indexes
    into partial ones over rows with no user, so code still in production
    keeps deduplicating shared rows. Deletion removes a user's own rows.
-2. **L2, per-user concept references (done).** Reads and writes the
-   user's own reference, falling back to the shared row when the user has
-   none. Waits until L1 is deployed. L2 must also:
+2. **L2, per-user concept references (done, apart from the privacy copy
+   below).** Reads and writes the user's own reference, falling back to the
+   shared row when the user has none. Waits until L1 is deployed. L2 must also:
    - scope `ConceptReference`'s `uniqueness: { scope: :language }` to
      `user_id`;
    - key `GenerateConceptReferenceJob`'s `limits_concurrency` on `user_id`
@@ -62,7 +63,10 @@ ships one release before any code reads it for Learn
      and the write. The job joins the "Work in flight" list in
      `deleting-an-account.md` in the same step;
    - update the privacy page copy (`privacy.show`) and the `PrivacyNotice`
-     code note, since deletion starts removing a person's write-ups here;
+     code note, since deletion starts removing a person's write-ups here.
+     The privacy page is not on L2's base: it arrives with PR #785. These
+     copy changes land in the first pull request opened after both #785
+     and L2 are merged, so this item is still open;
    - update the locale strings that say the wording is shared: Learn's
      `ladder_offer` and `lesson_offer`, and the bulk preparation copy
      (`prepare_cost`, `ladders_cost`) that says what it writes is shared with
@@ -74,10 +78,16 @@ ships one release before any code reads it for Learn
    make its write survive a deletion mid-call, with the same spec, and add
    it to "Work in flight"; and update any privacy or locale copy that still
    calls a guide shared.
-4. **L4, copy shared rows.** Copies every shared row to every active
+4. **L3b, scheduled sets ahead of Learn's bulk prepare.** Learn's
+   prepare and prepare-ladders presses queue at `JobPriority::BULK`, ahead
+   of `JobPriority::SCHEDULED`, so a press can still delay a morning set.
+   L3b moves that click-driven bulk work behind the scheduled sets and
+   lets a single-concept click jump the queue (issue #777). It needs no
+   deploy gate.
+5. **L4, copy shared rows.** Copies every shared row to every active
    account. Waits until L2 (and L3 for guides) is deployed on both web and
    worker, so no old writer creates a shared row after the copy.
-5. **L5, drop the shared fallback, then tighten the schema.** The pull
+6. **L5, drop the shared fallback, then tighten the schema.** The pull
    request that removes the fallback also carries a data migration that
    runs the L4 copy again for every active account still missing a copy.
    It runs in the web pre-deploy step, while the code still serving reads
@@ -101,30 +111,53 @@ ships one release before any code reads it for Learn
   only the shared row who asks for a rewrite gets a new row of their own,
   numbered past the shared row's `generation_version` so the Learn poll sees
   the rewrite land; the shared row is never written again.
-- The admin promote check counts any row, a teammate's included. It asks
+- The admin promote check (`ConceptReference.written_up?` and
+  `.written_up_keys`) counts any row, a teammate's included. It asks
   only whether the concept has ever been written up and shows no text, and
   a reference for a concept outside the vocabulary exists only once
   someone's set was tagged with it.
 - Generating a set (a new one or a regeneration) queues the user's missing
-  write-ups at `JobPriority::BULK` once the set is saved, leaving out a
+  write-ups at `JobPriority::SCHEDULED` once the set is saved. They are
+  enqueued after that hour's scheduled sets, and Solid Queue breaks a
+  priority tie by job id, so they run behind every set already queued and
+  never delay a teammate's daily set. It leaves out a
   concept the set hides until it is submitted, so Learn never gains a
   write-up that hints at a hidden answer. Submitting still queues the rest.
 - `User#writes_learn_content?` (it replaced `#prepares_ladders?`) gates
   every enqueue path and the job itself, so a trial account writes nothing.
 - The preview seed writes the preview user's own row, never a shared one,
   so nothing writes a shared row after L2.
-- Until L3b moves bulk work behind the scheduled sets, `JobPriority::BULK`
-  still runs ahead of `JobPriority::SCHEDULED`, so the write-ups a morning
-  set queues can run before later users' scheduled sets.
+- Which pairs still lack a write-up is `ConceptReference.missing_for(user,
+  pairs)`, asked by both Learn's prepare button and
+  `GenerateConceptReferenceJob.queue_missing`.
+- "Own wins" is decided per row, not per field. A user whose own row has no
+  ladder sees that row, so a shared row's ladder for the same concept stays
+  hidden from them until they refresh it or L5 removes the shared rows.
+  Mixing fields from two rows would show a ladder written for different
+  text, so this is accepted.
+- Until L3b ships, Learn's bulk prepare presses still run at
+  `JobPriority::BULK`, ahead of the scheduled sets.
 
 ## The deploy window between L1 and L2
 
-Railway does not order the web and worker deploys. While L2 rolls out, the
-web service can still run L1 code after the L2 worker has written a user's
-own row. L1 code looks a reference up by concept and language alone, so it
-may show that row to another user as if it were shared. The text is a
-generic concept explanation and holds nothing private, so this is accepted
-for the length of one deploy.
+Railway does not order the web and worker deploys, so either service can
+run L1 code while the other runs L2.
+
+- **Web still on L1.** The web service can run L1 code after the L2 worker
+  has written a user's own row. L1 code looks a reference up by concept and
+  language alone, so it may show that row to another user as if it were
+  shared. The text is a generic concept explanation and holds nothing
+  private.
+- **Worker still on L1.** An L1 worker can run a job the L2 web service
+  queued. It also looks rows up by concept and language only, so it may
+  skip a user's write-up because a teammate's row exists, rewrite a
+  teammate's incomplete row from this user's call, or create a shared row
+  with no `user_id`. A skipped write-up is queued again on the user's next
+  submit or Learn press. A shared row written here is one the L4 copy
+  picks up, and L4 waits until L2 is deployed on both web and worker, so
+  no old writer creates a shared row after the copy.
+
+Both cases last for the length of one deploy, so they are accepted.
 
 ## Rollback
 
