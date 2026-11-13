@@ -30,8 +30,13 @@ saying how long they keep a copy, in the same change.
 ## What the page leaves out
 
 The owner asked for the deletion section to stay short and plain. It names
-server logs, the shared concept write-ups and copies held outside Coding
-Gym. It leaves out the other leftovers `docs/decisions/deleting-an-account.md`
+server logs and copies held outside Coding Gym as what outlives a deletion.
+Every concept write-up and recognition guide belongs to one person, and
+deletion removes them (the `concept_references` and `recognition_guides`
+entries in `AccountData::FATES`), so the page lists write-ups and guides with
+what deletion removes.
+
+It leaves out the other leftovers `docs/decisions/deleting-an-account.md`
 lists: cache entries that hold an email, IP address or user id until
 `config/cache.yml`'s `max_age`, finished jobs cleared a day later, and a job
 that fails after deletion and stays in the failed-jobs list. It also leaves

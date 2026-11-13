@@ -50,9 +50,9 @@ ships one release before any code reads it for Learn
    language)` and `(user_id, group_key)`, and turns the old unique indexes
    into partial ones over rows with no user, so code still in production
    keeps deduplicating shared rows. Deletion removes a user's own rows.
-2. **L2, per-user concept references (done, apart from the privacy copy
-   below).** Reads and writes the user's own reference, falling back to the
-   shared row when the user has none. Waits until L1 is deployed. L2 must also:
+2. **L2, per-user concept references (done).** Reads and writes the user's own reference. It first fell
+   back to the shared row when the user had none; L5 replaced that with own
+   rows only. Waits until L1 is deployed. L2 must also:
    - scope `ConceptReference`'s `uniqueness: { scope: :language }` to
      `user_id`;
    - key `GenerateConceptReferenceJob`'s `limits_concurrency` on `user_id`
@@ -65,26 +65,20 @@ ships one release before any code reads it for Learn
      and the write. The job joins the "Work in flight" list in
      `deleting-an-account.md` in the same step;
    - update the privacy page copy (`privacy.show`) and the `PrivacyNotice`
-     code note, since deletion starts removing a person's write-ups here.
-     The privacy page is not on L2's base: it arrives with PR #785. These
-     copy changes land in the first pull request opened after both #785
-     and L2 are merged, so this item is still open. Since L5 no user reads
-     a shared write-up, so that pull request also removes the sentence
-     "Concept write-ups your key wrote before Learn became personal are
-     shared with everyone and stay until they are retired" from the privacy
-     page. L5 does not edit the page, which is not on its branch;
+     code note, since deletion starts removing a person's write-ups here
+     (done; "What remains" below says what the page now states);
    - update the locale strings that say the wording is shared: Learn's
      `ladder_offer` and `lesson_offer`, and the bulk preparation copy
      (`prepare_cost`, `ladders_cost`) that says what it writes is shared with
      everyone on the team.
-3. **L3, per-user recognition guides (done, apart from any privacy copy,
-   which follows the same note as L2's).** The same for guides, with the same
+3. **L3, per-user recognition guides (done).** The same for guides, with the same
    obligations: scope `RecognitionGuide`'s `uniqueness: true` on `group_key`
    to `user_id`; key `GenerateRecognitionGuideJob`'s `limits_concurrency`
    (today `recognition_guide/<group_key>`, with discard) on `user_id` too;
    make its write survive a deletion mid-call, with the same spec, and add
    it to "Work in flight"; and update any privacy or locale copy that still
-   calls a guide shared.
+   calls a guide shared (done: the privacy page names guides with write-ups,
+   and no copy calls either shared).
 4. **L3b, scheduled sets ahead of Learn's bulk prepare (done).** Learn's
    prepare and prepare-ladders presses queued at `JobPriority::BULK`, ahead
    of `JobPriority::SCHEDULED`, so a press could delay a morning set. L3b
@@ -342,10 +336,11 @@ ships one release before any code reads it for Learn
 ## What remains
 
 Nothing in the schema: the schema step ran L4's copy a third time, deleted
-the shared rows and made `user_id` NOT NULL. The privacy page copy in step 2
-is still open: it lands in the first pull request opened after both #785 and
-L2 are merged, and removes the sentence about shared write-ups, which no
-longer exist.
+the shared rows and made `user_id` NOT NULL. The privacy page copy is
+done: it names concept write-ups and guides among what is stored, what the
+key writes and what deletion removes, says the morning set comes with the
+write-ups it needs, and says nothing about shared write-ups, which no longer
+exist.
 
 ## Open question for the owner
 

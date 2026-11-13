@@ -60,10 +60,11 @@ read it before changing that area.
   recovery codes, the key's storage and use, the email Resend sends, the
   answer draft and how long a sign-in lasts, the weekday schedule and the
   unopened-set pause, what the Account page's usage card prices, push
-  reminders, what deletion removes, and what outlives it (server logs
-  without the email address, the shared concept write-ups, copies outside
-  Coding Gym). It states no backups, since they are off. It speaks for the
-  app, with no first person. The copy is `privacy.show` in
+  reminders, what deletion removes (answers, reviews, conversations,
+  concept write-ups and guides, usage records, keys), and what outlives it
+  (server logs without the email address, copies outside Coding Gym). It
+  states no backups, since they are off. It speaks for the app, with no
+  first person. The copy is `privacy.show` in
   `config/locales/en.yml`; every number comes from `PrivacyNotice.facts`,
   and `LOG_DAYS` there must match Railway's log retention
   (`docs/code-notes/app/models/privacy_notice.md`). The page describes the
@@ -71,7 +72,8 @@ read it before changing that area.
   `per-user-api-keys.md`, `the-duck-thread-is-stored.md`,
   `pausing-generation.md`, `push-reminders.md`, `passwordless-sign-in.md`,
   `login-rate-limits.md`, `what-a-usage-row-records.md`,
-  `offline-answer-saving.md` and `the-learn-tab.md`, all under
+  `offline-answer-saving.md`, `the-learn-tab.md` and
+  `learn-content-per-user.md`, all under
   `docs/decisions/`.
 - **Account usage card**: `/account` shows this calendar month's own-key spend in dollars, a weekday projection held until the 4th, while generation is paused, and whenever a provider has no priced rows, and per-provider dollars from `ApiUsage.own_key_totals` and `MonthlySpend`, in the user's zone. House-key rows stay out, since the account's key did not pay for them, and rows with no price are counted as unpriced (`docs/code-notes/app/models/monthly_spend.md`).
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): an

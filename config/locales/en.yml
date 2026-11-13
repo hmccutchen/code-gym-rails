@@ -89,14 +89,14 @@ en:
       heading: "What Coding Gym keeps, and what it doesn't"
       stored:
         heading: "What's stored"
-        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, and a record of each request sent with your key: what it was for and how many tokens it used."
+        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, the concept write-ups and guides written for you on Learn, and a record of each request sent with your key: what it was for and how many tokens it used."
         kept: "Your sets, answers, reviews and usage records are kept until you delete your account."
         retention: "Thinking-partner conversations are deleted automatically once their set is more than %{duck_days} days old."
         authenticator: "If you turn on an authenticator app, its secret is stored encrypted, and your recovery codes are stored only in a scrambled form that can't be turned back into the codes."
       key:
         heading: "Your API key"
         storage: "Each key you save is stored encrypted, and the app never shows it again after you save it. You can remove it in Setup at any time."
-        use: "It's used only for requests your own account makes: writing your sets, reviewing your answers, answering your questions, and writing the concept write-ups on Learn."
+        use: "It's used only for requests your own account makes: writing your sets, reviewing your answers, answering your questions, and writing the concept write-ups and guides on Learn."
         operator: "The person who runs Coding Gym doesn't look at keys, but could technically decrypt one, so use a key with a spend limit set at your provider."
       sent:
         heading: "Where your work goes"
@@ -108,15 +108,15 @@ en:
       cost:
         heading: "What it costs you"
         billing: "Your provider bills every request to your key. The Account page shows an estimate of this month's spend for Anthropic keys, and a request count for the others."
-        schedule: "On weekdays, a set is generated with your key each morning, whether or not you open the app."
+        schedule: "On weekdays, a set is generated with your key each morning, along with the concept write-ups it needs, whether or not you open the app."
         pause: "If %{count} sets in a row go unopened, generation pauses until you resume it with one tap on the dashboard."
       reminders:
         heading: "Reminders"
         body: "If you turn on reminders, your browser's push service delivers them without being able to read them. Turning reminders off, or deleting your account, stops them on all your devices."
       deleting:
         heading: "Deleting your account"
-        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: your answers, reviews, conversations, usage records and keys. It can't be undone."
-        leftovers: "Server logs, which don't include your email address, are kept for up to %{log_days} days. Concept write-ups made with your key stay on Learn for everyone, but they contain nothing you wrote. Copies held outside Coding Gym, such as emails you were sent and what your AI provider keeps, are not affected."
+        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: your answers, reviews, conversations, concept write-ups and guides, usage records and keys. It can't be undone."
+        leftovers: "Server logs, which don't include your email address, are kept for up to %{log_days} days. Copies held outside Coding Gym, such as emails you were sent and what your AI provider keeps, are not affected."
       log_in: "Log in"
   sessions:
     new:

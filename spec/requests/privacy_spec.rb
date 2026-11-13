@@ -61,6 +61,16 @@ RSpec.describe "Privacy page", type: :request do
     expect(text).not_to include("channel")
   end
 
+  it "names concept write-ups and guides as stored, written with the key and removed by deletion" do
+    get privacy_path
+    text = page.at_css("main").text
+
+    %w[stored.body key.use deleting.body].each do |key|
+      expect(I18n.t("privacy.show.#{key}")).to include("write-ups and guides")
+    end
+    expect(text).not_to match(/stay on Learn for everyone/i)
+  end
+
   it "says the Account page prices only Anthropic keys and counts requests for the others" do
     get privacy_path
 
