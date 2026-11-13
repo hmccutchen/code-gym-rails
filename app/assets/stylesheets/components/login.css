@@ -4,3 +4,4 @@
 .form-field { text-align: left; }
 .form-field input:not([type="checkbox"], [type="radio"], [type="range"]):focus { border-color: var(--accent); }
 .pending-divider { border-top: 1px solid var(--border); padding-top: 1.25rem; font-size: .85rem; }
+.login-privacy { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; font-size: .85rem; }
