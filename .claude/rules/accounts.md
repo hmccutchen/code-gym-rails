@@ -54,10 +54,11 @@ read it before changing that area.
   recovery codes, the key's storage and use, the email Resend sends, the
   answer draft and how long a sign-in lasts, the weekday schedule and the
   unopened-set pause, what the Account page's usage card prices, push
-  reminders, what deletion removes, and what outlives it (server logs
-  without the email address, copies outside Coding Gym; deletion removes
-  the person's own concept write-ups). It states no backups, since they are off. It speaks for the
-  app, with no first person. The copy is `privacy.show` in
+  reminders, what deletion removes (answers, reviews, conversations,
+  concept write-ups and guides, usage records, keys), and what outlives it
+  (server logs without the email address, copies outside Coding Gym). It
+  states no backups, since they are off. It speaks for the app, with no
+  first person. The copy is `privacy.show` in
   `config/locales/en.yml`; every number comes from `PrivacyNotice.facts`,
   and `LOG_DAYS` there must match Railway's log retention
   (`docs/code-notes/app/models/privacy_notice.md`). The page describes the
