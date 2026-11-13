@@ -73,6 +73,10 @@ use writes one, so a failure for a call's own provider can only appear
 after a change through another attempt. The generation claim, the
 regeneration claim's release and the daily job's `set_today?` check keep
 that attempt from overlapping the call that is reporting.
+No database constraint holds it, so any new code that changes `provider`
+must clear the leaving provider's failure the same way. `#start_trial!`
+sets `provider` without the clear, which is safe only because it runs for an
+account with no key, whose failures were cleared when its last key went.
 `spec/jobs/call_failure_after_key_change_spec.rb` tries those
 interleavings, a row from before key changes cleared failures included,
 and finds no own-provider failure at a report. A failure written straight

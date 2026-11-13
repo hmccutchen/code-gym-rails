@@ -81,7 +81,7 @@ RSpec.describe "A failure for a call's own provider, found when its key changed"
       expect(user.reload.last_generation_error).to eq(GenerateDailyExercisesJob::SUPERSEDED_MESSAGE)
     end
 
-    it "is not found for a row written before key changes cleared failures, left against another provider" do
+    it "is not found for a legacy row, written before key changes cleared failures, which can only name another provider" do
       user.update_columns(provider: "openai", last_generation_error_date: Date.current, last_generation_failure: "bad_key",
                           last_generation_failure_provider: "anthropic", last_generation_failed_at: Time.current)
       reports = watch_reports

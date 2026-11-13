@@ -18,6 +18,10 @@ that went stale and was retaken belongs to a newer attempt, which writes
 the outcome, so this job then records nothing and clears nothing. The lock
 order is user, then exercise, and the lock reloads the account.
 
+The superseded path releases the claim without the user lock. It records
+no message, and the token-checked release is a single atomic update, so it
+needs none.
+
 A regeneration notes `User#key_in_use` before the call. A provider or setup
 failure is written through `User#report_call_failure` inside that lock, so
 a failure from a key removed, replaced or switched during the call is not
