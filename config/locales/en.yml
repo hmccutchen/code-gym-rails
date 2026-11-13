@@ -89,7 +89,7 @@ en:
       heading: "What Coding Gym keeps, and what it doesn't"
       stored:
         heading: "What's stored"
-        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, and a record of each request sent with your key: what it was for and how many tokens it used."
+        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, the concept write-ups written for you on Learn, and a record of each request sent with your key: what it was for and how many tokens it used."
         kept: "Your sets, answers, reviews and usage records are kept until you delete your account."
         retention: "Thinking-partner conversations are deleted automatically once their set is more than %{duck_days} days old."
         authenticator: "If you turn on an authenticator app, its secret is stored encrypted, and your recovery codes are stored only in a scrambled form that can't be turned back into the codes."
@@ -115,8 +115,8 @@ en:
         body: "If you turn on reminders, your browser's push service delivers them without being able to read them. Turning reminders off, or deleting your account, stops them on all your devices."
       deleting:
         heading: "Deleting your account"
-        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: your answers, reviews, conversations, usage records and keys. It can't be undone."
-        leftovers: "Server logs, which don't include your email address, are kept for up to %{log_days} days. Concept write-ups made with your key stay on Learn for everyone, but they contain nothing you wrote. Copies held outside Coding Gym, such as emails you were sent and what your AI provider keeps, are not affected."
+        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: your answers, reviews, conversations, concept write-ups, usage records and keys. It can't be undone."
+        leftovers: "Server logs, which don't include your email address, are kept for up to %{log_days} days. Copies held outside Coding Gym, such as emails you were sent and what your AI provider keeps, are not affected."
       log_in: "Log in"
   sessions:
     new:
