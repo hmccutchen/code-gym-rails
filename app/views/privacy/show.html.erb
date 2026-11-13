@@ -1,0 +1,68 @@
+<% page_title t("privacy.show.heading") %>
+<% page_stylesheet "privacy" %>
+
+<article class="privacy-page">
+  <% unless logged_in? %>
+    <p class="privacy-brand"><%= t("app_name") %></p>
+  <% end %>
+  <h1><%= t("privacy.show.heading") %></h1>
+
+  <section aria-labelledby="privacy-stored">
+    <h2 id="privacy-stored"><%= t("privacy.show.stored.heading") %></h2>
+    <p><%= t("privacy.show.stored.body") %></p>
+    <p><%= t("privacy.show.stored.retention", duck_days: @facts[:duck_days]) %></p>
+  </section>
+
+  <section aria-labelledby="privacy-key">
+    <h2 id="privacy-key"><%= t("privacy.show.key.heading") %></h2>
+    <p><%= t("privacy.show.key.storage") %></p>
+    <p><%= t("privacy.show.key.use") %></p>
+    <p><%= t("privacy.show.key.operator") %></p>
+  </section>
+
+  <section aria-labelledby="privacy-sent">
+    <h2 id="privacy-sent"><%= t("privacy.show.sent.heading") %></h2>
+    <p><%= t("privacy.show.sent.provider") %></p>
+    <p><%= t("privacy.show.sent.email") %></p>
+  </section>
+
+  <section aria-labelledby="privacy-cost">
+    <h2 id="privacy-cost"><%= t("privacy.show.cost.heading") %></h2>
+    <p><%= t("privacy.show.cost.billing") %></p>
+    <p><%= t("privacy.show.cost.pause", count: @facts[:unopened_sets]) %></p>
+  </section>
+
+  <section aria-labelledby="privacy-reminders">
+    <h2 id="privacy-reminders"><%= t("privacy.show.reminders.heading") %></h2>
+    <p><%= t("privacy.show.reminders.body") %></p>
+  </section>
+
+  <section aria-labelledby="privacy-looking">
+    <h2 id="privacy-looking"><%= t("privacy.show.looking.heading") %></h2>
+    <p><%= t("privacy.show.looking.counts") %></p>
+    <p><%= t("privacy.show.looking.content") %></p>
+    <p><%= t("privacy.show.looking.access") %></p>
+  </section>
+
+  <section id="deleting" aria-labelledby="privacy-deleting">
+    <h2 id="privacy-deleting"><%= t("privacy.show.deleting.heading") %></h2>
+    <p><%= t("privacy.show.deleting.body") %></p>
+    <ul>
+      <li><%= t("privacy.show.deleting.backups", days: @facts[:backup_days]) %></li>
+      <li><%= t("privacy.show.deleting.logs", days: @facts[:log_days]) %></li>
+      <li><%= t("privacy.show.deleting.rate_limits", days: @facts[:cache_days]) %></li>
+      <li><%= t("privacy.show.deleting.jobs") %></li>
+      <li><%= t("privacy.show.deleting.library") %></li>
+      <li><%= t("privacy.show.deleting.outside") %></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="privacy-questions">
+    <h2 id="privacy-questions"><%= t("privacy.show.questions.heading") %></h2>
+    <p><%= t("privacy.show.questions.body") %></p>
+  </section>
+
+  <% unless logged_in? %>
+    <p class="privacy-log-in"><%= link_to t("privacy.show.log_in"), login_path, class: "btn btn-primary" %></p>
+  <% end %>
+</article>

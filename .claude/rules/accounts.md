@@ -1,13 +1,13 @@
 ---
 paths:
-  - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes}_controller.rb"
+  - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes,privacy}_controller.rb"
   - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes,pending_trial_session}.rb"
-  - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user,account_data}.rb"
+  - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user,account_data,privacy_notice}.rb"
   - "app/models/concerns/signed_in_sessions.rb"
   - "app/models/user/authenticator.rb"
   - "app/clients/{preview_environment,preview_mail,lazy_cache_store,unfinished_jobs}.rb"
   - "app/services/{preview_seed,account_deletion}.rb"
-  - "app/views/{sessions,trials,user_mailer,second_factor_challenges,authenticators,recovery_codes}/**"
+  - "app/views/{sessions,trials,user_mailer,second_factor_challenges,authenticators,recovery_codes,privacy}/**"
   - "app/views/dashboard/{_trial_banner,_trial_ended}.html.erb"
   - "app/views/accounts/_authenticator.html.erb"
   - "app/helpers/authenticator_setups_helper.rb"
@@ -17,7 +17,7 @@ paths:
   - "lib/boot/app_host.rb"
   - "script/mint_invite_code.rb"
   - "railway.toml"
-  - "spec/**/*{session,login,trial,invite,preview,app_host,account_deletion,user_data_coverage}*"
+  - "spec/**/*{session,login,trial,invite,preview,app_host,account_deletion,user_data_coverage,privacy}*"
 ---
 
 # Sign-in, trials and preview apps
@@ -45,6 +45,22 @@ read it before changing that area.
   flight writes nothing once the row is gone. `User#anonymize!`,
   `anonymized_at` and `User.active` stay, uncalled by deletion, until the
   accounts anonymized before 2026-11-11 are cleaned up.
+- **The privacy page**: `GET /privacy` (`PrivacyController`, open signed
+  out and to an account with no key) states what Coding Gym keeps, where an
+  engineer's work goes and what outlives a deletion; the login page and the
+  Account page's delete card link to it. Its text is a set of claims about
+  the code, so a change to the behaviour one describes changes the page in
+  the same PR: what is stored, the key's storage and use, the email Resend
+  sends, the push services, the unopened-set pause, what deletion removes and
+  what it leaves, and what the logs and the cache hold. The copy is
+  `privacy.show` in `config/locales/en.yml`; every number comes from
+  `PrivacyNotice.facts`, and `BACKUP_DAYS` and `LOG_DAYS` there must match
+  Railway's settings (`docs/code-notes/app/models/privacy_notice.md`). The
+  page describes the behaviour in `docs/decisions/deleting-an-account.md`,
+  `per-user-api-keys.md`, `the-duck-thread-is-stored.md`,
+  `pausing-generation.md`, `push-reminders.md`, `passwordless-sign-in.md`,
+  `login-rate-limits.md`, `what-a-usage-row-records.md` and
+  `the-learn-tab.md`, all under `docs/decisions/`.
 - **Account usage card**: `/account` shows this calendar month's own-key spend in dollars, a weekday projection held until the 4th, while generation is paused, and whenever a provider has no priced rows, and per-provider dollars from `ApiUsage.own_key_totals` and `MonthlySpend`, in the user's zone. House-key rows stay out, since the account's key did not pay for them, and rows with no price are counted as unpriced (`docs/code-notes/app/models/monthly_spend.md`).
 - **Passwordless sign-in** (`docs/decisions/passwordless-sign-in.md`): an
   account signs in with its address and then the emailed code, or the

@@ -1,0 +1,12 @@
+.privacy-page { max-width: 40rem; margin: 2rem auto 3rem; padding: 1.5rem 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-wrap: break-word; }
+.privacy-brand { color: var(--accent-text); font-weight: 700; margin-bottom: .5rem; }
+.privacy-page h1 { font-size: 1.6rem; line-height: 1.25; margin-bottom: 1.5rem; }
+.privacy-page section { margin-bottom: 1.75rem; }
+.privacy-page section:last-of-type { margin-bottom: 0; }
+.privacy-page h2 { font-size: 1.1rem; margin-bottom: .5rem; }
+.privacy-page p, .privacy-page li { line-height: 1.6; }
+.privacy-page p + p { margin-top: .6rem; }
+.privacy-page ul { padding-left: 1.25rem; margin-top: .6rem; }
+.privacy-page li + li { margin-top: .4rem; }
+.privacy-log-in { margin-top: 1.75rem; }
+.privacy-log-in .btn { width: 100%; padding: .75rem; }

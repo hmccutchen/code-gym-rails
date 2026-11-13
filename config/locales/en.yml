@@ -84,6 +84,47 @@ en:
       cancel: "Cancel track change"
       refresh: "Refresh preview"
   app_name: "Coding Gym"
+  privacy:
+    show:
+      heading: "What Coding Gym keeps, and what it doesn't"
+      stored:
+        heading: "What's stored"
+        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, and a record of each request sent with your key: what it was for and how many tokens it used."
+        retention: "Thinking-partner conversations are deleted automatically %{duck_days} days after the day of their set."
+      key:
+        heading: "Your API key"
+        storage: "Each key you save is stored encrypted, and the app never shows it again after you save it. You can remove it in Setup at any time."
+        use: "It's used only for requests your own account makes: writing your sets, reviewing your answers, answering your questions, and writing the concept write-ups on Learn."
+        operator: "I don't look at keys. As the operator I could technically decrypt one, so use a key with a spend limit set at your provider."
+      sent:
+        heading: "Where your work goes"
+        provider: "Your exercises, answers and questions are sent to the AI provider whose key is in use, under that key. That provider's own data policy covers what it keeps. On Gemini's free tier, Google may use what you send to improve its products, and people at Google may read it."
+        email: "Email goes out through Resend: your login codes, a notice when you turn your authenticator app on or off or make new recovery codes, and a copy of a review, which is sent only when you press the button asking for one."
+      cost:
+        heading: "What it costs you"
+        billing: "Your provider bills every request to your key, or counts it against your allowance on Gemini's free tier. The Account page shows an estimate of what you've spent this month."
+        pause: "If %{count} sets in a row go unopened, generation pauses so your key isn't spent on sets you don't see. One tap on the dashboard resumes it."
+      reminders:
+        heading: "Reminders"
+        body: "If you turn on reminders, your browser's push service delivers them. The browser's maker runs that service: Apple, Google, Mozilla or Microsoft. It handles the delivery but can't read the message, which is encrypted for your browser. Turning reminders off, or deleting your account, removes the delivery addresses the app holds for your devices."
+      looking:
+        heading: "What I look at"
+        counts: "I run this as one person. I count how many accounts exist, how many have a key, how many have had a set generated, and how many have finished at least one day."
+        content: "I don't read your answers or reviews. The one tool that copies out an account's answers, for testing changes to grading, is only for an account whose owner has agreed to it. An admin page shows the design comparison exercises generated for people, once they've been reviewed, so I can check the step that tests each new exercise."
+        access: "I do have access to the database as its operator, and I'd rather say so than imply otherwise."
+      deleting:
+        heading: "Deleting your account"
+        body: "\"Delete my account\" on the Account page removes your account and everything tied to it: answers, reviews, conversations, usage records and your keys. A few things outlive it:"
+        backups: "Database backups keep a copy for up to %{days} days."
+        logs: "Server logs record your account number and the IP address of each request, and leave out your email address. Railway keeps them for up to %{days} days."
+        rate_limits: "Short-lived cache entries, such as the sign-in limits that stop someone guessing codes, keep your email address, IP address or account number for up to %{days} days."
+        jobs: "Records of finished background jobs, which name your account number, are cleared about a day after each job finishes."
+        library: "Concept write-ups generated with your key stay in the shared library. They're written from a concept's name, so they contain no text you wrote."
+        outside: "Copies held outside Coding Gym, such as email you were sent and what your AI provider keeps, are not affected."
+      questions:
+        heading: "Questions"
+        body: "Message me in the channel."
+      log_in: "Log in"
   sessions:
     new:
       page_title: "Log in"
@@ -91,6 +132,7 @@ en:
       email_label: "Email *"
       email_placeholder: "you@example.com"
       submit: "Send code"
+      privacy_link: "What Coding Gym keeps"
     enter_code:
       page_title: "Enter your code"
       start_over_prompt: "Didn't get the email, or used the wrong address?"
@@ -936,6 +978,7 @@ en:
       session_heading: "Session"
       danger_body: "Deleting your account permanently removes it and everything in it: your email, API keys, exercises, answers, reviews and usage history. It also logs you out. This cannot be undone. Copies held outside Coding Gym, such as email you were sent and what your AI provider keeps, are not affected."
       delete: "Delete my account"
+      privacy_link: "What Coding Gym keeps"
       delete_confirm: "Delete your account? This permanently removes your email, exercises, answers, reviews and usage history, and logs you out. It cannot be undone."
     api_usage:
       heading: "AI usage"

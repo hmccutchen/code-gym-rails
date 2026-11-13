@@ -15,7 +15,7 @@ RSpec.describe "Page stylesheets", type: :request do
   def page_sheets = stylesheets.grep(%r{\Apages/})
 
   { "history" => :history_path, "progress" => :progress_path, "learn" => :learn_path,
-    "account" => :account_path, "settings" => :setup_path, "today" => :root_path }.each do |page, path|
+    "account" => :account_path, "settings" => :setup_path, "today" => :root_path, "privacy" => :privacy_path }.each do |page, path|
     it "links #{page}'s own sheet, after the desktop sheet and before the display sheets" do
       get public_send(path)
 
