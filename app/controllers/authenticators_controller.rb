@@ -1,5 +1,6 @@
 class AuthenticatorsController < ApplicationController
   include AuthenticatorChanges
+  include RecentSignIn
 
   skip_before_action :require_provider
   before_action :no_store, only: %i[show create]
@@ -37,9 +38,7 @@ class AuthenticatorsController < ApplicationController
 
   # DELETE /account/authenticator/sign_in_again
   def sign_in_again
-    reset_session
-    session[:return_to] = account_authenticator_path
-    redirect_to login_path, notice: t("authenticators.sign_in_again.notice")
+    send_through_sign_in(return_to: account_authenticator_path, notice: t("authenticators.sign_in_again.notice"))
   end
 
   private
@@ -49,7 +48,7 @@ class AuthenticatorsController < ApplicationController
   end
 
   def require_recent_sign_in
-    render :sign_in_again, status: request.get? ? :ok : :forbidden unless User.signed_in_recently?(session[:signed_in_at])
+    render :sign_in_again, status: request.get? ? :ok : :forbidden unless signed_in_recently?
   end
 
   # Per session, so a key read in one session, an intruder's included, is never the key another session enrolls.

@@ -1,4 +1,6 @@
 class AccountsController < ApplicationController
+  include RecentSignIn
+
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
@@ -13,6 +15,8 @@ class AccountsController < ApplicationController
 
   # DELETE /account
   def destroy
+    return send_through_sign_in(return_to: account_path, notice: t("flash.accounts.sign_in_to_delete")) unless signed_in_recently?
+
     outcome = AccountDeletion.call(current_user)
 
     case outcome.status

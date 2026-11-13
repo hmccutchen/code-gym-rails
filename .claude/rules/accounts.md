@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/controllers/{sessions,trials,accounts,application,second_factor_challenges,authenticators,recovery_codes,privacy}_controller.rb"
-  - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes,pending_trial_session}.rb"
+  - "app/controllers/concerns/{login_code_requests,preview_auto_login,sign_in_completion,authenticator_changes,pending_trial_session,recent_sign_in}.rb"
   - "app/models/{invite_code,pending_trial,provider_credential,trial_allowance,trial_mode,trial_status,house_keys,user,account_data,privacy_notice}.rb"
   - "app/models/concerns/signed_in_sessions.rb"
   - "app/models/user/authenticator.rb"
@@ -44,7 +44,13 @@ read it before changing that area.
   gets a fate. Locks go user, exercises, responses, mastery rows. Work in
   flight writes nothing once the row is gone. `User#anonymize!`,
   `anonymized_at` and `User.active` stay, uncalled by deletion, until the
-  accounts anonymized before 2026-11-11 are cleaned up.
+  accounts anonymized before 2026-11-11 are cleaned up. Deleting needs a
+  sign-in within `User::RECENT_SIGN_IN`, the authenticator's check
+  (`RecentSignIn`), counted from the sign-in, not the click. An older
+  session deletes nothing; this browser's session is reset and comes back
+  to Account after the next sign-in, never replaying the DELETE. The cookie
+  store keeps a copied cookie valid elsewhere, and the stamp check still
+  refuses it.
 - **The privacy page**: `GET /privacy` (`PrivacyController`, open signed
   out and to an account with no key) states what Coding Gym keeps, where an
   engineer's work goes and what outlives a deletion; the login page and the

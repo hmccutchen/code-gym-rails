@@ -192,6 +192,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/controllers/authenticators_controller.rb` — `/account/authenticator`: the setup page, turning the authenticator on and off, and the sign-in-again page for an old session
 - `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once
 - `app/controllers/concerns/sign_in_completion.rb` — `SignInCompletion`: finishing a sign-in (`reset_session`, the stamp, `return_to`, a pending trial) and issuing the second-factor challenge
+- `app/controllers/concerns/recent_sign_in.rb` — `RecentSignIn`: `#signed_in_recently?`, the controller and view side of `User.signed_in_recently?`, and `#send_through_sign_in`, which signs out and saves a named page to return to; used by turning on the authenticator and deleting the account
 - `app/controllers/concerns/authenticator_changes.rb` — `AuthenticatorChanges`: the shared rate limit, `no-store`, the change notice and the recovery code page for both authenticator controllers
 - `app/models/concerns/signed_in_sessions.rb` — `SignedInSessions`: `User.session_time`, the one reader of a sign-in stamp, `User.signed_in_recently?`, and `User.signed_in_through(user_id:, signed_in_at:)`, the one check that a session is signed in and not ended by `sessions_valid_after`
 - `app/models/user/authenticator.rb` — `User::Authenticator`: the authenticator secret, TOTP and recovery code checks, the sign-in challenge and the daily cap, each write under the row lock

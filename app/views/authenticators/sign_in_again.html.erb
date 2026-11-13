@@ -3,7 +3,7 @@
 
 <div class="authenticator-wrap">
   <h1><%= t("authenticators.sign_in_again.heading") %></h1>
-  <p><%= t("authenticators.sign_in_again.body") %></p>
+  <p><%= t("authenticators.sign_in_again.body", minutes: User::RECENT_SIGN_IN.in_minutes.to_i) %></p>
   <%= button_to t("authenticators.sign_in_again.button"), sign_in_again_account_authenticator_path, method: :delete, class: "btn btn-primary" %>
   <p style="margin-top:1.5rem;"><%= link_to t("authenticators.show.back"), account_path %></p>
 </div>

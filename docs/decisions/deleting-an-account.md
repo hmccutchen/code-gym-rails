@@ -14,6 +14,33 @@ rows "anonymously for team statistics". The owner chose real deletion:
   `#anonymized?` and `User.active` stay in the code, uncalled by deletion,
   and a later change drops them.
 
+## A recent sign-in first
+
+**Decision (2026-11-13, issue #784).** Deleting cannot be undone, and it
+used to need only a signed-in session and a confirm click, so a borrowed or
+left-open browser was enough. `AccountsController#destroy` now needs a
+sign-in within the last 15 minutes (`User::RECENT_SIGN_IN`), the same check
+that guards turning on the authenticator. Both go through
+`RecentSignIn#signed_in_recently?`, which asks `User.signed_in_recently?`,
+so the window has one home.
+
+An older session deletes nothing. The action signs the browser out, saves
+the Account page as the place to come back to, and sends it to `/login`
+with a notice. After the next sign-in, the authenticator step included, the
+person is back on the Account page and presses Delete again. The refused
+DELETE is never replayed: the return address is a page, the way
+`require_login` saves one only for an HTML GET.
+
+The window counts from the sign-in, not from the click, as it does for the
+authenticator. Resetting the session ends it only in this browser: sessions
+live in a cookie store, so a copied cookie stays valid elsewhere until it
+expires or `sessions_valid_after` moves. That copy still carries the old
+signed stamp, so the same check refuses it a deletion.
+
+The Account page says, when the sign-in is already older than the window,
+that deleting will ask for a sign-in first. The server still decides at the
+click, so a page left open past the window gets the same redirect.
+
 ## One fate per table
 
 `AccountData::FATES` is the one list of what deletion does to each table

@@ -57,6 +57,19 @@ RSpec.describe "Accounts", type: :request do
       expect(response.body).to include("keyless@example.com")
     end
 
+    it "says a sign-in has to be repeated before deleting only once the sign-in is old" do
+      login_as(create_user_with_key(email: "dev@example.com"))
+      note = "You signed in more than 15 minutes ago, so you'll be asked to sign in again before the account is deleted."
+
+      get account_path
+      expect(response.body).not_to include(CGI.escapeHTML(note))
+
+      travel User::RECENT_SIGN_IN + 1.second do
+        get account_path
+      end
+      expect(response.body).to include(CGI.escapeHTML(note))
+    end
+
     it "redirects to login when logged out" do
       get account_path
 
@@ -90,6 +103,55 @@ RSpec.describe "Accounts", type: :request do
 
       get history_path
       expect(response).to redirect_to(login_path)
+    end
+
+    it "deletes on a sign-in just inside the authenticator's recent window" do
+      user = create_user_with_key(email: "recent@example.com")
+      login_as(user)
+
+      travel User::RECENT_SIGN_IN - 1.second do
+        delete account_path
+      end
+
+      expect(User.exists?(user.id)).to be(false)
+    end
+
+    it "deletes nothing on an older sign-in and sends the browser through sign-in back to Account" do
+      user = create_user_with_key(email: "stale@example.com")
+      login_as(user)
+
+      travel User::RECENT_SIGN_IN + 1.second do
+        delete account_path
+
+        expect(User.exists?(user.id)).to be(true)
+        expect(response).to redirect_to(login_path)
+        expect(flash[:notice]).to eq("Sign in again to delete your account. You'll come back to the Account page to confirm.")
+        get account_path
+        expect(response).to redirect_to(login_path)
+
+        login_as(user)
+        expect(response).to redirect_to(account_path)
+        follow_redirect!
+        expect(response).to have_http_status(:ok)
+      end
+
+      expect(User.exists?(user.id)).to be(true)
+    end
+
+    it "sends an authenticator account through both factors back to Account" do
+      user = create_user_with_key(email: "stale-otp@example.com")
+      secret, _recovery_codes = enroll_second_factor(user)
+      login_as(user)
+      post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+
+      travel User::RECENT_SIGN_IN + 1.second do
+        delete account_path
+        expect(User.exists?(user.id)).to be(true)
+
+        login_as(user)
+        post second_factor_challenge_path, params: { otp_code: current_totp(secret) }
+        expect(response).to redirect_to(account_path)
+      end
     end
 
     it "does nothing when logged out" do
