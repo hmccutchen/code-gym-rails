@@ -102,6 +102,19 @@ RSpec.describe GenerateConceptReferenceJob do
     end
   end
 
+  it "reads the version again under the claim, so a refresh whose version another job advanced meanwhile calls nothing" do
+    enqueue_reference(seen_version: 0)
+    allow(AdvisoryLock).to receive(:hold).and_wrap_original do |hold, key, &block|
+      write_row_behind_the_query_cache
+      ConceptReference.uncached { ConceptReference.find_by!(user: user).update_columns(generation_version: 1) }
+      hold.call(key, &block)
+    end
+
+    perform_next
+
+    expect(service).not_to have_received(:generate_concept_reference)
+  end
+
   it "discards one user's overlapping queued requests at one priority, across refresh modes" do
     enqueue_reference
 

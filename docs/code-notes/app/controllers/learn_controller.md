@@ -16,7 +16,8 @@ One press of `#prepare` or `#prepare_ladders` can queue about 90 jobs on
 they ran ahead of a dashboard click made after the press and ahead of every
 scheduled set. The bulk enqueues run at `JobPriority::BACKGROUND`: the
 press's write-ups through `GenerateConceptReferenceJob.queue_missing`, the
-way a saved set queues its own, and its guides and ladders through
+way a saved set queues its own, its ladders through
+`GenerateConceptReferenceJob.queue_rewrites`, and its guides through
 `#bulk`, so a click (`JobPriority::CLICK`) and every
 scheduled set (`JobPriority::SCHEDULED`) run first, even a set enqueued
 after the press. Nobody is waiting on any one job of a press.
@@ -24,7 +25,8 @@ after the press. Nobody is waiting on any one job of a press.
 write-up, and neither does the write-up
 `ResponsesController#enqueue_concept_references` queues for a concept just
 submitted. A click for a concept a press already queued still gets its own
-job; `GenerateConceptReferenceJob`'s claim keeps the two to one call.
+job; `GenerateConceptReferenceJob`'s claim, and the version each rewrite
+was asked against, keep the two to one call.
 `job_priority_spec` holds the ordering, whatever the numbers are.
 
 ## `AWAITING`
@@ -40,8 +42,9 @@ guess how long a provider call with thinking on will take.
 
 ## `#prepare_concept`
 
-Answers JSON for the page's script. It queues the job with `refresh: true`,
-which permits a rewrite of the whole row.
+Answers JSON for the page's script. It queues the job through
+`GenerateConceptReferenceJob.queue_rewrites`, with `refresh: true`, which
+permits a rewrite of the whole row, and the version of the row the user sees.
 
 It clears any earlier failure note before queueing. Otherwise that old note
 would answer this attempt's first poll before the job had run.

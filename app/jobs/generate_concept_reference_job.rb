@@ -15,17 +15,25 @@ class GenerateConceptReferenceJob < ApplicationJob
     end
   end
 
+  def self.queue_rewrites(user, pairs, priority: JobPriority::CLICK)
+    seen = ConceptReference.seen_by(user, concept: pairs.map(&:first).uniq, language: pairs.map(&:last).uniq)
+    pairs.each do |concept, language|
+      set(priority: priority).perform_later(concept: concept, language: language, user_id: user.id, refresh: true,
+                                            seen_version: seen[[ concept, language ]]&.generation_version || 0)
+    end
+  end
+
   def self.claim_key(user_id:, language:, concept:) = "concept_reference/#{user_id}/#{language}/#{concept}"
 
-  # refresh rewrites the whole row so its parts come from one response; only a deliberate Learn click passes it.
-  def perform(concept:, language:, user_id:, refresh: false)
+  # A rewrite asked for against an older seen_version already ran; jobs queued by older code pass no seen_version.
+  def perform(concept:, language:, user_id:, refresh: false, seen_version: nil)
     return if concept == "other"
 
     user = User.active.find_by(id: user_id)
-    return unless user&.writes_learn_content? && wanted?(ConceptReference.for(user, concept: concept, language: language), refresh)
+    return unless user&.writes_learn_content? && wanted?(ConceptReference.for(user, concept: concept, language: language), refresh, seen_version)
 
     claimed = AdvisoryLock.hold(self.class.claim_key(user_id: user.id, language: language, concept: concept)) do
-      write_up(user, concept, language, refresh)
+      write_up(user, concept, language, refresh, seen_version)
     end
     Rails.logger.info("Skipped concept reference for #{concept}/#{language}: another job is writing it") unless claimed
   rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
@@ -44,16 +52,20 @@ class GenerateConceptReferenceJob < ApplicationJob
 
   private
 
-  def wanted?(seen, refresh) = seen.nil? || (refresh && !seen.fully_written?)
+  def wanted?(seen, refresh, seen_version)
+    return false unless seen_version.nil? || seen_version == (seen&.generation_version || 0)
 
-  def write_up(user, concept, language, refresh)
+    seen.nil? || (refresh && !seen.fully_written?)
+  end
+
+  def write_up(user, concept, language, refresh, seen_version)
     seen = ConceptReference.uncached { ConceptReference.for(user, concept: concept, language: language) }
-    return unless wanted?(seen, refresh)
+    return unless wanted?(seen, refresh, seen_version)
 
     reference = AiService.for(user).generate_concept_reference(user, concept, language)
-    case write_own(user, concept, language, reference)
+    case write_own(user, concept, language, reference, refresh:, seen_version:)
     when :account_deleted then log_deleted(user.id, concept, language)
-    when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: already fully written")
+    when :skipped then Rails.logger.info("Skipped concept reference for #{concept}/#{language}: the row changed during the call")
     else
       ConceptReferenceFailures.clear(user_id: user.id, concept: concept, language: language)
       Rails.logger.info("Generated concept reference for #{concept}/#{language}")
@@ -61,14 +73,14 @@ class GenerateConceptReferenceJob < ApplicationJob
   end
 
   # The owner is share-locked first, as AccountDeletion locks it, so a deletion during the call leaves nothing behind.
-  def write_own(user, concept, language, reference)
+  def write_own(user, concept, language, reference, refresh:, seen_version:)
     attributes = ConceptReference::WRITTEN_FIELDS.index_with { |field| reference[field] }
 
     User.transaction do
       next :account_deleted unless User.active.lock("FOR SHARE").exists?(id: user.id)
 
       own = ConceptReference.for(user, concept: concept, language: language)
-      next rewrite(own, attributes) if own
+      next rewrite(own, attributes, refresh, seen_version) if own
 
       ConceptReference.create!(attributes.merge("user_id" => user.id, "concept" => concept, "language" => language,
                                                 "generation_version" => 1))
@@ -76,9 +88,9 @@ class GenerateConceptReferenceJob < ApplicationJob
     end
   end
 
-  def rewrite(own, attributes)
+  def rewrite(own, attributes, refresh, seen_version)
     own.with_lock do
-      next :skipped if own.fully_written?
+      next :skipped unless wanted?(own, refresh, seen_version)
 
       own.update!(attributes.merge(generation_version: own.generation_version + 1))
       :written

@@ -207,6 +207,21 @@ ships one release before any code reads it for Learn
   the click runs first, the press's job finds the row written; when the
   press's job is already running, the click finds the claim. Either way
   the concept gets one call.
+- The claim only keeps two calls from running at once. A ladder press
+  queued before a click for one of its concepts would still call after the
+  click, whenever the click's reply left the ladder or lesson unwritten, so
+  each refresh carries the `generation_version` the user saw when it was
+  asked for (`seen_version`, 0 for no row). Under the claim, a job whose
+  version no longer matches the row skips the call: a write has landed
+  since the request. A later press or click reads the new version and still
+  retries. `GenerateConceptReferenceJob.queue_rewrites` builds the argument
+  for both Learn entry points. A job queued before this change carries no
+  version and runs as before.
+- A writer that takes no claim, an older worker during a deploy or a
+  migration copying rows, can still add or rewrite the row during the call.
+  So the job asks the same question again under the row lock before it
+  writes: a plain write-up that now finds a row, or a rewrite whose version
+  the row has moved past, writes nothing.
 - The claim needs no column. A claim column would have to sit on a row
   that may not exist yet (the user's own reference is created by the job),
   and a claim on `users` would hold back every other concept of that user.
@@ -309,6 +324,12 @@ rendered under L4 shows the shared row. After L5 its ladder and lesson poll
 own row, written at version 1, and "explain differently" with the shared
 row's id answers 404. A reload fixes both. This lasts for one deploy, so it
 is accepted.
+
+A rewrite queued by L4 web carries the `seen_version` of the row L4 showed,
+which may be the shared row's. An L5 worker compares it with the user's own
+row: a copy keeps the shared row's version, so the rewrite runs, but for a
+user with no copy yet the versions differ and the job skips. The next press
+captures the own row's version and runs.
 
 ## The deploy window between L1 and L2
 
