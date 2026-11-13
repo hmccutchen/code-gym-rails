@@ -43,6 +43,8 @@ RSpec.describe AdvisoryLock do
     expect { described_class.hold("write-up/1") { raise ArgumentError, "the block's error" } }
       .to raise_error(ArgumentError, "the block's error")
     expect(Rails.logger).to have_received(:warn).with(/write-up\/1.*server closed the connection/)
+  ensure
+    connection.raw_connection.exec("SELECT pg_advisory_unlock_all()")
   end
 
   it "keeps different keys apart" do
