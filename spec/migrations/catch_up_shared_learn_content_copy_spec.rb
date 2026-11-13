@@ -2,6 +2,8 @@ require "rails_helper"
 require Rails.root.join("db/migrate/20261113170000_catch_up_shared_learn_content_copy").to_s
 
 RSpec.describe CatchUpSharedLearnContentCopy do
+  around { |example| with_shared_learn_rows { example.run } }
+
   self.use_transactional_tests = false
 
   let(:connection) { ActiveRecord::Base.connection }

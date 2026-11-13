@@ -39,15 +39,15 @@ Each entry states what a change must not break. An entry that names a
 read it before changing that area.
 
 - **Learn content becomes per user** (`docs/decisions/learn-content-per-user.md`):
-  `concept_references` and `recognition_guides` carry a nullable `user_id`.
-  It ships in six steps with deploy gates between them; follow that doc's
+  `concept_references` and `recognition_guides` carry a NOT NULL `user_id`.
+  It shipped in six steps with deploy gates between them; follow that doc's
   order and the obligations it lists for each step. Every reference and
   guide is written as its user's own row, and since L5 every reader asks
   `ConceptReference.for(user, ...)`, `.seen_by(user, ...)` or
   `RecognitionGuide.seen_by(user, ...)`, which read the user's own rows
-  only: never a shared row and never another user's. The admin promote
-  check alone counts any row. Shared rows (no user) remain, unread, until
-  the schema step (`docs/decisions/learn-content-per-user.md`).
+  only, never another user's. The admin promote check alone counts any
+  row. The schema step deleted the shared rows and requires an owner on
+  every row (`docs/decisions/learn-content-per-user.md`).
   A trial account writes no Learn content (`User#writes_learn_content?`).
 - **Alternate framings of a concept reference**
   (`docs/decisions/alternate-framings-of-a-concept-reference.md`): A control
@@ -67,7 +67,8 @@ read it before changing that area.
   `ConceptReference` is keyed on `(user_id, concept, language)`. L4's
   `CopySharedLearnContent` copied every shared reference and guide to each
   active account, inserting only where the user had no row yet, and L5's
-  `CatchUpSharedLearnContentCopy` runs that copy again. Guide, ladder and
+  `CatchUpSharedLearnContentCopy` ran that copy again before
+  `RequireUserOnLearnContent` deleted the shared rows. Guide, ladder and
   `lesson` come from the same
   `#generate_concept_reference` call, outside its required fields;
   `ConceptReference::REFERENCE_FIELDS` stays unwidened, `TRADEOFF_CONCEPTS` is written

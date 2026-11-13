@@ -4,7 +4,9 @@ require Rails.root.join("db/migrate/20261104120000_delete_javascript_unsafe_migr
 RSpec.describe DeleteJavascriptUnsafeMigrationReference do
   def migrate_up = ActiveRecord::Migration.suppress_messages { described_class.new.migrate(:up) }
 
-  def reference(concept, language) = ConceptReference.create!(concept: concept, language: language, tagline: "t")
+  let(:owner) { User.create!(email: "unsafe-migration-owner@example.com") }
+
+  def reference(concept, language) = ConceptReference.create!(user: owner, concept: concept, language: language, tagline: "t")
 
   it "deletes the JavaScript unsafe_migration reference, written before the prompt said it was a schema concept" do
     reference("unsafe_migration", "javascript")

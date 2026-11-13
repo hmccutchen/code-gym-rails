@@ -1,72 +1,67 @@
 require "rails_helper"
 
 RSpec.describe ConceptReference do
-  it "is valid with a concept and language" do
-    ref = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")
+  let(:owner) { User.create!(email: "owner@example.com") }
+  let(:other) { User.create!(email: "other@example.com") }
+
+  it "is valid with an owner, a concept and a language" do
+    ref = ConceptReference.new(user: owner, concept: "n_plus_one", language: "ruby_rails")
     expect(ref).to be_valid
   end
 
+  it "requires an owner, in the model and in the database" do
+    ref = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")
+    expect(ref).not_to be_valid
+    expect { ref.save!(validate: false) }.to raise_error(ActiveRecord::NotNullViolation)
+  end
+
   it "requires a concept" do
-    ref = ConceptReference.new(concept: nil, language: "ruby_rails")
+    ref = ConceptReference.new(user: owner, concept: nil, language: "ruby_rails")
     expect(ref).not_to be_valid
   end
 
   it "requires a language" do
-    ref = ConceptReference.new(concept: "n_plus_one", language: nil)
+    ref = ConceptReference.new(user: owner, concept: "n_plus_one", language: nil)
     expect(ref).not_to be_valid
   end
 
   it "allows the same concept in different languages" do
-    ConceptReference.create!(concept: "closures", language: "javascript")
-    ref = ConceptReference.new(concept: "closures", language: "ruby_rails")
+    ConceptReference.create!(user: owner, concept: "closures", language: "javascript")
+    ref = ConceptReference.new(user: owner, concept: "closures", language: "ruby_rails")
     expect(ref).to be_valid
   end
 
-  it "rejects a duplicate concept+language at the model level" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
-    ref = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")
+  it "rejects a duplicate concept+language for one user at the model level" do
+    ConceptReference.create!(user: owner, concept: "n_plus_one", language: "ruby_rails")
+    ref = ConceptReference.new(user: owner, concept: "n_plus_one", language: "ruby_rails")
     expect(ref).not_to be_valid
   end
 
   it "enforces uniqueness at the database level" do
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
-    dup = ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")
+    ConceptReference.create!(user: owner, concept: "n_plus_one", language: "ruby_rails")
+    dup = ConceptReference.new(user: owner, concept: "n_plus_one", language: "ruby_rails")
     expect { dup.save!(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
   end
 
   describe "ownership" do
-    let(:owner) { User.create!(email: "owner@example.com") }
-    let(:other) { User.create!(email: "other@example.com") }
-
-    it "lets each user and the shared row hold the same concept and language" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
+    it "lets each user hold the same concept and language once" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
 
       expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails", user: other)).to be_valid
       expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails", user: owner)).not_to be_valid
-      expect(ConceptReference.new(concept: "n_plus_one", language: "ruby_rails")).not_to be_valid
     end
 
-    it "gives a user only their own row, never the shared one" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
-      own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: owner)
+    it "never gives one user another user's row" do
+      own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
 
       expect(ConceptReference.for(owner, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
       expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to be_nil
       expect(ConceptReference.visible_to(other)).to be_empty
     end
 
-    it "never gives one user another user's row" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: owner)
-
-      expect(ConceptReference.for(other, concept: "n_plus_one", language: "ruby_rails")).to be_nil
-      expect(ConceptReference.visible_to(other)).to be_empty
-    end
-
-    it "indexes the user's own rows by concept and language, leaving out shared and other users' rows" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
+    it "indexes the user's own rows by concept and language, leaving out other users' rows" do
       own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: owner)
-      ConceptReference.create!(concept: "caching", language: "ruby_rails")
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "theirs", user: other)
       ConceptReference.create!(concept: "memoization", language: "ruby_rails", user: other)
 
       seen = ConceptReference.seen_by(owner, language: "ruby_rails")
@@ -75,7 +70,6 @@ RSpec.describe ConceptReference do
     end
 
     it "lists the pairs a user has no reference of their own for, in the order given" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails")
       ConceptReference.create!(concept: "caching", language: "ruby_rails", user: other)
       ConceptReference.create!(concept: "closures", language: "javascript", user: owner)
       pairs = [ [ "n_plus_one", "ruby_rails" ], [ "caching", "ruby_rails" ], [ "closures", "javascript" ], [ "memoization", "ruby_rails" ] ]
@@ -87,7 +81,7 @@ RSpec.describe ConceptReference do
 
     it "counts any user's row as a concept written up, for the admin promote check" do
       ConceptReference.create!(concept: "circuit_breaker", language: "ruby_rails", user: other)
-      ConceptReference.create!(concept: "debounce", language: "javascript")
+      ConceptReference.create!(concept: "debounce", language: "javascript", user: owner)
 
       expect(ConceptReference.written_up?(language: "ruby_rails", concept: "circuit_breaker")).to be(true)
       expect(ConceptReference.written_up?(language: "javascript", concept: "circuit_breaker")).to be(false)
@@ -135,7 +129,7 @@ RSpec.describe ConceptReference do
 
   describe "difficulty ladder" do
     def reference(**attrs)
-      ConceptReference.create!({ concept: "n_plus_one", language: "ruby_rails",
+      ConceptReference.create!({ user: owner, concept: "n_plus_one", language: "ruby_rails",
                                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
                                  guide_plain_language: "p", guide_worked_example: "w", guide_pitfalls: "x" }.merge(attrs))
     end

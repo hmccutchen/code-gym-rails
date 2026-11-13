@@ -22,7 +22,7 @@ class RecognitionGuide < ApplicationRecord
                     "judging it, and show how they fit into a single pass. Leave each concept's detail to its own reference."
   }.freeze
 
-  belongs_to :user, optional: true
+  belongs_to :user
 
   validates :group_key, presence: true, uniqueness: { scope: :user_id }, inclusion: { in: GROUP_KEYS }
   # A row's existence stops the backfill retrying, so a partial one would stay blank forever.

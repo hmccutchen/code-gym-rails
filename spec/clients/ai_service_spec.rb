@@ -232,7 +232,7 @@ RSpec.describe AiService do
                .explain_differently(user, exercise, response, section: "code_review")
       spy_class.new(canned_text: "A different angle on the same concept.")
                .explain_concept_differently(user, ConceptReference.create!(
-                 concept: "n_plus_one", language: "ruby_rails",
+                 user: user, concept: "n_plus_one", language: "ruby_rails",
                  tagline: "t", explanation: "e", code_example: "c", senior_lens: "s"
                ))
       spy_class.new(canned_text: { gaps_found: false, gaps: [] }.to_json)
@@ -4701,7 +4701,7 @@ RSpec.describe AiService do
 
     it "does not send the guide to the alternate-framing prompt" do
       reference = ConceptReference.create!(
-        concept: "n_plus_one", language: "ruby_rails",
+        user: user, concept: "n_plus_one", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
         guide_plain_language: "PLAIN_MARKER", guide_worked_example: "WORKED_MARKER",
         guide_pitfalls: "PITFALLS_MARKER"
@@ -4714,7 +4714,7 @@ RSpec.describe AiService do
 
     it "does not send the ladder to the alternate-framing prompt" do
       reference = ConceptReference.create!(
-        concept: "caching", language: "ruby_rails",
+        user: user, concept: "caching", language: "ruby_rails",
         tagline: "t", explanation: "e", code_example: "c", senior_lens: "s",
         ladder_junior: "JUNIOR_MARKER", ladder_mid_level: "m", ladder_senior: "SENIOR_MARKER", ladder_principal_engineer: "PRINCIPAL_MARKER"
       )

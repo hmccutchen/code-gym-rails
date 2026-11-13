@@ -3,19 +3,17 @@ require "rails_helper"
 RSpec.describe GenerationLadders do
   let(:user) { User.create!(email: "ladders@example.com") }
 
-  it "reads only the user's own ladder, never the shared one or another user's" do
+  it "reads only the user's own ladder, never another user's" do
     rungs = { ladder_junior: "j", ladder_mid_level: "m", ladder_principal_engineer: "p" }
-    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "shared", **rungs)
+    other = User.create!(email: "ladders-other@example.com")
+    ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "theirs", user: other, **rungs)
     ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", ladder_senior: "own", user: user, **rungs)
-    ConceptReference.create!(concept: "caching", language: "ruby_rails", ladder_senior: "shared caching", **rungs)
-    ConceptReference.create!(concept: "memoization", language: "ruby_rails", ladder_senior: "theirs", **rungs,
-                             user: User.create!(email: "ladders-other@example.com"))
+    ConceptReference.create!(concept: "memoization", language: "ruby_rails", ladder_senior: "theirs", **rungs, user: other)
 
     ladder = described_class.for(user, { ExerciseSection::Challenge => "senior" }, "ruby_rails", :application_code)
                             .fetch(ExerciseSection::Challenge)
 
     expect(ladder).to include("n_plus_one" => "own")
-    expect(ladder).not_to have_key("caching")
     expect(ladder).not_to have_key("memoization")
   end
 

@@ -232,16 +232,15 @@ RSpec.describe "Learn", type: :request do
       end
     end
 
-    it "renders only the user's own guide, never a shared one or another user's" do
-      RecognitionGuide.create!(group_key: "code_smell", questions: "Shared questions.", contrast: "c", misfires: "m")
-      RecognitionGuide.create!(group_key: "code_smell", questions: "My own questions.", contrast: "c", misfires: "m", user: user)
-      RecognitionGuide.create!(group_key: "data_modeling", questions: "Shared only questions.", contrast: "c", misfires: "m")
+    it "renders only the user's own guide, never another user's" do
       teammate = User.create!(email: "guide-teammate@example.com")
+      RecognitionGuide.create!(group_key: "code_smell", questions: "Their questions.", contrast: "c", misfires: "m", user: teammate)
+      RecognitionGuide.create!(group_key: "code_smell", questions: "My own questions.", contrast: "c", misfires: "m", user: user)
       RecognitionGuide.create!(group_key: "architecture", questions: "Teammate questions.", contrast: "c", misfires: "m", user: teammate)
       get learn_path
 
       expect(group_block("ruby_rails", "code_smell").at_css(".learn-recognition").text).to include("My own questions.")
-      expect(response.body).not_to include("Shared questions.", "Shared only questions.", "Teammate questions.")
+      expect(response.body).not_to include("Their questions.", "Teammate questions.")
     end
 
     it "renders no guide in a language bucket's core group" do
@@ -709,32 +708,23 @@ RSpec.describe "Learn", type: :request do
                                  code_example: "c", senior_lens: "s" }.merge(attrs))
     end
 
-    it "shows the user's own reference, never the shared one or a teammate's" do
-      reference("SHARED TEXT")
+    it "shows the user's own reference, never a teammate's" do
       reference("TEAMMATE TEXT", user: teammate)
       reference("OWN TEXT", user: user)
 
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
       expect(response.body).to include("OWN TEXT")
-      expect(response.body).not_to include("SHARED TEXT", "TEAMMATE TEXT")
+      expect(response.body).not_to include("TEAMMATE TEXT")
     end
 
-    it "shows no reference while the user has none, even when a shared row exists" do
-      reference("SHARED TEXT")
+    it "shows no reference while the user has none, even when a teammate has one" do
       reference("TEAMMATE TEXT", user: teammate)
 
       get learn_concept_path(bucket: "ruby_rails", concept: "n_plus_one")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).not_to include("SHARED TEXT", "TEAMMATE TEXT")
-    end
-
-    it "offers to write up a concept only the shared row covers" do
-      reference("SHARED TEXT")
-
-      expect { post prepare_learn_path }
-        .to have_enqueued_job(GenerateConceptReferenceJob).with(hash_including(concept: "n_plus_one", user_id: user.id))
+      expect(response.body).not_to include("TEAMMATE TEXT")
     end
 
     it "reports the user's own row on the write-up poll, not a teammate's" do

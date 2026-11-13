@@ -4,8 +4,10 @@ require Rails.root.join("db/migrate/20261029120000_clear_non_hash_concept_lesson
 RSpec.describe ClearNonHashConceptLessons do
   def migrate_up = ActiveRecord::Migration.suppress_messages { described_class.new.migrate(:up) }
 
+  let(:owner) { User.create!(email: "lesson-owner@example.com") }
+
   def reference_with_lesson(concept, lesson)
-    ConceptReference.create!(concept: concept, language: "ruby_rails").tap { |row| row.update_columns(lesson: lesson) }
+    ConceptReference.create!(user: owner, concept: concept, language: "ruby_rails").tap { |row| row.update_columns(lesson: lesson) }
   end
 
   it "clears a lesson stored as a string, number or list" do

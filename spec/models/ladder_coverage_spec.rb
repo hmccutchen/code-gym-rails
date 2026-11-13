@@ -3,14 +3,13 @@ require "rails_helper"
 RSpec.describe LadderCoverage do
   let(:user) { User.create!(email: "coverage@example.com", language: "ruby_rails") }
 
-  def laddered(concept, bucket, owner: nil)
+  def laddered(concept, bucket, owner:)
     ConceptReference.create!(concept: concept, language: bucket, user: owner,
                              ladder_junior: "j", ladder_mid_level: "m", ladder_senior: "s", ladder_principal_engineer: "p")
   end
 
-  it "grounds a concept on the user's own ladder only, never on the shared one or another user's" do
+  it "grounds a concept on the user's own ladder only, never on another user's" do
     laddered("n_plus_one", "ruby_rails", owner: user)
-    laddered("caching", "ruby_rails")
     laddered("memoization", "ruby_rails", owner: User.create!(email: "coverage-other@example.com"))
 
     grounded = described_class.for(user).for_kind(ExerciseSection::Challenge).then { |entry| entry.pairs - entry.gaps }

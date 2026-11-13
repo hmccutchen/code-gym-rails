@@ -1056,14 +1056,6 @@ RSpec.describe "Responses", type: :request do
         .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
     end
 
-    it "enqueues for a concept only the shared row covers, since no user reads it" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "x")
-      expect { submit_with_concepts }
-        .to have_enqueued_job(GenerateConceptReferenceJob)
-        .with(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
-        .exactly(:once)
-    end
-
     it "enqueues for a concept only another user has written up, since that row is theirs" do
       teammate = User.create!(email: "teammate-reference@example.com")
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "x", user: teammate)

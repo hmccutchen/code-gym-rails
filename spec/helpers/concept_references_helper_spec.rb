@@ -9,15 +9,12 @@ RSpec.describe ConceptReferencesHelper, type: :helper do
       helper.define_singleton_method(:current_user) { current_user }
     end
 
-    it "returns the reader's own reference, and never a shared one or another user's" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared")
-      ConceptReference.create!(concept: "caching", language: "ruby_rails", tagline: "shared only")
+    it "returns the reader's own reference, and never another user's" do
       ConceptReference.create!(concept: "closures", language: "javascript", tagline: "theirs",
                                user: User.create!(email: "writer@example.com"))
       own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "own", user: reader)
 
       expect(helper.concept_reference_for("n_plus_one", "ruby_rails")).to eq(own)
-      expect(helper.concept_reference_for("caching", "ruby_rails")).to be_nil
       expect(helper.concept_reference_for("closures", "javascript")).to be_nil
     end
 

@@ -2,6 +2,8 @@ require "rails_helper"
 require Rails.root.join("db/migrate/20261113120000_add_user_to_learn_content").to_s
 
 RSpec.describe AddUserToLearnContent do
+  around { |example| with_shared_learn_rows { example.run } }
+
   let(:connection) { ActiveRecord::Base.connection }
   let(:ana) { User.create!(email: "ana-learn@example.com") }
   let(:ben) { User.create!(email: "ben-learn@example.com") }

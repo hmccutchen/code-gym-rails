@@ -32,17 +32,6 @@ RSpec.describe "Concept reference alternate framings", type: :request do
     expect(JSON.parse(response.body)).to include("error" => I18n.t("errors.concept_references.reference_missing"))
   end
 
-  it "answers 404 for a shared reference, which no user reads any more" do
-    shared = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
-                                      tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
-    expect(AiService).not_to receive(:for)
-    login_as(user)
-
-    post explain_differently_concept_reference_path(shared), params: { prior_alternates: [] }, as: :json
-
-    expect(response).to have_http_status(:not_found)
-  end
-
   it "reframes the user's own reference" do
     stub_alternate("Picture a library courier.")
     own = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user,

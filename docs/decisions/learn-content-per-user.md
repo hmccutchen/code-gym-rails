@@ -34,9 +34,10 @@ A user's own rows go when the account is deleted
 (`AccountData::FATES`, `deleting-an-account.md`). Since L2, every reference
 read and write goes through `user_id`, so deletion finds the concept
 references a user has written. Since L3 the same holds for recognition
-guides. Shared rows have no
-`user_id`, so deletion leaves them alone. Since L5 nobody reads them, and
-the schema step after L5 removes them.
+guides. Shared rows had no
+`user_id`, so deletion left them alone. Since L5 nobody read them, and the
+schema step deleted them and made `user_id` NOT NULL, so every row has an
+owner and deletion finds every row a user holds.
 
 ## Order and deploy gates
 
@@ -97,8 +98,8 @@ ships one release before any code reads it for Learn
    after the copy. L3b writes no shared row, so the gate does not name it;
    the branches stack, so L4 ships with L3b anyway. This is the one
    statement of the gate. "What L4 does" below has the details.
-6. **L5, drop the shared fallback (done), then tighten the schema (not
-   started).** The pull request that removes the fallback also carries a
+6. **L5, drop the shared fallback (done), then tighten the schema
+   (done).** The pull request that removes the fallback also carries a
    data migration that runs the L4 copy again for every active account still missing a copy.
    It runs in the web pre-deploy step, while the code still serving reads
    the shared rows, so every account that exists before the new web code
@@ -111,7 +112,8 @@ ships one release before any code reads it for Learn
    called inside a transaction, which would hold every user's lock until
    the end. "What L5 does" below has the details.
 
-   The schema step is a later, separate pull request. Its migration deletes
+   The schema step is a later, separate pull request. Its migration
+   (`RequireUserOnLearnContent`) deletes
    the shared rows, drops the two partial unique indexes over rows with no
    user, makes `user_id` NOT NULL on both tables, and makes `belongs_to
    :user` required on both models. It keeps the per-user unique indexes. Its
@@ -121,7 +123,8 @@ ships one release before any code reads it for Learn
    also run after L5's catch-up copy, which needs the shared rows to copy
    from. It also changes `app/models/account_data.rb`, whose fate text says
    shared rows "stay", and the fate table in `deleting-an-account.md`, which
-   says the same, because no shared row will exist to stay.
+   says the same, because no shared row will exist to stay. "What the
+   schema step does" below has the details.
 
 ## What L2 does
 
@@ -263,8 +266,8 @@ ships one release before any code reads it for Learn
 - An anonymized account gets nothing.
 - A row the user already owns stays as it is (the end of "The deploy window
   between L2 and L3").
-- It removes no shared row and leaves the fallback in place; L5 removes the
-  fallback, and the schema step after it removes the rows.
+- It removes no shared row and leaves the fallback in place; L5 removed the
+  fallback, and the schema step after it removed the rows.
 - `down` does nothing: a copied row cannot be told apart from one the user
   wrote, and deleting it would delete user data.
 - Its deploy gate is step 5 above.
@@ -297,6 +300,47 @@ ships one release before any code reads it for Learn
 - Learn's `ladder_offer`, `lesson_offer` and `ladders_cost` say the call
   rewrites the reference, no longer that it writes "your own version",
   since every reference a user sees is already theirs.
+
+## What the schema step does
+
+- The migration `RequireUserOnLearnContent` first runs L4's copy
+  (`CopySharedLearnContent.copy_to_active_users`) once more, then deletes
+  every `concept_references` and `recognition_guides` row with no
+  `user_id`, drops
+  the two partial unique indexes over those rows that L1 created, and makes
+  `user_id` NOT NULL on both tables. The per-user unique indexes stay, since
+  L4's copy names their columns in its `ON CONFLICT`.
+- `ConceptReference` and `RecognitionGuide` declare `belongs_to :user`
+  without `optional: true`, so a row with no owner fails validation before
+  it reaches the NOT NULL constraint. Their uniqueness validations were
+  already scoped to `user_id` and stay as they are.
+- The readers keep their names (`visible_to`, `for`, `seen_by`,
+  `missing_for`, `written_for?`). `User` gains no `has_many` for the two
+  tables: nothing would call it, and `AccountData::FATES` already deletes
+  the rows.
+- It runs the copy a third time because L5's catch-up reads the list of
+  active accounts once, before its loop, so an account created after that
+  list was read got no copy. That includes a trial started through
+  `/trial/start` with an invite code: trials are paused only by hiding the
+  link, and a trial cannot write its own Learn content
+  (`User#writes_learn_content?`). Copying again just before the shared rows
+  go gives every account that exists then its copy, so the only accounts
+  left without one are those created between L5's catch-up and this step,
+  which L5 code already shows no shared text. The copy commits one user at
+  a time, so the migration declares `disable_ddl_transaction!` and runs the
+  delete, the index drops and the NOT NULL change together in a transaction
+  of their own.
+- `AccountData::FATES` and the fate table in `deleting-an-account.md` no
+  longer say shared rows stay.
+- Its deploy gate is step 6 above. How it runs (locking, the deploy window
+  and rolling back) is in
+  `docs/code-notes/db/migrate/20261113190000_require_user_on_learn_content.md`.
+
+## What remains
+
+Nothing in the schema. The privacy page copy in step 2 is still open: it
+lands in the first pull request opened after both #785 and L2 are merged,
+and removes the sentence about shared write-ups, which no longer exist.
 
 ## The deploy window between L4 and L5
 
@@ -384,3 +428,9 @@ L1 can be reverted only until L2 ships. Its `down` raises
 `user_id`: recreating the old full unique indexes would fail, and code from
 before L2 would pick an arbitrary user's row by concept and language. After
 L2 has written owned rows, the rollback floor is L2's code.
+
+The schema step's `down` makes `user_id` nullable again and recreates the
+partial indexes, the schema L5 code ran against. It cannot bring back the
+deleted shared rows. L5 code reads none, so rolling back to L5 loses nothing
+a user sees; rolling back further, to code that still read the shared rows,
+is below the floor once the schema step has run.

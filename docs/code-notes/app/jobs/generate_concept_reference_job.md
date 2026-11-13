@@ -8,8 +8,8 @@ exists and this is not a refresh. Since L5 no shared row is read, so a user
 with no row of their own gets a new one with `generation_version` 1, the
 first write. A rewrite only ever asks for a row the page already showed,
 which is the user's own; it adds one to that row's number, and the Learn poll
-compares against the number the page showed, so it sees the rewrite land. A
-shared row is never written.
+compares against the number the page showed, so it sees the rewrite land.
+Every reference has an owner, so the job writes no shared row.
 
 ## Concurrency
 

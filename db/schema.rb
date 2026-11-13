@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,8 +76,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_170000) do
     t.datetime "updated_at", null: false
     t.jsonb "lesson"
     t.text "ladder_mid_level"
-    t.bigint "user_id"
-    t.index ["concept", "language"], name: "index_concept_references_shared_on_concept_and_language", unique: true, where: "(user_id IS NULL)"
+    t.bigint "user_id", null: false
     t.index ["user_id", "concept", "language"], name: "index_concept_references_on_user_id_and_concept_and_language", unique: true
   end
 
@@ -242,8 +241,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_170000) do
     t.text "misfires", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "user_id"
-    t.index ["group_key"], name: "index_recognition_guides_shared_on_group_key", unique: true, where: "(user_id IS NULL)"
+    t.bigint "user_id", null: false
     t.index ["user_id", "group_key"], name: "index_recognition_guides_on_user_id_and_group_key", unique: true
   end
 

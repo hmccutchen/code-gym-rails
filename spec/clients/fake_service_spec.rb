@@ -222,7 +222,7 @@ RSpec.describe FakeService do
 
   describe "#explain_concept_differently" do
     it "returns non-blank plain prose, distinct from the review reframing" do
-      reference = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails",
+      reference = ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails",
                                            tagline: "t", explanation: "e", code_example: "c", senior_lens: "s")
 
       text = described_class.new(user.api_key).explain_concept_differently(user, reference)

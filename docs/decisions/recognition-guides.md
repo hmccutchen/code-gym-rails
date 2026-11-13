@@ -14,7 +14,7 @@ it is handed no exercise, response or history. It is therefore shown with no
 exposure gating. One row per group, shared across languages, written by
 `GenerateRecognitionGuideJob` from the existing "Write up the rest"
 backfill and never rewritten. Since L3 of `learn-content-per-user.md` each
-user has their own row, and since L5 the old shared row is never read; all three fields are required, so a
+user has their own row, and the schema step after L5 deleted the old shared rows; all three fields are required, so a
 flubbed response writes nothing and the next backfill retries. Two framings
 are derived rather than branched: a group holding any `TRADEOFF_CONCEPTS`
 gets a line saying those are choices, and meta skill is framed as the habit

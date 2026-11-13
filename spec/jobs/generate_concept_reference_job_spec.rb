@@ -128,8 +128,9 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
 
     it "queues a write-up for each pair the user has no reference of their own for, at the priority given" do
       ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: user)
-      ConceptReference.create!(concept: "caching", language: "ruby_rails", user: User.create!(email: "x@example.com"))
-      ConceptReference.create!(concept: "closures", language: "javascript")
+      teammate = User.create!(email: "x@example.com")
+      ConceptReference.create!(concept: "caching", language: "ruby_rails", user: teammate)
+      ConceptReference.create!(concept: "closures", language: "javascript", user: teammate)
 
       described_class.queue_missing(user, pairs, priority: JobPriority::BACKGROUND)
 
@@ -164,19 +165,6 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
       }.to change(ConceptReference, :count).by(1)
       expect(ConceptReference.find_by!(user: teammate).tagline).to eq("theirs")
       expect(ConceptReference.find_by!(user: user).tagline).to eq("Avoid N+1 by eager loading.")
-    end
-
-    it "writes the user's own row, numbered 1, when only a shared row exists, and leaves the shared row alone" do
-      shared = ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", tagline: "shared", generation_version: 3)
-      stub_service
-
-      described_class.perform_now(concept: "n_plus_one", language: "ruby_rails", user_id: user.id)
-
-      expect(shared.reload.tagline).to eq("shared")
-      own = ConceptReference.find_by!(user: user)
-      expect(own).to be_complete
-      expect(own.generation_version).to eq(1)
-      expect(ConceptReference.for(user, concept: "n_plus_one", language: "ruby_rails")).to eq(own)
     end
 
     it "calls no provider for a trial account" do
@@ -253,7 +241,8 @@ RSpec.describe GenerateConceptReferenceJob, type: :job do
     include ActiveJob::TestHelper
 
     it "queues a refresh per pair naming the version of the user's own row, 0 when they have none, at the priority given" do
-      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", generation_version: 2)
+      ConceptReference.create!(concept: "n_plus_one", language: "ruby_rails", user: User.create!(email: "rewrites-teammate@example.com"),
+                               generation_version: 2)
       ConceptReference.create!(concept: "caching", language: "ruby_rails", user: user, generation_version: 5)
 
       described_class.queue_rewrites(user, [ %w[n_plus_one ruby_rails], %w[caching ruby_rails], %w[closures javascript] ],

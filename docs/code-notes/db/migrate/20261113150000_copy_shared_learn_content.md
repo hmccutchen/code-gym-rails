@@ -23,9 +23,10 @@ The insert ends in `ON CONFLICT (user_id, concept, language) DO NOTHING` (or
 `(user_id, group_key)` for a guide). Those are the unique indexes L1 added,
 and PostgreSQL refuses an `ON CONFLICT` target with no matching index. So an
 own row is never overwritten, and a run that finds every copy in place adds
-nothing. The later migration that tightens the schema (removes the shared
-rows, drops the partial indexes and makes `user_id` non-null) must run after
-L5's second copy, and must keep these two indexes.
+nothing. The later migration that tightens the schema
+(`RequireUserOnLearnContent`: removes the shared rows, drops the partial
+indexes and makes `user_id` non-null) runs after L5's second copy and keeps
+these two indexes.
 
 ## One user at a time
 

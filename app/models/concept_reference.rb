@@ -6,7 +6,7 @@ class ConceptReference < ApplicationRecord
   WRITTEN_FIELDS   = (REFERENCE_FIELDS + GUIDE_FIELDS + LADDER_FIELDS + [ "lesson" ]).freeze
   MAX_LADDER_RUNG_LENGTH = 300
 
-  belongs_to :user, optional: true
+  belongs_to :user
 
   validates :concept, :language, presence: true
   validates :concept, uniqueness: { scope: %i[user_id language] }
