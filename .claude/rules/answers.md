@@ -59,12 +59,13 @@ read it before changing that area.
   5xx. Confirmed saves, submits, submitted dashboards and every signed-out
   page clear the copy, and submit always stays manual.
 - **Folding a section** (`docs/decisions/folding-a-section.md`): Each
-  answer-form section is an open native `<details>` the user folds by hand;
-  on the submitted dashboard each section starts folded, so the review is
-  what the page opens on; History's sections start open inside History's own
-  closed disclosure. Nothing on the form folds automatically except
-  reopening a folded, rated section when its answer is edited. The summary holds an `<h2>` (never `role="button"`)
-  and the status from `SectionStatusHelper#section_status`. Folding is purely
+  section is a native `<details>` the user folds by hand. It starts open on
+  the answer form and folded on the submitted dashboard, so the review is
+  what that page opens on; History's sections start open inside History's
+  own closed disclosure. Nothing on the form folds automatically except
+  reopening a folded, rated section when its answer is edited. The summary
+  holds an `<h2>` (never `role="button"`) and the status from
+  `SectionStatusHelper#section_status`. Folding is purely
   visual, nothing inside a section may require visibility, and fold state is
   not persisted.
 - **No free-text feedback box**: the answer form once carried an "Anything
