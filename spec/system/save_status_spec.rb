@@ -173,8 +173,4 @@ RSpec.describe "Save status", type: :system do
     expect(user.reload.excluded_section_kinds)
       .to match_array(ExerciseSection.fourths.drop(1).map(&:key))
   end
-
-  def open_folded_section(key)
-    find(%(details.section[data-section-fold="#{key}"]:not([open]) > summary)).click
-  end
 end
