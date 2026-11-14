@@ -226,6 +226,23 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).not_to include('data-rating-for="code_review"')
   end
 
+  it "keeps the review and its controls outside the folded sections on a submitted day" do
+    create_response(create_exercise, ai_review: sample_review)
+    get root_path
+    reviewed = Nokogiri::HTML(response.body)
+
+    user.daily_responses.sole.update!(ai_review: {}, reviewing_since: Time.current)
+    get root_path
+    reviewing = Nokogiri::HTML(response.body)
+
+    expect(reviewed.at_css("#ai-review")).to be_present
+    expect(reviewing.at_css(".review-in-progress, [data-controller~='generating']")).to be_present
+    [ reviewed, reviewing ].each do |page|
+      expect(page.css("details.section")).to be_present
+      expect(page.css("details.section #ai-review, details.section .review-in-progress, details.section .review-failure, details.section form.review-form, details.section [data-controller~='generating']")).to be_empty
+    end
+  end
+
   it "shows next_step under Approach and next step on a submitted review" do
     create_response(create_exercise, ai_review: sample_review)
 
@@ -1935,7 +1952,7 @@ RSpec.describe "Dashboard section folding", type: :request do
     expect(response.body).to match(%r{data-status-for="pattern"[^>]*>in progress<})
   end
 
-  it "lets each submitted section fold, open by default and with no status line" do
+  it "folds each submitted section so the review is what the page shows, with no status line" do
     exercise = exercise_with_sections
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                           answers: { "code_review" => "a" * 20, "pattern" => "b" * 20 })
@@ -1943,7 +1960,7 @@ RSpec.describe "Dashboard section folding", type: :request do
 
     sections = Nokogiri::HTML(response.body).css("details.section")
     expect(sections.map { |section| section["data-section-fold"] }).to eq(exercise.active_section_keys)
-    expect(sections).to all(satisfy { |section| section.key?("open") })
+    expect(sections).to all(satisfy { |section| !section.key?("open") })
     expect(sections.map { |section| section.at_css("> summary > h2.section-title") }).to all(be_present)
     expect(sections.css(".section-status")).to be_empty
   end

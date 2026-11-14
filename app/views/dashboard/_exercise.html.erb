@@ -14,7 +14,7 @@
   <div class="today-day">
     <div class="today-main">
       <div data-submitted-day hidden></div>
-      <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers %>
+      <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers, folded: true %>
       <%= render "responses/submission", response: response %>
       <% if @size_change&.direction == :larger %>
         <p class="hint"><%= t("dashboard.size_change.larger") %></p>

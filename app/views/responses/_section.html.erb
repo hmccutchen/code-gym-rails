@@ -1,10 +1,10 @@
-<%# Locals: kind, key, data, slot, exercise, response, submitted, picker (nil on a card with no swap control). %>
+<%# Locals: kind, key, data, slot, exercise, response, submitted, picker (nil on a card with no swap control), folded (renders closed). %>
 <% bucket = ConceptBucket.for(key, exercise.language) %>
 <% concept_shown = submitted || exercise.concepts_withheld_before_submission.exclude?(data["concept"]) %>
 <% label = capture do %>
   <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: t("sections.#{key}.name"), title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: t("sections.#{key}.name")) %><% end %>
 <% end %>
-<details class="section" open data-slot="<%= slot %>" data-section-fold="<%= key %>">
+<details class="section"<%= " open".html_safe unless local_assigns[:folded] %> data-slot="<%= slot %>" data-section-fold="<%= key %>">
   <%# No glossary terms in the summary (a control nested in a control), and never role="button": it erases the <h2>. %>
   <summary class="section-label"><h2 class="section-title"><%= label %></h2><%= render "responses/featured_marker" if concept_shown && featured_section?(data["concept"], bucket) %>
   <% unless submitted %>
