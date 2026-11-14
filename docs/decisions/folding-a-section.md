@@ -23,7 +23,9 @@ folds the same way, with the label in the summary and no status line.
 On the submitted dashboard every section starts folded
 (`dashboard/_exercise` passes `folded: true`), so the page opens on the
 section titles and the review below them, and a reader opens a section to
-compare an answer with its review. Before 2026-11-14 they started open and
+compare an answer with its review. A card's daily-kind swap control sits
+inside the section, so on a submitted day it is one tap away; the owner
+chose per-section folding over one closed wrapper with that cost known. Before 2026-11-14 they started open and
 the reader scrolled past every answered problem to reach the review. Each
 section inside a History entry folds too, but starts open: History already
 wraps the day's problems in one disclosure that starts closed, and folding
