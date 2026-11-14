@@ -36,6 +36,7 @@ RSpec.describe "Save status", type: :system do
       find(%(textarea[data-field="code_review"])).fill_in(with: "This late edit must not replace the submission")
 
       expect(page).to have_no_css("#gym-form")
+      open_folded_section("code_review")
       expect(page).to have_content("The answer already submitted")
       expect(saved.reload.answers["code_review"]).to eq("The answer already submitted")
     end
@@ -108,6 +109,7 @@ RSpec.describe "Save status", type: :system do
       rate_section("pattern", value: "too_hard")
 
       expect(page).to have_no_css("#gym-form")
+      open_folded_section("code_review")
       expect(page).to have_content("The final submitted answer")
       expect(page).not_to have_selector(".history-pill", text: "Pattern: too hard")
       expect(saved.reload.answers["pattern"]).to eq("")
@@ -170,5 +172,9 @@ RSpec.describe "Save status", type: :system do
     expect(page).to have_no_css("#save-status", visible: true)
     expect(user.reload.excluded_section_kinds)
       .to match_array(ExerciseSection.fourths.drop(1).map(&:key))
+  end
+
+  def open_folded_section(key)
+    find(%(details.section[data-section-fold="#{key}"]:not([open]) > summary)).click
   end
 end
