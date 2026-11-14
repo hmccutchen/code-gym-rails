@@ -60,8 +60,10 @@ read it before changing that area.
   page clear the copy, and submit always stays manual.
 - **Folding a section** (`docs/decisions/folding-a-section.md`): Each
   answer-form section is an open native `<details>` the user folds by hand;
-  nothing folds automatically except reopening a folded, rated section when
-  its answer is edited. The summary holds an `<h2>` (never `role="button"`)
+  on the submitted dashboard each section starts folded, so the review is
+  what the page opens on; History's sections start open inside History's own
+  closed disclosure. Nothing on the form folds automatically except
+  reopening a folded, rated section when its answer is edited. The summary holds an `<h2>` (never `role="button"`)
   and the status from `SectionStatusHelper#section_status`. Folding is purely
   visual, nothing inside a section may require visibility, and fold state is
   not persisted.

@@ -1,2 +1,3 @@
-<%# Locals: exercise, response, pickers (optional; History passes none). %>
-<%= render "responses/sections", exercise: exercise, response: response, submitted: true, pickers: local_assigns[:pickers] %>
+<%# Locals: exercise, response, pickers and folded (both optional; History passes neither). %>
+<%= render "responses/sections", exercise: exercise, response: response, submitted: true,
+      pickers: local_assigns[:pickers], folded: local_assigns[:folded] %>

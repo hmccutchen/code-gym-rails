@@ -91,8 +91,9 @@ RSpec.describe "History", type: :request do
     login_as(user)
     get history_path
 
-    folds = Nokogiri::HTML5(response.body).css("details.answers details.section").map { |section| section["data-section-fold"] }
-    expect(folds).to eq(session.daily_exercise.active_section_keys)
+    sections = Nokogiri::HTML5(response.body).css("details.answers details.section")
+    expect(sections.map { |section| section["data-section-fold"] }).to eq(session.daily_exercise.active_section_keys)
+    expect(sections).to all(satisfy { |section| section.key?("open") })
   end
 
   it "numbers each review block with its section's slot, so the heading takes that section's color" do
