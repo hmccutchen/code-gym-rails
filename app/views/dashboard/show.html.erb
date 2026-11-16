@@ -42,4 +42,7 @@
       <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
     </div>
   <% end %>
+  <% unless @content_state == :generating %>
+    <%= render "dashboard/fresh_day", shown: @exercise&.draft_scope %>
+  <% end %>
 </div>

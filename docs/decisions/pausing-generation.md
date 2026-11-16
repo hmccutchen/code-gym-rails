@@ -80,6 +80,18 @@ is not stamped. The held set a paused user is shown is stamped like any
 other. A set opened from a push reminder needs no stamp of its own, because
 the reminder links to the dashboard. `GET /dashboard/status` stamps nothing.
 
+**An open tab does not open a set by itself.** A dashboard left open
+overnight keeps showing the previous day, so it asks
+`GET /dashboard/freshness` whether a newer set exists and reloads when one
+does. That check stamps nothing, like the status poll. The reload is a
+dashboard load, which does stamp the set, so the page checks only on a sign
+that a person is there: the tab becomes visible or gains focus, a pointer
+moves, or a key is pressed. It runs on no timer. A tab nobody returns to
+sends nothing and never reloads, and its sets stay unopened and count
+toward the pause.
+`docs/code-notes/app/javascript/controllers/fresh_day_controller.md` has the
+rest.
+
 **Resume ends the run.** Decided by the owner on 2026-11-12. Clearing the
 pause alone left the three unopened sets as the account's three latest, so
 the next hand-out paused it again whenever no new set existed yet: a resume

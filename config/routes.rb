@@ -71,6 +71,7 @@ Rails.application.routes.draw do
   post "generate", to: "daily_exercises#generate"
 
   get "dashboard/status", to: "dashboard#status", as: :dashboard_status
+  get "dashboard/freshness", to: "dashboard#freshness", as: :dashboard_freshness
 
   resources :responses, only: [ :create ] do
     member do
