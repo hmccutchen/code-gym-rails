@@ -19,6 +19,20 @@ RSpec.describe "A dashboard left open while a newer set arrives", type: :system 
     end
   end
 
+  def let_the_notice_time_pass
+    shown_ms = Integer(find("[data-controller~='fresh-day']", visible: :all)["data-fresh-day-notice-shown-for-value"])
+    page.driver.with_playwright_page { |pw| pw.clock.fast_forward(shown_ms + 1000) }
+  end
+
+  def reload_onto_a_replaced_set
+    newer_scope = replace_todays_set
+    let_the_minimum_gap_pass
+    move_the_pointer
+    expect(page).to have_css(%([data-fresh-day-shown-value="#{newer_scope}"]), visible: :all)
+    expect(page).to have_css("#save-status", text: replaced_notice)
+    wait_for_js
+  end
+
   def let_the_minimum_gap_pass
     gap_ms = Integer(find("[data-controller~='fresh-day']", visible: :all)["data-fresh-day-minimum-gap-value"])
     page.driver.with_playwright_page { |pw| pw.clock.fast_forward(gap_ms + 1000) }
@@ -47,9 +61,11 @@ RSpec.describe "A dashboard left open while a newer set arrives", type: :system 
     page.execute_script(<<~JS)
       const original = window.fetch;
       window.__releaseSaves = () => {};
+      window.__heldSaves = 0;
       window.fetch = (url, options) => {
         const sent = original(url, options);
         if (options?.method !== "POST") return sent;
+        window.__heldSaves++;
         return new Promise((resolve) => { window.__releaseSaves = () => resolve(sent); });
       };
     JS
@@ -183,6 +199,70 @@ RSpec.describe "A dashboard left open while a newer set arrives", type: :system 
 
       expect(page).to have_css(%([data-answer-form-draft-scope-value="#{newer_scope}"]))
       expect(page).to have_css("#save-status", text: replaced_notice)
+    end
+  end
+
+  it "says the set was replaced on a submitted dashboard too" do
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      exercise = user.daily_exercises.sole
+      user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+                                   answers: { "code_review" => "The answer already submitted" })
+      page.refresh
+      wait_for_js
+      expect(page).to have_no_css("#gym-form")
+      watch_this_load
+
+      reload_onto_a_replaced_set
+
+      expect(page).to have_no_css("#gym-form")
+    end
+  end
+
+  it "keeps the notice through an early signal and an answer save, without holding a later leave" do
+    travel_to(a_weekday) do
+      open_dashboard
+      reload_onto_a_replaced_set
+
+      move_the_pointer
+      find(%(textarea[data-field="code_review"])).fill_in(with: "An answer saved under the notice")
+      wait_for { user.daily_responses.first&.answers&.dig("code_review") == "An answer saved under the notice" }
+      wait_for_answers_settled
+
+      expect(page).to have_css("#save-status", text: replaced_notice)
+      page.execute_script("window.CodeGymSaveStatus.settled().then((ready) => { window.__couldLeave = ready })")
+      wait_for_js_condition("window.__couldLeave === true")
+    end
+  end
+
+  it "takes the notice away on the first signal after its time has passed" do
+    travel_to(a_weekday) do
+      open_dashboard
+      reload_onto_a_replaced_set
+
+      let_the_notice_time_pass
+      expect(page).to have_css("#save-status", text: replaced_notice)
+      move_the_pointer
+
+      expect(page).to have_no_css("#save-status", visible: true)
+    end
+  end
+
+  it "lets the answer form's unsaved-change sentence win when a save hits the replaced set first" do
+    travel_to(a_weekday) do
+      open_dashboard
+      hold_save_replies
+      replace_todays_set
+      find(%(textarea[data-field="code_review"])).fill_in(with: "Typed after the set was replaced")
+      wait_for_js_condition("window.__heldSaves > 0")
+
+      let_the_minimum_gap_pass
+      move_the_pointer
+      wait_for { freshness_checks.size == 1 }
+      release_save_replies
+
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
+      expect(user.daily_responses).to be_empty
     end
   end
 

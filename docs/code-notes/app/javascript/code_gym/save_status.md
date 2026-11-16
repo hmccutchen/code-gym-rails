@@ -81,7 +81,8 @@ Every automatic way the dashboard leaves goes through the gate:
   and for a reply that says another tab submitted
   (`leaveWhenSaved(..., "answers")`);
 - the fresh-day check's reload (`fresh_day_controller`), which carries its
-  "set was replaced" notice only once the leave runs;
+  "set was replaced" notice only once the leave runs, under its own key
+  (`replaced`), and clears that key itself on the reloaded page;
 - the review-in-progress poll (`generating_controller`), which reloads
   through the re-armed leave once the other save lands;
 - the level suggestion card's and the exercise mix's conflict reloads
@@ -209,6 +210,17 @@ one meant to read it. A caller that sets a message and then never reloads (a
 refused navigation, a closed tab) would otherwise leave it for whatever page
 this partial renders on next, which could be days later and about nothing the
 reader did.
+
+One message is stored at a time, so a second `carry` before the reload
+replaces the first. The dashboard has two callers, the answer form and the
+fresh-day check, and
+`docs/code-notes/app/javascript/controllers/fresh_day_controller.md` ("Two
+notices, one stored slot") says why the answer form's sentence is the one
+that survives.
+
+`clear(key)` takes a carried message off the banner like any other. The key
+stays marked as carried, which only matters to `clean`, and a later
+`report` under that key unmarks it.
 
 Private browsing can refuse the sessionStorage write. The reload still happens,
 and the page it lands on says nothing, which is where it started.

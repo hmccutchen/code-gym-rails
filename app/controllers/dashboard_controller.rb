@@ -1,5 +1,12 @@
 class DashboardController < ApplicationController
   FRESHNESS_CHECK_GAP = 60.seconds
+  REPLACED_NOTICE_SHOWN_FOR = 10.seconds
+
+  FRESHNESS_REPLIES = {
+    current:  { stale: false, replaced: false },
+    stale:    { stale: true, replaced: false },
+    replaced: { stale: true, replaced: true }
+  }.freeze
 
   # no-store, or Back after submit → review replays the cached empty form with a Submit button that re-posts it.
   before_action :no_store, only: :show
@@ -37,10 +44,9 @@ class DashboardController < ApplicationController
 
   # GET /dashboard/freshness
   def freshness
-    exercise = todays_exercise
-    stale = exercise.present? && !exercise.regenerating? && exercise.differs_from_scope?(params[:shown])
+    outcome = todays_exercise&.freshness_against(params[:shown]) || :current
 
-    render json: { stale: stale, replaced: stale && exercise.rewritten_since_scope?(params[:shown]) }
+    render json: FRESHNESS_REPLIES.fetch(outcome)
   end
 
   private

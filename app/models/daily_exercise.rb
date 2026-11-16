@@ -59,11 +59,10 @@ class DailyExercise < ApplicationRecord
 
   def draft_scope = "#{id}-#{written_stamp}"
 
-  def differs_from_scope?(scope) = draft_scope != scope.to_s
+  def freshness_against(scope)
+    return :current if regenerating? || draft_scope == scope.to_s
 
-  def rewritten_since_scope?(scope)
-    row, written = scope.to_s.match(DRAFT_SCOPE_FORMAT)&.captures
-    row == id.to_s && written.to_i < written_stamp.to_i
+    rewritten_since?(scope) ? :replaced : :stale
   end
 
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
@@ -129,6 +128,13 @@ class DailyExercise < ApplicationRecord
   private
 
   def written_stamp = generated_at.strftime("%s%6N")
+
+  def rewritten_since?(scope)
+    shown = scope.to_s.match(DRAFT_SCOPE_FORMAT)
+    return false unless shown
+
+    shown[1] == id.to_s && shown[2].to_i < written_stamp.to_i
+  end
 
   def tagged_concept(key)
     concept = problem_set.dig(key, "concept")

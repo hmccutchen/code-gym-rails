@@ -234,79 +234,74 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
-  describe "#differs_from_scope?" do
+  describe "#freshness_against" do
     let(:user) { User.create!(email: "fresh-model@example.com") }
-
-    def exercise(regenerating_since: nil)
-      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
-                            problem_set: { "code_review" => { "question" => "q" } },
-                            regenerating_since: regenerating_since)
-    end
-
-    it "is false for this set's own scope" do
-      set = exercise
-
-      expect(set.differs_from_scope?(set.draft_scope)).to be(false)
-    end
-
-    it "is true for another set's scope" do
-      expect(exercise.differs_from_scope?("1-1")).to be(true)
-    end
-
-    it "is true for no scope" do
-      set = exercise
-
-      expect(set.differs_from_scope?(nil)).to be(true)
-      expect(set.differs_from_scope?("")).to be(true)
-    end
-
-    it "compares scopes only, so a regenerating set still differs from another scope" do
-      set = exercise(regenerating_since: 10.seconds.ago)
-
-      expect(set.differs_from_scope?("1-1")).to be(true)
-      expect(set.differs_from_scope?(set.draft_scope)).to be(false)
-    end
-  end
-
-  describe "#rewritten_since_scope?" do
-    let(:user) { User.create!(email: "rewritten-model@example.com") }
     let(:set) do
       DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                             problem_set: { "code_review" => { "question" => "q" } })
     end
 
-    it "is true for an earlier write of this row" do
-      shown = set.draft_scope
-      set.update!(generated_at: set.generated_at + 1.second)
-
-      expect(set.rewritten_since_scope?(shown)).to be(true)
+    def written_again(exercise)
+      exercise.draft_scope.tap { exercise.update!(generated_at: exercise.generated_at + 1.second) }
     end
 
-    it "is false for this set's own scope" do
-      expect(set.rewritten_since_scope?(set.draft_scope)).to be(false)
+    it "is current for this set's own scope" do
+      expect(set.freshness_against(set.draft_scope)).to eq(:current)
     end
 
-    it "is false for a later write than the one stored" do
+    it "is replaced for an earlier write of this row" do
+      shown = written_again(set)
+
+      expect(set.freshness_against(shown)).to eq(:replaced)
+    end
+
+    it "is stale, not replaced, for a later write than the one stored" do
       later = "#{set.id}-#{set.generated_at.strftime('%s%6N').to_i + 1}"
 
-      expect(set.rewritten_since_scope?(later)).to be(false)
+      expect(set.freshness_against(later)).to eq(:stale)
     end
 
-    it "is false for another row's scope" do
-      expect(set.rewritten_since_scope?("#{set.id + 1}-1")).to be(false)
-      expect(set.rewritten_since_scope?("#{set.id}0-1")).to be(false)
+    it "is stale for another row's scope" do
+      expect(set.freshness_against("#{set.id + 1}-1")).to eq(:stale)
+      expect(set.freshness_against("#{set.id}0-1")).to eq(:stale)
     end
 
-    it "is false for no scope" do
-      expect(set.rewritten_since_scope?(nil)).to be(false)
-      expect(set.rewritten_since_scope?("")).to be(false)
+    it "is stale for no scope" do
+      expect(set.freshness_against(nil)).to eq(:stale)
+      expect(set.freshness_against("")).to eq(:stale)
     end
 
-    it "is false for anything that is not a draft scope" do
+    it "is stale, never replaced, for anything that is not a draft scope" do
       [ "garbage", "#{set.id}", "#{set.id}-", "#{set.id}-abc", "#{set.id}-1-1", " #{set.id}-1", "#{set.id}-1\n",
-        "-1", [ "#{set.id}-1" ], { "id" => set.id } ].each do |shown|
-        expect(set.rewritten_since_scope?(shown)).to be(false), "expected #{shown.inspect} not to count"
+        "-1", "<script>", [ "#{set.id}-1" ], { "id" => set.id } ].each do |shown|
+        expect(set.freshness_against(shown)).to eq(:stale), "expected #{shown.inspect} to be stale"
       end
+    end
+
+    it "is current while the set is regenerating, whatever scope is shown" do
+      shown = set.draft_scope
+      set.update!(regenerating_since: 10.seconds.ago)
+
+      expect(set.freshness_against(shown)).to eq(:current)
+      expect(set.freshness_against("1-1")).to eq(:current)
+      expect(set.freshness_against(nil)).to eq(:current)
+      expect(set.freshness_against("#{set.id}-1")).to eq(:current)
+    end
+
+    it "is replaced only once the rewrite has finished" do
+      shown = set.draft_scope
+      set.update!(regenerating_since: Time.current)
+
+      expect(set.freshness_against(shown)).to eq(:current)
+
+      set.update!(generated_at: set.generated_at + 1.second, regenerating_since: nil)
+
+      expect(set.freshness_against(shown)).to eq(:replaced)
+    end
+
+    it "keeps the rewrite test private, since it is right only after the regenerating check" do
+      expect(set).not_to respond_to(:rewritten_since?)
+      expect(set.respond_to?(:rewritten_since?, true)).to be(true)
     end
   end
 

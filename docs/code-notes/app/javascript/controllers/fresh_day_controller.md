@@ -13,9 +13,9 @@ dashboard state except the generating panel, whose own poll reloads.
 
 The controller sends the draft scope of the set the page shows, empty when
 it shows none, and acts on the reply's two booleans: `stale` says whether to
-reload, and `replaced` whether to say why. It holds no copy of either rule;
-they are `DailyExercise#differs_from_scope?` and `#rewritten_since_scope?`,
-described in `docs/code-notes/app/controllers/dashboard_controller.md`.
+reload, and `replaced` whether to say why. It holds no copy of the rule;
+that is `DailyExercise#freshness_against`, described in
+`docs/code-notes/app/models/daily_exercise.md`.
 
 The date changing is not enough to reload. A reload on a day with no set
 starts on-demand generation, and it would take the form away from someone
@@ -77,14 +77,38 @@ leave, right before `window.location.reload()`: a leave held behind a
 failed save may never run, and a notice stored then would show on some
 later, unrelated load of the dashboard.
 
-It is carried under the `answers` key, the key the answer form's own stale
-reload uses. On the answer form the next answer save that succeeds clears
-it, and a failed one replaces it with the failure. The submitted dashboard
-has nothing that saves under `answers`, so there the notice stays until the
-next page load. A carried key never blocks a later leave
+It is carried under its own key, `replaced`. The answer form's saves report
+and clear under `answers`, so no answer save clears the notice or writes
+over it, and it behaves the same on the answer form and on the submitted
+dashboard. A carried key never blocks a later leave
 (`docs/code-notes/app/javascript/code_gym/save_status.md`). The banner it
 appears in is the save-failure banner, so it is announced as an alert,
 which is louder than this notice needs.
+
+The controller takes the notice away itself, with `saveStatus.clear`. It
+does so on the first presence signal that arrives at least
+`noticeShownFor` after the controller connected; the partial renders that
+from `DashboardController::REPLACED_NOTICE_SHOWN_FOR` (10 seconds). No timer
+runs, as everywhere else in this controller, so the notice waits for a
+reader: on a tab nobody is at, it stays. A signal counts only while the
+document is visible, and the clear runs once per load.
+
+## Two notices, one stored slot
+
+`save_status.js` keeps one carried message in sessionStorage, and the answer
+form also writes there: a save refused with `409 stale` carries "that last
+change wasn't saved" under `answers` before it reloads. Both can start from
+the same regeneration. The answer form's sentence wins, which is the right
+one, because it tells the reader a change was lost:
+
+- When the refused save comes back first, or while this controller is
+  waiting on it, the refusal is reported under `answers`. This controller's
+  leave ignores no key, so it is held and never carries. The answer form
+  reloads with its own sentence.
+- When this controller's leave has already run, the page is on its way out.
+  A refused save that still lands writes its sentence over this one.
+
+`spec/system/fresh_day_spec.rb` holds the first case.
 
 ## A reply that is not an answer
 
