@@ -234,7 +234,7 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
-  describe "#replaces_page_showing?" do
+  describe "#differs_from_scope?" do
     let(:user) { User.create!(email: "fresh-model@example.com") }
 
     def exercise(regenerating_since: nil)
@@ -243,25 +243,70 @@ RSpec.describe DailyExercise, type: :model do
                             regenerating_since: regenerating_since)
     end
 
-    it "is false for a page showing this set" do
+    it "is false for this set's own scope" do
       set = exercise
 
-      expect(set.replaces_page_showing?(set.draft_scope)).to be(false)
+      expect(set.differs_from_scope?(set.draft_scope)).to be(false)
     end
 
-    it "is true for a page showing another set" do
-      expect(exercise.replaces_page_showing?("1-1")).to be(true)
+    it "is true for another set's scope" do
+      expect(exercise.differs_from_scope?("1-1")).to be(true)
     end
 
-    it "is true for a page showing no set" do
+    it "is true for no scope" do
       set = exercise
 
-      expect(set.replaces_page_showing?(nil)).to be(true)
-      expect(set.replaces_page_showing?("")).to be(true)
+      expect(set.differs_from_scope?(nil)).to be(true)
+      expect(set.differs_from_scope?("")).to be(true)
     end
 
-    it "is false while the set is regenerating, whatever the page shows" do
-      expect(exercise(regenerating_since: 10.seconds.ago).replaces_page_showing?("1-1")).to be(false)
+    it "compares scopes only, so a regenerating set still differs from another scope" do
+      set = exercise(regenerating_since: 10.seconds.ago)
+
+      expect(set.differs_from_scope?("1-1")).to be(true)
+      expect(set.differs_from_scope?(set.draft_scope)).to be(false)
+    end
+  end
+
+  describe "#rewritten_since_scope?" do
+    let(:user) { User.create!(email: "rewritten-model@example.com") }
+    let(:set) do
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                            problem_set: { "code_review" => { "question" => "q" } })
+    end
+
+    it "is true for an earlier write of this row" do
+      shown = set.draft_scope
+      set.update!(generated_at: set.generated_at + 1.second)
+
+      expect(set.rewritten_since_scope?(shown)).to be(true)
+    end
+
+    it "is false for this set's own scope" do
+      expect(set.rewritten_since_scope?(set.draft_scope)).to be(false)
+    end
+
+    it "is false for a later write than the one stored" do
+      later = "#{set.id}-#{set.generated_at.strftime('%s%6N').to_i + 1}"
+
+      expect(set.rewritten_since_scope?(later)).to be(false)
+    end
+
+    it "is false for another row's scope" do
+      expect(set.rewritten_since_scope?("#{set.id + 1}-1")).to be(false)
+      expect(set.rewritten_since_scope?("#{set.id}0-1")).to be(false)
+    end
+
+    it "is false for no scope" do
+      expect(set.rewritten_since_scope?(nil)).to be(false)
+      expect(set.rewritten_since_scope?("")).to be(false)
+    end
+
+    it "is false for anything that is not a draft scope" do
+      [ "garbage", "#{set.id}", "#{set.id}-", "#{set.id}-abc", "#{set.id}-1-1", " #{set.id}-1", "#{set.id}-1\n",
+        "-1", [ "#{set.id}-1" ], { "id" => set.id } ].each do |shown|
+        expect(set.rewritten_since_scope?(shown)).to be(false), "expected #{shown.inspect} not to count"
+      end
     end
   end
 

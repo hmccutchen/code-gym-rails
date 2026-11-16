@@ -21,6 +21,8 @@ class DailyExercise < ApplicationRecord
 
   WRITE_MARGIN = 60.seconds
 
+  DRAFT_SCOPE_FORMAT = /\A(\d+)-(\d+)\z/
+
   REGENERATION_STALE_AFTER = REGENERATION_DEADLINE + WRITE_MARGIN
 
   include Claimable
@@ -55,9 +57,14 @@ class DailyExercise < ApplicationRecord
     size if size.is_a?(Integer) && User::DAILY_SECTION_COUNTS.cover?(size)
   end
 
-  def draft_scope = "#{id}-#{generated_at.strftime('%s%6N')}"
+  def draft_scope = "#{id}-#{written_stamp}"
 
-  def replaces_page_showing?(shown_scope) = !regenerating? && draft_scope != shown_scope.to_s
+  def differs_from_scope?(scope) = draft_scope != scope.to_s
+
+  def rewritten_since_scope?(scope)
+    row, written = scope.to_s.match(DRAFT_SCOPE_FORMAT)&.captures
+    row == id.to_s && written.to_i < written_stamp.to_i
+  end
 
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
@@ -120,6 +127,8 @@ class DailyExercise < ApplicationRecord
   end
 
   private
+
+  def written_stamp = generated_at.strftime("%s%6N")
 
   def tagged_concept(key)
     concept = problem_set.dig(key, "concept")

@@ -26,7 +26,7 @@ RSpec.describe "GET /dashboard/freshness", type: :request do
       yesterday = set_for(Date.current - 1)
       set_for(Date.current)
 
-      expect(freshness(shown: yesterday.draft_scope)).to eq("stale" => true)
+      expect(freshness(shown: yesterday.draft_scope)).to eq("stale" => true, "replaced" => false)
     end
 
     it "is stale when today's set was written again after the page loaded" do
@@ -34,41 +34,88 @@ RSpec.describe "GET /dashboard/freshness", type: :request do
       shown = today.draft_scope
       today.update!(generated_at: Time.current + 1.second)
 
-      expect(freshness(shown: shown)).to eq("stale" => true)
+      expect(freshness(shown: shown)).to eq("stale" => true, "replaced" => true)
+    end
+
+    it "is replaced only once the rewrite has finished" do
+      today = set_for(Date.current)
+      shown = today.draft_scope
+      today.update!(regenerating_since: Time.current)
+
+      expect(freshness(shown: shown)).to eq("stale" => false, "replaced" => false)
+
+      today.update!(generated_at: Time.current + 1.second, regenerating_since: nil)
+
+      expect(freshness(shown: shown)).to eq("stale" => true, "replaced" => true)
+    end
+
+    it "is stale but not replaced for a shown value that is not a draft scope" do
+      today = set_for(Date.current)
+
+      [ "garbage", "#{today.id}", "#{today.id}-", "#{today.id}-x", "#{today.id}-1-1", "<script>" ].each do |shown|
+        expect(freshness(shown: shown)).to eq("stale" => true, "replaced" => false)
+      end
+    end
+
+    it "is stale but not replaced for a shown value that is not a string" do
+      today = set_for(Date.current)
+
+      get dashboard_freshness_path, params: { shown: [ "#{today.id}-1" ] }
+      expect(response.parsed_body).to eq("stale" => true, "replaced" => false)
+
+      get dashboard_freshness_path, params: { shown: { id: today.id } }
+      expect(response.parsed_body).to eq("stale" => true, "replaced" => false)
+    end
+
+    it "answers the same for another account's scope as for any other set" do
+      other = User.create!(email: "other@example.com")
+      theirs = set_for(Date.current, owner: other)
+      theirs_rewritten = theirs.draft_scope.sub(/\d+\z/, "1")
+      set_for(Date.current)
+
+      expect(freshness(shown: theirs.draft_scope)).to eq("stale" => true, "replaced" => false)
+      expect(freshness(shown: theirs_rewritten)).to eq("stale" => true, "replaced" => false)
+    end
+
+    it "is not replaced by another account's rewritten set when this account has none" do
+      other = User.create!(email: "other@example.com")
+      theirs = set_for(Date.current, owner: other)
+
+      expect(freshness(shown: "#{theirs.id}-1")).to eq("stale" => false, "replaced" => false)
     end
 
     it "is fresh when the page already shows today's set" do
       today = set_for(Date.current)
 
-      expect(freshness(shown: today.draft_scope)).to eq("stale" => false)
+      expect(freshness(shown: today.draft_scope)).to eq("stale" => false, "replaced" => false)
     end
 
     it "is stale when the page showed no set and today's set now exists" do
       set_for(Date.current)
 
-      expect(freshness(shown: "")).to eq("stale" => true)
-      expect(freshness).to eq("stale" => true)
+      expect(freshness(shown: "")).to eq("stale" => true, "replaced" => false)
+      expect(freshness).to eq("stale" => true, "replaced" => false)
     end
 
     it "is fresh when today has no set, whatever the page shows" do
       yesterday = set_for(Date.current - 1)
 
-      expect(freshness(shown: yesterday.draft_scope)).to eq("stale" => false)
-      expect(freshness).to eq("stale" => false)
+      expect(freshness(shown: yesterday.draft_scope)).to eq("stale" => false, "replaced" => false)
+      expect(freshness).to eq("stale" => false, "replaced" => false)
     end
 
     it "is fresh while today's set is still being regenerated" do
       yesterday = set_for(Date.current - 1)
       set_for(Date.current, regenerating_since: Time.current)
 
-      expect(freshness(shown: yesterday.draft_scope)).to eq("stale" => false)
+      expect(freshness(shown: yesterday.draft_scope)).to eq("stale" => false, "replaced" => false)
     end
 
     it "never counts another account's set" do
       other = User.create!(email: "other@example.com")
       set_for(Date.current, owner: other)
 
-      expect(freshness).to eq("stale" => false)
+      expect(freshness).to eq("stale" => false, "replaced" => false)
     end
 
     it "stamps no set as opened" do
@@ -87,7 +134,7 @@ RSpec.describe "GET /dashboard/freshness", type: :request do
       held = set_for(Date.current - 3)
       user.update!(paused_generation_at: (Date.current - 3).in_time_zone("UTC") + 9.hours)
 
-      expect(freshness).to eq("stale" => false)
+      expect(freshness).to eq("stale" => false, "replaced" => false)
       expect(held.reload.date).to eq(Date.current - 3)
     end
   end

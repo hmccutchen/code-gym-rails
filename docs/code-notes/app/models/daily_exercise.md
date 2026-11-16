@@ -77,3 +77,21 @@ was, so its three conditions moved here unchanged. `replace_blocker` stays the
 authority on whether a regeneration is accepted: a click during a review that
 is still running is refused by `/regenerate`, and the button is right again
 once the review lands.
+
+## `#draft_scope`, `#differs_from_scope?` and `#rewritten_since_scope?`
+
+A draft scope names one write of one set: the row id, a hyphen, and
+`generated_at` in microseconds. A regeneration updates the row in place
+(`PracticeGeneration.commit_replacement`), so the id stays and the time
+moves. The format is written and read only here: `DRAFT_SCOPE_FORMAT` is the
+pattern, and the private `#written_stamp` is the time part.
+
+`#differs_from_scope?` is the plain comparison. It says nothing about a
+regeneration in progress; a caller that cares, such as
+`DashboardController#freshness`, asks `#regenerating?` itself.
+
+`#rewritten_since_scope?` is true only for a scope that names this row and
+an earlier write of it. A page sends the scope back as a parameter, so
+anything that does not match the pattern (blank, an array, extra parts, a
+trailing newline) is false, and so are another row's scope and a time later
+than the stored one.

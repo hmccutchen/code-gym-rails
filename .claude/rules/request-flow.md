@@ -88,12 +88,16 @@ User opens dashboard:
        (DailyExercise#mark_opened!), never while it is still generating
        every state but the generating panel mounts the fresh-day controller:
        on a presence signal (the tab becomes visible or focused, a pointer
-       moves, a key is pressed), at most once a minute, it asks
+       moves, a key is pressed), at most once a minute
+       (DashboardController::FRESHNESS_CHECK_GAP), it asks
        GET /dashboard/freshness?shown=<draft scope>, and
        DashboardController#freshness answers stale only when today's set
        exists, is not regenerating and is not the set shown
-       (DailyExercise#replaces_page_showing?); the page then reloads once
-       pending saves land. The check stamps nothing and starts no
+       (DailyExercise#differs_from_scope?), and replaced when the set
+       shown is an earlier write of today's row
+       (DailyExercise#rewritten_since_scope?); the page then reloads once
+       pending saves land, and after a replaced reply the reloaded page
+       says the set was replaced. The check stamps nothing and starts no
        generation, and it runs on no timer, so a tab that gets no
        presence signal never reloads. A window the browser restores or
        focuses on wake gives one too, with nobody there

@@ -7,7 +7,8 @@ export default class extends Controller {
   static values = {
     url: String,
     shown: String,
-    minimumGap: Number
+    minimumGap: Number,
+    replacedText: String
   }
 
   connect() {
@@ -36,6 +37,11 @@ export default class extends Controller {
     if (this.stopped || data?.stale !== true) return
 
     this.stopped = true
-    saveStatus.leaveWhenSaved(() => window.location.reload(), () => {})
+    saveStatus.leaveWhenSaved(() => this.reload(data.replaced === true), () => {})
+  }
+
+  reload(replaced) {
+    if (replaced) saveStatus.carry("answers", this.replacedTextValue)
+    window.location.reload()
   }
 }

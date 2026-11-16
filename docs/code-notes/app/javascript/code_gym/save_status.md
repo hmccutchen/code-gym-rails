@@ -80,6 +80,8 @@ Every automatic way the dashboard leaves goes through the gate:
 - the answer form's autosave reloads, for a 409 that says the set changed
   and for a reply that says another tab submitted
   (`leaveWhenSaved(..., "answers")`);
+- the fresh-day check's reload (`fresh_day_controller`), which carries its
+  "set was replaced" notice only once the leave runs;
 - the review-in-progress poll (`generating_controller`), which reloads
   through the re-armed leave once the other save lands;
 - the level suggestion card's and the exercise mix's conflict reloads

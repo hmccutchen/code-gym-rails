@@ -1,4 +1,6 @@
 class DashboardController < ApplicationController
+  FRESHNESS_CHECK_GAP = 60.seconds
+
   # no-store, or Back after submit → review replays the cached empty form with a Submit button that re-posts it.
   before_action :no_store, only: :show
 
@@ -20,7 +22,7 @@ class DashboardController < ApplicationController
 
   # GET /dashboard/status — polled by dashboard/_generating.
   def status
-    exercise = current_user.daily_exercises.for_date.first
+    exercise = todays_exercise
 
     if exercise&.regenerating?
       render json: { status: "pending" }
@@ -35,19 +37,22 @@ class DashboardController < ApplicationController
 
   # GET /dashboard/freshness
   def freshness
-    exercise = current_user.daily_exercises.for_date.first
+    exercise = todays_exercise
+    stale = exercise.present? && !exercise.regenerating? && exercise.differs_from_scope?(params[:shown])
 
-    render json: { stale: exercise.present? && exercise.replaces_page_showing?(params[:shown]) }
+    render json: { stale: stale, replaced: stale && exercise.rewritten_since_scope?(params[:shown]) }
   end
 
   private
 
+  def todays_exercise = current_user.daily_exercises.for_date.first
+
   def load_todays_set
     # Re-read after the move: a second first-load of the day can lose the race and move nothing.
-    @exercise = current_user.daily_exercises.for_date.first
+    @exercise = todays_exercise
     if @exercise.nil?
       current_user.carry_held_set_forward!
-      @exercise = current_user.daily_exercises.for_date.first
+      @exercise = todays_exercise
     end
     @response = @exercise&.daily_response&.tap { |stored| stored.user = current_user } ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
