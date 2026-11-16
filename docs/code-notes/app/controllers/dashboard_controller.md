@@ -27,6 +27,22 @@ memory, a moment later than the stored one, and nothing on the page reads it. It
 page was shown, which is the fact the pause rule needs, and `#load_todays_set`
 already writes on this action when it carries a held set forward.
 
+## `#freshness`
+
+An open dashboard asks this whether to reload
+(`docs/code-notes/app/javascript/controllers/fresh_day_controller.md`). The
+page sends the draft scope of the set it shows, empty when it shows none,
+and `DailyExercise#replaces_page_showing?` compares it with today's set. The
+answer is stale only when today's set exists, is not being regenerated and
+has another scope. A day with no set is never stale: a reload then would
+start on-demand generation and pull the form away from someone still
+working on yesterday's set past midnight. A set behind the regeneration
+spinner is not stale either, so the page reloads once, to the finished set.
+
+Like `#status`, it only reads. It does not call `mark_opened!`, enqueue a
+job, or carry a paused user's held set forward; those belong to `#show`,
+which the reload runs.
+
 ## `#settle_missing_set`
 
 `MissingSetState` decides what a day with no set shows, and its order is the

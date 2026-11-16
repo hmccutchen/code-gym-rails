@@ -234,6 +234,37 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#replaces_page_showing?" do
+    let(:user) { User.create!(email: "fresh-model@example.com") }
+
+    def exercise(regenerating_since: nil)
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                            problem_set: { "code_review" => { "question" => "q" } },
+                            regenerating_since: regenerating_since)
+    end
+
+    it "is false for a page showing this set" do
+      set = exercise
+
+      expect(set.replaces_page_showing?(set.draft_scope)).to be(false)
+    end
+
+    it "is true for a page showing another set" do
+      expect(exercise.replaces_page_showing?("1-1")).to be(true)
+    end
+
+    it "is true for a page showing no set" do
+      set = exercise
+
+      expect(set.replaces_page_showing?(nil)).to be(true)
+      expect(set.replaces_page_showing?("")).to be(true)
+    end
+
+    it "is false while the set is regenerating, whatever the page shows" do
+      expect(exercise(regenerating_since: 10.seconds.ago).replaces_page_showing?("1-1")).to be(false)
+    end
+  end
+
   describe "#regenerating?" do
     let(:user) { User.create!(email: "regen-model@example.com") }
 

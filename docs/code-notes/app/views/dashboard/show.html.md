@@ -32,3 +32,12 @@ below 600px every card on the page loses its side borders. While the line
 shows, `@automatic_pause` also tells `dashboard/_paused_empty` to leave out
 its resume link.
 `docs/decisions/pausing-generation.md` has the rule.
+
+## Freshness check
+
+`dashboard/_fresh_day` is rendered in every state but `:generating`, where
+the panel's own poll already reloads the page. It is an empty hidden
+element inside `.today-page`: its actions listen on the window and the
+document, so it needs to wrap nothing, and the page's markup stays as it
+was. `docs/code-notes/app/javascript/controllers/fresh_day_controller.md`
+says when it checks.

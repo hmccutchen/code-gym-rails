@@ -33,6 +33,13 @@ class DashboardController < ApplicationController
     end
   end
 
+  # GET /dashboard/freshness
+  def freshness
+    exercise = current_user.daily_exercises.for_date.first
+
+    render json: { stale: exercise.present? && exercise.replaces_page_showing?(params[:shown]) }
+  end
+
   private
 
   def load_todays_set

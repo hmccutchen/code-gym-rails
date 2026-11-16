@@ -65,4 +65,35 @@ RSpec.describe "Page scripts", type: :request do
       expect(page.css("script:not([src]):not([type])").to_s).not_to include(dashboard_status_path)
     end
   end
+
+  it "leaves the freshness check off the generating panel, whose own poll reloads the page" do
+    travel_to(Date.new(2026, 7, 13)) do
+      get root_path
+
+      expect(doc.at_css("[data-controller~='generating']")).to be_present
+      expect(doc.at_css("[data-controller~='fresh-day']")).to be_nil
+    end
+  end
+
+  it "mounts the freshness check with the shown set's scope" do
+    travel_to(Date.new(2026, 7, 13)) do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                       problem_set: { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" } })
+      get root_path
+      checker = doc.at_css("[data-controller~='fresh-day']")
+
+      expect(checker["data-fresh-day-url-value"]).to eq(dashboard_freshness_path)
+      expect(checker["data-fresh-day-shown-value"]).to eq(exercise.draft_scope)
+    end
+  end
+
+  it "mounts the freshness check with no scope on a day that shows no set" do
+    travel_to(Date.new(2026, 7, 18)) do
+      reset!
+      login_as(user)
+      get root_path
+
+      expect(doc.at_css("[data-controller~='fresh-day']")["data-fresh-day-shown-value"]).to eq("")
+    end
+  end
 end

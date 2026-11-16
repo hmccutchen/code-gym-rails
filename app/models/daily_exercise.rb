@@ -57,6 +57,8 @@ class DailyExercise < ApplicationRecord
 
   def draft_scope = "#{id}-#{generated_at.strftime('%s%6N')}"
 
+  def replaces_page_showing?(shown_scope) = !regenerating? && draft_scope != shown_scope.to_s
+
   def planned_by_setting? = plan_notes["size_reason"] == "setting"
 
   def planned_under_brake? = plan_notes["brake"] == true

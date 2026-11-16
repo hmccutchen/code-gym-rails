@@ -58,6 +58,14 @@ RSpec.describe "Cross-user access", type: :request do
     end
   end
 
+  describe "GET /dashboard/freshness" do
+    it "does not report the owner's set as the intruder's newer day" do
+      get dashboard_freshness_path
+
+      expect(response.parsed_body).to eq("stale" => false)
+    end
+  end
+
   describe "POST /regenerate" do
     it "leaves another user's set alone" do
       expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
