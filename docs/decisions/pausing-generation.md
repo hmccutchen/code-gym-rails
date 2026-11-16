@@ -88,7 +88,11 @@ dashboard load, which does stamp the set, so the page checks only on a sign
 that a person is there: the tab becomes visible or gains focus, a pointer
 moves, or a key is pressed. It runs on no timer. A tab nobody returns to
 sends nothing and never reloads, and its sets stay unopened and count
-toward the pause.
+toward the pause. The signals stand in for a person and are not proof of
+one: a browser can show or focus a window when the computer wakes, with
+nobody at it. Such a reload stamps one set and delays the pause by that
+set. The visibility signals stay because the home-screen app has no key
+presses and few pointer moves.
 `docs/code-notes/app/javascript/controllers/fresh_day_controller.md` has the
 rest.
 

@@ -94,8 +94,9 @@ User opens dashboard:
        exists, is not regenerating and is not the set shown
        (DailyExercise#replaces_page_showing?); the page then reloads once
        pending saves land. The check stamps nothing and starts no
-       generation, and it runs on no timer, so an unattended tab never
-       reloads itself
+       generation, and it runs on no timer, so a tab that gets no
+       presence signal never reloads. A window the browser restores or
+       focuses on wake gives one too, with nobody there
        while the pause is automatic, shows one line above every state with
        Resume and "Keep it paused", both posting to
        PATCH /account/toggle_generation with return_to=dashboard
