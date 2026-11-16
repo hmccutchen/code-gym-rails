@@ -48,6 +48,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
       expect(page).to have_selector("h3", text: /\A#{blank.humanize}\s*Skipped\z/i)
       expect(page).to have_selector("h3", text: /\A#{short.humanize}\s*(beginner|developing|solid|strong)\z/i)
       expect(page).to have_no_selector(".review-ungraded", text: "Not graded")
+      open_folded_section(short)
       expect(page).to have_selector(".answer-display", text: "N+1?")
       expect(page).to have_no_text("Not counted as an answer.")
     end

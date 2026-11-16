@@ -1,9 +1,8 @@
 # Folding a section
 
-on the answer form each section is its own open
-`<details>`, the disclosure the reference, hint and history already use,
-so a section can be folded away by hand. Nothing folds on its own, and
-folding is available whatever the section's state. The summary carries
+On the answer form each section is its own `<details>`, starting open, the
+disclosure the reference, hint and history already use, so a section can
+be folded away by hand. Nothing folds on its own, and folding is available whatever the section's state. The summary carries
 the label, as an `<h2>` so VoiceOver's heading rotor reaches each section
 (never give the summary `role="button"`, which would erase it), and a
 status line (`SectionStatusHelper#section_status`, the only statement of
@@ -17,10 +16,17 @@ nothing inside a section needs to be visible to work — the diagram
 renders to an SVG string once at load, the duck and pseudocode controls
 fetch on click, and every autosave listener is on `input` — so the fold
 is purely visual and the submit gate, rating and autosave are untouched.
-Fold state is not persisted: a reload opens every section, which costs one
-tap per section and avoids keying browser storage to a response that
+Fold state is not persisted: on the answer form a reload opens every
+section, which costs one tap per section and avoids keying browser storage to a response that
 regenerate and start-over would have to invalidate. The read-only render
-folds the same way, open by default with the label in the summary and no
-status line, so on the submitted dashboard a reader can fold the answered
-problems away and reach the review below them without scrolling past
-every section. Each section inside a History entry folds too.
+folds the same way, with the label in the summary and no status line.
+On the submitted dashboard every section starts folded
+(`dashboard/_exercise` passes `folded: true`), so the page opens on the
+section titles and the review below them, and a reader opens a section to
+compare an answer with its review. A card's daily-kind swap control sits
+inside the section, so on a submitted day it is one tap away; the owner
+chose per-section folding over one closed wrapper with that cost known. Before 2026-11-14 they started open and
+the reader scrolled past every answered problem to reach the review. Each
+section inside a History entry folds too, but starts open: History already
+wraps the day's problems in one disclosure that starts closed, and folding
+each section inside it as well would cost a second tap.

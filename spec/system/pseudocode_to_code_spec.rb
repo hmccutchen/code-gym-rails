@@ -87,6 +87,7 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
 
       click_button "Submit answers"
 
+      open_folded_section("pseudocode_to_code")
       expect(page).to have_content("def merge_ranges")
       expect(page).to have_content(/implemented literally — gaps and all/i)
 

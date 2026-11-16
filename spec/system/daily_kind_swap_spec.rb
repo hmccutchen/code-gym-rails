@@ -610,6 +610,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     refresh
     wait_for_js
     expect(page).to have_css("[data-controller='generating']")
+    all("details.section:not([open]) > summary").each(&:click)
     fail_first_swap
     response.update!(reviewing_since: nil)
     sleep 4

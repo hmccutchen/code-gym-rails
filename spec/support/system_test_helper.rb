@@ -59,6 +59,10 @@ module AnswerFormHelper
   def expect_ready_to_submit
     expect(page).to have_selector("#rating-nudge", visible: :hidden)
   end
+
+  def open_folded_section(key)
+    find(%(details.section[data-section-fold="#{key}"]:not([open]) > summary)).click
+  end
 end
 
 module TodaysSetHelper
