@@ -84,7 +84,38 @@ RSpec.describe "Page scripts", type: :request do
 
       expect(checker["data-fresh-day-url-value"]).to eq(dashboard_freshness_path)
       expect(checker["data-fresh-day-shown-value"]).to eq(exercise.draft_scope)
+      expect(checker["data-fresh-day-replaced-text-value"]).to eq(I18n.t("dashboard.fresh_day.replaced"))
     end
+  end
+
+  it "takes the freshness check's minimum gap from the controller's constant" do
+    travel_to(Date.new(2026, 7, 18)) do
+      stub_const("DashboardController::FRESHNESS_CHECK_GAP", 95.seconds)
+      reset!
+      login_as(user)
+      get root_path
+
+      expect(doc.at_css("[data-controller~='fresh-day']")["data-fresh-day-minimum-gap-value"]).to eq("95000")
+    end
+  end
+
+  it "checks for a newer set at most once a minute" do
+    expect(DashboardController::FRESHNESS_CHECK_GAP).to eq(60.seconds)
+  end
+
+  it "takes how long the replaced notice stays from the controller's constant" do
+    travel_to(Date.new(2026, 7, 18)) do
+      stub_const("DashboardController::REPLACED_NOTICE_SHOWN_FOR", 17.seconds)
+      reset!
+      login_as(user)
+      get root_path
+
+      expect(doc.at_css("[data-controller~='fresh-day']")["data-fresh-day-notice-shown-for-value"]).to eq("17000")
+    end
+  end
+
+  it "keeps the replaced notice up for ten seconds" do
+    expect(DashboardController::REPLACED_NOTICE_SHOWN_FOR).to eq(10.seconds)
   end
 
   it "mounts the freshness check with no scope on a day that shows no set" do

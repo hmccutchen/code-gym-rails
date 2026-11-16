@@ -62,7 +62,13 @@ RSpec.describe "Cross-user access", type: :request do
     it "does not report the owner's set as the intruder's newer day" do
       get dashboard_freshness_path
 
-      expect(response.parsed_body).to eq("stale" => false)
+      expect(response.parsed_body).to eq("stale" => false, "replaced" => false)
+    end
+
+    it "does not say the owner's set replaced the one the intruder names" do
+      get dashboard_freshness_path, params: { shown: "#{owner_exercise.id}-1" }
+
+      expect(response.parsed_body).to eq("stale" => false, "replaced" => false)
     end
   end
 

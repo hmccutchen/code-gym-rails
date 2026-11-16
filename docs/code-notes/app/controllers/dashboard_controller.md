@@ -8,6 +8,10 @@ renders in every state the dashboard shows and each section's marker reads
 the same pick. `#status` does not read it, because picking the week's concept
 is not generation progress.
 
+`#todays_exercise` is the one read of today's set, and it is not memoized:
+`#load_todays_set` calls it again after `carry_held_set_forward!`, because a
+second first-load of the day can lose the race and move nothing.
+
 `#load_todays_set` gives the stored response `current_user` as its user, so the review's
 short version reads the exposure index the page already built for the
 signed-in user instead of loading the user again and building a second one.
@@ -31,13 +35,37 @@ already writes on this action when it carries a held set forward.
 
 An open dashboard asks this whether to reload
 (`docs/code-notes/app/javascript/controllers/fresh_day_controller.md`). The
-page sends the draft scope of the set it shows, empty when it shows none,
-and `DailyExercise#replaces_page_showing?` compares it with today's set. The
-answer is stale only when today's set exists, is not being regenerated and
-has another scope. A day with no set is never stale: a reload then would
-start on-demand generation and pull the form away from someone still
-working on yesterday's set past midnight. A set behind the regeneration
-spinner is not stale either, so the page reloads once, to the finished set.
+page sends the draft scope of the set it shows, empty when it shows none.
+Today's set answers for itself: `DailyExercise#freshness_against` returns
+`:current`, `:stale` or `:replaced`
+(`docs/code-notes/app/models/daily_exercise.md`), and the action only looks
+that name up in `FRESHNESS_REPLIES`. A day with no set answers as `:current`.
+`fetch` raises on a name the table lacks, so a new outcome on the model
+cannot pass through as a silent "fresh".
+
+A day with no set is never stale: a reload then would start on-demand
+generation and pull the form away from someone still working on yesterday's
+set past midnight. A set behind the regeneration spinner is not stale
+either, so the page reloads once, to the finished set.
+
+`replaced` is true when the scope the page sent is an earlier write of
+today's own row: the set the person was looking at was regenerated, most
+likely from another tab. The reloaded page then says so. A new day's set
+stays silent, since nobody expects yesterday's set to still be there. The
+`shown` parameter is only ever compared with the signed-in user's own set
+for today, so a made-up scope or another account's scope learns nothing: it
+gets the same `stale` answer as any other value and is never `replaced`.
+
+`#status` also treats a regenerating set as not ready and keeps its own line
+for it. `#status` answers `pending` for a regenerating set even when today's
+generation failed, so sharing one "finished set" reader with `#freshness`
+would change which answer wins there.
+
+`FRESHNESS_CHECK_GAP` is the shortest time between two checks from one page,
+and `REPLACED_NOTICE_SHOWN_FOR` is how long the replaced notice stays before
+a presence signal may take it away. Both are read only by
+`dashboard/_fresh_day`, which renders them in milliseconds for the
+controller; nothing on the server limits requests by them.
 
 Like `#status`, it only reads. It does not call `mark_opened!`, enqueue a
 job, or carry a paused user's held set forward; those belong to `#show`,

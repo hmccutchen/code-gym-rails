@@ -432,6 +432,8 @@ en:
     weekend_empty:
       message: "No exercises are generated automatically on weekends — the morning job runs Monday–Friday."
       bug_hunt: "A weekend set's code review is a bug hunt: a few lines of code with one planted trap to find."
+    fresh_day:
+      replaced: "This set was replaced, so the page now shows the current one."
     teaching_hint:
       summary: "Need a nudge? 💡"
       locked: "Available after you attempt this section"

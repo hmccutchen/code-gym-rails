@@ -12,9 +12,10 @@ dashboard state except the generating panel, whose own poll reloads.
 ## The server decides
 
 The controller sends the draft scope of the set the page shows, empty when
-it shows none, and acts on one boolean. It holds no copy of the rule; that
-is `DailyExercise#replaces_page_showing?`, described in
-`docs/code-notes/app/controllers/dashboard_controller.md`.
+it shows none, and acts on the reply's two booleans: `stale` says whether to
+reload, and `replaced` whether to say why. It holds no copy of the rule;
+that is `DailyExercise#freshness_against`, described in
+`docs/code-notes/app/models/daily_exercise.md`.
 
 The date changing is not enough to reload. A reload on a day with no set
 starts on-demand generation, and it would take the form away from someone
@@ -38,7 +39,8 @@ nothing, however long it stays open.
 ## The minimum gap
 
 `pointermove` fires many times a second, so a check runs only when the
-view's minimum gap (60 seconds) has passed since the last one. The count
+minimum gap has passed since the last one. The partial renders it from
+`DashboardController::FRESHNESS_CHECK_GAP`. The count
 starts when the controller connects, because the server rendered the page
 at that moment and a check right after would learn nothing.
 
@@ -60,6 +62,53 @@ reload is on its way, and another check would add nothing.
 The reload goes through `saveStatus.leaveWhenSaved`, so an answer save that
 is pending lands first. While a save has failed, the leave stays armed and
 the page reloads once that save succeeds.
+
+## The replaced notice
+
+A new day's set arriving overnight reloads without a word. A set
+regenerated the same day, usually from another tab, would otherwise swap
+the questions under the reader with no explanation, so a `replaced` reply
+makes the reloaded page say "This set was replaced, so the page now shows
+the current one." The sentence is `dashboard.fresh_day.replaced`, rendered
+onto the element as `replacedText` because a module cannot translate.
+
+`saveStatus.carry` takes it across the reload. It is called inside the
+leave, right before `window.location.reload()`: a leave held behind a
+failed save may never run, and a notice stored then would show on some
+later, unrelated load of the dashboard.
+
+It is carried under its own key, `replaced`. The answer form's saves report
+and clear under `answers`, so no answer save clears the notice or writes
+over it, and it behaves the same on the answer form and on the submitted
+dashboard. A carried key never blocks a later leave
+(`docs/code-notes/app/javascript/code_gym/save_status.md`). The banner it
+appears in is the save-failure banner, so it is announced as an alert,
+which is louder than this notice needs.
+
+The controller takes the notice away itself, with `saveStatus.clear`. It
+does so on the first presence signal that arrives at least
+`noticeShownFor` after the controller connected; the partial renders that
+from `DashboardController::REPLACED_NOTICE_SHOWN_FOR` (10 seconds). No timer
+runs, as everywhere else in this controller, so the notice waits for a
+reader: on a tab nobody is at, it stays. A signal counts only while the
+document is visible, and the clear runs once per load.
+
+## Two notices, one stored slot
+
+`save_status.js` keeps one carried message in sessionStorage, and the answer
+form also writes there: a save refused with `409 stale` carries "that last
+change wasn't saved" under `answers` before it reloads. Both can start from
+the same regeneration. The answer form's sentence wins, which is the right
+one, because it tells the reader a change was lost:
+
+- When the refused save comes back first, or while this controller is
+  waiting on it, the refusal is reported under `answers`. This controller's
+  leave ignores no key, so it is held and never carries. The answer form
+  reloads with its own sentence.
+- When this controller's leave has already run, the page is on its way out.
+  A refused save that still lands writes its sentence over this one.
+
+`spec/system/fresh_day_spec.rb` holds the first case.
 
 ## A reply that is not an answer
 

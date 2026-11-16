@@ -3,5 +3,7 @@
      data-controller="fresh-day"
      data-fresh-day-url-value="<%= dashboard_freshness_path %>"
      data-fresh-day-shown-value="<%= shown %>"
-     data-fresh-day-minimum-gap-value="<%= 60.seconds.in_milliseconds.to_i %>"
+     data-fresh-day-minimum-gap-value="<%= DashboardController::FRESHNESS_CHECK_GAP.in_milliseconds.to_i %>"
+     data-fresh-day-notice-shown-for-value="<%= DashboardController::REPLACED_NOTICE_SHOWN_FOR.in_milliseconds.to_i %>"
+     data-fresh-day-replaced-text-value="<%= t("dashboard.fresh_day.replaced") %>"
      data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present"></div>

@@ -77,3 +77,27 @@ was, so its three conditions moved here unchanged. `replace_blocker` stays the
 authority on whether a regeneration is accepted: a click during a review that
 is still running is refused by `/regenerate`, and the button is right again
 once the review lands.
+
+## `#draft_scope` and `#freshness_against`
+
+A draft scope names one write of one set: the row id, a hyphen, and
+`generated_at` in microseconds. A regeneration updates the row in place
+(`PracticeGeneration.commit_replacement`), so the id stays and the time
+moves. The format is written and read only here: `DRAFT_SCOPE_FORMAT` is the
+pattern, and the private `#written_stamp` is the time part.
+
+`#freshness_against(scope)` compares the set with the scope an open page
+shows and names the result, so a caller never has to combine checks in the
+right order:
+
+- `:current` when the scope is this set's own, and also while the set is
+  regenerating, whatever the scope. A page that reloaded then would land on
+  the generating panel, so the set holds its answer until the rewrite is
+  finished.
+- `:replaced` when the scope names this row and an earlier write of it.
+- `:stale` for everything else.
+
+A page sends the scope back as a parameter, so the rewrite test (the private
+`#rewritten_since?`) accepts only a value that matches the pattern. Blank, an
+array, extra parts and a trailing newline are `:stale`, and so are another
+row's scope and a time later than the stored one.
