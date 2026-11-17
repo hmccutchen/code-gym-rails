@@ -80,6 +80,7 @@ class DashboardController < ApplicationController
     question = NoteQuestion.text(shown_note_question(note, note_question_for(@exercise, @response)))
     @note_box = { question: question, body: note&.body, editable: !@response.submitted? }
     @note_box = nil unless @note_box[:editable] || note&.body.present?
+    @explain_box = explain_box_for(@exercise, @response, note) if @response.submitted?
   end
 
   def settle_missing_set

@@ -859,12 +859,29 @@ en:
       too_hard: "You rated %{kind} too hard. Which part did you get stuck on?"
       skipped: "You skipped %{kind}. What would you have needed to start it?"
       hardest: "What was the hardest part of today's set?"
+    explain:
+      first: "In your own words, what does %{concept} do?"
+      second: "When does %{concept} go wrong, or when wouldn't you use it?"
+      third: "How would you explain %{concept} to a teammate who's new to it?"
   learner_notes:
     note:
       label: "Note for this set (optional)"
       hint: "Optional. It saves as you type, and it can't change once you submit."
       after_submit: "This set is submitted, so its note can't change now."
       unavailable: "Learner notes are off for this account."
+    explain:
+      heading: "Explain it in your own words"
+      choose: "Explain a different one"
+      answer_label: "Your explanation"
+      locks: "Saving sends your explanation, and it can't be changed afterwards."
+      save: "Save"
+      save_failed: "Couldn't save your explanation. Try again."
+      closed: "This question closed at the end of the day you submitted, so there is nothing to save now."
+      blank: "Write your explanation before saving."
+      too_long: "Keep your explanation to %{max} characters."
+      already_saved: "Your explanation is already saved, so it can't change now."
+      not_an_option: "That concept isn't one of today's. Reload the page and choose again."
+      before_submit: "Submit today's set before explaining one of its concepts."
   concept_reference:
     summary: "Reference — %{concept}: how it works"
     explain_differently: "This didn't quite land — try a different explanation"

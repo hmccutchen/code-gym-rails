@@ -1,0 +1,24 @@
+<%# Local: box (a LearnerNoteQuestions::ExplainBox; its state picks what shows). %>
+<% open = box.state == :open %>
+<section class="learner-explanation" id="learner-explanation"<% if open %> data-controller="learner-explanation" data-learner-explanation-url-value="<%= learner_explanation_path %>" data-learner-explanation-failed-text-value="<%= t("learner_notes.explain.save_failed") %>"<% end %>>
+  <h2><%= t("learner_notes.explain.heading") %></h2>
+  <p class="learner-explanation-question" id="learner-explanation-question"<% if open %> data-learner-explanation-target="question"<% end %>><%= box.question %></p>
+  <% case box.state %>
+  <% when :open %>
+    <label for="learner-explanation-section"><%= t("learner_notes.explain.choose") %></label>
+    <select id="learner-explanation-section" data-learner-explanation-target="section" data-action="learner-explanation#choose">
+      <% box.choices.each do |choice| %>
+        <%= tag.option choice.concept.humanize, value: choice.section, selected: choice.section == box.default_section, data: { question: choice.question } %>
+      <% end %>
+    </select>
+    <label for="learner-explanation-input" class="visually-hidden"><%= t("learner_notes.explain.answer_label") %></label>
+    <textarea id="learner-explanation-input" class="answer" maxlength="<%= LearnerNote::MAX_TEXT_LENGTH %>" aria-describedby="learner-explanation-question" data-learner-explanation-target="input"></textarea>
+    <p class="hint"><%= t("learner_notes.explain.locks") %></p>
+    <button type="button" class="btn btn-primary btn-sm" data-learner-explanation-target="save" data-action="learner-explanation#save"><%= t("learner_notes.explain.save") %></button>
+    <p class="hint" aria-live="polite" data-learner-explanation-target="status"></p>
+  <% when :saved %>
+    <%= simple_format(h(box.text), class: "learner-explanation-text") %>
+  <% when :closed %>
+    <p class="hint"><%= t("learner_notes.explain.closed") %></p>
+  <% end %>
+</section>

@@ -38,6 +38,28 @@ RSpec.describe LearnerNote do
     expect { exercise.destroy! }.to change(described_class, :count).from(1).to(0)
   end
 
+  describe ".explain_history" do
+    def explained_on(date, concept)
+      set = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                  problem_set: { "code_review" => { "question" => "q", "snippet" => "x" } })
+      described_class.create!(user: user, daily_exercise: set, explain_concept: concept, explanation: "words")
+    end
+
+    it "counts each concept's earlier explanations and names those on sets dated in the 7 days before" do
+      today = Date.current + 30
+      explained_on(today - 7, "n_plus_one")
+      explained_on(today - 8, "callbacks")
+      explained_on(today - 20, "n_plus_one")
+      explained_on(today, "service_objects")
+      described_class.create!(user: user, daily_exercise: exercise, body: "a note, no explanation")
+
+      history = user.learner_notes.explain_history(before: today)
+
+      expect(history.recent).to eq([ "n_plus_one" ])
+      expect(history.counts).to eq("n_plus_one" => 2, "callbacks" => 1)
+    end
+  end
+
   it "keeps one row per exercise" do
     note.save!
 

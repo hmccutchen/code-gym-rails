@@ -89,6 +89,8 @@ class DailyExercise < ApplicationRecord
     active_section_keys.select { |key| ExerciseSection.for(key).adaptation_evidence?(problem_set[key]) }
   end
 
+  def section_concepts = active_section_keys.map { |key| [ key, tagged_concept(key) ] }
+
   def concept_pairs(before_submission: false)
     withheld = before_submission ? concepts_withheld_before_submission : []
     active_section_keys.filter_map do |key|
