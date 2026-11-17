@@ -87,6 +87,22 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
     expect_snapshot("dashboard_swapped_pair")
   end
 
+  context "with LEARNER_NOTES on and the account's setting off" do
+    before { stub_env("LEARNER_NOTES" => "1") }
+
+    it "renders the unsubmitted dashboard unchanged" do
+      exercise
+      get root_path
+      expect_snapshot("dashboard_unsubmitted")
+    end
+
+    it "renders the submitted, reviewed dashboard unchanged" do
+      submit_and_review
+      get root_path
+      expect_snapshot("dashboard_submitted")
+    end
+  end
+
   it "renders setup unchanged" do
     exercise
     get setup_path
