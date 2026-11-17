@@ -3,6 +3,8 @@ class User < ApplicationRecord
   include SignedInSessions
   include GenerationPause
 
+  has_many :learner_notes, dependent: :delete_all
+  has_many :learner_items, dependent: :delete_all
   has_many :daily_exercises, dependent: :destroy
   has_many :daily_responses, dependent: :destroy, inverse_of: :user
   has_many :duck_threads,    dependent: :delete_all
@@ -221,6 +223,8 @@ class User < ApplicationRecord
 
       push_subscriptions.destroy_all
       duck_threads.delete_all
+      learner_notes.delete_all
+      learner_items.delete_all
 
       update!(
         email:                            "deleted-user-#{id}@anonymized.local",

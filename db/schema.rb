@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -205,6 +205,53 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_190000) do
     t.check_constraint "never_shown_reason IS NULL OR (never_shown_reason::text = ANY (ARRAY['replaced_by_retry'::character varying, 'section_dropped'::character varying]::text[])) AND shipped = false AND source::text = 'live'::text", name: "judge_solves_never_shown_reason"
     t.check_constraint "source::text = 'synthetic'::text OR user_id IS NOT NULL AND daily_exercise_id IS NOT NULL AND set_generated_at IS NOT NULL", name: "judge_solves_owner_unless_synthetic"
     t.check_constraint "source::text = ANY (ARRAY['live'::character varying, 'replay'::character varying, 'synthetic'::character varying]::text[])", name: "judge_solves_source"
+  end
+
+  create_table "learner_items", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "concept", null: false
+    t.string "bucket", null: false
+    t.string "kind", null: false
+    t.string "label", null: false
+    t.string "term"
+    t.jsonb "evidence", default: [], null: false
+    t.jsonb "came_up_on", default: [], null: false
+    t.string "status", default: "open", null: false
+    t.date "expires_on", null: false
+    t.date "used_on"
+    t.date "closed_on"
+    t.date "returned_after"
+    t.datetime "reopened_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "user_id, bucket, concept, kind, lower((COALESCE(term, ''::character varying))::text)", name: "index_learner_items_one_open_per_key", unique: true, where: "((status)::text = 'open'::text)"
+    t.index ["user_id", "status"], name: "index_learner_items_on_user_id_and_status"
+    t.index ["user_id"], name: "index_learner_items_on_user_id"
+    t.check_constraint "(kind::text = 'term'::text) = (term IS NOT NULL)", name: "learner_items_term_only_on_terms"
+    t.check_constraint "kind::text = ANY (ARRAY['term'::character varying, 'misconception'::character varying, 'concept'::character varying]::text[])", name: "learner_items_kind"
+    t.check_constraint "status::text = ANY (ARRAY['open'::character varying, 'used'::character varying, 'dismissed'::character varying, 'expired'::character varying]::text[])", name: "learner_items_status"
+  end
+
+  create_table "learner_notes", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "daily_exercise_id", null: false
+    t.text "body"
+    t.string "question_key"
+    t.string "explain_section"
+    t.string "explain_concept"
+    t.string "explain_phrasing"
+    t.text "explanation"
+    t.jsonb "explanation_reply"
+    t.integer "reply_attempts", default: 0, null: false
+    t.datetime "reply_requested_at"
+    t.integer "extract_attempts", default: 0, null: false
+    t.datetime "extracted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["daily_exercise_id"], name: "index_learner_notes_on_daily_exercise_id", unique: true
+    t.index ["user_id"], name: "index_learner_notes_on_user_id"
+    t.check_constraint "extract_attempts >= 0 AND extract_attempts <= 2", name: "learner_notes_extract_attempts_range"
+    t.check_constraint "reply_attempts >= 0 AND reply_attempts <= 2", name: "learner_notes_reply_attempts_range"
   end
 
   create_table "level_suggestion_events", force: :cascade do |t|
@@ -458,6 +505,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_190000) do
     t.string "generation_pause_source"
     t.integer "generation_account_failures", default: 0, null: false
     t.jsonb "key_saved_times", default: {}, null: false
+    t.boolean "learner_notes_enabled", default: false, null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["invite_code_id"], name: "index_users_on_invite_code_id"
   end
@@ -474,6 +522,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_190000) do
   add_foreign_key "featured_concepts", "users"
   add_foreign_key "judge_solves", "daily_exercises"
   add_foreign_key "judge_solves", "users"
+  add_foreign_key "learner_items", "users"
+  add_foreign_key "learner_notes", "daily_exercises"
+  add_foreign_key "learner_notes", "users"
   add_foreign_key "level_suggestion_events", "users"
   add_foreign_key "push_subscriptions", "users"
   add_foreign_key "recognition_guides", "users"

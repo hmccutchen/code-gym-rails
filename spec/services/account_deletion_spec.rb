@@ -93,6 +93,25 @@ RSpec.describe AccountDeletion, type: :model do
     expect(kept.map { |row| row.class.exists?(row.id) }).to eq([ true, true ])
   end
 
+  def learner_rows(user, tag)
+    exercise = give_rows(user, tag)
+    note = LearnerNote.create!(user: user, daily_exercise: exercise, body: "stuck on #{tag}", explanation: "in my words")
+    item = LearnerItem.create!(user: user, concept: "open_closed", bucket: "ruby_rails", kind: "concept", label: "A label.",
+                               evidence: [ { "date" => exercise.date.iso8601, "source" => "note" } ], expires_on: exercise.date + 14)
+    [ note, item ]
+  end
+
+  it "deletes the account's learner notes and items and leaves another account's" do
+    owned = learner_rows(leaving, "leaving")
+    kept = learner_rows(staying, "staying")
+
+    described_class.call(leaving)
+
+    expect(LearnerNote.where(user_id: leaving.id).or(LearnerNote.where(id: owned.first.id))).to be_empty
+    expect(LearnerItem.where(user_id: leaving.id)).to be_empty
+    expect(kept.map { |row| row.class.exists?(row.id) }).to eq([ true, true ])
+  end
+
   it "deletes the account's unfinished jobs and leaves a running one and another account's jobs" do
     give_rows(leaving, "leaving")
     response = leaving.daily_responses.first
