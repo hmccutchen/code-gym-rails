@@ -1,5 +1,6 @@
 class AccountsController < ApplicationController
   include RecentSignIn
+  include LearnerNotesGate
 
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
@@ -38,7 +39,37 @@ class AccountsController < ApplicationController
     redirect_to after_toggle_path, notice: t(notice)
   end
 
+  # PATCH /account/learner_notes
+  def learner_notes
+    return head(:not_found) unless LearnerNotes.enabled?
+
+    case write_learner_notes_setting(params[:enabled] == "1")
+    when :saved          then redirect_to account_path, notice: t(learner_notes_notice)
+    when :own_key_needed then redirect_to account_path, alert: t("flash.accounts.learner_notes_need_own_key")
+    when :deleted        then redirect_to login_path, alert: t("flash.application.login_required")
+    else raise ArgumentError, "Unhandled learner notes setting outcome"
+    end
+  end
+
   private
+
+  def learner_notes_notice
+    current_user.learner_notes_enabled? ? "flash.accounts.learner_notes_on" : "flash.accounts.learner_notes_off"
+  end
+
+  # Turning the setting off needs no key, so an account that lost its own key can still stop its notes.
+  def write_learner_notes_setting(wanted)
+    return :own_key_needed if wanted && !learner_notes_offered?
+
+    current_user.with_lock do
+      next :deleted if current_user.anonymized?
+
+      current_user.update!(learner_notes_enabled: wanted)
+      :saved
+    end
+  rescue ActiveRecord::RecordNotFound
+    :deleted
+  end
 
   # A fixed name, never a URL, so the form's return_to cannot send the browser off this site.
   def after_toggle_path = params[:return_to] == "dashboard" ? root_path : account_path

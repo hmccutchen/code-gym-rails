@@ -196,6 +196,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/controllers/authenticators_controller.rb` — `/account/authenticator`: the setup page, turning the authenticator on and off, and the sign-in-again page for an old session
 - `app/controllers/recovery_codes_controller.rb` — `POST /account/recovery_codes`: a new set of recovery codes, shown once
 - `app/controllers/concerns/sign_in_completion.rb` — `SignInCompletion`: finishing a sign-in (`reset_session`, the stamp, `return_to`, a pending trial) and issuing the second-factor challenge
+- `app/controllers/concerns/learner_notes_gate.rb` — `LearnerNotesGate`: `#learner_notes_offered?` (the `LEARNER_NOTES` switch and the account's own key) and `#learner_notes_on?` (that and the account's setting), the one statement of when the setting, the note box and the explain question show
 - `app/controllers/concerns/recent_sign_in.rb` — `RecentSignIn`: `#signed_in_recently?`, the controller and view side of `User.signed_in_recently?`, and `#send_through_sign_in`, which signs out and saves a named page to return to; used by turning on the authenticator and deleting the account
 - `app/controllers/concerns/authenticator_changes.rb` — `AuthenticatorChanges`: the shared rate limit, `no-store`, the change notice and the recovery code page for both authenticator controllers
 - `app/models/concerns/signed_in_sessions.rb` — `SignedInSessions`: `User.session_time`, the one reader of a sign-in stamp, `User.signed_in_recently?`, and `User.signed_in_through(user_id:, signed_in_at:)`, the one check that a session is signed in and not ended by `sessions_valid_after`
@@ -203,7 +204,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/helpers/loading_form_helper.rb` — `#loading_form_data`, the one statement of how a form is wired to the `loading-form` controller, with its optional label and confirm message
 - `app/helpers/authenticator_setups_helper.rb` — the setup page's inline QR code SVG and the setup key in groups of four
 - `app/javascript/controllers/copy_text_controller.js` — the Copy buttons on the setup key and recovery codes, selecting the text instead when the clipboard is missing or refuses
-- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (`AccountDeletion` removes the user row and every row that belongs to it)
+- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (`AccountDeletion` removes the user row and every row that belongs to it), plus `#learner_notes`, the Learner notes setting, written under the user row lock and turned on only for an account on its own key
 - `app/models/monthly_spend.rb` — `MonthlySpend`: decides the month's own-key total and the weekday projection, which stays hidden until the 4th in the user's zone; see `docs/code-notes/app/models/monthly_spend.md`
 - `app/helpers/usage_helper.rb` — `usage_dollars`: formats a cost as dollars, showing anything under a cent as `< $0.01`
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption
@@ -237,6 +238,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/views/accounts/_push_reminders.html.erb` — the Account toggle. Its click handler is where the synchronous-gesture requirement lives. The nudges switch saves on change through `save-switch` and keeps a `<noscript>` Save
 - `app/javascript/controllers/save_switch_controller.js` — the `save-switch` controller: a checkbox that saves the moment it changes (level suggestions, reminder nudges), with an optional inline status line and a revert when the save fails
 - `app/javascript/controllers/value_row_controller.js` — the `value-row` controller: copies a select's chosen option text into the visible span of a value row
+- `app/views/accounts/_learner_notes.html.erb` — the Account card for the Learner notes setting, on or off, rendered only while `learner_notes_offered?`
 - `app/views/accounts/_api_usage.html.erb` — the Account page's card of this month's own-key spend, projection and per-provider dollars, from `ApiUsage.own_key_totals` and `MonthlySpend`
 - `app/views/accounts/_authenticator.html.erb` — the Account section for the authenticator app: a link to add it, or when it's on, the date, codes left, and the forms for new codes and turning it off
 - `app/views/pwa/service-worker.js.erb` — shows the notification, with the versioned icon. Every path ends in `showNotification`: Safari revokes the permission if a worker takes a push and displays nothing

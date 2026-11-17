@@ -24,6 +24,9 @@
     <% end %>
   </section>
 
+  <% if learner_notes_offered? %>
+    <%= render "accounts/learner_notes" %>
+  <% end %>
   <%= render "accounts/push_reminders" if WebPushCredentials.configured? %>
 
   <%= render "accounts/authenticator" %>

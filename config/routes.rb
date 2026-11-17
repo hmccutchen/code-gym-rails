@@ -33,6 +33,7 @@ Rails.application.routes.draw do
 
   resource :account, only: [ :show, :destroy ] do
     patch :toggle_generation, on: :member
+    patch :learner_notes, on: :member
     resource :authenticator, only: [ :show, :create, :destroy ] do
       delete :sign_in_again
     end

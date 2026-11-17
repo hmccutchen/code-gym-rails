@@ -225,6 +225,9 @@ en:
       generation_resumed: "Automatic daily generation resumed."
       generation_paused: "Automatic daily generation paused."
       generation_kept_paused: "Automatic generation stays paused."
+      learner_notes_on: "Learner notes are on."
+      learner_notes_off: "Learner notes are off."
+      learner_notes_need_own_key: "Learner notes need your own API key."
     api_keys:
       unrecognized_key: "We don't recognize this key format — currently supporting Anthropic, Gemini and OpenAI keys."
       key_saved: "API key saved. You're all set!"
@@ -977,6 +980,13 @@ en:
       privacy_link: "what Coding Gym keeps"
       danger_privacy_html: "A few things outlive it, listed on the page about %{link}."
       delete_confirm: "Delete your account? This permanently removes your email, exercises, answers, reviews and usage history, and logs you out. It cannot be undone."
+    learner_notes:
+      heading: "Learner notes"
+      state_on: "Learner notes: on"
+      state_off: "Learner notes: off"
+      about: "With learner notes on, each set offers a note box and, after you submit, one question asking you to explain a concept in your own words."
+      turn_on: "Turn on learner notes"
+      turn_off: "Turn off learner notes"
     api_usage:
       heading: "AI usage"
       spent_label: "Spent in %{month}"

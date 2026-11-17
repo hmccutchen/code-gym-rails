@@ -1,0 +1,10 @@
+<section class="card" id="learner-notes-setting">
+  <h2><%= t("accounts.learner_notes.heading") %></h2>
+  <p class="card-note"><%= t(current_user.learner_notes_enabled? ? "accounts.learner_notes.state_on" : "accounts.learner_notes.state_off") %></p>
+  <p class="card-note"><%= t("accounts.learner_notes.about") %></p>
+  <% if current_user.learner_notes_enabled? %>
+    <%= button_to t("accounts.learner_notes.turn_off"), learner_notes_account_path, method: :patch, params: { enabled: "0" }, class: "btn btn-ghost btn-block" %>
+  <% else %>
+    <%= button_to t("accounts.learner_notes.turn_on"), learner_notes_account_path, method: :patch, params: { enabled: "1" }, class: "btn btn-ghost btn-block" %>
+  <% end %>
+</section>
