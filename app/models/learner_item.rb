@@ -24,6 +24,7 @@ class LearnerItem < ApplicationRecord
   validates :term, format: { with: TERM_SHAPE }, if: :term_item?
   validates :term, absence: true, unless: :term_item?
   validates :expires_on, presence: true
+  validate :concept_in_vocabulary
   validate :evidence_holds_references
   validate :came_up_on_holds_dates
 
@@ -40,6 +41,10 @@ class LearnerItem < ApplicationRecord
   def term_item? = kind == "term"
 
   private
+
+  def concept_in_vocabulary
+    errors.add(:concept, "is not in that vocabulary") unless ConceptBucket.valid_identity?(concept: concept, bucket: bucket)
+  end
 
   def evidence_holds_references
     return if evidence.is_a?(Array) && evidence.size <= MAX_EVIDENCE && evidence.all? { |reference| reference_shaped?(reference) }

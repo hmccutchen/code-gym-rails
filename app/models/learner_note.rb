@@ -11,4 +11,11 @@ class LearnerNote < ApplicationRecord
   validates :body, :explanation, length: { maximum: MAX_TEXT_LENGTH }
   validates :extract_attempts, numericality: { only_integer: true, in: 0..MAX_EXTRACT_ATTEMPTS }
   validates :reply_attempts, numericality: { only_integer: true, in: 0..MAX_REPLY_ATTEMPTS }
+  validate :owned_by_the_sets_owner
+
+  private
+
+  def owned_by_the_sets_owner
+    errors.add(:user, "must own the set") unless daily_exercise && user_id == daily_exercise.user_id
+  end
 end

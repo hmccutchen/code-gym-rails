@@ -62,6 +62,12 @@ paths:
   until L5 runs on web and worker, as step 6 states. Its `down` restores
   the schema but not the deleted rows, so after it runs the rollback floor
   is L5's code.
+- `CreateLearnerNotes` adds `learner_notes`, `learner_items` and
+  `users.learner_notes_enabled` a release before any code reads them, with
+  their `AccountData::FATES` entries. Once a later release writes rows,
+  that commit is the rollback floor: older code's `AccountDeletion` does not
+  delete the new tables, so their foreign keys would stop an account
+  deletion.
 - Never rename a migration that has been pushed: the PR app has already run
   it under its old version (see "The preview migration version is
   reconciled" in `docs/decisions/tracks.md`).

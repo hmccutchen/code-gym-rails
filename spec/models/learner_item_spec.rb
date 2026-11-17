@@ -21,6 +21,30 @@ RSpec.describe LearnerItem do
     expect(refused(item(kind: "strength"))).to include(:kind)
   end
 
+  it "accepts only a concept and bucket the vocabulary knows" do
+    expect(refused(item(concept: "not_a_concept"))).to include(:concept)
+    expect(refused(item(bucket: "not_a_bucket"))).to include(:concept)
+  end
+
+  it "refuses an unknown kind in the database too" do
+    row = item.tap(&:save!)
+
+    expect { row.update_columns(kind: "strength") }.to raise_error(ActiveRecord::StatementInvalid, /learner_items_kind/)
+  end
+
+  it "refuses an unknown status in the database too" do
+    row = item.tap(&:save!)
+
+    expect { row.update_columns(status: "closed") }.to raise_error(ActiveRecord::StatementInvalid, /learner_items_status/)
+  end
+
+  it "refuses a term on an item that is not a term in the database too" do
+    row = item.tap(&:save!)
+
+    expect { described_class.where(id: row.id).update_all(term: "Liskov") }
+      .to raise_error(ActiveRecord::StatementInvalid, /learner_items_term_only_on_terms/)
+  end
+
   it "starts open and accepts only the four statuses" do
     expect(described_class.new.status).to eq("open")
     described_class::STATUSES.each { |status| expect(item(status: status)).to be_valid }

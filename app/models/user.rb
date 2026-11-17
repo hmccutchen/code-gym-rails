@@ -223,6 +223,8 @@ class User < ApplicationRecord
 
       push_subscriptions.destroy_all
       duck_threads.delete_all
+      learner_notes.delete_all
+      learner_items.delete_all
 
       update!(
         email:                            "deleted-user-#{id}@anonymized.local",

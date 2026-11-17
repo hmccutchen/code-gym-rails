@@ -36,6 +36,9 @@ class CreateLearnerNotes < ActiveRecord::Migration[8.1]
       t.datetime :reopened_at
       t.timestamps
       t.index %i[user_id status]
+      t.check_constraint "kind IN ('term', 'misconception', 'concept')", name: "learner_items_kind"
+      t.check_constraint "status IN ('open', 'used', 'dismissed', 'expired')", name: "learner_items_status"
+      t.check_constraint "(kind = 'term') = (term IS NOT NULL)", name: "learner_items_term_only_on_terms"
       t.index "user_id, bucket, concept, kind, lower(coalesce(term, ''))", unique: true, where: "status = 'open'",
         name: "index_learner_items_one_open_per_key"
     end

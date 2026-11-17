@@ -227,6 +227,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
     t.index "user_id, bucket, concept, kind, lower((COALESCE(term, ''::character varying))::text)", name: "index_learner_items_one_open_per_key", unique: true, where: "((status)::text = 'open'::text)"
     t.index ["user_id", "status"], name: "index_learner_items_on_user_id_and_status"
     t.index ["user_id"], name: "index_learner_items_on_user_id"
+    t.check_constraint "(kind::text = 'term'::text) = (term IS NOT NULL)", name: "learner_items_term_only_on_terms"
+    t.check_constraint "kind::text = ANY (ARRAY['term'::character varying, 'misconception'::character varying, 'concept'::character varying]::text[])", name: "learner_items_kind"
+    t.check_constraint "status::text = ANY (ARRAY['open'::character varying, 'used'::character varying, 'dismissed'::character varying, 'expired'::character varying]::text[])", name: "learner_items_status"
   end
 
   create_table "learner_notes", force: :cascade do |t|

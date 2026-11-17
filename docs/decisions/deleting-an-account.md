@@ -58,6 +58,7 @@ two cannot disagree.
 | `judge_solves` | delete the rows with this `user_id` or on this person's sets | judge passes on the person's own sets; synthetic rows have no user |
 | `invite_codes` | keep the code, give the seat back (`redeemed_count` down by one) | the code is shared |
 | `suggested_concepts.reviewed_by_id` | set to NULL | the concept stays for the team |
+| `learner_items`, `learner_notes` | delete the rows with this `user_id` | the person's notes, explanations and the reminders written from them; the owner decided on 2026-11-16 that they go with the account. A note's owner must own its set, so deleting the set's owner is never blocked by another account's note |
 | `concept_references`, `recognition_guides` | delete the rows with this `user_id` | the person's own Learn write-ups; every row has an owner since the schema step of `learn-content-per-user.md` deleted the shared rows |
 | `solid_queue_jobs` | delete the person's unfinished jobs that no worker has claimed or is claiming | their arguments name the person |
 | the Solid Queue execution tables | go with their job row | the foreign key cascades |

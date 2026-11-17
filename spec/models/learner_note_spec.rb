@@ -19,6 +19,18 @@ RSpec.describe LearnerNote do
     expect(user.learner_notes).to contain_exactly(an_instance_of(described_class))
   end
 
+  it "belongs to the owner of its set, so deleting that owner can never be blocked" do
+    other = create_user_with_key(email: "other-#{SecureRandom.hex(4)}@example.com")
+
+    expect(refused(described_class.new(user: other, daily_exercise: exercise))).to include(:user)
+  end
+
+  it "goes with its owner when an account is anonymized" do
+    note.save!
+
+    expect { user.anonymize! }.to change { described_class.where(user: user).count }.from(1).to(0)
+  end
+
   it "keeps one row per exercise" do
     note.save!
 
