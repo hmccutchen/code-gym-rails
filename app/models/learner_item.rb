@@ -24,8 +24,8 @@ class LearnerItem < ApplicationRecord
   validates :term, format: { with: TERM_SHAPE }, if: :term_item?
   validates :term, absence: true, unless: :term_item?
   validates :expires_on, presence: true
-  validate :concept_in_vocabulary
-  validate :evidence_holds_references
+  validate :concept_in_vocabulary, if: -> { new_record? || will_save_change_to_concept? || will_save_change_to_bucket? }
+  validate :evidence_holds_references, if: -> { new_record? || will_save_change_to_evidence? }
   validate :came_up_on_holds_dates
 
   def self.expiry_for(newest_evidence_on:, created_on:)

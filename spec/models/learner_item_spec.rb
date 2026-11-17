@@ -30,6 +30,18 @@ RSpec.describe LearnerItem do
     expect(described_class.exists?(kept.id)).to be(true)
   end
 
+  it "can still be closed after its concept or a section it cites leaves the registry" do
+    retired_concept = item.tap(&:save!)
+    retired_concept.update_columns(concept: "retired_concept")
+    retired_section = item(concept: "dependency_inversion").tap(&:save!)
+    retired_section.update_columns(evidence: [ duck.merge("section" => "retired_kind") ])
+
+    expect { retired_concept.reload.update!(status: "dismissed") }.not_to raise_error
+    expect { retired_section.reload.update!(status: "dismissed") }.not_to raise_error
+    expect(retired_concept.update(concept: "still_not_a_concept")).to be(false)
+    expect(retired_section.update(evidence: [ duck.merge("section" => "not_a_section") ])).to be(false)
+  end
+
   it "accepts only a concept and bucket the vocabulary knows" do
     expect(refused(item(concept: "not_a_concept"))).to include(:concept)
     expect(refused(item(bucket: "not_a_bucket"))).to include(:concept)
