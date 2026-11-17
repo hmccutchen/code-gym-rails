@@ -16,6 +16,9 @@
       <div data-submitted-day hidden></div>
       <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers, folded: true %>
       <%= render "responses/submission", response: response %>
+      <% if @note_box %>
+        <%= render "shared/learner_note", **@note_box %>
+      <% end %>
       <% if @size_change&.direction == :larger %>
         <p class="hint"><%= t("dashboard.size_change.larger") %></p>
       <% elsif @size_change&.direction == :smaller %>
@@ -76,6 +79,9 @@
         <% if exercise.shared_concept_shown? %>
           <p class="hint"><%= t("dashboard.shared_concept", sections: exercise.shared_pair.map { |kind| t("sections.#{kind.key}.name") }.to_sentence) %></p>
         <% end %>
+      <% end %>
+      <% if @note_box %>
+        <%= render "shared/learner_note", **@note_box %>
       <% end %>
     </div>
     <div class="today-side">

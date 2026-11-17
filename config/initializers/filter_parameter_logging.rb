@@ -11,5 +11,8 @@ Rails.application.config.filter_parameters += [
 # Anchored like `code`: a bare :name would hide every key that contains it.
 Rails.application.config.filter_parameters += [ /\Aname\z/ ]
 
+# Anchored too; `body` and `explanation` also keep a learner note's text out of the SQL log's bound values.
+Rails.application.config.filter_parameters += [ /\Alearner_note\z/, /\Aexplanation\z/, /\Abody\z/ ]
+
 # An invite code is a secret, and `_key` does not cover its name.
 Rails.application.config.filter_parameters += [ :invite_code ]

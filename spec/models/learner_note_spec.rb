@@ -31,6 +31,13 @@ RSpec.describe LearnerNote do
     expect { user.anonymize! }.to change { described_class.where(user: user).count }.from(1).to(0)
   end
 
+  it "is deleted with its set, as the set's duck thread is" do
+    note.save!
+
+    expect(exercise.learner_note).to eq(described_class.last)
+    expect { exercise.destroy! }.to change(described_class, :count).from(1).to(0)
+  end
+
   it "keeps one row per exercise" do
     note.save!
 

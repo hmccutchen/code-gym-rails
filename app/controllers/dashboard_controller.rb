@@ -1,4 +1,7 @@
 class DashboardController < ApplicationController
+  include LearnerNotesGate
+  include LearnerNoteQuestions
+
   FRESHNESS_CHECK_GAP = 60.seconds
   REPLACED_NOTICE_SHOWN_FOR = 10.seconds
 
@@ -23,6 +26,7 @@ class DashboardController < ApplicationController
     return @content_state = :generating if @exercise&.regenerating?
 
     @exercise&.mark_opened!
+    load_learner_note_boxes if @exercise && learner_notes_on?
     @regeneration_failed = @exercise.present? && current_user.generation_failed_today?
     @content_state = settle_missing_set if @exercise.nil?
   end
@@ -69,6 +73,13 @@ class DashboardController < ApplicationController
 
     @level_suggestion = LevelSuggestion.for(current_user) if current_user.suggests_level_moves?
     @size_change = SizeForecast.for(current_user, @exercise)
+  end
+
+  def load_learner_note_boxes
+    note = @exercise.learner_note
+    question = NoteQuestion.text(shown_note_question(note, note_question_for(@exercise, @response)))
+    @note_box = { question: question, body: note&.body, editable: !@response.submitted? }
+    @note_box = nil unless @note_box[:editable] || note&.body.present?
   end
 
   def settle_missing_set

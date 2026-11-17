@@ -852,6 +852,19 @@ en:
     turns_used:
       one: "You've used your one message for this section — clear the conversation to keep going."
       other: "You've used all %{count} messages for this section — clear the conversation to keep going."
+  learner_questions:
+    note:
+      cleared: "You started over with the thinking partner on %{kind}. What made you start again?"
+      duck_turns: "You asked the thinking partner about %{kind}. What was unclear at first?"
+      too_hard: "You rated %{kind} too hard. Which part did you get stuck on?"
+      skipped: "You skipped %{kind}. What would you have needed to start it?"
+      hardest: "What was the hardest part of today's set?"
+  learner_notes:
+    note:
+      label: "Note for this set (optional)"
+      hint: "Optional. It saves as you type, and it can't change once you submit."
+      after_submit: "This set is submitted, so its note can't change now."
+      unavailable: "Learner notes are off for this account."
   concept_reference:
     summary: "Reference — %{concept}: how it works"
     explain_differently: "This didn't quite land — try a different explanation"
