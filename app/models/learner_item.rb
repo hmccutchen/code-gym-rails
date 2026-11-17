@@ -56,7 +56,7 @@ class LearnerItem < ApplicationRecord
     return false unless reference.is_a?(Hash) && iso_date?(reference["date"]) && EVIDENCE_SOURCES.include?(reference["source"])
 
     expected_keys = SECTIONLESS_SOURCES.include?(reference["source"]) ? %w[date source] : %w[date source section]
-    reference.keys.sort == expected_keys.sort && (!reference.key?("section") || reference["section"].is_a?(String) && reference["section"].present?)
+    reference.keys.sort == expected_keys.sort && (!reference.key?("section") || ExerciseSection.keys.include?(reference["section"]))
   end
 
   def came_up_on_holds_dates

@@ -17,6 +17,11 @@ RSpec.describe "The one open learner item per key index" do
     expect { write(term: "sti") }.to raise_error(ActiveRecord::RecordNotUnique)
   end
 
+  it "stores a term with its spaces collapsed, so a spacing variant is the same key" do
+    expect(write(term: "Single Table  Inheritance").reload.term).to eq("Single Table Inheritance")
+    expect { write(term: "single   table inheritance") }.to raise_error(ActiveRecord::RecordNotUnique)
+  end
+
   it "refuses a second open row for a key with no term" do
     write(kind: "misconception")
 

@@ -21,6 +21,15 @@ RSpec.describe LearnerItem do
     expect(refused(item(kind: "strength"))).to include(:kind)
   end
 
+  it "goes with its owner when an account is anonymized, and leaves other accounts' items" do
+    item.save!
+    other = create_user_with_key(email: "other-#{SecureRandom.hex(4)}@example.com")
+    kept = item(user: other).tap(&:save!)
+
+    expect { user.anonymize! }.to change { described_class.where(user: user).count }.from(1).to(0)
+    expect(described_class.exists?(kept.id)).to be(true)
+  end
+
   it "accepts only a concept and bucket the vocabulary knows" do
     expect(refused(item(concept: "not_a_concept"))).to include(:concept)
     expect(refused(item(bucket: "not_a_bucket"))).to include(:concept)
@@ -81,6 +90,7 @@ RSpec.describe LearnerItem do
     expect(refused(item(evidence: [ duck.merge("source" => "review") ]))).to include(:evidence)
     expect(refused(item(evidence: [ duck.merge("date" => "yesterday") ]))).to include(:evidence)
     expect(refused(item(evidence: [ duck.merge("text" => "what they said") ]))).to include(:evidence)
+    expect(refused(item(evidence: [ duck.merge("section" => "not_a_section") ]))).to include(:evidence)
     expect(refused(item(evidence: { "0" => duck }))).to include(:evidence)
   end
 
