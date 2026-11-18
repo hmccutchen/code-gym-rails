@@ -289,6 +289,35 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
   end
 
+  it "saves a learner note typed before the note's controller connected" do
+    stub_env("LEARNER_NOTES" => "1")
+    user.update!(learner_notes_enabled: true)
+    note = "Typed before the note controller connected."
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      expect(page).to have_css("#learner-note textarea")
+      url = page.current_url
+      stalled[:held] = "learner_note_controller"
+
+      page.driver.with_playwright_page do |pw|
+        goto_once_parsed(pw, url)
+        pw.evaluate(<<~JS)
+          (() => {
+            const box = document.querySelector("#learner-note textarea");
+            box.value = #{note.to_json};
+            box.dispatchEvent(new Event("input", { bubbles: true }));
+          })()
+        JS
+      end
+      stalled[:held] = nil
+
+      wait_for_js
+      wait_for { LearnerNote.find_by(user: user)&.body == note }
+      expect(page.evaluate_script("document.querySelector('#learner-note textarea').value")).to eq(note)
+    end
+  end
+
   it "counts a slider moved while the modules are still loading as pending, then saves it" do
     watch_page_errors
     visit_as(user)

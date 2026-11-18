@@ -6,6 +6,11 @@ export default class extends Controller {
 
   static values = { url: String, responseId: String, questionKey: String }
 
+  // Text typed before the module loaded fired its input event with no controller to hear it.
+  connect() {
+    if (this.inputTarget.value !== this.inputTarget.defaultValue) this.save()
+  }
+
   // The body is read when the save is sent, so a burst of typing collapses into the latest text.
   async save() {
     const result = await saveStatus.queue("learner_note", "PATCH", this.urlValue,

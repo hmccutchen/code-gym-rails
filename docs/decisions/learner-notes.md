@@ -31,7 +31,9 @@ Both are pure decision objects. They take values, read no record and make no
 provider call. The server picks, and the page holds no copy of either rule.
 
 **The stuck-point question** (`NoteQuestion`) is asked before submission in
-the note box, at most 1,000 characters, autosaved to its own endpoint. It
+the note box, at most 1,000 characters, autosaved to its own endpoint. Text
+typed before the box's script loaded is saved when the script connects, as
+the answer form does. It
 picks one question from signals the app already has, first match wins: a
 cleared duck thread, duck turns, a "too hard" rating, a skipped section, or
 none of these. It names a section kind, never a concept, because some kinds
