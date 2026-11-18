@@ -205,13 +205,17 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
     end
   end
 
-  it "keeps edits made during an in-flight save in the latest queued body" do
+  it "waits for the latest queued body when Submit flushes another edit during an in-flight save" do
     stub_env("LEARNER_NOTES" => "1")
     user = create_fake_provider_user
     user.update!(learner_notes_enabled: true)
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
+      fill_in_answer("code_review", "It queries once per row in the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
+      wait_for_answers_settled
       pause_browser_clock
       page.execute_script(<<~JS)
         const passThrough = window.fetch;
@@ -219,7 +223,6 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
         window.fetch = (url, options) => {
           if (new URL(String(url), location.href).pathname !== "/learner_note") return passThrough(url, options);
           window.__noteBodies.push(JSON.parse(options.body));
-          if (window.__noteBodies.length !== 1) return passThrough(url, options);
           return new Promise((resolve) => { window.__releaseNote = () => resolve(passThrough(url, options)); });
         };
       JS
@@ -230,13 +233,20 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       advance_browser_clock(800)
       expect(page.evaluate_script("window.CodeGymSaveStatus.queued('learner_note')")).to be(true)
       type_note("The final thought.")
-      advance_browser_clock(800)
+      page.execute_script("document.querySelector('#submit-answers').click()")
+      expect(page).to have_button(I18n.t("dashboard.exercise.submitting"), disabled: true)
+      expect(user.daily_responses.sole).not_to be_submitted
       page.driver.with_playwright_page { |pw| pw.clock.resume }
       page.execute_script("window.__releaseNote()")
-      wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+      wait_for_js_condition("window.__noteBodies.length === 2")
 
-      expect(LearnerNote.find_by(user: user)&.body).to eq("The final thought.")
+      expect(user.daily_responses.sole).not_to be_submitted
+      expect(LearnerNote.find_by(user: user)&.body).to eq("The first thought.")
       expect(page.evaluate_script("window.__noteBodies.map((body) => body.learner_note)")).to eq([ "The first thought.", "The final thought." ])
+      page.execute_script("window.__releaseNote()")
+      expect(page).to have_no_css("#gym-form")
+      expect(LearnerNote.find_by(user: user)&.body).to eq("The final thought.")
+      expect(user.daily_responses.sole).to be_submitted
     end
   end
 
@@ -313,7 +323,7 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
     end
   end
 
-  it "starts the review when Submit lands before a note save it held back" do
+  it "waits for an in-flight note before posting Submit, including a second Submit click" do
     stub_env("LEARNER_NOTES" => "1")
     user = create_fake_provider_user
     user.update!(learner_notes_enabled: true)
@@ -324,12 +334,18 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
         (() => {
           const passThrough = window.fetch;
           window.__heldNote = [];
+          window.__submits = 0;
           window.__releaseNote = () => {
             window.__noteReleased = true;
             window.__heldNote.forEach((go) => go());
           };
           window.fetch = (url, options) => {
             const pathname = new URL(String(url), location.href).pathname;
+            if (pathname === "/responses" && JSON.parse(options.body).response.submit) {
+              window.__submits++;
+              return passThrough(url, options).then((response) =>
+                new Promise((resolve) => { window.__releaseSubmit = () => resolve(response); }));
+            }
             if (pathname !== "/learner_note" || window.__noteReleased) return passThrough(url, options);
             return new Promise((resolve) => window.__heldNote.push(() => resolve(passThrough(url, options))));
           };
@@ -343,15 +359,159 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       wait_for_js_condition("window.__heldNote.length > 0")
 
       click_button I18n.t("dashboard.exercise.submit")
-      wait_for { user.daily_responses.sole.submitted? }
+      page.execute_script("document.querySelector('#gym-form').requestSubmit()")
+      expect(page).to have_button(I18n.t("dashboard.exercise.submitting"), disabled: true)
+      expect(page).to have_no_css("#leave-held", wait: 0.2)
+      expect(page.evaluate_script("window.__submits")).to eq(0)
+      expect(user.daily_responses.sole).not_to be_submitted
       page.execute_script("window.__releaseNote()")
 
+      wait_for_js_condition("window.__releaseSubmit")
+      expect(user.daily_responses.sole).to be_submitted
+      expect(page.evaluate_script("window.__submits")).to eq(1)
+      expect(LearnerNote.find_by(user: user)&.body).to eq("The loop hid the query.")
+      page.execute_script("window.__releaseSubmit()")
       expect(page).to have_no_css("#gym-form")
       expect(page).to have_no_css("#leave-held")
     end
   end
 
-  it "does not recreate a reset note when its typing timer fires from the old page" do
+  [ [ "offline", "The final thought.", FetchStubHelper::OFFLINE_REPLY ],
+    [ "server error", "", FetchStubHelper::SERVER_ERROR_REPLY ] ].each do |failure, text, reply|
+    it "retries an ordinary #{failure} only on Submit and keeps a failed retry editable" do
+      stub_env("LEARNER_NOTES" => "1")
+      user = create_fake_provider_user
+      user.update!(learner_notes_enabled: true)
+
+      travel_to(a_weekday) do
+        visit_with_todays_set(user)
+        fill_in_answer("code_review", "It queries once per row in the loop.")
+        rate_section("code_review")
+        expect_ready_to_submit
+        wait_for_answers_settled
+        type_note("The saved thought.")
+        wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+        pause_browser_clock
+        page.execute_script("window.__noteBodies = []; window.__failNote = true")
+        stub_fetch(learner_note_path, <<~JS)
+          (window.__noteBodies.push(JSON.parse(options.body).learner_note),
+            window.__failNote ? #{reply} :
+              new Promise((resolve) => { window.__releaseNote = () => resolve(passThrough(url, options)); }))
+        JS
+        type_note(text)
+        advance_browser_clock(800)
+        wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+        error = failure == "offline" ? page.evaluate_script("document.body.dataset.saveFailedText") : "nope"
+        expect(page).to have_css("#save-status", text: error)
+        advance_browser_clock(30_000)
+        expect(page.evaluate_script("window.__noteBodies")).to eq([ text ])
+
+        page.execute_script("document.querySelector('#submit-answers').click()")
+        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+        expect(page.evaluate_script("window.__noteBodies")).to eq([ text, text ])
+        expect(page).to have_css("#save-status", text: error)
+        expect(user.daily_responses.sole).not_to be_submitted
+        expect(find("#learner-note textarea").value).to eq(text)
+        expect(page.evaluate_script("document.querySelector('#learner-note textarea').closest('[inert]')")).to be_nil
+        expect(page.evaluate_script("document.querySelector('#gym-form').inert")).to be(false)
+
+        page.execute_script("window.__failNote = false; document.querySelector('#submit-answers').click()")
+        wait_for_js_condition("window.__releaseNote")
+        expect(user.daily_responses.sole).not_to be_submitted
+        expect(page.evaluate_script("window.__noteBodies")).to eq([ text, text, text ])
+        page.driver.with_playwright_page { |pw| pw.clock.resume }
+        page.execute_script("window.__releaseNote()")
+        expect(page).to have_no_css("#gym-form")
+        expect(LearnerNote.find_by(user: user)&.body).to eq(text)
+        expect(user.daily_responses.sole).to be_submitted
+        expect(page).to have_no_css("#save-status")
+      end
+    end
+  end
+
+  [ false, true ].each do |newer_edit|
+    it "unlocks Submit when the #{newer_edit ? 'latest queued' : 'in-flight'} note fails without retrying it automatically" do
+      stub_env("LEARNER_NOTES" => "1")
+      user = create_fake_provider_user
+      user.update!(learner_notes_enabled: true)
+
+      travel_to(a_weekday) do
+        visit_with_todays_set(user)
+        fill_in_answer("code_review", "It queries once per row in the loop.")
+        rate_section("code_review")
+        expect_ready_to_submit
+        wait_for_answers_settled
+        pause_browser_clock
+        page.execute_script("window.__noteBodies = []; window.__failNote = true")
+        stub_fetch(learner_note_path, <<~JS)
+          (window.__noteBodies.push(JSON.parse(options.body).learner_note),
+            new Promise((resolve) => {
+              window.__releaseNote = () => resolve(window.__failNote ? #{FetchStubHelper::SERVER_ERROR_REPLY} : passThrough(url, options));
+            }))
+        JS
+        type_note("The first thought.")
+        advance_browser_clock(800)
+        wait_for_js_condition("window.__releaseNote")
+        if newer_edit
+          type_note("The latest thought.")
+          advance_browser_clock(800)
+          expect(page.evaluate_script("window.CodeGymSaveStatus.queued('learner_note')")).to be(true)
+        end
+        page.execute_script("document.querySelector('#submit-answers').click()")
+        expect(page).to have_button(I18n.t("dashboard.exercise.submitting"), disabled: true)
+        expect(user.daily_responses.sole).not_to be_submitted
+
+        if newer_edit
+          page.execute_script("window.__failNote = false; window.__releaseNote()")
+          wait_for { LearnerNote.find_by(user: user)&.body == "The first thought." }
+          advance_browser_clock(1)
+          wait_for_js_condition("window.__noteBodies.length === 2")
+          expect(user.daily_responses.sole).not_to be_submitted
+          expect(page).to have_button(I18n.t("dashboard.exercise.submitting"), disabled: true)
+        end
+        page.execute_script("window.__failNote = true; window.__releaseNote()")
+        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+        expect(page).to have_css("#save-status", text: "nope")
+        expect(user.daily_responses.sole).not_to be_submitted
+        expect(page.evaluate_script("document.querySelector('#learner-note textarea').closest('[inert]')")).to be_nil
+        expected = newer_edit ? [ "The first thought.", "The latest thought." ] : [ "The first thought." ]
+        advance_browser_clock(30_000)
+        expect(page.evaluate_script("window.__noteBodies")).to eq(expected)
+
+        page.execute_script("window.__failNote = false; document.querySelector('#submit-answers').click()")
+        wait_for_js_condition("window.__noteBodies.length === #{expected.length + 1}")
+        page.driver.with_playwright_page { |pw| pw.clock.resume }
+        page.execute_script("window.__releaseNote()")
+        expect(page).to have_no_css("#gym-form")
+        expect(LearnerNote.find_by(user: user)&.body).to eq(expected.last)
+        expect(user.daily_responses.sole).to be_submitted
+      end
+    end
+  end
+
+  it "does not resend a successfully autosaved note after refused Submits" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      page.execute_script("window.__noteBodies = []")
+      stub_fetch(learner_note_path, "(window.__noteBodies.push(JSON.parse(options.body).learner_note), passThrough(url, options))")
+      type_note("The saved thought.")
+      wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+      2.times do
+        click_button I18n.t("dashboard.exercise.submit")
+        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+      end
+
+      expect(page.evaluate_script("window.__noteBodies")).to eq([ "The saved thought." ])
+      expect(LearnerNote.find_by(user: user)&.body).to eq("The saved thought.")
+      expect(user.daily_responses.where.not(submitted_at: nil)).to be_empty
+    end
+  end
+
+  it "keeps a timer's stale refusal for Submit to reload without retrying or posting answers" do
     stub_env("LEARNER_NOTES" => "1")
     user = create_fake_provider_user
     user.update!(learner_notes_enabled: true)
@@ -364,6 +524,8 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       visit root_path
       wait_for_js
       pause_browser_clock
+      page.execute_script("window.__noteSaves = 0")
+      stub_fetch(learner_note_path, "(window.__noteSaves++, passThrough(url, options))")
       type_note("An unsent edit to the old note.")
       response = user.daily_responses.sole
       expect(response.daily_exercise.start_over!(response_id: response.id)).to eq(:cleared)
@@ -372,6 +534,17 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       expect(page).to have_css("#save-status", text: I18n.t("flash.responses.stale_answers"))
       expect(LearnerNote.find_by(user: user)).to be_nil
       expect(user.daily_responses).to be_empty
+      page.execute_script("window.__submits = 0")
+      stub_fetch(responses_path, "(window.__submits++, passThrough(url, options))")
+      page.execute_script("window.CodeGymSaveStatus.report('other_control', 'Another change has not saved.'); document.querySelector('#submit-answers').click()")
+      page.driver.with_playwright_page { |pw| pw.clock.resume }
+      expect(page).to have_css("#leave-held")
+      expect(page.evaluate_script("window.__noteSaves")).to eq(1)
+      expect(page.evaluate_script("window.__submits")).to eq(0)
+      expect(user.daily_responses).to be_empty
+      page.execute_script("window.CodeGymSaveStatus.clear('other_control')")
+      expect(page).to have_no_css("#leave-held")
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
     end
   end
 
