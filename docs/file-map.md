@@ -217,7 +217,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/helpers/loading_form_helper.rb` — `#loading_form_data`, the one statement of how a form is wired to the `loading-form` controller, with its optional label and confirm message
 - `app/helpers/authenticator_setups_helper.rb` — the setup page's inline QR code SVG and the setup key in groups of four
 - `app/javascript/controllers/copy_text_controller.js` — the Copy buttons on the setup key and recovery codes, selecting the text instead when the clipboard is missing or refuses
-- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (`AccountDeletion` removes the user row and every row that belongs to it), plus `#learner_notes`, the Learner notes setting, written under the user row lock and turned on only for an account on its own key; `#show` builds the learner notes lists while the setting is offered or the account has rows
+- `app/controllers/accounts_controller.rb` — Account page: log out + self-service deletion (`AccountDeletion` removes the user row and every row that belongs to it), plus `#learner_notes`, which maps `User#write_learner_notes_setting!`'s outcome to a redirect; `#show` builds the learner notes lists while the setting is offered or the account has rows
 - `app/models/monthly_spend.rb` — `MonthlySpend`: decides the month's own-key total and the weekday projection, which stays hidden until the 4th in the user's zone; see `docs/code-notes/app/models/monthly_spend.md`
 - `app/helpers/usage_helper.rb` — `usage_dollars`: formats a cost as dollars, showing anything under a cent as `< $0.01`
 - `app/models/user.rb` — auth methods, `recent_performance`, `language_for_today`, `anonymize!` / `active` scope, encryption

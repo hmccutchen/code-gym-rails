@@ -46,8 +46,9 @@ class AccountsController < ApplicationController
   def learner_notes
     return head(:not_found) unless LearnerNotes.enabled?
 
-    case write_learner_notes_setting(params[:enabled] == "1")
-    when :saved          then redirect_to account_path, notice: t(learner_notes_notice)
+    case current_user.write_learner_notes_setting!(params[:enabled] == "1", offered: learner_notes_offered?)
+    when :turned_on      then redirect_to account_path, notice: t("flash.accounts.learner_notes_on")
+    when :turned_off     then redirect_to account_path, notice: t("flash.accounts.learner_notes_off")
     when :own_key_needed then redirect_to account_path, alert: t("flash.accounts.learner_notes_need_own_key")
     when :deleted        then redirect_to login_path, alert: t("flash.application.login_required")
     else raise ArgumentError, "Unhandled learner notes setting outcome"
@@ -60,24 +61,6 @@ class AccountsController < ApplicationController
     LearnerLists.new(open: LearnerItem.listed_open(current_user, today: today).to_a,
                      dismissed: LearnerItem.recently_dismissed(current_user, today: today).to_a,
                      written: LearnerNote.listed(current_user).to_a)
-  end
-
-  def learner_notes_notice
-    current_user.learner_notes_enabled? ? "flash.accounts.learner_notes_on" : "flash.accounts.learner_notes_off"
-  end
-
-  # Turning the setting off needs no key, so an account that lost its own key can still stop its notes.
-  def write_learner_notes_setting(wanted)
-    return :own_key_needed if wanted && !learner_notes_offered?
-
-    current_user.with_lock do
-      next :deleted if current_user.anonymized?
-
-      current_user.update!(learner_notes_enabled: wanted)
-      :saved
-    end
-  rescue ActiveRecord::RecordNotFound
-    :deleted
   end
 
   # A fixed name, never a URL, so the form's return_to cannot send the browser off this site.
