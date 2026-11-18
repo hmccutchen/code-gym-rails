@@ -185,7 +185,7 @@ RSpec.describe "The explain question on the submitted dashboard", type: :request
                "explain_phrasing" => "explain.first", "explanation" => "It runs one query per row.")
       saved = Nokogiri::HTML(reply["html"]).at_css("#learner-explanation")
       expect(saved.text).to include("In your own words, what does N plus one do?", "It runs one query per row.")
-      expect(saved.at_css("textarea, select, button")).to be_nil
+      expect(saved.at_css("textarea, select, button:not([hidden])")).to be_nil
     end
 
     it "stores a different pick's own section and concept" do
@@ -247,7 +247,7 @@ RSpec.describe "The explain question on the submitted dashboard", type: :request
 
       get root_path
       expect(box.text).to include("First words.")
-      expect(box.at_css("textarea, select, button")).to be_nil
+      expect(box.at_css("textarea, select, button:not([hidden])")).to be_nil
     end
 
     it "refuses before the day is submitted" do
@@ -283,7 +283,7 @@ RSpec.describe "The explain question on the submitted dashboard", type: :request
 
       expect(box.at_css(".learner-explanation-question").text).to eq("In your own words, what does N plus one do?")
       expect(box.text).to include("This question closed at the end of the day you submitted, so there is nothing to save now.")
-      expect(box.at_css("textarea, select, button")).to be_nil
+      expect(box.at_css("textarea, select, button:not([hidden])")).to be_nil
 
       save_explanation("From a tab still open.")
 

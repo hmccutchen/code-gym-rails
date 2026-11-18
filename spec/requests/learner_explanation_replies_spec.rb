@@ -86,7 +86,7 @@ RSpec.describe "The reply to an explanation", type: :request do
 
       expect(box.text).to include("Getting feedback…")
       expect(asks_on_load?).to eq("true")
-      expect(box.at_css("button")).to be_nil
+      expect(box.css("button:not([hidden])")).to be_empty
     end
 
     it "waits without asking again while another request holds the claim" do
@@ -343,6 +343,57 @@ RSpec.describe "The reply to an explanation", type: :request do
       expect(box_html.text).to include("NEW-TEXT")
       expect(response.parsed_body.to_s).not_to include("SOUND-FOR-OLD")
       expect(note.reload.explanation_reply).to be_nil
+    end
+  end
+
+  describe "the status a waiting box reads" do
+    def status(identity = shown) = get(reply_status_learner_explanation_path, params: identity)
+
+    it "answers with the reply's state, taking no claim, counting no attempt and making no call" do
+      spend_reply_attempts(1)
+      note.update!(reply_requested_at: Time.current)
+
+      status
+
+      expect(response).to have_http_status(:ok)
+      expect(reply_box.text).to include("Getting feedback…")
+      expect(reply_box.at_css("[data-learner-explanation-target~='replyPending']")).to be_present
+
+      note.update!(explanation_reply: { "sound" => "Right.", "correction" => nil }, reply_requested_at: nil)
+      status
+
+      expect(reply_box.text).to include("What was sound: Right.")
+      expect(reply_box.at_css("[data-learner-explanation-target~='replyPending']")).to be_nil
+      expect(calls).to be_empty
+      expect(reply_attempts).to eq(1)
+      expect(note.reload.reply_requested_at).to be_nil
+    end
+
+    it "is not pending on a box the page asks for itself" do
+      status
+
+      expect(reply_box.at_css("[data-learner-explanation-target~='replyPending']")).to be_nil
+      expect(calls).to be_empty
+      expect(reply_attempts).to eq(0)
+    end
+
+    it "answers with the whole box once the explanation was replaced" do
+      LearnerNote.remove!(user, note.id, :explanation)
+      LearnerNote.save_explanation!(exercise.reload, section: "code_review", text: "NEW-TEXT", expected_scope: exercise.draft_scope,
+                                                     expected_response_id: response_row.id.to_s)
+
+      status
+
+      expect(response).to have_http_status(:conflict)
+      expect(Nokogiri::HTML.fragment(response.parsed_body["box"]).text).to include("NEW-TEXT")
+    end
+
+    it "is off with the setting off" do
+      user.update!(learner_notes_enabled: false)
+
+      status
+
+      expect(response).to have_http_status(:not_found)
     end
   end
 end

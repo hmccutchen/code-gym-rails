@@ -130,7 +130,11 @@ this area.
   deleted: the page shows Try again once, and a third request is refused. A
   note deleted during the call gets the no-explanation refusal as JSON,
   never a 404 page. The box asks for the reply when a saved box that has not
-  asked yet connects. A save moves focus to the new box's heading and Try
+  asked yet connects. A box left waiting on another request's claim (rendered
+  with `replyPending`) reads `GET /learner_explanation/reply_status`, which
+  takes no claim, spends no attempt and makes no call, waiting 1 second and
+  doubling to at most 30, until the box settles or `REPLY_CLAIM_STALE_AFTER`
+  has passed, when it reveals the waiting box's hidden Try again. A save moves focus to the new box's heading and Try
   again to the new reply (`tabindex="-1"`); the reply asked for on load
   moves no focus. Results are announced only through
   `#learner-explanation-announcer`, a live region outside the markup a save

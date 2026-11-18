@@ -50,6 +50,16 @@ class LearnerExplanationsController < ApplicationController
     token.is_a?(Symbol) ? render_reply_refusal(exercise, token) : ask_for_reply(exercise, note, token)
   end
 
+  # GET /learner_explanation/reply_status
+  def reply_status
+    return render_json_error(t("learner_notes.note.unavailable"), status: :not_found) unless learner_notes_on?
+
+    exercise = current_user.daily_exercises.for_date.first
+    return render_json_error(t("learner_notes.reply.no_explanation"), status: :conflict) unless exercise
+
+    render_reply_box(exercise) { |html| render json: { status: "ok", html: html } }
+  end
+
   private
 
   def ask_for_reply(exercise, note, token)

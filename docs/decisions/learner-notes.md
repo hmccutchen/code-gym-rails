@@ -97,6 +97,15 @@ so a reply asked for one explanation never shows under another. An
 identical explanation saved again has the same stamp, and a reply to it
 fits either.
 
+A box can be rendered while another request holds the reply's claim: a
+second tab, or a reply request refused as busy. That box shows the waiting
+line and does not ask, so it reads the box's state from
+`GET /learner_explanation/reply_status`, which takes no claim, spends no
+attempt and makes no call. It waits a second, then doubles the wait up to
+30 seconds, and stops once the box shows the reply or Try again. If the
+claim's stale time passes first, it reveals the waiting box's Try again, so
+the engineer can ask once the abandoned claim has lapsed.
+
 ## Extraction
 
 `ExtractLearnerItemsJob` makes at most one call per set, with at most two

@@ -87,6 +87,7 @@ Rails.application.routes.draw do
   resource :learner_note, only: :update
   resource :learner_explanation, only: :create do
     post :reply
+    get :reply_status
   end
 
   resources :responses, only: [ :create ] do

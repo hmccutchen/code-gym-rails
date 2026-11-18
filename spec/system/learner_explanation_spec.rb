@@ -154,4 +154,24 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
       expect(page).to have_css("#learner-explanation-announcer", visible: :all, text: I18n.t("learner_notes.reply.moved"))
     end
   end
+
+  it "shows the reply once another request holding the claim stores it, without asking again" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      note = LearnerNote.find_by!(daily_exercise: explained_set(user, attempts: 0))
+      token = note.start_reply!(stamp: note.explanation_stamp)
+      visit_as(user)
+      wait_for_js
+      expect(find("#learner-explanation")["data-learner-explanation-ask-reply-value"]).to eq("false")
+      expect(page).to have_css("#learner-explanation-reply", text: I18n.t("learner_notes.reply.waiting"))
+
+      note.finish_reply!(token, ExplanationReply::Reply.new(sound: "OTHER-REQUEST-REPLY", correction: nil))
+
+      expect(page).to have_css("#learner-explanation-reply", text: "OTHER-REQUEST-REPLY")
+      expect(LearnerExtraction.for(note.daily_exercise.reload).reply_attempts).to eq(1)
+    end
+  end
 end
