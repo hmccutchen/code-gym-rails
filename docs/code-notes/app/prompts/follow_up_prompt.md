@@ -7,4 +7,10 @@ The prompt that answers a follow-up question about a reviewed section, moved out
 The engineer's own answer stays in the user turn, since a role boundary the
 user can write across is no boundary.
 
+Stored `ReviewFollowUp` turns reach `UserText.tag_history`: earlier questions
+are fenced and capped at `MAX_QUESTION_LENGTH`, while assistant replies are
+defanged without a wrapper or length cap. A provider-written engineer tag
+therefore cannot mark its words as learner evidence on the next call. The
+stored transcript is unchanged; sanitization happens when building the prompt.
+
 The review summary reads only `DailyResponse::AI_REVIEW_FIELDS`, so the grader's original prose kept under `graded_prose` never reaches it.
