@@ -5,7 +5,7 @@ class AccountsController < ApplicationController
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
-  LearnerLists = Data.define(:open, :dismissed, :written)
+  LearnerLists = Data.define(:open, :dismissed, :written, :any_rows)
 
   PAUSE_NOTICES = { paused: "flash.accounts.generation_paused", kept: "flash.accounts.generation_kept_paused" }.freeze
 
@@ -60,7 +60,8 @@ class AccountsController < ApplicationController
   def learner_lists(today)
     LearnerLists.new(open: LearnerItem.listed_open(current_user, today: today).to_a,
                      dismissed: LearnerItem.recently_dismissed(current_user, today: today).to_a,
-                     written: LearnerNote.listed(current_user).to_a)
+                     written: LearnerNote.listed(current_user).to_a,
+                     any_rows: current_user.learner_items.exists? || current_user.learner_notes.exists?)
   end
 
   # A fixed name, never a URL, so the form's return_to cannot send the browser off this site.

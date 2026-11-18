@@ -180,7 +180,11 @@ The Learner notes section shows while the setting is offered or the account
 still has rows. It lists open items with the concept, the kind in plain
 words, where each came from, the dates it came up and its expiry; a returned
 item's history as plain fact; dismissed items closed in the last 30 days; and
-each day's note and explanation. Every action runs under the user row lock.
+each day's note and explanation. Delete all shows whenever the account has
+any learner row, listed or not, so an expired item, one marked as got more
+than 30 days ago or a used one can always be deleted; the privacy page says
+what is listed and that Delete all removes everything. Every action runs
+under the user row lock.
 The page reads no `ConceptMastery`, no item leaves because a concept was
 mastered, and its fixed copy names no tier, score or level, so nothing on it
 implies a mastery tier.

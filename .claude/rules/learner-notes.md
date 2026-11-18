@@ -116,7 +116,9 @@ this area.
   carries the response it was queued for and stops when that response was
   replaced.
 - **The Account section.** Shown while the setting is offered or the account
-  has rows. Every action takes the user row lock (`LearnerItem.under_owner_lock`).
+  has rows. Delete all shows whenever the account has any learner row,
+  including rows the lists leave out (expired, used, or dismissed more than
+  30 days ago), and the privacy page says what is listed. Every action takes the user row lock (`LearnerItem.under_owner_lock`).
   "I've got this" (`LearnerItem.dismiss!`) closes an open item as `dismissed`
   with the owner's local date and refuses a closed one. Deleting a note or an
   explanation deletes every item that cited it, even one with other

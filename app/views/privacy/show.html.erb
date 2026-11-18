@@ -13,7 +13,7 @@
     <p><%= t("privacy.show.stored.kept") %></p>
     <p><%= t("privacy.show.stored.retention", duck_days: @facts[:duck_days]) %></p>
     <% if @learner_notes_shown %>
-      <p><%= t("privacy.show.stored.learner_notes", **@facts.slice(:item_lookback_days, :open_items, :note_days, :item_days)) %></p>
+      <p><%= t("privacy.show.stored.learner_notes", **@facts.slice(:item_lookback_days, :open_items, :listed_closed_days, :note_days, :item_days)) %></p>
       <p><%= t("privacy.show.stored.learner_notes_reply") %></p>
     <% end %>
     <p><%= t("privacy.show.stored.authenticator") %></p>

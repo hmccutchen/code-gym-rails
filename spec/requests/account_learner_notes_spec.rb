@@ -323,6 +323,57 @@ RSpec.describe "The Learner notes setting on the Account page", type: :request d
       expect(section.css(".learner-item-open, .learner-note-row, .learner-explanation-row")).to be_empty
     end
 
+    describe "Delete all when the page lists nothing" do
+      def delete_all_form = section&.at_css("form[action='#{all_account_learner_notes_path}']")
+
+      it "is offered to an account holding only an expired item" do
+        item(status: "expired", closed_on: today - 2, expires_on: today - 2)
+        login_as(user)
+
+        get account_path
+
+        expect(delete_all_form).to be_present
+      end
+
+      it "is offered to an account holding only an item marked as got more than 30 days ago" do
+        item(status: "dismissed", closed_on: today - 40)
+        login_as(user)
+
+        get account_path
+
+        expect(delete_all_form).to be_present
+      end
+
+      it "is offered to an account holding only a note row with no text" do
+        LearnerNote.create!(user: user, daily_exercise: set_on(today))
+        login_as(user)
+
+        get account_path
+
+        expect(delete_all_form).to be_present
+      end
+
+      it "is offered with the switch off too, and removes what the page did not list" do
+        stub_env("LEARNER_NOTES" => nil)
+        item(status: "used", closed_on: today - 3, used_on: today - 3)
+        login_as(user)
+
+        get account_path
+        expect(delete_all_form).to be_present
+
+        delete all_account_learner_notes_path
+        expect(LearnerItem.where(user: user)).to be_empty
+      end
+
+      it "is not offered to an account with no rows" do
+        login_as(user)
+
+        get account_path
+
+        expect(delete_all_form).to be_nil
+      end
+    end
+
     it "shows the section with the switch off while the account has rows, without the setting" do
       stub_env("LEARNER_NOTES" => nil)
       item

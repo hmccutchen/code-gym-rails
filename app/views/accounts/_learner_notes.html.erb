@@ -1,4 +1,4 @@
-<%# Local: lists (an AccountsController::LearnerLists of open items, recently dismissed items and written notes). %>
+<%# Local: lists (an AccountsController::LearnerLists of open items, recently dismissed items, written notes and whether any row exists). %>
 <% open_items, dismissed, written = lists.open, lists.dismissed, lists.written %>
 <section class="card" id="learner-notes">
   <h2><%= t("accounts.learner_notes.heading") %></h2>
@@ -68,7 +68,7 @@
     <% end %>
   <% end %>
 
-  <% if open_items.any? || dismissed.any? || written.any? %>
+  <% if lists.any_rows %>
     <%= button_to t("accounts.learner_notes.delete_all"), all_account_learner_notes_path, method: :delete,
           class: "btn btn-danger btn-block", form: { data: loading_form_data(confirm_message: t("accounts.learner_notes.delete_all_confirm")) } %>
   <% end %>

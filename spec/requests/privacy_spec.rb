@@ -64,13 +64,16 @@ RSpec.describe "Privacy page", type: :request do
 
     expect(PrivacyNotice.facts).to include(note_days: LearnerNote::KEPT_FOR.in_days.to_i,
                                            item_days: LearnerItem::KEPT_AFTER_CLOSE.in_days.to_i,
-                                           item_lookback_days: LearnerItem::RECENT_DAYS, open_items: LearnerItem::MAX_OPEN)
+                                           item_lookback_days: LearnerItem::RECENT_DAYS, open_items: LearnerItem::MAX_OPEN,
+                                           listed_closed_days: LearnerItem::RECENT_DAYS)
     expect(text).to include(
       "If you turn on learner notes in Account, the note you write with each set and your answer to the explain " \
       "question are stored. After you submit, one request sent with your key reads them, along with your " \
       "thinking-partner conversation and your answers for that day and your reminders from the last " \
       "#{LearnerItem::RECENT_DAYS} days, and keeps up to #{LearnerItem::MAX_OPEN} short reminders of what to practise next. " \
-      "You can read and delete all of them on your Account page. Notes are deleted automatically after " \
+      "Your Account page lists your notes and explanations, your open reminders and the ones you marked as got in the " \
+      "last #{LearnerItem::RECENT_DAYS} days, and its Delete all button deletes every note, explanation and reminder, " \
+      "including the ones it no longer lists. Notes are deleted automatically after " \
       "#{LearnerNote::KEPT_FOR.in_days.to_i} days, reminders #{LearnerItem::KEPT_AFTER_CLOSE.in_days.to_i} days after they " \
       "close, and everything is deleted with your account."
     )
