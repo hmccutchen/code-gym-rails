@@ -114,6 +114,18 @@ but `DuckThread`, `DailyExercise`, `User`, `AccountData`, which only names the t
 is the only other reader. Giving them a
 reader, or a longer window, is a new decision, not an extension of this one.
 
+**Amended for learner notes (`learner-notes.md`).** Threads now have one more
+reader, by that new decision. With learner notes on for an account,
+`ExtractLearnerItemsJob` reads the stored turns of a submitted set in one
+provider call, sent with the account's own key, to keep short reminders of
+what to practise. `duck_thread_isolation_spec` names the job as the one new
+reader of a thread's text. The dashboard also reads two counts from the
+thread, user turns and clears, to pick the note box's question and the explain
+question's default concept; it sits outside the folders that spec scans, so
+it is named here. The cleared count, which nothing read before, is one of
+those signals. Planning, mastery, review and the judges still never read a
+thread, and the window stays 365 days.
+
 **User-facing text.** The app has no privacy page. The account page's danger
 zone says deleting the account removes everything in it, which threads are
 part of. Nothing tells someone that

@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/models/learner_item/merge.md
 class LearnerItem::Merge
   Result = Data.define(:written, :absorbed, :dropped)
 

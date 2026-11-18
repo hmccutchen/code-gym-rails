@@ -1,5 +1,16 @@
 # Personalization loop
 
+**One stated exception: learner notes (`learner-notes.md`).** Adaptation
+otherwise requires submitted, validly assessed answers. Learner items are
+written from submitted work before any grade exists: the day's answers, duck
+turns, note and explanation. The exception is bounded by what an item may
+do once the generation stage reads it: nominate a concept for a free host
+slot, aim one problem at a stated misunderstanding, and define terms the
+engineer asked about. It never changes difficulty. Items never reach
+`ConceptMastery`, `KindDifficulty`, `CompetencyGate`, `DaySize`, level
+suggestions or `User#recent_performance`, and a concept mastery already eases
+is eased at ingest as before, with no easing of the notes' own.
+
 Protected-practice enrollment adds per-kind requests and within-capacity
 opportunities as described in `protected-practice-opportunities.md`.
 Existing response receipts retain v1 behavior; new enrolled responses use

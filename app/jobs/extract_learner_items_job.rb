@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/jobs/extract_learner_items_job.md
 class ExtractLearnerItemsJob < ApplicationJob
   queue_as :provider_calls
 

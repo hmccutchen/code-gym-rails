@@ -4,8 +4,10 @@ paths:
   - "app/models/{learner_note,learner_item,learner_items_reply,explanation_reply,note_question,explain_question}.rb"
   - "app/models/learner_item/merge.rb"
   - "app/clients/learner_notes.rb"
-  - "app/jobs/extract_learner_items_job.rb"
-  - "app/controllers/{learner_notes,learner_explanations}_controller.rb"
+  - "app/jobs/{extract_learner_items,sweep_learner_notes}_job.rb"
+  - "app/controllers/{learner_notes,learner_explanations,account_learner_items,account_learner_notes}_controller.rb"
+  - "app/views/accounts/_learner_notes.html.erb"
+  - "app/helpers/learner_notes_helper.rb"
   - "app/controllers/concerns/{learner_notes_gate,learner_note_questions}.rb"
   - "app/views/shared/{_learner_note,_learner_explanation,_learner_explanation_reply}.html.erb"
   - "app/javascript/controllers/{learner_note,learner_explanation}_controller.js"
@@ -14,7 +16,9 @@ paths:
 
 # Learner notes
 
-Each entry states what a change must not break.
+Each entry states what a change must not break. The full decision, with its
+reasoning, is `docs/decisions/learner-notes.md`; read it before changing
+this area.
 
 - **Off by default.** Nothing here runs unless `LearnerNotes.enabled?`
   (`LEARNER_NOTES` exactly `"1"`) and the account's
@@ -85,3 +89,27 @@ Each entry states what a change must not break.
   and stores the parsed reply only while its claim holds. Two attempts at
   most: the page shows Try again once, and a third request is refused. The
   box asks for the reply when a saved box that has not asked yet connects.
+- **A replaced set starts with no note.** Regenerating a set
+  (`PracticeGeneration#commit_replacement`) and Start over
+  (`DailyExercise#start_over!`) delete the day's note row in the same
+  transaction as their own change, through `LearnerNote.forget_set!`, which
+  removes that date's `note` and `explanation` evidence and deletes an item
+  left with none. The note and explanation saves post the page's draft scope
+  and a replaced set refuses them with the refresh text. An extraction run
+  carries the response it was queued for and stops when that response was
+  replaced.
+- **The Account section.** Shown while the setting is offered or the account
+  has rows. Every action takes the user row lock (`LearnerItem.under_owner_lock`).
+  "I've got this" (`LearnerItem.dismiss!`) closes an open item as `dismissed`
+  with the owner's local date and refuses a closed one. Deleting a note or an
+  explanation removes that date's matching evidence and any item left with
+  none; a row a request already read stays as an empty marker so the set is
+  never read again. Deleting keeps no record. The page reads no
+  `ConceptMastery`, and its fixed copy names no tier, score or level.
+- **Retention.** `SweepLearnerNotesJob` (daily, `default`) deletes notes past
+  `LearnerNote::KEPT_FOR` by their set's date and closed items past
+  `LearnerItem::KEPT_AFTER_CLOSE` after `closed_on`. The privacy page reads
+  both, the look-back window and the open-item limit from
+  `PrivacyNotice.facts`, so a change to one changes the page.
+- **Duck turns in the extraction prompt** pass through `UserText.defanged`,
+  so a duck reply carrying engineer tags never reads as the engineer's words.

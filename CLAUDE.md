@@ -272,6 +272,13 @@ rather than only catching it afterward:
     delete them, so the trial, level-suggestion and duck-thread isolation
     specs allow it; `user_data_coverage_spec` lets only `AccountDeletion`
     use it.
+  - Among models, services, jobs, prompts and clients, only the learner
+    notes models, the extraction and sweep jobs, `DailyExercise`, `User`,
+    `AccountData` and `PrivacyNotice` name `LearnerNote` or `LearnerItem`;
+    the extraction prompt and its reply boundary read only `LearnerItem`'s
+    limits. Generation, review, both judges, `ConceptMastery` and
+    `KindDifficulty` never read them, and the explanation's reply never
+    reaches extraction or generation (`learner_notes_isolation_spec`).
   - `SectionKindGuide` and `ConceptBookSources` never reach a provider prompt.
   - `#assess_difficulty` is handed no response or history, and
     `#explain_concept_differently`, `#generate_concept_reference`,

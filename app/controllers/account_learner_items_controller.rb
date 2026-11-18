@@ -1,3 +1,4 @@
+# Design notes: docs/code-notes/app/controllers/account_learner_items_controller.md
 class AccountLearnerItemsController < ApplicationController
   skip_before_action :require_provider
 
