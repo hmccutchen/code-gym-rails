@@ -32,7 +32,7 @@ RSpec.describe "PATCH /learner_note", type: :request do
     save_note("I couldn't see where the query ran.")
 
     expect(response).to have_http_status(:ok)
-    expect(reply).to eq("status" => "ok", "question" => "What was the hardest part of today's set?")
+    expect(reply).to eq("status" => "ok", "question" => "What was the hardest part of today's set?", "question_key" => "hardest")
     expect(note.body).to eq("I couldn't see where the query ran.")
     expect(note.user).to eq(user)
   end
@@ -63,6 +63,39 @@ RSpec.describe "PATCH /learner_note", type: :request do
 
     expect(note.question_key).to eq("duck_turns:pattern")
     expect(reply["question"]).to eq("You asked the thinking partner about Pattern of the Month. What was unclear at first?")
+  end
+
+  describe "the question the page showed" do
+    def shown_box = Nokogiri::HTML(response.body).at_css("#learner-note")
+
+    it "is rendered on the box as its key, and stored even after a duck turn between render and first save" do
+      exercise = create_exercise_for(user)
+      login_as(user)
+      get root_path
+      expect(shown_box.at_css("[data-learner-note-target=question]").text).to eq("What was the hardest part of today's set?")
+      expect(shown_box["data-learner-note-question-key-value"]).to eq("hardest")
+
+      DuckThread.append!(exercise, "pattern", message: "q", answer: "a", expected_version: 0, expected_scope: exercise.draft_scope)
+      patch learner_note_path, params: { learner_note: "The loop confused me.", draft_scope: exercise.draft_scope,
+                                         question_key: "hardest" }, as: :json
+
+      expect(note.question_key).to eq("hardest")
+      expect(reply).to include("question" => "What was the hardest part of today's set?", "question_key" => "hardest")
+    end
+
+    it "falls back to the server's pick for a key that is not a real question or names a section the set lacks" do
+      exercise = create_exercise_for(user)
+      DuckThread.append!(exercise, "pattern", message: "q", answer: "a", expected_version: 0, expected_scope: exercise.draft_scope)
+      login_as(user)
+
+      patch learner_note_path, params: { learner_note: "Lost.", draft_scope: exercise.draft_scope, question_key: "made_up" }, as: :json
+      expect(note.question_key).to eq("duck_turns:pattern")
+
+      note.update!(question_key: nil)
+      patch learner_note_path, params: { learner_note: "Lost.", draft_scope: exercise.draft_scope,
+                                         question_key: "duck_turns:security_review" }, as: :json
+      expect(note.question_key).to eq("duck_turns:pattern")
+    end
   end
 
   it "keeps at most 1,000 characters" do

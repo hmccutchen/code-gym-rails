@@ -18,6 +18,22 @@ RSpec.describe LearnerDay do
     end
   end
 
+  describe ".shown_note_question" do
+    it "takes a posted key that names a real question about one of the day's sections" do
+      expect(described_class.shown_note_question(day, posted: "duck_turns:pattern"))
+        .to eq(NoteQuestion::Pick.new(rule: "duck_turns", section: "pattern"))
+      expect(described_class.shown_note_question(day, posted: NoteQuestion::NO_SIGNAL))
+        .to eq(NoteQuestion::Pick.new(rule: NoteQuestion::NO_SIGNAL, section: nil))
+    end
+
+    it "refuses a made-up key, an unknown section and a section the day lacks" do
+      expect(described_class.shown_note_question(day, posted: "made_up")).to be_nil
+      expect(described_class.shown_note_question(day, posted: "duck_turns:nope")).to be_nil
+      expect(described_class.shown_note_question(day, posted: "too_hard:security_review")).to be_nil
+      expect(described_class.shown_note_question(day, posted: "")).to be_nil
+    end
+  end
+
   describe ".note_question" do
     it "follows the first signal, in NoteQuestion's order" do
       expect(described_class.note_question(day(duck_turns: { "pattern" => 2 }, too_hard: %w[code_review])))

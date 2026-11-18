@@ -11,6 +11,12 @@ module LearnerDay
                                                     skipped: passed_over(day))
   end
 
+  # The page posts the key it showed, so the note keeps that question even after a later signal would pick another.
+  def self.shown_note_question(day, posted:)
+    pick = NoteQuestion.parse(posted)
+    pick if pick && (pick.section.nil? || day.sections.include?(pick.section))
+  end
+
   # Fold state is never stored, so a section counts as skipped only once a later one is answered.
   def self.passed_over(day)
     last_answered = day.sections.rindex { |section| day.answered.include?(section) }

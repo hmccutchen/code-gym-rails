@@ -37,7 +37,11 @@ cleared duck thread, duck turns, a "too hard" rating, a skipped section, or
 none of these. It names a section kind, never a concept, because some kinds
 hide their concept until submission. The pick is stored with the note on its
 first non-blank save and stays fixed, so extraction sees the question the
-answer was written to. The note is read-only once the day is submitted.
+answer was written to. The page renders the question's key on the box and
+posts it with each save, and the server stores that key when it names a real
+question about one of the set's sections (`LearnerDay.shown_note_question`),
+so a duck turn between the page load and the first save cannot swap the
+question the note answers. Any other key falls back to the server's pick. The note is read-only once the day is submitted.
 
 **The explain question** (`ExplainQuestion`) is offered on every submitted day
 with a usable concept tag, whether or not the engineer used the duck or rated

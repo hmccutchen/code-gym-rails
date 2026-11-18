@@ -19,3 +19,11 @@ nothing after it answered, reads as not yet reached.
 
 `POST /learner_explanation` logs whether the saved section was the default.
 It asks `.default_section` for that, which builds no box.
+
+## The question the page showed
+
+`.shown_note_question` checks a key the note box posted: a real
+`NoteQuestion` key whose section, if any, is one of the day's. The note
+stores that key on its first non-blank save, so the note keeps the question
+the engineer read, even when a duck turn since the page loaded would make
+`.note_question` pick another.

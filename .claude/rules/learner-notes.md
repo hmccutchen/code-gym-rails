@@ -38,7 +38,9 @@ this area.
   `NoteQuestion` and `ExplainQuestion`) derives the sections passed over,
   the note question, the explain default and the explain box from values
   `LearnerNoteQuestions` reads once a request; a controller only picks a
-  status and a partial.
+  status and a partial. The note box posts the question key it shows, and
+  the first non-blank save stores it when `LearnerDay.shown_note_question`
+  accepts it, else the server's pick.
 - **The extraction prompt is pure.** `LearnerItemsPrompt` takes values the
   job built: each active section through `SectionContext.render` (no answer
   key), the answer cut to 2,000 characters, the duck turns cut to 1,000 each,
