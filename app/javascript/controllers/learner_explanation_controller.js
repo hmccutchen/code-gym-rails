@@ -5,7 +5,7 @@ export default class extends Controller {
   static targets = ["question", "section", "input", "save", "status", "reply", "replyStatus", "replyFocus"]
 
   static values = { url: String, draftScope: String, responseId: String, failedText: String, savedText: String, replyUrl: String,
-                    askReply: Boolean, waitingText: String, replyFailedText: String }
+                    askReply: Boolean, waitingText: String, replyFailedText: String, noteId: String, explanationStamp: String }
 
   connect() {
     if (this.askReplyValue) this.askReply()
@@ -38,7 +38,12 @@ export default class extends Controller {
     const retry = this.replyTarget.querySelector("button")
     retry?.setAttribute("disabled", "")
     if (this.hasReplyStatusTarget) this.replyStatusTarget.textContent = this.waitingTextValue
-    const result = await request.send("POST", this.replyUrlValue, {}, { fallback: this.replyFailedTextValue })
+    const result = await request.send("POST", this.replyUrlValue,
+      { note_id: this.noteIdValue, explanation_stamp: this.explanationStampValue }, { fallback: this.replyFailedTextValue })
+    if (result.data?.box) {
+      this.replaceBox(result.data.box, result.message, event)
+      return
+    }
     if (result.data?.html) {
       this.replyTarget.outerHTML = result.data.html
       if (!result.ok && this.hasReplyStatusTarget) this.replyStatusTarget.textContent = result.message
@@ -49,6 +54,13 @@ export default class extends Controller {
     retry?.removeAttribute("disabled")
     const message = result.message || this.replyFailedTextValue
     if (this.hasReplyStatusTarget) this.replyStatusTarget.textContent = message
+    this.announce(message)
+  }
+
+  // The explanation this box showed was replaced, so the server sends the whole box as it is now.
+  replaceBox(html, message, event) {
+    this.element.outerHTML = html
+    if (event) document.getElementById("learner-explanation-heading")?.focus()
     this.announce(message)
   }
 

@@ -1,7 +1,7 @@
 # Design notes: docs/code-notes/app/models/learner_day.md
 module LearnerDay
   Signals = Data.define(:sections, :duck_turns, :cleared, :too_hard, :answered)
-  ExplainBox = Data.define(:state, :question, :choices, :default_section, :text, :reply)
+  ExplainBox = Data.define(:state, :question, :choices, :default_section, :text, :reply, :note_id, :stamp)
   ReplyView = Data.define(:state, :sound, :correction, :ask)
   ExplainChoice = Data.define(:section, :concept, :question)
 
@@ -35,12 +35,12 @@ module LearnerDay
     choices = options.map { |option| choice(option, history) }
     default = default_option(day, options, history.recent).section
     ExplainBox.new(state: closed ? :closed : :open, question: choices.find { |held| held.section == default }.question,
-                   choices: choices, default_section: default, text: nil, reply: nil)
+                   choices: choices, default_section: default, text: nil, reply: nil, note_id: nil, stamp: nil)
   end
 
-  def self.saved_box(section:, concept:, phrasing:, text:, reply:)
+  def self.saved_box(section:, concept:, phrasing:, text:, reply:, note_id:, stamp:)
     ExplainBox.new(state: :saved, question: ExplainQuestion.text(phrasing, concept), choices: [], default_section: section,
-                   text: text, reply: reply)
+                   text: text, reply: reply, note_id: note_id, stamp: stamp)
   end
 
   def self.signalled(counts) = counts.select { |_, count| count.positive? }.keys

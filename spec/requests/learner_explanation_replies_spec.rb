@@ -31,7 +31,9 @@ RSpec.describe "The reply to an explanation", type: :request do
                         explain_concept: "n_plus_one", explain_phrasing: "explain.first", explanation: "One query per row.")
   end
 
-  def ask = post(reply_learner_explanation_path, as: :json)
+  let(:shown) { { note_id: note.id, explanation_stamp: note.explanation_stamp } }
+
+  def ask(identity = shown) = post(reply_learner_explanation_path, params: identity, as: :json)
   def failure_text(error)
     ProviderFailureText.new(ProviderFailure.classify(error), provider: user.provider, surface: :explanation_reply,
                             failed_at: Time.current, zone: user.effective_time_zone, variant: ProviderFailureText.variant_for(user))
@@ -270,6 +272,77 @@ RSpec.describe "The reply to an explanation", type: :request do
       ask
 
       expect(reply_attempts).to eq(1)
+    end
+  end
+
+  describe "a page showing an explanation that has since been replaced" do
+    def page_identity
+      get root_path
+      box = Nokogiri::HTML(response.body).at_css("#learner-explanation")
+      { note_id: box["data-learner-explanation-note-id-value"], explanation_stamp: box["data-learner-explanation-explanation-stamp-value"] }
+    end
+
+    def save_new_explanation(text = "NEW-TEXT")
+      LearnerNote.save_explanation!(exercise.reload, section: "code_review", text: text, expected_scope: exercise.draft_scope,
+                                                     expected_response_id: response_row.id.to_s)
+    end
+
+    def box_html = Nokogiri::HTML.fragment(response.parsed_body["box"].to_s)
+
+    it "renders the note and its explanation's stamp on the saved box" do
+      expect(page_identity).to eq(note_id: note.id.to_s, explanation_stamp: note.explanation_stamp)
+      expect(note.explanation_stamp).to be_present
+    end
+
+    it "refuses an old tab once the explanation was deleted and another saved in a new row, with the current box and no attempt spent" do
+      old_tab = page_identity
+      LearnerNote.remove!(user, note.id, :note)
+      LearnerNote.remove!(user, note.id, :explanation)
+      expect(save_new_explanation).to be_a(LearnerNote)
+
+      ask(old_tab)
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["error"]).to eq(I18n.t("learner_notes.reply.moved"))
+      expect(box_html.text).to include("NEW-TEXT")
+      expect(calls).to be_empty
+      expect(reply_attempts).to eq(0)
+    end
+
+    it "refuses an old tab once the same row holds a different explanation" do
+      old_tab = page_identity
+      LearnerNote.remove!(user, note.id, :explanation)
+      expect(save_new_explanation.id).to eq(note.id)
+
+      ask(old_tab)
+
+      expect(response).to have_http_status(:conflict)
+      expect(box_html.text).to include("NEW-TEXT")
+      expect(calls).to be_empty
+      expect(reply_attempts).to eq(0)
+    end
+
+    it "refuses a request that names no explanation" do
+      ask({})
+
+      expect(response).to have_http_status(:conflict)
+      expect(calls).to be_empty
+    end
+
+    it "answers with the current box, not the reply, when the explanation is replaced during the call" do
+      allow_any_instance_of(AiService).to receive(:explanation_reply) do
+        LearnerNote.remove!(user, note.id, :explanation)
+        save_new_explanation
+        ExplanationReply::Reply.new(sound: "SOUND-FOR-OLD", correction: nil)
+      end
+
+      ask
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["error"]).to eq(I18n.t("learner_notes.reply.moved"))
+      expect(box_html.text).to include("NEW-TEXT")
+      expect(response.parsed_body.to_s).not_to include("SOUND-FOR-OLD")
+      expect(note.reload.explanation_reply).to be_nil
     end
   end
 end

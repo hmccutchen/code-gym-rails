@@ -132,4 +132,26 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
       expect(page).to have_button("Try again", disabled: false)
     end
   end
+
+  it "shows the box as it is now when Try again names an explanation replaced since the page loaded" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      exercise = explained_set(user, attempts: 1)
+      visit_as(user)
+      wait_for_js
+      note = LearnerNote.find_by(user: user)
+      LearnerNote.remove!(user, note.id, :explanation)
+      LearnerNote.save_explanation!(exercise.reload, section: "code_review", text: "A newer explanation.",
+                                                     expected_scope: exercise.draft_scope, expected_response_id: exercise.daily_response.id.to_s)
+
+      click_button "Try again"
+
+      expect(page).to have_css("#learner-explanation", text: "A newer explanation.")
+      expect(page).to have_no_css("#learner-explanation", text: "One query per row.")
+      expect(page).to have_css("#learner-explanation-announcer", visible: :all, text: I18n.t("learner_notes.reply.moved"))
+    end
+  end
 end

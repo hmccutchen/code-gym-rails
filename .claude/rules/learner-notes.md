@@ -123,7 +123,10 @@ this area.
   `failure` kind beside the box's html. Under the exercise and note row locks it takes the
   `reply_requested_at` claim and counts the attempt on the set's ledger,
   calls outside the locks, and stores the parsed reply only while its claim
-  holds. Two attempts at most per set, kept even when the explanation is
+  holds. The saved box carries the note id and `LearnerNote#explanation_stamp`,
+  and the request posts them back; a pair that no longer matches gets a 409
+  with the whole box as it is now, checked before the claim (no attempt
+  spent) and again after the call. Two attempts at most per set, kept even when the explanation is
   deleted: the page shows Try again once, and a third request is refused. A
   note deleted during the call gets the no-explanation refusal as JSON,
   never a 404 page. The box asks for the reply when a saved box that has not

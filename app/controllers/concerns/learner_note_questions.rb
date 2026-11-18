@@ -23,7 +23,7 @@ module LearnerNoteQuestions
 
   def saved_explain_box(note, ledger)
     LearnerDay.saved_box(section: note.explain_section, concept: note.explain_concept, phrasing: note.explain_phrasing,
-                         text: note.explanation, reply: reply_view(note, ledger))
+                         text: note.explanation, reply: reply_view(note, ledger), note_id: note.id, stamp: note.explanation_stamp)
   end
 
   def reply_view(note, ledger)

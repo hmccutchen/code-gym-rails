@@ -86,6 +86,17 @@ on its own `explanation_reply` surface, which says the feedback did not come
 back and that the explanation is saved, with the failure's kind in the
 reply so the page knows which it was.
 
+A page names the explanation it shows: the saved box carries the note's id
+and a stamp of the explanation (a short hash of its section, concept,
+phrasing and text), and a reply request posts both back. The explanation can
+be deleted and another saved from a second tab or the Account page, on the
+same row or a new one, so a request whose id or stamp no longer matches is
+refused with a conflict and the whole box as it is now, before it takes a
+claim or spends an attempt. The answer after the call checks the same pair,
+so a reply asked for one explanation never shows under another. An
+identical explanation saved again has the same stamp, and a reply to it
+fits either.
+
 ## Extraction
 
 `ExtractLearnerItemsJob` makes at most one call per set, with at most two

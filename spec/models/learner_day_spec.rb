@@ -87,10 +87,10 @@ RSpec.describe LearnerDay do
       reply = described_class::ReplyView.new(state: :waiting, sound: nil, correction: nil, ask: true)
 
       box = described_class.saved_box(section: "code_review", concept: "n_plus_one", phrasing: "explain.second",
-                                      text: "One query per row.", reply: reply)
+                                      text: "One query per row.", reply: reply, note_id: 7, stamp: "abc")
 
       expect(box).to have_attributes(state: :saved, choices: [], default_section: "code_review", text: "One query per row.",
-                                     reply: reply, question: ExplainQuestion.text("explain.second", "n_plus_one"))
+                                     reply: reply, note_id: 7, stamp: "abc", question: ExplainQuestion.text("explain.second", "n_plus_one"))
     end
   end
 end

@@ -903,6 +903,7 @@ en:
       failed: "No feedback this time. Your explanation is saved."
       try_again: "Try again"
       no_explanation: "Save an explanation before asking for feedback on it."
+      moved: "Your explanation changed since this page loaded, so this box now shows the current one."
   concept_reference:
     summary: "Reference — %{concept}: how it works"
     explain_differently: "This didn't quite land — try a different explanation"

@@ -44,8 +44,9 @@ class LearnerExplanationsController < ApplicationController
     exercise = current_user.daily_exercises.for_date.first
     note = exercise && LearnerNote.find_by(daily_exercise: exercise)
     return render_json_error(t("learner_notes.reply.no_explanation"), status: :unprocessable_content) if note&.explanation.blank?
+    return render_moved(exercise) unless note.shows_explanation?(**shown_explanation)
 
-    token = note.start_reply!
+    token = note.start_reply!(stamp: shown_explanation[:stamp])
     token.is_a?(Symbol) ? render_reply_refusal(exercise, token) : ask_for_reply(exercise, note, token)
   end
 
@@ -78,14 +79,22 @@ class LearnerExplanationsController < ApplicationController
     end
   end
 
-  # The note is read again, since the Account page or Start over can delete it while the call is out.
+  # The note is read again, since the Account page or Start over can delete or replace it while the call is out.
   def render_reply_box(exercise)
     note = LearnerNote.find_by(daily_exercise_id: exercise.id)
     fresh = DailyExercise.find_by(id: exercise.id)
     return render_json_error(t("learner_notes.reply.no_explanation"), status: :conflict) if note&.explanation.blank? || fresh.nil?
+    return render_moved(fresh) unless note.shows_explanation?(**shown_explanation)
 
     yield render_to_string(partial: "shared/learner_explanation_reply", formats: [ :html ],
                            locals: { reply: reply_view(note, LearnerExtraction.for(fresh)) })
+  end
+
+  def shown_explanation = { note_id: params[:note_id].to_s, stamp: params[:explanation_stamp].to_s }
+
+  def render_moved(exercise)
+    render_json_error(t("learner_notes.reply.moved"), status: :conflict,
+                                                      box: box_html(exercise, learner_day(exercise, exercise.daily_response)))
   end
 
   def text_refusal(text)

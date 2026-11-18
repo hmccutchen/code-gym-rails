@@ -149,6 +149,12 @@ class LearnerNote < ApplicationRecord
 
   def reply = ExplanationReply.from_stored(explanation_reply)
 
+  def explanation_stamp
+    Digest::SHA256.hexdigest([ explain_section, explain_concept, explain_phrasing, explanation ].to_json).first(16) if explanation.present?
+  end
+
+  def shows_explanation?(note_id:, stamp:) = id.to_s == note_id.to_s && explanation_stamp.present? && explanation_stamp == stamp.to_s
+
   def reply_state(attempts)
     return :replied if reply
     return :waiting if reply? || attempts.zero?
@@ -158,11 +164,12 @@ class LearnerNote < ApplicationRecord
 
   def reply_askable?(attempts) = reply_state(attempts) == :waiting && !reply?
 
-  # Returns the claim's token, or :replied, :busy, :exhausted or :gone; the set counts the attempt with the claim.
-  def start_reply!
+  # Returns the claim's token, or :replied, :busy, :exhausted, :moved or :gone; the set counts the attempt with the claim.
+  def start_reply!(stamp:)
     LearnerExtraction.count_reply_attempt!(daily_exercise) do |spent|
       note = self.class.lock.find_by(id: id)
       next :gone if note&.explanation.blank?
+      next :moved unless note.explanation_stamp == stamp.to_s
       next :replied if note.reply
       next :busy if note.reply?
       next :exhausted if spent
