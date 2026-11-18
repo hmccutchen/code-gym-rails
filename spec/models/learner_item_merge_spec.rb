@@ -23,7 +23,9 @@ RSpec.describe LearnerItem, ".merge!" do
                             created_at: created_on.to_time, **attrs)
   end
 
-  def merge(*items, date: set_date) = described_class.merge!(user, items, set_date: date)
+  let(:all_sources) { -> { LearnerItem::EVIDENCE_SOURCES } }
+
+  def merge(*items, date: set_date, still_there: all_sources) = described_class.merge!(user, items, set_date: date, still_there: still_there)
 
   def concepts = %w[n_plus_one memoization service_objects scope_chaining transaction_safety caching]
 
@@ -72,7 +74,8 @@ RSpec.describe LearnerItem, ".merge!" do
       [ other.id, 999_999 ].each do |id|
         raw = { "items" => [ { "id" => id, "concept" => "n_plus_one", "bucket" => "ruby_rails", "kind" => "misconception",
                                "label" => "Reworded.", "evidence" => [ { "source" => "duck", "section" => "code_review" } ] } ] }
-        described_class.merge!(user, LearnerItemsReply.parse(raw, day: day, buckets: %w[ruby_rails]).items, set_date: set_date)
+        described_class.merge!(user, LearnerItemsReply.parse(raw, day: day, buckets: %w[ruby_rails]).items, set_date: set_date,
+                                     still_there: all_sources)
       end
 
       expect(other.reload.attributes).to eq(before)
@@ -228,7 +231,45 @@ RSpec.describe LearnerItem, ".merge!" do
       items = [ reply_item ]
       User.where(id: user.id).delete_all
 
-      expect(described_class.merge!(user, items, set_date: set_date)).to eq(:deleted)
+      expect(described_class.merge!(user, items, set_date: set_date, still_there: all_sources)).to eq(:deleted)
+    end
+  end
+
+  describe "evidence deleted while the call was out" do
+    let(:note_gone) { -> { %w[duck answer explanation] } }
+
+    it "writes no item that cited a note deleted meanwhile, even one with other evidence" do
+      result = merge(reply_item(evidence: [ reference(source: "duck"), { "date" => set_date.iso8601, "source" => "note" } ]),
+                     reply_item(concept: "memoization", evidence: [ reference(source: "answer") ]),
+                     still_there: note_gone)
+
+      expect(described_class.pluck(:concept)).to eq([ "memoization" ])
+      expect(result).to have_attributes(written: 1, dropped: { evidence_deleted: 1 })
+    end
+
+    it "lets no open item absorb a repeat citing a deleted explanation" do
+      open_item = stored
+      merge(reply_item(evidence: [ reference(source: "explanation") ]), still_there: -> { %w[duck answer note] })
+
+      expect(open_item.reload.evidence).to eq([ reference(set_date - 3) ])
+    end
+
+    it "writes nothing once the set is no longer the one read" do
+      stored(concept: "memoization", kind: "concept")
+
+      result = merge(reply_item, reply_item(concept: "caching", kind: "concept"), still_there: -> { })
+
+      expect(described_class.pluck(:concept)).to eq([ "memoization" ])
+      expect(result).to have_attributes(written: 0, absorbed: 0, dropped: { set_replaced: 2 })
+    end
+
+    it "asks what is still there after it takes the user row lock" do
+      order = []
+      allow(User).to receive(:lock).and_wrap_original { |original, *args| (order << :user_lock) && original.call(*args) }
+
+      merge(reply_item, still_there: -> { (order << :check) && LearnerItem::EVIDENCE_SOURCES })
+
+      expect(order).to eq(%i[user_lock check])
     end
   end
 end
@@ -259,7 +300,8 @@ RSpec.describe LearnerItem, ".merge! under concurrency", type: :model do
     batches.map { |concepts|
       Thread.new do
         ActiveRecord::Base.connection_pool.with_connection do
-          LearnerItem.merge!(user, concepts.map { |concept| reply_item(concept) }, set_date: Date.current)
+          LearnerItem.merge!(user, concepts.map { |concept| reply_item(concept) }, set_date: Date.current,
+                                                                                   still_there: -> { LearnerItem::EVIDENCE_SOURCES })
         end
       end
     }.each(&:join)

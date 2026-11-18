@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/prompts/{learner_items_prompt,explanation_reply_prompt}.rb"
-  - "app/models/{learner_note,learner_item,learner_items_reply,explanation_reply,note_question,explain_question}.rb"
+  - "app/models/{learner_note,learner_item,learner_items_reply,explanation_reply,note_question,explain_question,learner_extraction}.rb"
   - "app/models/learner_item/merge.rb"
   - "app/clients/learner_notes.rb"
   - "app/jobs/{extract_learner_items,sweep_learner_notes}_job.rb"
@@ -68,15 +68,22 @@ this area.
   triggers: the fallback, scheduled at submit for the later of local
   midnight and an hour after, and one early run, after the explanation's
   save or at submit on a day with no explain question. Each run takes an
-  `AdvisoryLock` claim on the set and re-reads the note row inside
-  `uncached`; a fallback that finds the claim held queues itself again. The
-  four no-call checks run in order (the switch or setting off, no key in
-  use, `KeyHold.holds?`, nothing to read) and each closes the set with no
-  attempt counted. `extract_attempts` is saved before the call leaves, so a
-  worker that dies mid-call has spent it. An early run calls only at zero
-  attempts and closes the set only on success; the fallback calls below two
-  and closes the set before its call leaves. An extraction failure never
-  touches `generation_account_failures`. Its log line carries counts only.
+  `AdvisoryLock` claim on the set and re-reads the set's ledger and the note
+  row inside `uncached`; a fallback that finds the claim held queues itself
+  again. The ledger is `LearnerExtraction`: text-free counts in
+  `plan_notes["learner_extraction"]` on the `DailyExercise`, written under
+  the user share lock and the exercise row lock, merging only that key. The
+  job never creates a note row. The no-call checks run in order (learner
+  notes off for the account, `KeyHold.holds?`, nothing to read) and each
+  closes the set with no attempt counted. The attempt is saved before the
+  call leaves, so a worker that dies mid-call has spent it. An early run
+  calls only at zero attempts and closes the set only on success; the
+  fallback calls below two and closes the set before its call leaves. The
+  merge takes a `still_there:` check from the job, called under the user row
+  lock, and writes no item citing a note or explanation deleted during the
+  call, and nothing once the set was replaced. A set or account deleted
+  mid-call is logged, never raised. An extraction failure never touches
+  `generation_account_failures`. Its log line carries counts only.
 - **The reply to an explanation.** `ExplanationReplyPrompt` takes only the
   concept's name, the question's phrasing and the explanation: no review
   text, answer key, answer, duck turn, note, item, other day or
@@ -90,17 +97,21 @@ this area.
   `POST /learner_explanation/reply` sits behind `ProviderCallLimits`, like
   the duck, and makes no call with the switch or setting off or without the
   account's own key; the key hold does not stop it, and a failure never
-  counts toward the hold. Under the note's row lock it takes the
-  `reply_requested_at` claim and counts the attempt, calls outside the lock,
-  and stores the parsed reply only while its claim holds. Two attempts at
-  most: the page shows Try again once, and a third request is refused. The
-  box asks for the reply when a saved box that has not asked yet connects.
+  counts toward the hold. Under the exercise and note row locks it takes the
+  `reply_requested_at` claim and counts the attempt on the set's ledger,
+  calls outside the locks, and stores the parsed reply only while its claim
+  holds. Two attempts at most per set, kept even when the explanation is
+  deleted: the page shows Try again once, and a third request is refused. A
+  note deleted during the call gets the no-explanation refusal as JSON,
+  never a 404 page. The box asks for the reply when a saved box that has not
+  asked yet connects.
 - **A replaced set starts with no note.** Regenerating a set
   (`PracticeGeneration#commit_replacement`) and Start over
   (`DailyExercise#start_over!`) delete the day's note row in the same
   transaction as their own change, through `LearnerNote.forget_set!`, which
-  removes that date's `note` and `explanation` evidence and deletes an item
-  left with none. The note and explanation saves post the page's draft scope
+  deletes every item citing that date's `note` or `explanation`, even one
+  with other evidence; regeneration replaces `plan_notes` and Start over
+  drops the ledger's key, so the set's counts start fresh. The note and explanation saves post the page's draft scope
   and a replaced set refuses them with the refresh text. An extraction run
   carries the response it was queued for and stops when that response was
   replaced.
@@ -108,9 +119,11 @@ this area.
   has rows. Every action takes the user row lock (`LearnerItem.under_owner_lock`).
   "I've got this" (`LearnerItem.dismiss!`) closes an open item as `dismissed`
   with the owner's local date and refuses a closed one. Deleting a note or an
-  explanation removes that date's matching evidence and any item left with
-  none; a row a request already read stays as an empty marker so the set is
-  never read again. Deleting keeps no record. The page reads no
+  explanation deletes every item that cited it, even one with other
+  evidence, and deletes the row once neither is left; Delete all deletes
+  every row and item. No empty marker stays: the set's ledger says it was
+  read, and the action discards any extraction still waiting for that set
+  (`ExtractLearnerItemsJob.discard_waiting`). Deleting keeps no record. The page reads no
   `ConceptMastery`, and its fixed copy names no tier, score or level.
 - **Retention.** `SweepLearnerNotesJob` (daily, `default`) deletes notes past
   `LearnerNote::KEPT_FOR` by their set's date and closed items past

@@ -58,7 +58,10 @@ class DailyExercise < ApplicationRecord
     end
   end
 
-  def forget_learner_note! = LearnerNote.forget_set!(self)
+  def forget_learner_note!
+    LearnerNote.forget_set!(self)
+    LearnerExtraction.clear!(self)
+  end
 
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])

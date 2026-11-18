@@ -79,12 +79,27 @@ evidence: extraction and generation never read it.
 attempts. It waits for the explanation: an early run follows the
 explanation's save, or follows the submit when the day has no explain
 question, and a fallback runs at the later of local midnight and an hour
-after submit. Each run takes an advisory lock on the set and re-reads the
-note row under it. It makes no call, and closes the set, when the switch or
-the setting is off, the account has no key, the key is held after repeated
-failures, or the day has no duck turn, note or explanation. A run carries the
-response it was queued for, so a run queued before Start over or a
-regeneration stops instead of reading the new set.
+after submit. Each run takes an advisory lock on the set and re-reads, under
+it, the set's ledger and the note row. The ledger (`LearnerExtraction`)
+keeps text-free counts in `plan_notes["learner_extraction"]` on the day's
+`DailyExercise`: the extraction attempts, the time the set closed and the
+explanation reply's attempts. It is written under the exercise row lock and
+merges only its own key, so generation's notes are untouched. It makes no
+call, and closes the set, when learner notes are off for the account
+(`LearnerNotes.on_for?`: the switch, the setting and the account's own key),
+the key is held after repeated failures, or the day has no duck turn, note
+or explanation. A run carries the response it was queued for, so a run
+queued before Start over or a regeneration stops instead of reading the new
+set.
+
+**Deletion during the call holds.** The call runs outside every lock. The
+merge re-checks, under the user row lock it already holds, that the set's
+response is still the one read and that the note and the explanation still
+hold the text the call read. It drops an item citing anything deleted
+meanwhile, and writes nothing once the set was replaced. A note row or a set
+deleted mid-call never makes the job or the reply endpoint fail: the job
+logs a named outcome, and the endpoint answers with the box's current state
+or the refusal text as JSON (owner's decision, 2026-11-18).
 
 **What it reads.** Each active section through `SectionContext.render`, with
 no answer key; the engineer's answer; the duck turns; the note and the
@@ -191,12 +206,16 @@ one back, and a deleted closed item sets no `returned_after`. A record kept
 to stop an item coming back would itself be a record of what the engineer
 asked to have deleted.
 
-Deleting a note or an explanation removes that date's matching evidence
-references, and an item left with none is deleted too. Deleting the
-explanation deletes its reply. When a set has already been read by a request,
-its emptied row stays as a marker with no text, so a later run cannot read
-the set a second time; otherwise the row is deleted. Delete all removes every
-item and empties every note row the same way.
+Deleting a note or an explanation deletes every item that cited it, even
+one a duck question or an answer also supports, since its label may
+paraphrase the deleted text. Deleting the explanation deletes its reply. A
+row left with neither a note nor an explanation is deleted outright, and
+Delete all deletes every item and every note row; no empty marker row stays
+behind (owner's decision, 2026-11-18). The set is still never read twice:
+its ledger, on the set and not on the note row, keeps the counts that say it
+was read, and deleting also discards any extraction still waiting for that
+set from the queue, or every waiting one on Delete all. The ledger holds no
+text, so keeping it keeps nothing the engineer asked to have deleted.
 
 ## A replaced set starts with no note
 
@@ -206,7 +225,9 @@ explanation were written about sections that no longer exist. A set can be
 regenerated after submission until its review starts, so extraction may
 already have read the old set. Deleting the row then works as deleting a note
 on the Account page does: that date's note and explanation evidence goes, and
-an item left with none is deleted. Items that cite only the old set's duck
-turns or answers stay, since they describe what the engineer asked or wrote,
-which still happened. A page still showing the replaced set gets the refresh
+every item that cited them is deleted, even one with other evidence. Items
+that cite only the old set's duck turns or answers stay, since they describe
+what the engineer asked or wrote, which still happened. Regeneration
+replaces `plan_notes` wholesale and Start over drops the ledger's key, so a
+replaced set starts with fresh counts, as it starts with no note. A page still showing the replaced set gets the refresh
 refusal when it saves a note or an explanation.

@@ -56,6 +56,8 @@ RSpec.describe ExtractLearnerItemsJob do
 
   def note(exercise) = LearnerNote.find_by(daily_exercise: exercise)
 
+  def ledger(exercise) = LearnerExtraction.for(exercise.reload)
+
   describe ".queue_for_submitted" do
     it "schedules only the fallback on a day with a usable tag, at the later of local midnight and an hour after submit" do
       exercise = submitted_set
@@ -118,7 +120,7 @@ RSpec.describe ExtractLearnerItemsJob do
 
       expect(calls.size).to eq(1)
       expect(calls.sole[:explanation]).to include(section: "code_review", concept: "n_plus_one", text: "It runs one query per row.")
-      expect(note(exercise)).to have_attributes(extract_attempts: 1, extracted_at: be_present)
+      expect(ledger(exercise)).to have_attributes(attempts: 1, closed?: true)
     end
 
     it "sends sections, answers, turns and the note as values, with no review text, answer key or rating" do
@@ -161,7 +163,7 @@ RSpec.describe ExtractLearnerItemsJob do
       run(exercise, "fallback")
 
       expect(calls).to be_empty
-      expect(note(exercise)).to have_attributes(extract_attempts: 0, extracted_at: be_present)
+      expect(ledger(exercise)).to have_attributes(attempts: 0, closed?: true)
     end
 
     it "writes the items the reply returns through the merge and logs counts with no text" do
@@ -208,22 +210,42 @@ RSpec.describe ExtractLearnerItemsJob do
       end
 
       run(exercise, "early")
-      expect(note(exercise)).to have_attributes(extract_attempts: 1, extracted_at: nil)
+      expect(ledger(exercise)).to have_attributes(attempts: 1, closed?: false)
 
       run(exercise, "fallback")
       run(exercise, "fallback")
 
       expect(calls.size).to eq(2)
-      expect(note(exercise)).to have_attributes(extract_attempts: 2, extracted_at: be_present)
+      expect(ledger(exercise)).to have_attributes(attempts: 2, closed?: true)
     end
 
     it "makes no call from a run that finds two attempts counted" do
-      LearnerNote.create!(user: user, daily_exercise: exercise, body: "Stuck.", extract_attempts: 2)
+      LearnerNote.create!(user: user, daily_exercise: exercise, body: "Stuck.")
+      2.times { LearnerExtraction.count_attempt!(exercise, close: false) }
 
       run(exercise, "fallback")
 
       expect(calls).to be_empty
-      expect(note(exercise).extracted_at).to be_present
+      expect(ledger(exercise)).to have_attributes(attempts: 2, closed?: true)
+    end
+
+    it "makes no call for a set read before its note was deleted, and writes no note row" do
+      explained(exercise)
+      run(exercise, "early")
+      LearnerNote.remove_all!(user)
+
+      run(exercise, "fallback")
+
+      expect(calls.size).to eq(1)
+      expect(note(exercise)).to be_nil
+    end
+
+    it "writes no note row for a set that has none" do
+      run(exercise, "fallback")
+
+      expect(calls.size).to eq(1)
+      expect(LearnerNote.where(daily_exercise: exercise)).to be_empty
+      expect(ledger(exercise)).to have_attributes(attempts: 1, closed?: true)
     end
 
     it "does not call again when a job runs again after its worker died mid-call" do
@@ -239,7 +261,7 @@ RSpec.describe ExtractLearnerItemsJob do
       expect { run(exercise, "fallback") }.to raise_error(SignalException)
       run(exercise, "fallback")
       expect(calls.size).to eq(2)
-      expect(note(exercise)).to have_attributes(extract_attempts: 2, extracted_at: be_present)
+      expect(ledger(exercise)).to have_attributes(attempts: 2, closed?: true)
     end
 
     it "leaves generation_account_failures alone when the call fails" do
@@ -259,7 +281,7 @@ RSpec.describe ExtractLearnerItemsJob do
       run(exercise, kind)
 
       expect(calls).to be_empty
-      expect(note(exercise)).to have_attributes(extract_attempts: 0, extracted_at: be_present)
+      expect(ledger(exercise)).to have_attributes(attempts: 0, closed?: true)
     end
 
     %w[early fallback].each do |kind|

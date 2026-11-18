@@ -27,3 +27,10 @@ job and its execution in one transaction, so that only happens mid-enqueue.
 
 Deleting a job row removes its ready, scheduled, blocked or failed
 execution through the foreign keys' `ON DELETE CASCADE`.
+
+## Discarding one job class by its arguments
+
+`.discard_job(class_name, **arguments)` deletes the waiting jobs of one
+class whose keyword arguments carry every given value, with the same
+`still_waiting` guard. `ExtractLearnerItemsJob.discard_waiting` uses it to
+drop a set's waiting extraction when its note or explanation is deleted.

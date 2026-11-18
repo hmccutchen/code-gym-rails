@@ -35,11 +35,10 @@ module LearnerExtraction
     end
   end
 
+  # Yields whether both reply attempts are spent; the block returns the claim's token, or a symbol for why it took none.
   def self.count_reply_attempt!(exercise)
     change(exercise) do |ledger|
-      next :exhausted if ledger.reply_attempts >= MAX_REPLY_ATTEMPTS
-
-      token = yield
+      token = yield ledger.reply_attempts >= MAX_REPLY_ATTEMPTS
       next token if token.is_a?(Symbol)
 
       [ token, ledger.with(reply_attempts: ledger.reply_attempts + 1) ]

@@ -4,20 +4,29 @@ class AccountLearnerNotesController < ApplicationController
 
   # DELETE /account/learner_notes/:id/note
   def destroy_note
-    answer(LearnerNote.remove!(current_user, params[:id], :note), "flash.accounts.learner_note_removed")
+    remove(:note, "flash.accounts.learner_note_removed")
   end
 
   # DELETE /account/learner_notes/:id/explanation
   def destroy_explanation
-    answer(LearnerNote.remove!(current_user, params[:id], :explanation), "flash.accounts.learner_explanation_removed")
+    remove(:explanation, "flash.accounts.learner_explanation_removed")
   end
 
   # DELETE /account/learner_notes/all
   def destroy_all
-    answer(LearnerNote.remove_all!(current_user), "flash.accounts.learner_notes_all_removed")
+    outcome = LearnerNote.remove_all!(current_user)
+    ExtractLearnerItemsJob.discard_waiting(current_user) if outcome == :removed
+    answer(outcome, "flash.accounts.learner_notes_all_removed")
   end
 
   private
+
+  def remove(part, notice)
+    set_id = current_user.learner_notes.where(id: params[:id]).pick(:daily_exercise_id)
+    outcome = LearnerNote.remove!(current_user, params[:id], part)
+    ExtractLearnerItemsJob.discard_waiting(current_user, daily_exercise_id: set_id) if outcome == :removed
+    answer(outcome, notice)
+  end
 
   def answer(outcome, notice)
     case outcome

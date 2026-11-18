@@ -83,7 +83,8 @@ RSpec.describe "When learner items are extracted", type: :request do
 
       note = LearnerNote.find_by(daily_exercise: exercise)
       expect(response).to have_http_status(:conflict)
-      expect(note).to have_attributes(explanation: "One query per row.", extract_attempts: 1, extracted_at: nil)
+      expect(note).to have_attributes(explanation: "One query per row.")
+      expect(LearnerExtraction.for(exercise.reload)).to have_attributes(attempts: 1, closed?: false)
       expect(extraction_runs).to eq([])
 
       calls = 0
@@ -97,11 +98,11 @@ RSpec.describe "When learner items are extracted", type: :request do
       end
 
       expect(calls).to eq(1)
-      expect(note.reload).to have_attributes(extract_attempts: 2, extracted_at: be_present)
+      expect(LearnerExtraction.for(exercise.reload)).to have_attributes(attempts: 2, closed?: true)
     end
 
     it "enqueues nothing for a save the closed box refuses" do
-      LearnerNote.create!(user: user, daily_exercise: user.daily_exercises.sole, extracted_at: Time.current)
+      LearnerExtraction.close!(user.daily_exercises.sole)
 
       save_explanation("Too late.")
 

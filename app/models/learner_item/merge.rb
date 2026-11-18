@@ -2,12 +2,13 @@
 class LearnerItem::Merge
   Result = Data.define(:written, :absorbed, :dropped)
 
-  def self.call(user, items, set_date:)
+  # still_there returns the evidence sources that still exist for the set read, or nil once the set was replaced.
+  def self.call(user, items, set_date:, still_there:)
     LearnerItem.transaction do
       owner = User.lock.find_by(id: user.id)
       next :deleted if owner.nil? || owner.anonymized?
 
-      new(owner, set_date).run(items)
+      new(owner, set_date).run(items, still_there.call)
     end
   end
 
@@ -20,10 +21,10 @@ class LearnerItem::Merge
     @dropped = Hash.new(0)
   end
 
-  def run(items)
+  def run(items, sources)
     LearnerItem.expire_overdue!(@owner, today: @today)
     open = LearnerItem.open_by_key(@owner)
-    repeats, fresh = collapse(items).partition { |item| open.key?(key_of(item)) }
+    repeats, fresh = collapse(still_supported(items, sources)).partition { |item| open.key?(key_of(item)) }
     repeats.each { |item| absorb(open.fetch(key_of(item)), item) }
     @dropped[:over_limit] += fresh.size - LearnerItem::MAX_NEW_PER_DAY if fresh.size > LearnerItem::MAX_NEW_PER_DAY
     fresh.first(LearnerItem::MAX_NEW_PER_DAY).each { |item| insert(item) }
@@ -32,6 +33,16 @@ class LearnerItem::Merge
   end
 
   private
+
+  def still_supported(items, sources)
+    kept, gone = sources ? items.partition { |item| cites_only(item, sources) } : [ [], items ]
+    @dropped[sources ? :evidence_deleted : :set_replaced] += gone.size if gone.any?
+    kept
+  end
+
+  def cites_only(item, sources)
+    item.evidence.all? { |reference| reference["date"] != @set_date.iso8601 || sources.include?(reference["source"]) }
+  end
 
   def key_of(item) = LearnerItem.matching_key(concept: item.concept, bucket: item.bucket, kind: item.kind, term: item.term)
 

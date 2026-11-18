@@ -43,33 +43,41 @@ class LearnerExplanationsController < ApplicationController
     return render_json_error(t("learner_notes.reply.no_explanation"), status: :unprocessable_content) if note&.explanation.blank?
 
     token = note.start_reply!
-    token.is_a?(Symbol) ? render_reply_refusal(note, token) : ask_for_reply(note, token)
+    token.is_a?(Symbol) ? render_reply_refusal(exercise, token) : ask_for_reply(exercise, note, token)
   end
 
   private
 
-  def ask_for_reply(note, token)
+  def ask_for_reply(exercise, note, token)
     reply = AiService.for(current_user).explanation_reply(
       current_user, concept: note.explain_concept.humanize, explanation: note.explanation,
                     phrasing: ExplainQuestion.text(note.explain_phrasing, note.explain_concept)
     )
     note.finish_reply!(token, reply)
-    render json: { status: "ok", html: reply_html(note) }
+    render_reply_box(exercise) { |html| render json: { status: "ok", html: html } }
   rescue ProviderError, SetupError => e
     note.release_reply!(token)
     Rails.logger.warn("[learner_explanation] reply failed=#{ProviderFailure.classify(e)} user #{current_user.id}")
-    render_json_error(t("learner_notes.reply.failed"), status: :service_unavailable, html: reply_html(note))
+    render_reply_box(exercise) { |html| render_json_error(t("learner_notes.reply.failed"), status: :service_unavailable, html: html) }
   end
 
-  def render_reply_refusal(note, outcome)
-    return render json: { status: "ok", html: reply_html(note) } if outcome == :replied
+  def render_reply_refusal(exercise, outcome)
+    render_reply_box(exercise) do |html|
+      next render json: { status: "ok", html: html } if outcome == :replied
 
-    message = outcome == :busy ? "learner_notes.reply.waiting" : "learner_notes.reply.failed"
-    render_json_error(t(message), status: :conflict, html: reply_html(note))
+      message = outcome == :busy ? "learner_notes.reply.waiting" : "learner_notes.reply.failed"
+      render_json_error(t(message), status: :conflict, html: html)
+    end
   end
 
-  def reply_html(note)
-    render_to_string(partial: "shared/learner_explanation_reply", formats: [ :html ], locals: { reply: reply_view(note.reload) })
+  # The note is read again, since the Account page or Start over can delete it while the call is out.
+  def render_reply_box(exercise)
+    note = LearnerNote.find_by(daily_exercise_id: exercise.id)
+    fresh = DailyExercise.find_by(id: exercise.id)
+    return render_json_error(t("learner_notes.reply.no_explanation"), status: :conflict) if note&.explanation.blank? || fresh.nil?
+
+    yield render_to_string(partial: "shared/learner_explanation_reply", formats: [ :html ],
+                           locals: { reply: reply_view(note, LearnerExtraction.for(fresh)) })
   end
 
   def text_refusal(text)

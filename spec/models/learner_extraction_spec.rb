@@ -68,14 +68,16 @@ RSpec.describe LearnerExtraction do
   it "counts reply attempts apart from extraction attempts, at most two, when the block takes the claim" do
     token = Time.current.floor(6)
 
-    expect(described_class.count_reply_attempt!(exercise) { token }).to eq(token)
-    expect(described_class.count_reply_attempt!(exercise) { token }).to eq(token)
-    expect(described_class.count_reply_attempt!(exercise) { token }).to eq(:exhausted)
+    take = ->(spent) { spent ? :exhausted : token }
+
+    expect(described_class.count_reply_attempt!(exercise, &take)).to eq(token)
+    expect(described_class.count_reply_attempt!(exercise, &take)).to eq(token)
+    expect(described_class.count_reply_attempt!(exercise, &take)).to eq(:exhausted)
 
     expect(described_class.for(exercise.reload)).to have_attributes(reply_attempts: 2, attempts: 0)
   end
 
-  it "counts no reply attempt when the block refuses with a symbol other than a claim" do
+  it "counts no reply attempt when the block refuses with a symbol" do
     expect(described_class.count_reply_attempt!(exercise) { :busy }).to eq(:busy)
 
     expect(described_class.for(exercise.reload).reply_attempts).to eq(0)

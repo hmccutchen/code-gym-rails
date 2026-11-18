@@ -130,11 +130,19 @@ RSpec.describe "The Learner notes setting on the Account page", type: :request d
     end
 
     def note_on(date, body: "The loop confused me.", explanation: "It runs one query per row.")
-      LearnerNote.create!(user: user, daily_exercise: set_on(date), body: body, question_key: "hardest",
+      exercise = set_on(date)
+      LearnerExtraction.count_attempt!(exercise, close: true)
+      LearnerNote.create!(user: user, daily_exercise: exercise, body: body, question_key: "hardest",
                           explain_section: ("code_review" if explanation), explain_concept: ("n_plus_one" if explanation),
                           explain_phrasing: ("explain.first" if explanation), explanation: explanation,
-                          explanation_reply: ({ "sound" => "Right.", "correction" => nil } if explanation),
-                          extract_attempts: 1, extracted_at: Time.current)
+                          explanation_reply: ({ "sound" => "Right.", "correction" => nil } if explanation))
+    end
+
+    def waiting_extraction(exercise)
+      job = ExtractLearnerItemsJob.new(user_id: user.id, daily_exercise_id: exercise.id, daily_response_id: nil,
+                                       run: ExtractLearnerItemsJob::FALLBACK)
+      SolidQueue::Job.create!(queue_name: job.queue_name, class_name: job.class.name, arguments: job.serialize,
+                              active_job_id: job.job_id, priority: JobPriority::BACKGROUND, scheduled_at: 1.day.from_now)
     end
 
     it "lists open items with their label, concept, kind, origin, the dates they came up and their expiry" do
@@ -245,55 +253,71 @@ RSpec.describe "The Learner notes setting on the Account page", type: :request d
       expect(explanation.text).to include("Nov 16", "In your own words, what does N plus one do?", "It runs one query per row.")
     end
 
-    it "deletes a note and its evidence references, and an item left with none" do
+    it "deletes a note and every item that cited it, even one with other evidence, keeping the explanation" do
       note = note_on(today - 2)
       only_note = item(evidence: [ reference(today - 2, "note") ])
-      mixed = item(concept: "memoization", evidence: [ reference(today - 2, "note"), reference(today - 2, "explanation") ])
+      mixed = item(concept: "memoization", evidence: [ reference(today - 2, "note"), reference(today - 2, "duck") ])
+      other_day = item(concept: "caching", evidence: [ reference(today - 3, "note") ])
+      explained = item(concept: "scope_chaining", evidence: [ reference(today - 2, "explanation") ])
       login_as(user)
 
       delete note_account_learner_note_path(note)
 
       expect(note.reload).to have_attributes(body: nil, question_key: nil, explanation: "It runs one query per row.")
-      expect(LearnerItem.exists?(only_note.id)).to be(false)
-      expect(mixed.reload.evidence).to eq([ reference(today - 2, "explanation") ])
+      expect(LearnerItem.where(id: [ only_note, mixed, other_day, explained ].map(&:id))).to contain_exactly(other_day, explained)
       follow_redirect!
       expect(section.css(".learner-note-row")).to be_empty
     end
 
-    it "deletes an explanation with its reply and its evidence references" do
+    it "deletes an explanation with its reply and every item that cited it, keeping the note" do
       note = note_on(today - 2)
-      mixed = item(evidence: [ reference(today - 2, "note"), reference(today - 2, "explanation") ])
+      mixed = item(evidence: [ reference(today - 2, "explanation"), reference(today - 2, "answer") ])
+      noted = item(concept: "memoization", evidence: [ reference(today - 2, "note") ])
       login_as(user)
 
       delete explanation_account_learner_note_path(note)
 
       expect(note.reload).to have_attributes(explanation: nil, explanation_reply: nil, explain_concept: nil,
                                              explain_section: nil, explain_phrasing: nil, body: "The loop confused me.")
-      expect(mixed.reload.evidence).to eq([ reference(today - 2, "note") ])
+      expect(LearnerItem.where(id: [ mixed.id, noted.id ])).to contain_exactly(noted)
       follow_redirect!
       expect(section.css(".learner-explanation-row")).to be_empty
     end
 
-    it "removes a row whose note was deleted when no request has been made for its set" do
-      note = LearnerNote.create!(user: user, daily_exercise: set_on(today), body: "Before submitting.")
+    it "deletes the row outright once nothing is left in it, even for a set already read, keeping the set's counts" do
+      note = note_on(today - 2, explanation: nil)
       login_as(user)
 
       delete note_account_learner_note_path(note)
 
       expect(LearnerNote.exists?(note.id)).to be(false)
+      expect(LearnerExtraction.for(note.daily_exercise.reload)).to have_attributes(attempts: 1, closed?: true)
     end
 
-    it "deletes everything at once, keeping only an empty marker for a set already read" do
+    it "discards a waiting extraction for the deleted note's set, and leaves another set's" do
+      note = note_on(today - 2)
+      other = note_on(today - 3)
+      waiting = [ waiting_extraction(note.daily_exercise), waiting_extraction(other.daily_exercise) ]
+      login_as(user)
+
+      delete explanation_account_learner_note_path(note)
+
+      expect(SolidQueue::Job.where(id: waiting.map(&:id)).pluck(:id)).to eq([ waiting.last.id ])
+    end
+
+    it "deletes every note row and item at once, and discards every waiting extraction" do
       read = note_on(today - 2)
       unread = LearnerNote.create!(user: user, daily_exercise: set_on(today), body: "Before submitting.")
       item
+      waiting = waiting_extraction(read.daily_exercise)
       login_as(user)
 
       delete all_account_learner_notes_path
 
       expect(LearnerItem.where(user: user)).to be_empty
-      expect(LearnerNote.exists?(unread.id)).to be(false)
-      expect(read.reload).to have_attributes(body: nil, explanation: nil, explanation_reply: nil, extract_attempts: 1)
+      expect(LearnerNote.where(id: [ read.id, unread.id ])).to be_empty
+      expect(LearnerExtraction.for(read.daily_exercise.reload)).to have_attributes(attempts: 1, closed?: true)
+      expect(SolidQueue::Job.where(id: waiting.id)).to be_empty
       follow_redirect!
       expect(response.body).to include("Every learner note and reminder was deleted.")
       expect(section.css(".learner-item-open, .learner-note-row, .learner-explanation-row")).to be_empty

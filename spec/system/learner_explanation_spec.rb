@@ -61,7 +61,9 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
       reply = find("#learner-explanation-reply", text: "Feedback on your explanation, not a grade")
       expect(reply).to have_text("What was sound: You named what the concept does.")
       expect(reply).to have_no_text("One thing to correct")
-      expect(LearnerNote.find_by(user: user)).to have_attributes(reply_attempts: 1, explanation_reply: include("correction" => nil))
+      note = LearnerNote.find_by(user: user)
+      expect(note).to have_attributes(explanation_reply: include("correction" => nil))
+      expect(LearnerExtraction.for(note.daily_exercise).reply_attempts).to eq(1)
     end
   end
 end

@@ -32,6 +32,8 @@ RSpec.describe "The reply to an explanation", type: :request do
   end
 
   def ask = post(reply_learner_explanation_path, as: :json)
+  def reply_attempts = LearnerExtraction.for(exercise.reload).reply_attempts
+  def spend_reply_attempts(count) = count.times { LearnerExtraction.count_reply_attempt!(exercise) { Time.current } }
   def reply_box = Nokogiri::HTML.fragment(response.parsed_body["html"]).at_css("#learner-explanation-reply")
   def dashboard_reply
     get root_path
@@ -45,7 +47,8 @@ RSpec.describe "The reply to an explanation", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(calls.sole).to eq(concept: "N plus one", phrasing: "In your own words, what does N plus one do?", explanation: "One query per row.")
-    expect(note.reload).to have_attributes(reply_attempts: 1, reply_requested_at: nil,
+    expect(reply_attempts).to eq(1)
+    expect(note.reload).to have_attributes(reply_requested_at: nil,
                                            explanation_reply: { "sound" => "You named the per-row query.",
                                                                 "correction" => "Preloading adds one query, not none." })
     expect(reply_box.at_css("h3").text).to eq("Feedback on your explanation, not a grade")
@@ -81,7 +84,8 @@ RSpec.describe "The reply to an explanation", type: :request do
     end
 
     it "waits without asking again while another request holds the claim" do
-      note.update!(reply_attempts: 1, reply_requested_at: Time.current)
+      spend_reply_attempts(1)
+      note.update!(reply_requested_at: Time.current)
 
       box = dashboard_reply
 
@@ -97,7 +101,8 @@ RSpec.describe "The reply to an explanation", type: :request do
       expect(response.parsed_body["error"]).to eq("No feedback this time. Your explanation is saved.")
       expect(reply_box.text).to include("No feedback this time. Your explanation is saved.")
       expect(reply_box.at_css("button").text).to eq("Try again")
-      expect(note.reload).to have_attributes(reply_attempts: 1, reply_requested_at: nil, explanation_reply: nil)
+      expect(reply_attempts).to eq(1)
+      expect(note.reload).to have_attributes(reply_requested_at: nil, explanation_reply: nil)
 
       ask
       expect(reply_box.text).to include("No feedback this time. Your explanation is saved.")
@@ -111,7 +116,8 @@ RSpec.describe "The reply to an explanation", type: :request do
       2.times { ask }
 
       expect(response).to have_http_status(:ok)
-      expect(note.reload).to have_attributes(reply_attempts: 2, explanation_reply: { "sound" => "Right.", "correction" => nil })
+      expect(reply_attempts).to eq(2)
+      expect(note.reload).to have_attributes(explanation_reply: { "sound" => "Right.", "correction" => nil })
     end
 
     it "counts a malformed reply as a failure" do
@@ -125,7 +131,7 @@ RSpec.describe "The reply to an explanation", type: :request do
   end
 
   it "refuses a third request with no call" do
-    note.update!(reply_attempts: 2)
+    spend_reply_attempts(2)
 
     ask
 
@@ -135,17 +141,19 @@ RSpec.describe "The reply to an explanation", type: :request do
   end
 
   it "makes one call for two requests at once: the second finds the claim held" do
-    note.update!(reply_attempts: 1, reply_requested_at: 5.seconds.ago)
+    spend_reply_attempts(1)
+    note.update!(reply_requested_at: 5.seconds.ago)
 
     ask
 
     expect(response).to have_http_status(:conflict)
     expect(calls).to be_empty
-    expect(note.reload.reply_attempts).to eq(1)
+    expect(reply_attempts).to eq(1)
   end
 
   it "makes no call once a reply is stored, and answers with it" do
-    note.update!(reply_attempts: 1, explanation_reply: { "sound" => "Right.", "correction" => nil })
+    spend_reply_attempts(1)
+    note.update!(explanation_reply: { "sound" => "Right.", "correction" => nil })
 
     ask
 
@@ -179,6 +187,59 @@ RSpec.describe "The reply to an explanation", type: :request do
     expect(response).to have_http_status(:unprocessable_content)
 
     expect(calls).to be_empty
-    expect(note.reload.reply_attempts).to eq(0)
+    expect(reply_attempts).to eq(0)
+  end
+
+  describe "a note deleted while the reply is asked for" do
+    it "answers with the refusal text as JSON when the explanation is deleted during the call, and stores nothing" do
+      allow_any_instance_of(AiService).to receive(:explanation_reply) do
+        LearnerNote.remove!(user, note.id, :explanation)
+        ExplanationReply::Reply.new(sound: "Late.", correction: nil)
+      end
+
+      ask
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.media_type).to eq("application/json")
+      expect(response.parsed_body["error"]).to eq(I18n.t("learner_notes.reply.no_explanation"))
+      expect(note.reload).to have_attributes(explanation: nil, explanation_reply: nil)
+    end
+
+    it "answers with the refusal text as JSON when the set is started over during the call" do
+      allow_any_instance_of(AiService).to receive(:explanation_reply) do
+        exercise.reload.start_over!(exercise.daily_response)
+        ExplanationReply::Reply.new(sound: "Late.", correction: nil)
+      end
+
+      ask
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.media_type).to eq("application/json")
+      expect(response.parsed_body["error"]).to eq(I18n.t("learner_notes.reply.no_explanation"))
+      expect(LearnerNote.exists?(note.id)).to be(false)
+    end
+
+    it "answers with the refusal text as JSON when the call fails after the note was deleted" do
+      allow_any_instance_of(AiService).to receive(:explanation_reply) do
+        LearnerNote.remove_all!(user)
+        raise ProviderError::TimeoutError, "slow"
+      end
+
+      ask
+
+      expect(response.media_type).to eq("application/json")
+      expect(response.parsed_body["error"]).to eq(I18n.t("learner_notes.reply.no_explanation"))
+    end
+
+    it "keeps the attempt counted on the set, so a new explanation the same day cannot ask twice more" do
+      allow_any_instance_of(AiService).to receive(:explanation_reply) do
+        LearnerNote.remove!(user, note.id, :explanation)
+        ExplanationReply::Reply.new(sound: "Late.", correction: nil)
+      end
+
+      ask
+
+      expect(reply_attempts).to eq(1)
+    end
   end
 end

@@ -5,7 +5,6 @@ class LearnerItem < ApplicationRecord
   STATUSES = %w[open used dismissed expired].freeze
   EVIDENCE_SOURCES = %w[duck answer note explanation].freeze
   SECTIONLESS_SOURCES = %w[note].freeze
-  WRITTEN_SOURCES = %w[note explanation].freeze
   MAX_OPEN = 5
   MAX_NEW_PER_DAY = 3
   MAX_EARLIER_LABELS = 20
@@ -41,7 +40,7 @@ class LearnerItem < ApplicationRecord
     [ newest_evidence_on + EXPIRES_AFTER_EVIDENCE, created_on + LONGEST_LIFE ].min
   end
 
-  def self.merge!(user, items, set_date:) = Merge.call(user, items, set_date: set_date)
+  def self.merge!(user, items, set_date:, still_there:) = Merge.call(user, items, set_date: set_date, still_there: still_there)
 
   def self.under_owner_lock(user)
     transaction do
@@ -87,16 +86,9 @@ class LearnerItem < ApplicationRecord
   end
 
   # The caller holds the user row lock, as every writer of items does.
-  def self.forget_evidence!(user, date:, sources:)
-    day = date.iso8601
-    user.learner_items.find_each do |item|
-      kept = item.evidence.reject { |reference| reference["date"] == day && sources.include?(reference["source"]) }
-      next if kept.size == item.evidence.size
-      next item.delete if kept.empty?
-
-      came_up_on = kept.any? { |reference| reference["date"] == day } ? item.came_up_on : item.came_up_on - [ day ]
-      item.update!(evidence: kept, came_up_on: came_up_on)
-    end
+  def self.forget_citing!(user, date:, sources:)
+    cited = sources.map { |source| [ { "date" => date.iso8601, "source" => source } ].to_json }
+    user.learner_items.where("evidence @> ANY (ARRAY[?]::jsonb[])", cited).delete_all
   end
 
   def self.prompt_values(item) = { concept: item.concept, bucket: item.bucket, kind: item.kind, term: item.term, label: item.label }

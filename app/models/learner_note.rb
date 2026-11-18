@@ -4,19 +4,17 @@ class LearnerNote < ApplicationRecord
 
   MAX_TEXT_LENGTH = 1_000
   KEPT_FOR = 365.days
-  MAX_EXTRACT_ATTEMPTS = 2
-  MAX_REPLY_ATTEMPTS = 2
   REPLY_CLAIM_STALE_AFTER = CallProfiles.worst_case_seconds_for("explanation_reply").seconds + DailyExercise::WRITE_MARGIN
 
   include Claimable
+
+  self.ignored_columns += %w[extract_attempts extracted_at reply_attempts]
 
   claim :reply, column: :reply_requested_at, stale_after: REPLY_CLAIM_STALE_AFTER
 
   self.filter_attributes += %i[body explanation explanation_reply]
 
   validates :body, :explanation, length: { maximum: MAX_TEXT_LENGTH }
-  validates :extract_attempts, numericality: { only_integer: true, in: 0..MAX_EXTRACT_ATTEMPTS }
-  validates :reply_attempts, numericality: { only_integer: true, in: 0..MAX_REPLY_ATTEMPTS }
   validate :owned_by_the_sets_owner
 
   ExplainHistory = Data.define(:recent, :counts)
@@ -35,10 +33,13 @@ class LearnerNote < ApplicationRecord
     transaction do
       owner = User.lock("FOR SHARE").find_by(id: exercise.user_id)
       next :deleted if owner.nil? || owner.anonymized?
-      next :stale if DailyExercise.find_by(id: exercise.id)&.draft_scope != expected_scope
+
+      locked = DailyExercise.lock.find_by(id: exercise.id)
+      next :stale if locked&.draft_scope != expected_scope
       next :not_submitted unless exercise.daily_response&.submitted?
 
-      write(row_for(exercise)) { |note| note.explain(owner, exercise, section, text) }
+      closed = LearnerExtraction.for(locked).closed?
+      write(row_for(exercise)) { |note| note.explain(owner, exercise, section, text, closed: closed) }
     end
   end
 
@@ -53,7 +54,7 @@ class LearnerNote < ApplicationRecord
     end
   end
 
-  def self.extraction_row(exercise) = row_for(exercise)
+  def self.for_set(exercise) = find_by(daily_exercise_id: exercise.id)
 
   FORGOTTEN_COLUMNS = {
     note: { body: nil, question_key: nil },
@@ -69,7 +70,7 @@ class LearnerNote < ApplicationRecord
 
   def self.remove!(user, id, part)
     LearnerItem.under_owner_lock(user) do |owner|
-      note = owner.learner_notes.includes(:daily_exercise).find_by(id: id)
+      note = owner.learner_notes.includes(:daily_exercise).lock.find_by(id: id)
       next :missing unless note&.holds?(part)
 
       note.forget!(part)
@@ -80,18 +81,14 @@ class LearnerNote < ApplicationRecord
   def self.remove_all!(user)
     LearnerItem.under_owner_lock(user) do |owner|
       owner.learner_items.delete_all
-      owner.learner_notes.includes(:daily_exercise).find_each { |note| note.forget!(*FORGOTTEN_COLUMNS.keys) }
+      owner.learner_notes.delete_all
       :removed
     end
   end
 
-  # The caller holds the user row lock, since items lose this set's note and explanation evidence with it.
+  # The caller holds the user row lock, since every item citing this set's note or explanation goes with it.
   def self.forget_set!(exercise)
-    note = find_by(daily_exercise_id: exercise.id)
-    return unless note
-
-    LearnerItem.forget_evidence!(note.user, date: exercise.date, sources: LearnerItem::WRITTEN_SOURCES)
-    note.delete
+    for_set(exercise)&.forget!(*FORGOTTEN_COLUMNS.keys)
   end
 
   def self.under_draft_locks(exercise, expected_scope)
@@ -131,9 +128,9 @@ class LearnerNote < ApplicationRecord
   end
   private_class_method :write
 
-  def explain(owner, exercise, section, text)
+  def explain(owner, exercise, section, text, closed:)
     return :explained if explanation.present?
-    return :closed if extracted_at.present?
+    return :closed if closed
 
     option = ExplainQuestion.options(tags: exercise.section_concepts).find { |held| held.section == section }
     return :not_an_option unless option
@@ -144,66 +141,48 @@ class LearnerNote < ApplicationRecord
     nil
   end
 
-  def extracted? = extracted_at.present?
-
-  def close_extraction!
-    with_lock { update!(extracted_at: Time.current) unless extracted? }
-  end
-
-  # The attempt is saved before the call leaves, so a worker that dies mid-call has already spent it.
-  def count_extract_attempt!(close:)
-    with_lock do
-      next false if extracted? || extract_attempts >= MAX_EXTRACT_ATTEMPTS
-
-      update!(extract_attempts: extract_attempts + 1, extracted_at: (Time.current if close))
-      true
-    end
-  end
-
   def reply = ExplanationReply.from_stored(explanation_reply)
 
-  def reply_state
+  def reply_state(attempts)
     return :replied if reply
-    return :waiting if reply? || reply_attempts.zero?
+    return :waiting if reply? || attempts.zero?
 
-    reply_attempts < MAX_REPLY_ATTEMPTS ? :failed_retry : :failed_final
+    attempts < LearnerExtraction::MAX_REPLY_ATTEMPTS ? :failed_retry : :failed_final
   end
 
-  def reply_askable? = reply_state == :waiting && !reply?
+  def reply_askable?(attempts) = reply_state(attempts) == :waiting && !reply?
 
-  # Returns the claim's token, or :replied, :busy or :exhausted; the attempt is counted with the claim.
+  # Returns the claim's token, or :replied, :busy, :exhausted or :gone; the set counts the attempt with the claim.
   def start_reply!
-    with_lock do
-      next :replied if reply
-      next :busy if reply?
-      next :exhausted if reply_attempts >= MAX_REPLY_ATTEMPTS
+    LearnerExtraction.count_reply_attempt!(daily_exercise) do |spent|
+      note = self.class.lock.find_by(id: id)
+      next :gone if note&.explanation.blank?
+      next :replied if note.reply
+      next :busy if note.reply?
+      next :exhausted if spent
 
-      token = claim_reply!
-      next :busy unless token
-
-      update!(reply_attempts: reply_attempts + 1)
-      token
+      note.claim_reply! || :busy
     end
   end
 
   def finish_reply!(token, reply)
-    with_lock do
-      next :moved unless reply_requested_at == token
+    transaction do
+      note = self.class.lock.find_by(id: id)
+      next :gone unless note
+      next :moved unless note.reply_requested_at == token
 
-      update!(explanation_reply: reply.to_h, reply_requested_at: nil)
+      note.update!(explanation_reply: reply.to_h, reply_requested_at: nil)
+      :stored
     end
   end
 
   def holds?(part) = part == :note ? body.to_s.strip.present? : explanation.present?
 
   def forget!(*parts)
-    LearnerItem.forget_evidence!(user, date: daily_exercise.date, sources: parts.map(&:to_s))
+    LearnerItem.forget_citing!(user, date: daily_exercise.date, sources: parts.map(&:to_s))
     assign_attributes(parts.map { |part| FORGOTTEN_COLUMNS.fetch(part) }.reduce(:merge))
-    nothing_left = !holds?(:note) && !holds?(:explanation)
-    nothing_left && !read_by_a_request? ? delete : save!
+    holds?(:note) || holds?(:explanation) ? save! : delete
   end
-
-  def read_by_a_request? = extract_attempts.positive? || extracted? || reply_attempts.positive?
 
   def something_to_read? = body.to_s.strip.present? || explanation.to_s.strip.present?
 

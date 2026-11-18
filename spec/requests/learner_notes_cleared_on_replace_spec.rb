@@ -28,10 +28,10 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
   end
 
   def note_on(exercise, extracted: true)
+    LearnerExtraction.count_attempt!(exercise, close: true) if extracted
     LearnerNote.create!(user: user, daily_exercise: exercise, body: "The loop confused me.", question_key: "hardest",
                         explain_section: "code_review", explain_concept: "n_plus_one", explain_phrasing: "explain.first",
-                        explanation: "It runs one query per row.", extract_attempts: extracted ? 1 : 0,
-                        extracted_at: (Time.current if extracted))
+                        explanation: "It runs one query per row.")
   end
 
   def reference(date, source, section = nil)
@@ -48,20 +48,19 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
     today = Date.current
     { only_note: item("n_plus_one", [ reference(today, "note"), reference(today, "explanation", "code_review") ]),
       with_duck: item("service_objects", [ reference(today, "note"), reference(today, "duck", "code_review") ]),
-      other_day: item("memoization", [ reference(today - 1, "note"), reference(today, "explanation", "code_review") ]) }
+      other_day: item("memoization", [ reference(today - 1, "note"), reference(today, "explanation", "code_review") ]),
+      duck_only: item("scope_chaining", [ reference(today, "duck", "code_review"), reference(today, "answer", "code_review") ]),
+      earlier_note: item("caching", [ reference(today - 1, "note") ]) }
   end
 
   def expect_the_days_note_forgotten(exercise, items)
-    today = Date.current.iso8601
     expect(LearnerNote.where(daily_exercise: exercise)).to be_empty
-    expect(LearnerItem.exists?(items[:only_note].id)).to be(false)
-    expect(items[:with_duck].reload.evidence).to eq([ reference(Date.current, "duck", "code_review") ])
-    expect(items[:other_day].reload.evidence).to eq([ { "date" => (Date.current - 1).iso8601, "source" => "note" } ])
-    expect(LearnerItem.all.flat_map(&:evidence)).not_to include(hash_including("date" => today, "source" => "note"))
+    expect(LearnerItem.where(id: items.values.map(&:id)).pluck(:concept)).to contain_exactly("scope_chaining", "caching")
+    expect(LearnerExtraction.for(exercise.reload)).to have_attributes(attempts: 0, closed?: false)
   end
 
   describe "Start over" do
-    it "deletes the day's note and that date's note and explanation evidence, keeping items with other evidence" do
+    it "deletes the day's note, every item citing it or the explanation, and the set's extraction counts" do
       exercise = todays_set
       note_on(exercise)
       items = items_from_the_day
@@ -114,7 +113,7 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
       allow(service).to receive(:model_for).and_return("model")
     end
 
-    it "deletes the note of a submitted set whose extraction already ran, and that date's note and explanation evidence" do
+    it "deletes the note of a submitted set whose extraction already ran, and every item citing it or the explanation" do
       exercise = todays_set(regenerating_since: Time.current)
       note_on(exercise)
       items = items_from_the_day
@@ -171,7 +170,7 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
       ExtractLearnerItemsJob.perform_now(user_id: user.id, daily_exercise_id: exercise.id, daily_response_id: old_response.id,
                                          run: "fallback")
 
-      expect(LearnerNote.find_by(daily_exercise: exercise)).to have_attributes(extract_attempts: 0, extracted_at: nil)
+      expect(LearnerExtraction.for(exercise.reload)).to have_attributes(attempts: 0, closed?: false)
     end
   end
 end

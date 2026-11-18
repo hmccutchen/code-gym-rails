@@ -53,7 +53,7 @@ RSpec.describe SweepLearnerNotesJob do
     reply = LearnerItemsReply::Item.new(concept: "n_plus_one", bucket: "ruby_rails", kind: "concept", term: nil,
                                         label: "Practise it again.",
                                         evidence: [ { "date" => today.iso8601, "source" => "note" } ])
-    LearnerItem.merge!(user, [ reply ], set_date: today)
+    LearnerItem.merge!(user, [ reply ], set_date: today, still_there: -> { LearnerItem::EVIDENCE_SOURCES })
 
     expect(LearnerItem.sole).to have_attributes(status: "open", returned_after: nil)
   end

@@ -20,3 +20,18 @@ new items, closed-item repeats included, count toward the three a day.
 The partial unique index allows one open row per key. If a row for the key
 appears between the read and the insert, the insert's savepoint rolls back
 and the item is absorbed into that row instead.
+
+## Evidence deleted while the call was out
+
+The extraction call runs outside every lock, so the engineer can delete the
+note or the explanation, press Delete all or Start over, or regenerate the
+set while it is out. The caller passes `still_there:`, which the merge calls
+once it holds the user row lock: it answers nil when the set is no longer
+the one read, and otherwise the evidence sources whose text is still the
+text the call read. Every account-page deletion and Start over take the
+same lock, so the answer holds until the merge commits. An item citing a
+source of the set's date that is gone is not written and cannot be
+absorbed, and is counted as `evidence_deleted`; when the set itself moved,
+nothing is written and every item counts as `set_replaced`. The merge never
+names the note model, which keeps it inside `learner_notes_isolation_spec`;
+the job builds the check.

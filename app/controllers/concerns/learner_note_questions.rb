@@ -20,7 +20,8 @@ module LearnerNoteQuestions
   end
 
   def explain_box_for(exercise, response, note)
-    return saved_explain_box(note) if note&.explanation.present?
+    ledger = LearnerExtraction.for(exercise)
+    return saved_explain_box(note, ledger) if note&.explanation.present?
 
     options = ExplainQuestion.options(tags: exercise.section_concepts)
     return if options.empty?
@@ -29,18 +30,20 @@ module LearnerNoteQuestions
     choices = options.map { |option| explain_choice(option, history) }
     default = ExplainQuestion.default(options: options, recent: history.recent, **day_signals(exercise, response))
     question = choices.find { |choice| choice.section == default.section }.question
-    ExplainBox.new(state: note&.extracted_at ? :closed : :open, question: question, choices: choices,
+    ExplainBox.new(state: ledger.closed? ? :closed : :open, question: question, choices: choices,
                    default_section: default.section, text: nil, reply: nil)
   end
 
-  def saved_explain_box(note)
+  def saved_explain_box(note, ledger)
     ExplainBox.new(state: :saved, question: ExplainQuestion.text(note.explain_phrasing, note.explain_concept),
-                   choices: [], default_section: note.explain_section, text: note.explanation, reply: reply_view(note))
+                   choices: [], default_section: note.explain_section, text: note.explanation, reply: reply_view(note, ledger))
   end
 
-  def reply_view(note)
+  def reply_view(note, ledger)
     reply = note.reply
-    ReplyView.new(state: note.reply_state, sound: reply&.sound, correction: reply&.correction, ask: note.reply_askable?)
+    attempts = ledger.reply_attempts
+    ReplyView.new(state: note.reply_state(attempts), sound: reply&.sound, correction: reply&.correction,
+                  ask: note.reply_askable?(attempts))
   end
 
   def explain_choice(option, history)

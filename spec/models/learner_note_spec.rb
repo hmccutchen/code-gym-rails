@@ -73,28 +73,8 @@ RSpec.describe LearnerNote do
     expect(refused(note(explanation: "b" * 1_001))).to include(:explanation)
   end
 
-  it "never counts more than two extraction attempts" do
-    expect(note(extract_attempts: 2)).to be_valid
-    expect(refused(note(extract_attempts: 3))).to include(:extract_attempts)
-    expect(refused(note(extract_attempts: -1))).to include(:extract_attempts)
-  end
-
-  it "refuses a third attempt in the database too" do
-    row = note.tap(&:save!)
-
-    expect { row.update_columns(extract_attempts: 3) }.to raise_error(ActiveRecord::StatementInvalid, /extract_attempts_range/)
-  end
-
-  it "never counts more than two reply attempts" do
-    expect(note(reply_attempts: 2)).to be_valid
-    expect(refused(note(reply_attempts: 3))).to include(:reply_attempts)
-    expect(refused(note(reply_attempts: -1))).to include(:reply_attempts)
-  end
-
-  it "refuses a third reply attempt in the database too" do
-    row = note.tap(&:save!)
-
-    expect { row.update_columns(reply_attempts: 3) }.to raise_error(ActiveRecord::StatementInvalid, /reply_attempts_range/)
+  it "leaves the old extraction and reply counts unused, since the set's ledger holds them now" do
+    expect(described_class.column_names).not_to include("extract_attempts", "extracted_at", "reply_attempts")
   end
 
   it "hides the note, the explanation and its reply from inspect" do
