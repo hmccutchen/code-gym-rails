@@ -74,6 +74,11 @@ class LearnerItem < ApplicationRecord
     user.learner_items.where(status: "dismissed", closed_on: (today - RECENT_DAYS)..).order(closed_on: :desc, id: :desc)
   end
 
+  # No zone's date runs more than a day ahead of UTC, so this finds every owner with an item overdue where they live.
+  def self.owners_with_overdue_open_items
+    User.where(id: where(status: "open", expires_on: ...(Date.current + 1)).select(:user_id))
+  end
+
   def self.open_by_key(user) = user.learner_items.where(status: "open").index_by(&:matching_key)
 
   def self.expire_overdue!(user, today:)

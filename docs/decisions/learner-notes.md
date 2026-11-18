@@ -195,7 +195,10 @@ implies a mastery tier.
 
 Notes and explanations are kept 365 days by their set's date, as duck threads
 are. Closed items of every status are deleted 90 days after `closed_on`.
-`SweepLearnerNotesJob` does both, daily. Both tables are deleted with the
+`SweepLearnerNotesJob` does both, daily. It first expires every overdue open
+item, by its owner's local date, as a merge would: an account that stops
+submitting runs no merge, and its open items would otherwise be kept
+forever. Both tables are deleted with the
 account (`deleting-an-account.md`), and a waiting fallback job, which names
 the user, is discarded with it. The note, the explanation and the reply are
 filtered from logs and `inspect`. While `LEARNER_NOTES` is on, the privacy

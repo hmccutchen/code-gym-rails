@@ -133,9 +133,12 @@ this area.
   read, and the action discards any extraction still waiting for that set
   (`ExtractLearnerItemsJob.discard_waiting`). Deleting keeps no record. The page reads no
   `ConceptMastery`, and its fixed copy names no tier, score or level.
-- **Retention.** `SweepLearnerNotesJob` (daily, `default`) deletes notes past
+- **Retention.** `SweepLearnerNotesJob` (daily, `default`) first expires
+  overdue open items under each owner's row lock, by the owner's local date
+  (`closed_on` is the expiry date), then deletes notes past
   `LearnerNote::KEPT_FOR` by their set's date and closed items past
-  `LearnerItem::KEPT_AFTER_CLOSE` after `closed_on`. The privacy page reads
+  `LearnerItem::KEPT_AFTER_CLOSE` after `closed_on`, so an inactive
+  account's items still go. The privacy page reads
   both, the look-back window and the open-item limit from
   `PrivacyNotice.facts`, so a change to one changes the page. It shows the
   learner notes lines, and `stored.body_with_learner_notes` in place of

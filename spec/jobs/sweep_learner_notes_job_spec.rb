@@ -46,6 +46,28 @@ RSpec.describe SweepLearnerNotesJob do
     expect(LearnerItem::KEPT_AFTER_CLOSE).to eq(90.days)
   end
 
+  it "expires an overdue open item first, so an inactive account's item goes 90 days after its expiry" do
+    long_overdue = item(status: "open")
+    long_overdue.update_columns(expires_on: today - 91)
+    recently_overdue = item(status: "open", concept: "memoization")
+    recently_overdue.update_columns(expires_on: today - 2)
+
+    described_class.perform_now
+
+    expect(LearnerItem.where(id: long_overdue.id)).to be_empty
+    expect(recently_overdue.reload).to have_attributes(status: "expired", closed_on: today - 2)
+  end
+
+  it "expires by the owner's local date" do
+    user.update!(time_zone: "Pacific/Honolulu")
+    due_today_there = item(status: "open")
+    due_today_there.update_columns(expires_on: today - 1)
+
+    described_class.perform_now
+
+    expect(due_today_there.reload.status).to eq("open")
+  end
+
   it "leaves no trace of a swept dismissed item, so a later item for its key gets no returned_after" do
     item(status: "dismissed", closed_on: today - 91)
     described_class.perform_now
