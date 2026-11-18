@@ -87,25 +87,47 @@ the module has connected. `spec/system/deferred_module_spec.rb` answers the
 missing comparison module with a 404 and expects the stale pick to stay
 unsubmitted.
 
-## Submit flushes a pending note
+## Submit waits for the latest note save
 
 The learner-note box sits inside this controller's wrapper but outside
 `formTarget`, so its text never joins the answer payload. Once the modules
-are ready, `flushPendingNote` asks that box's controller to send any pending
-typing timer and waits for its result before posting Submit. Waiting only
-at the later leave gate would let Submit close the day before the note
-could save. A missing note controller uses the existing controls-not-ready
-message; no note box means no extra save.
+are ready, `flushPendingNote` asks that box's controller to flush any pending
+typing timer and await its latest queued or in-flight save before posting
+Submit. An ordinary autosave that already failed is retried once with the
+latest text, including an empty string. Waiting only at the later leave gate
+would let Submit close the day before the note could save. A missing note
+controller uses the existing controls-not-ready message; no note box means
+no extra save.
 
 `lockForSubmit` makes the note inert too, so a new edit cannot appear while
-the flush is running. A 409 from the flush takes the existing stale-page
-reload path without posting answers. Its leave gate ignores that note
-conflict, but still waits for unrelated saves and failures; the form stays
-locked until recovery. Other failed flushes call the existing `unlock`,
-restoring both the answer form and the note. The note controller keeps the
-failed flush for the next explicit Submit, without adding automatic retries.
-An already-sent note with no pending typing timer retains the existing
-post-submit leave handling.
+the flush is running. A 409 returned by the flush takes the existing
+stale-page reload path without posting answers. A completed autosave's 409
+is reused without another PATCH only when no new edit is pending; editing
+still schedules a save. The leave gate ignores that note conflict, but
+still waits for unrelated saves and failures; the form stays locked until
+recovery. Other failed flushes call the existing `unlock`,
+restoring both the answer form and the note with its text and error intact.
+A save that fails while Submit waits is not retried by that same click.
+The note controller retains the latest pending promise and its result, so
+an older reply cannot clear a newer failure or lose a pending edit. The next
+explicit Submit retries a failed save; a successful, unchanged note needs
+no new save. The shared queue still owns request ordering and error display.
+An already-submitted refusal from another tab, including one cached from a
+completed autosave, is settled without retrying unchanged text; the server
+keeps the note read-only.
+
+The account's notes setting can change while this page stays open. Its real
+404 follows the failed-flush path: each explicit Submit retries once, keeps
+the note text and error, and leaves answers unsubmitted. `unlock` resumes
+ordinary answer autosaving. A persistent refusal is not bypassed. A manual
+reload reads the new setting and removes the box, losing its unsaved text.
+The missing-exercise 404 takes the same path.
+
+If the note request never settles, neither does the flush: Submit stays
+disabled, both boxes stay inert, and no answer POST begins. `request.send`
+has no application timeout or cancellation; this controller adds none.
+The browser regression holds and releases a request to verify the ordering,
+without measuring browser or network timeouts.
 
 ## Leaving the page waits for other saves
 

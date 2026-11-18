@@ -41,15 +41,36 @@ Text typed before the box's script loaded schedules that same save when the
 script connects. Saves still queue with `latest: true`, reading the text when
 sent so edits during a request are kept.
 
-Submit flushes a pending typing timer before posting the answers, since a
-note arriving after submission would be refused. The note stays inert while
-Submit runs, even though its box sits outside the answer form. If the flush
-gets a 409 because the page is stale, Submit uses the existing stale-page
-reload without posting answers. That reload ignores the note conflict
-alone; unrelated saves and failures still hold it. Other failed flushes keep
-the text, show the existing save error and unlock the page; the next Submit
-retries that flush. Saves already in flight keep their existing submission
-handling below.
+Submit flushes a pending typing timer and waits for the latest queued or
+in-flight note save before posting the answers, since a note arriving after
+submission would be refused. If an ordinary autosave already failed, Submit
+retries the latest text once, including a deletion. A save that fails while
+Submit waits is surfaced without another attempt: the answers stay
+unsubmitted, the text and existing save error remain, and both boxes unlock.
+The next explicit Submit can retry; no automatic retry or provider call is
+added. A successful, unchanged note is not saved again on Submit.
+
+If the account turns notes off in another tab, the old box's autosave gets
+the server's 404. Each explicit Submit makes one more attempt and keeps
+the note text and error, with answers still unsubmitted. Ordinary answer
+autosaving resumes after the refusal. A persistent refusal blocks submission
+on that page; it never silently drops the current note to let Submit succeed.
+A manual reload reads the current setting and removes the disabled box,
+discarding its unsaved text. The missing-exercise 404 follows the same
+failure path.
+
+An unanswered note request keeps Submit waiting and both boxes inert.
+The shared request layer has no application timeout or cancellation, so
+this wait has no application-set bound. The browser check holds a request,
+verifies that no answer POST starts, then releases it; it does not measure
+a browser or network timeout.
+
+The note stays inert while Submit runs, even though its box sits outside the
+answer form. A 409 returned by the flush uses the existing stale-page reload
+without posting answers. If an earlier autosave returned 409 and no new
+edit is pending, Submit uses that result without another PATCH. A new edit
+still schedules a save. The reload ignores the note conflict alone;
+unrelated saves and failures still hold it.
 
 `NoteQuestion` picks from signals the app already has, first match wins: a
 cleared duck thread, duck turns, a "too hard" rating, a skipped section, or
@@ -60,10 +81,13 @@ answer was written to. The page renders the question's key on the box and
 posts it with each save, and the server stores that key when it names a real
 question about one of the set's sections (`LearnerDay.shown_note_question`),
 so a duck turn between the page load and the first save cannot swap the
-question the note answers. Any other key falls back to the server's pick. The note is read-only once the day is submitted. A note save that reaches
-the server after Submit is refused with `submitted: true`, and the page
-treats that refusal as settled, so the move to the review that Submit
-started is not held waiting for it.
+question the note answers. Any other key falls back to the server's pick.
+The note is read-only once the day is submitted. Another tab can still submit
+before this tab's note reaches the server. That save is refused with
+`submitted: true`, and the page treats the refusal as settled without
+retrying the unchanged text or changing the stored note, so the move to the
+submitted page is not held waiting for it. This also holds when the ordinary
+autosave completed before Submit.
 
 **The explain question** (`ExplainQuestion`) is offered on every submitted day
 with a usable concept tag, whether or not the engineer used the duck or rated
