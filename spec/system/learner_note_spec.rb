@@ -262,6 +262,7 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
           page.execute_script("window.CodeGymSaveStatus.clear('other_control')")
         end
         expect(page).to have_no_css(%([data-answer-form-draft-scope-value="#{old_scope}"]))
+        expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
         expect(LearnerNote.find_by(user: user)).to be_nil
         expect(user.daily_responses).to be_empty
       end
