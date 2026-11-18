@@ -5,5 +5,6 @@ class PrivacyController < ApplicationController
   # GET /privacy
   def show
     @facts = PrivacyNotice.facts
+    @learner_notes_shown = LearnerNotes.enabled?
   end
 end

@@ -199,7 +199,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/controllers/daily_exercises_controller.rb` — manual generate + once-daily regenerate
 - `app/controllers/history_controller.rb` — paginated list of submitted sessions
 - `app/controllers/sessions_controller.rb` — code request, the code page, verification and starting again, with rate limits; an account with the authenticator on goes from its address to the second step
-- `app/controllers/privacy_controller.rb` — `GET /privacy`: the privacy page, open to anyone signed out or signed in, with or without a key; hands the view `PrivacyNotice.facts`
+- `app/controllers/privacy_controller.rb` — `GET /privacy`: the privacy page, open to anyone signed out or signed in, with or without a key; hands the view `PrivacyNotice.facts` and whether the learner notes lines show (only while `LEARNER_NOTES` is on)
 - `app/models/privacy_notice.rb` — `PrivacyNotice`: the numbers the privacy page states, read from the code that sets them (`DuckThread::KEPT_FOR`, `LearnerNote::KEPT_FOR`, `LearnerItem::KEPT_AFTER_CLOSE`, `LearnerItem::RECENT_DAYS`, `LearnerItem::MAX_OPEN`, `UnopenedSets::PAUSE_AFTER`, the session cookie's `expire_after`) or, for Railway's log retention, held as `LOG_DAYS`; see `docs/code-notes/app/models/privacy_notice.md`
 - `app/views/privacy/show.html.erb` — the privacy page's markup; its text is `privacy.show` in `config/locales/en.yml`
 - `app/controllers/second_factor_challenges_controller.rb` — `/login/second-factor`: the authenticator or recovery code asked for in place of the emailed code, when the account has the authenticator on

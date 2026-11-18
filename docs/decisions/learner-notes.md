@@ -177,9 +177,11 @@ are. Closed items of every status are deleted 90 days after `closed_on`.
 `SweepLearnerNotesJob` does both, daily. Both tables are deleted with the
 account (`deleting-an-account.md`), and a waiting fallback job, which names
 the user, is discarded with it. The note, the explanation and the reply are
-filtered from logs and `inspect`. The privacy page states what is stored, the
-request that reads it, the reply's own request and both periods, with every
-number read from `PrivacyNotice.facts`.
+filtered from logs and `inspect`. While `LEARNER_NOTES` is on, the privacy
+page states what is stored, the request that reads it, the reply's own
+request and both periods, with every number read from `PrivacyNotice.facts`.
+With the switch unset, the page is exactly as it was before learner notes,
+including the list of what is stored (owner's decision, 2026-11-18).
 
 ## Deletion keeps no record
 

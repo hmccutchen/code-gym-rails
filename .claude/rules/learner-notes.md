@@ -110,6 +110,8 @@ this area.
   `LearnerNote::KEPT_FOR` by their set's date and closed items past
   `LearnerItem::KEPT_AFTER_CLOSE` after `closed_on`. The privacy page reads
   both, the look-back window and the open-item limit from
-  `PrivacyNotice.facts`, so a change to one changes the page.
+  `PrivacyNotice.facts`, so a change to one changes the page. It shows the
+  learner notes lines, and `stored.body_with_learner_notes` in place of
+  `stored.body`, only while `LEARNER_NOTES` is on.
 - **Duck turns in the extraction prompt** pass through `UserText.defanged`,
   so a duck reply carrying engineer tags never reads as the engineer's words.
