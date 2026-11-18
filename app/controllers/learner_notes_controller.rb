@@ -22,7 +22,7 @@ class LearnerNotesController < ApplicationController
   def render_note_outcome(outcome, day, asked)
     case outcome
     when LearnerNote        then render_question(LearnerDay.note_question(day, stored: outcome.question_key || asked.key))
-    when :submitted         then render_json_error(t("learner_notes.note.after_submit"), status: :unprocessable_content)
+    when :submitted         then render_json_error(t("learner_notes.note.after_submit"), status: :unprocessable_content, submitted: true)
     when :stale, :deleted   then render_json_error(t("flash.responses.stale_answers"), status: :conflict)
     else raise ArgumentError, "Unhandled learner note outcome: #{outcome.inspect}"
     end

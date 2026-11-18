@@ -131,6 +131,7 @@ RSpec.describe "PATCH /learner_note", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(reply["error"]).to eq("This set is submitted, so its note can't change now.")
+    expect(reply["submitted"]).to be(true)
     expect(note.body).to eq("before submit")
   end
 

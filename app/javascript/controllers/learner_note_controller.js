@@ -11,6 +11,8 @@ export default class extends Controller {
     const result = await saveStatus.queue("learner_note", "PATCH", this.urlValue,
       () => ({ learner_note: this.inputTarget.value, draft_scope: this.draftScope(), response_id: this.responseIdValue,
         question_key: this.questionKeyValue }), { latest: true })
+    // A submit that landed first leaves the note as stored, so its refusal must not hold the page's move to the review.
+    if (result.data?.submitted) return saveStatus.clear("learner_note")
     if (!result.ok || !result.data?.question) return
 
     this.questionTarget.textContent = result.data.question

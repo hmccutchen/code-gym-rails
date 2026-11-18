@@ -41,7 +41,10 @@ answer was written to. The page renders the question's key on the box and
 posts it with each save, and the server stores that key when it names a real
 question about one of the set's sections (`LearnerDay.shown_note_question`),
 so a duck turn between the page load and the first save cannot swap the
-question the note answers. Any other key falls back to the server's pick. The note is read-only once the day is submitted.
+question the note answers. Any other key falls back to the server's pick. The note is read-only once the day is submitted. A note save that reaches
+the server after Submit is refused with `submitted: true`, and the page
+treats that refusal as settled, so the move to the review that Submit
+started is not held waiting for it.
 
 **The explain question** (`ExplainQuestion`) is offered on every submitted day
 with a usable concept tag, whether or not the engineer used the duck or rated
