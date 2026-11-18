@@ -119,27 +119,33 @@ RSpec.describe LearnerExtraction do
   end
 
   describe ".forget_all!" do
-    it "stamps a forgotten time on each of the owner's existing ledgers, keeping their counts and the plan's notes" do
+    it "stamps a forgotten time on each of the owner's ledgers, keeping their counts and the plan's notes" do
       described_class.count_attempt!(exercise, close: false, response_id: response_id)
-      untouched = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
-                                        problem_set: exercise.problem_set, plan_notes: { "size" => 2 })
 
       described_class.forget_all!(user)
 
       expect(described_class.for(exercise.reload)).to have_attributes(attempts: 1, forgotten_at: Time.current.iso8601)
       expect(stored).to include("size" => 2, "daily_kinds" => %w[code_review design_comparison])
-      expect(untouched.reload.plan_notes).to eq("size" => 2)
     end
 
-    it "leaves another account's ledgers alone" do
-      other = User.create!(email: "other-ledger@example.com", provider: "fake", api_keys: { "fake" => "fake-key" })
-      theirs = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
-                                     problem_set: exercise.problem_set)
-      described_class.count_reply_attempt!(theirs) { Time.current }
+    it "creates the ledger on a set no run has read yet, so a run that read none sees the stamp" do
+      unread = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: exercise.problem_set, plan_notes: { "size" => 2 })
 
       described_class.forget_all!(user)
 
-      expect(described_class.for(theirs.reload).forgotten_at).to be_nil
+      expect(unread.reload.plan_notes).to eq("size" => 2, described_class::KEY => { "forgotten_at" => Time.current.iso8601 })
+      expect(described_class.for(unread)).to have_attributes(attempts: 0, reply_attempts: 0, closed?: false)
+    end
+
+    it "leaves another account's sets alone" do
+      other = User.create!(email: "other-ledger@example.com", provider: "fake", api_keys: { "fake" => "fake-key" })
+      theirs = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: exercise.problem_set, plan_notes: { "size" => 2 })
+
+      described_class.forget_all!(user)
+
+      expect(theirs.reload.plan_notes).to eq("size" => 2)
     end
   end
 end

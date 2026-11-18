@@ -50,9 +50,11 @@ module LearnerExtraction
 
   # The caller holds the user row lock, so an extraction's merge sees the stamp before it writes.
   def self.forget_all!(user)
-    DailyExercise.where(user_id: user.id).where("plan_notes ? :key", key: KEY)
-                 .update_all([ "plan_notes = jsonb_set(plan_notes, ARRAY[:key, 'forgotten_at'], to_jsonb(CAST(:at AS text)))",
-                               { key: KEY, at: Time.current.iso8601 } ])
+    DailyExercise.where(user_id: user.id).where("jsonb_typeof(plan_notes) = 'object'").update_all([ <<~SQL.squish, { key: KEY, at: Time.current.iso8601 } ])
+      plan_notes = jsonb_set(plan_notes, ARRAY[:key],
+        (CASE WHEN jsonb_typeof(plan_notes->:key) = 'object' THEN plan_notes->:key ELSE '{}'::jsonb END)
+          || jsonb_build_object('forgotten_at', CAST(:at AS text)))
+    SQL
   end
 
   def self.clear!(exercise)

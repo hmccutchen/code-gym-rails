@@ -47,7 +47,11 @@ nothing.
 Delete all cannot tell which set an extraction call is reading, and an
 item that cites only a duck turn or an answer would survive the note
 checks. So `.forget_all!`, called under the user row lock Delete all
-holds, stamps `forgotten_at` on every ledger the account has. The job
+holds, stamps `forgotten_at` on every set the account has, creating the
+ledger key on a set that has none yet. A run may read a set before any
+ledger exists and only create the key when it counts its attempt; stamping
+only existing ledgers would miss that set, and its run would find no stamp
+moved and write its items after Delete all. The job
 keeps the ledger it read before the call, and its `still_there:` check,
 run under the same lock, answers nil when the stamp moved since. The stamp
 is a time, with no text, so keeping it keeps nothing the engineer asked to

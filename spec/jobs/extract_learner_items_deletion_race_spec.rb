@@ -223,4 +223,17 @@ RSpec.describe ExtractLearnerItemsJob, "when the set moves on before the run wri
 
     expect(LearnerExtraction.for(exercise.reload)).to have_attributes(closed?: false, attempts: 0)
   end
+
+  it "writes no item when Delete all lands after the run read a set with no ledger yet" do
+    exercise = submitted_set
+    expect(exercise.plan_notes).not_to have_key(LearnerExtraction::KEY)
+    allow(DuckThread).to receive(:for).and_wrap_original do |original, *args|
+      LearnerNote.remove_all!(user)
+      original.call(*args)
+    end
+
+    run(exercise, exercise.daily_response.id)
+
+    expect(LearnerItem.where(user_id: user.id)).to be_empty
+  end
 end

@@ -99,7 +99,8 @@ this area.
   merge takes a `still_there:` check from the job, called under the user row
   lock, and writes no item citing a note or explanation deleted during the
   call, and nothing once the set was replaced or Delete all stamped the
-  set's ledger `forgotten_at` after the call read it; for those the merge
+  set's ledger `forgotten_at` after the call read it (Delete all stamps every
+  set of the account, creating the ledger where it is missing); for those the merge
   returns `:replaced` and the job leaves the ledger alone. A set or account deleted
   mid-call is logged, never raised. An extraction failure never touches
   `generation_account_failures`. Its log line carries counts only.

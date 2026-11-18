@@ -113,7 +113,7 @@ response is still the one read and that the note and the explanation still
 hold the text the call read. It drops an item citing anything deleted
 meanwhile, and writes nothing once the set was replaced. Delete all cannot
 know which set a call is reading, so it stamps a text-free forgotten time on
-every ledger the account has; a call whose set's stamp moved after it read
+every set the account has, creating the ledger where a set has none yet; a call whose set's stamp moved after it read
 the set writes nothing, even an item citing only a duck turn (owner's
 decision, 2026-11-18). In both cases the job leaves the ledger as it is,
 since after Start over it belongs to the response that replaced the one
