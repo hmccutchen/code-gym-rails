@@ -37,6 +37,20 @@ class LearnerItem < ApplicationRecord
     [ newest_evidence_on + EXPIRES_AFTER_EVIDENCE, created_on + LONGEST_LIFE ].min
   end
 
+  def self.merge!(user, items, set_date:) = Merge.call(user, items, set_date: set_date)
+
+  def self.open_by_key(user) = user.learner_items.where(status: "open").index_by(&:matching_key)
+
+  def self.expire_overdue!(user, today:)
+    user.learner_items.where(status: "open", expires_on: ...today)
+        .update_all([ "status = 'expired', closed_on = expires_on, updated_at = ?", Time.current ])
+  end
+
+  def self.displace_past_limit!(user, today:)
+    open = user.learner_items.where(status: "open").sort_by { |item| [ item.newest_evidence_on, item.created_at, item.id ] }
+    open.first([ open.size - MAX_OPEN, 0 ].max).each { |item| item.update!(status: "expired", closed_on: today) }
+  end
+
   def self.matching_key(concept:, bucket:, kind:, term: nil)
     [ concept, bucket, kind, kind == "term" ? term.to_s.squish.downcase : "" ]
   end
@@ -44,6 +58,8 @@ class LearnerItem < ApplicationRecord
   def matching_key = self.class.matching_key(concept: concept, bucket: bucket, kind: kind, term: term)
 
   def term_item? = kind == "term"
+
+  def newest_evidence_on = evidence.map { |reference| Date.iso8601(reference["date"]) }.max
 
   private
 

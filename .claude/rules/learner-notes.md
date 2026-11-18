@@ -2,6 +2,7 @@
 paths:
   - "app/prompts/learner_items_prompt.rb"
   - "app/models/{learner_note,learner_item,learner_items_reply,note_question,explain_question}.rb"
+  - "app/models/learner_item/merge.rb"
   - "app/clients/learner_notes.rb"
   - "app/controllers/{learner_notes,learner_explanations}_controller.rb"
   - "app/controllers/concerns/{learner_notes_gate,learner_note_questions}.rb"
@@ -38,3 +39,15 @@ Each entry states what a change must not break.
   or on two lines (never cut), a bad term, and an item with no valid
   evidence. The server stamps each reference with the set's date and ignores
   any id or date in the reply. The reply is parsed with `log_raw: false`.
+- **One writer of items.** `LearnerItem.merge!` takes the user row lock,
+  expires overdue open rows, then applies the five merge rules in order:
+  collapse matching items inside the reply; let an open item with the same
+  key absorb its repeat (evidence newest 5, the day in `came_up_on`, a moved
+  expiry, its own label kept); count repeats apart from new items and drop
+  new items past `LearnerItem::MAX_NEW_PER_DAY` as `over_limit`; hold back a
+  match for an item used in the last 30 days (a term outright, another kind
+  keeps only evidence from the shaped set onward) as `recently_used`; insert
+  with `returned_after` when the key was dismissed and is still kept; then
+  displace past `LearnerItem::MAX_OPEN`. A unique violation merges into the
+  existing open row. The matching key is `LearnerItem.matching_key` alone.
+  Deleting a row keeps no record, so a deleted item holds nothing back.
