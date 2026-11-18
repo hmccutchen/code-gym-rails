@@ -335,12 +335,14 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
           const passThrough = window.fetch;
           window.__heldNote = [];
           window.__submits = 0;
+          window.__answerPosts = 0;
           window.__releaseNote = () => {
             window.__noteReleased = true;
             window.__heldNote.forEach((go) => go());
           };
           window.fetch = (url, options) => {
             const pathname = new URL(String(url), location.href).pathname;
+            if (pathname === "/responses") window.__answerPosts++;
             if (pathname === "/responses" && JSON.parse(options.body).response.submit) {
               window.__submits++;
               return passThrough(url, options).then((response) =>
@@ -355,6 +357,7 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       rate_section("code_review")
       expect_ready_to_submit
       wait_for_answers_settled
+      page.execute_script("window.__answerPosts = 0")
       find("#learner-note textarea").fill_in(with: "The loop hid the query.")
       wait_for_js_condition("window.__heldNote.length > 0")
 
@@ -363,6 +366,7 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       expect(page).to have_button(I18n.t("dashboard.exercise.submitting"), disabled: true)
       expect(page).to have_no_css("#leave-held", wait: 0.2)
       expect(page.evaluate_script("window.__submits")).to eq(0)
+      expect(page.evaluate_script("window.__answerPosts")).to eq(0)
       expect(user.daily_responses.sole).not_to be_submitted
       page.execute_script("window.__releaseNote()")
 
@@ -545,6 +549,102 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       page.execute_script("window.CodeGymSaveStatus.clear('other_control')")
       expect(page).to have_no_css("#leave-held")
       expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
+    end
+  end
+
+  it "keeps a disabled account's refused autosave and makes only one attempt per explicit Submit" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      fill_in_answer("code_review", "It queries once per row in the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
+      wait_for_answers_settled
+      pause_browser_clock
+      page.execute_script("window.__noteStatuses = []; window.__submits = 0")
+      stub_fetch(learner_note_path, <<~JS)
+        passThrough(url, options).then((response) => {
+          window.__noteStatuses.push(response.status);
+          return response;
+        })
+      JS
+      stub_fetch(responses_path, "(window.__submits += JSON.parse(options.body).response.submit ? 1 : 0, passThrough(url, options))")
+      expect(user.write_learner_notes_setting!(false, offered: true)).to eq(:turned_off)
+      type_note("The old tab's unsent edit.")
+      advance_browser_clock(800)
+      wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+      expect(page.evaluate_script("window.__noteStatuses")).to eq([ 404 ])
+      expect(page).to have_css("#save-status", text: I18n.t("learner_notes.note.unavailable"))
+      advance_browser_clock(30_000)
+      expect(page.evaluate_script("window.__noteStatuses")).to eq([ 404 ])
+
+      2.times do |attempt|
+        page.execute_script("document.querySelector('#submit-answers').click()")
+        wait_for_js_condition("window.__noteStatuses.length === #{attempt + 2}")
+        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+        expect(page).to have_css("#save-status", text: I18n.t("learner_notes.note.unavailable"))
+        expect(find("#learner-note textarea").value).to eq("The old tab's unsent edit.")
+        expect(page.evaluate_script("document.querySelector('#learner-note textarea').closest('[inert]')")).to be_nil
+        expect(page.evaluate_script("document.querySelector('#gym-form').inert")).to be(false)
+        expect(user.daily_responses.sole).not_to be_submitted
+        advance_browser_clock(30_000)
+        wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+        expect(page.evaluate_script("window.__noteStatuses")).to eq([ 404 ] * (attempt + 2))
+        expect(page.evaluate_script("window.__submits")).to eq(0)
+      end
+
+      expect(LearnerNote.find_by(user: user)).to be_nil
+      page.driver.with_playwright_page { |pw| pw.clock.resume }
+      visit root_path
+      wait_for_js
+      expect(page).to have_no_css("#learner-note")
+      expect(page).to have_no_css("#save-status")
+      expect(user.daily_responses.sole).not_to be_submitted
+      expect(user.daily_responses.sole.answers["code_review"]).to eq("It queries once per row in the loop.")
+    end
+  end
+
+  it "does not retry a completed autosave refused because another tab already submitted" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      fill_in_answer("code_review", "It queries once per row in the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
+      wait_for_answers_settled
+      pause_browser_clock
+      page.execute_script("window.__noteSaves = 0")
+      stub_fetch(learner_note_path, <<~JS)
+        (window.__noteSaves++, passThrough(url, options).then(async (response) => {
+          window.__noteRefusal = await response.clone().json();
+          return response;
+        }))
+      JS
+      stub_fetch(responses_path, <<~JS)
+        passThrough(url, options).then((response) =>
+          new Promise((resolve) => { window.__releaseSubmit = () => resolve(response); }))
+      JS
+      type_note("The old tab's unsent edit.")
+      user.daily_responses.sole.update!(submitted_at: Time.current)
+      advance_browser_clock(800)
+      wait_for_js_condition("window.__noteRefusal?.submitted && !window.CodeGymSaveStatus.pending()")
+      expect(page.evaluate_script("window.__noteSaves")).to eq(1)
+      expect(page).to have_no_css("#save-status")
+      page.execute_script("document.querySelector('#submit-answers').click()")
+      wait_for_js_condition("window.__releaseSubmit")
+      expect(page.evaluate_script("window.__noteSaves")).to eq(1)
+      expect(page).to have_no_css("#leave-held")
+      page.execute_script("window.__releaseSubmit()")
+
+      expect(page).to have_no_css("#gym-form")
+      expect(page).to have_no_css("#leave-held")
+      expect(LearnerNote.find_by(user: user)).to be_nil
     end
   end
 

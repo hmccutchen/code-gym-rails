@@ -100,18 +100,34 @@ controller uses the existing controls-not-ready message; no note box means
 no extra save.
 
 `lockForSubmit` makes the note inert too, so a new edit cannot appear while
-the flush is running. A 409 from the flush or a completed autosave takes the
-existing stale-page reload path without retrying or posting answers. Its leave gate ignores that note
-conflict, but still waits for unrelated saves and failures; the form stays
-locked until recovery. Other failed flushes call the existing `unlock`,
+the flush is running. A 409 returned by the flush takes the existing
+stale-page reload path without posting answers. A completed autosave's 409
+is reused without another PATCH only when no new edit is pending; editing
+still schedules a save. The leave gate ignores that note conflict, but
+still waits for unrelated saves and failures; the form stays locked until
+recovery. Other failed flushes call the existing `unlock`,
 restoring both the answer form and the note with its text and error intact.
 A save that fails while Submit waits is not retried by that same click.
 The note controller retains the latest pending promise and its result, so
 an older reply cannot clear a newer failure or lose a pending edit. The next
 explicit Submit retries a failed save; a successful, unchanged note needs
 no new save. The shared queue still owns request ordering and error display.
-An already-submitted refusal from another tab is settled without a retry;
-the server keeps the note read-only.
+An already-submitted refusal from another tab, including one cached from a
+completed autosave, is settled without retrying unchanged text; the server
+keeps the note read-only.
+
+The account's notes setting can change while this page stays open. Its real
+404 follows the failed-flush path: each explicit Submit retries once, keeps
+the note text and error, and leaves answers unsubmitted. `unlock` resumes
+ordinary answer autosaving. A persistent refusal is not bypassed. A manual
+reload reads the new setting and removes the box, losing its unsaved text.
+The missing-exercise 404 takes the same path.
+
+If the note request never settles, neither does the flush: Submit stays
+disabled, both boxes stay inert, and no answer POST begins. `request.send`
+has no application timeout or cancellation; this controller adds none.
+The browser regression holds and releases a request to verify the ordering,
+without measuring browser or network timeouts.
 
 ## Leaving the page waits for other saves
 
