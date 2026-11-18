@@ -46,6 +46,8 @@ class LearnerNote < ApplicationRecord
     end
   end
 
+  def self.extraction_row(exercise) = row_for(exercise)
+
   def self.under_draft_locks(exercise, expected_scope)
     transaction do
       owner = User.lock("FOR SHARE").find_by(id: exercise.user_id)
@@ -95,6 +97,24 @@ class LearnerNote < ApplicationRecord
                       explain_phrasing: ExplainQuestion.phrasing(earlier), explanation: text)
     nil
   end
+
+  def extracted? = extracted_at.present?
+
+  def close_extraction!
+    with_lock { update!(extracted_at: Time.current) unless extracted? }
+  end
+
+  # The attempt is saved before the call leaves, so a worker that dies mid-call has already spent it.
+  def count_extract_attempt!(close:)
+    with_lock do
+      next false if extracted? || extract_attempts >= MAX_EXTRACT_ATTEMPTS
+
+      update!(extract_attempts: extract_attempts + 1, extracted_at: (Time.current if close))
+      true
+    end
+  end
+
+  def something_to_read? = body.to_s.strip.present? || explanation.to_s.strip.present?
 
   private
 

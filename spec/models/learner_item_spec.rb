@@ -146,4 +146,48 @@ RSpec.describe LearnerItem do
     expect(shown).not_to include("STI", "polymorphism")
     expect(shown).to include("label: [FILTERED]", "term: [FILTERED]")
   end
+
+  describe ".earlier_labels" do
+    let(:set_date) { Date.new(2026, 11, 16) }
+    let(:concepts) { %w[n_plus_one memoization service_objects scope_chaining transaction_safety caching idempotency authorization] }
+
+    def closed(concept, closed_on, status: "expired", label: "#{concept} on #{closed_on}")
+      item(concept: concept, status: status, closed_on: closed_on, label: label).tap(&:save!)
+    end
+
+    it "lists items used, dismissed or expired in the last 30 days, newest first, with no id" do
+      closed("n_plus_one", set_date - 2, status: "used")
+      closed("memoization", set_date - 1, status: "dismissed")
+      closed("caching", set_date - 31)
+      item.tap(&:save!)
+
+      labels = described_class.earlier_labels(user, set_date: set_date)
+
+      expect(labels).to eq([
+        { concept: "memoization", bucket: "ruby_rails", kind: "concept", term: nil, label: "memoization on 2026-11-15", status: "dismissed", date: "2026-11-15" },
+        { concept: "n_plus_one", bucket: "ruby_rails", kind: "concept", term: nil, label: "n_plus_one on 2026-11-14", status: "used", date: "2026-11-14" }
+      ])
+    end
+
+    it "keeps at most three labels a concept and twenty in all, the newest" do
+      (1..5).each { |back| closed("n_plus_one", set_date - back) }
+      concepts.drop(1).each_with_index { |concept, index| (1..3).each { |back| closed(concept, set_date - 3 - (3 * index) - back) } }
+
+      labels = described_class.earlier_labels(user, set_date: set_date)
+
+      expect(labels.size).to eq(LearnerItem::MAX_EARLIER_LABELS)
+      expect(labels.count { |label| label[:concept] == "n_plus_one" }).to eq(LearnerItem::EARLIER_LABELS_PER_CONCEPT)
+      expect(labels.first(3).map { |label| label[:date] }).to eq(%w[2026-11-15 2026-11-14 2026-11-13])
+      expect(labels.map { |label| label[:date] }).to eq(labels.map { |label| label[:date] }.sort.reverse)
+      expect(labels.map { |label| label[:concept] }).not_to include("authorization")
+      expect(labels.count { |label| label[:concept] == "idempotency" }).to eq(2)
+    end
+  end
+
+  it "gives the extraction prompt its open items without ids" do
+    item.tap(&:save!)
+
+    expect(described_class.open_for_prompt(user)).to eq([ { concept: "open_closed", bucket: "ruby_rails", kind: "concept", term: nil,
+                                                            label: "Reaches for a subclass where a new case only needs a new object." } ])
+  end
 end

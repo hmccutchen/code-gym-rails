@@ -51,6 +51,17 @@ class LearnerItem < ApplicationRecord
     open.first([ open.size - MAX_OPEN, 0 ].max).each { |item| item.update!(status: "expired", closed_on: today) }
   end
 
+  def self.prompt_values(item) = { concept: item.concept, bucket: item.bucket, kind: item.kind, term: item.term, label: item.label }
+
+  def self.open_for_prompt(user) = user.learner_items.where(status: "open").order(:id).map { |item| prompt_values(item) }
+
+  def self.earlier_labels(user, set_date:)
+    closed = user.learner_items.where.not(status: "open").where(closed_on: (set_date - RECENT_DAYS)..).order(closed_on: :desc, id: :desc)
+    capped = closed.group_by { |item| [ item.concept, item.bucket ] }.values.flat_map { |same| same.first(EARLIER_LABELS_PER_CONCEPT) }
+    capped.sort_by { |item| [ -item.closed_on.jd, -item.id ] }.first(MAX_EARLIER_LABELS)
+          .map { |item| prompt_values(item).merge(status: item.status, date: item.closed_on.iso8601) }
+  end
+
   def self.matching_key(concept:, bucket:, kind:, term: nil)
     [ concept, bucket, kind, kind == "term" ? term.to_s.squish.downcase : "" ]
   end

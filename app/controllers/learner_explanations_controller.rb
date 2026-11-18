@@ -43,6 +43,7 @@ class LearnerExplanationsController < ApplicationController
     if outcome.is_a?(LearnerNote)
       pick = outcome.explain_section == default_section ? "default" : "different"
       Rails.logger.info("[learner_explanation] saved pick=#{pick}")
+      ExtractLearnerItemsJob.queue_early(current_user, exercise)
       return render json: { status: "ok", html: box_html(exercise) }
     end
 

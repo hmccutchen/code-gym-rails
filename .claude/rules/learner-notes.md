@@ -4,6 +4,7 @@ paths:
   - "app/models/{learner_note,learner_item,learner_items_reply,note_question,explain_question}.rb"
   - "app/models/learner_item/merge.rb"
   - "app/clients/learner_notes.rb"
+  - "app/jobs/extract_learner_items_job.rb"
   - "app/controllers/{learner_notes,learner_explanations}_controller.rb"
   - "app/controllers/concerns/{learner_notes_gate,learner_note_questions}.rb"
   - "app/views/shared/{_learner_note,_learner_explanation}.html.erb"
@@ -51,3 +52,18 @@ Each entry states what a change must not break.
   displace past `LearnerItem::MAX_OPEN`. A unique violation merges into the
   existing open row. The matching key is `LearnerItem.matching_key` alone.
   Deleting a row keeps no record, so a deleted item holds nothing back.
+- **The call after submission.** `ExtractLearnerItemsJob` runs on
+  `provider_calls` at `JobPriority::BACKGROUND`, with `user_id:` in its
+  arguments so account deletion finds a waiting fallback. A set has two
+  triggers: the fallback, scheduled at submit for the later of local
+  midnight and an hour after, and one early run, after the explanation's
+  save or at submit on a day with no explain question. Each run takes an
+  `AdvisoryLock` claim on the set and re-reads the note row inside
+  `uncached`; a fallback that finds the claim held queues itself again. The
+  four no-call checks run in order (the switch or setting off, no key in
+  use, `KeyHold.holds?`, nothing to read) and each closes the set with no
+  attempt counted. `extract_attempts` is saved before the call leaves, so a
+  worker that dies mid-call has spent it. An early run calls only at zero
+  attempts and closes the set only on success; the fallback calls below two
+  and closes the set before its call leaves. An extraction failure never
+  touches `generation_account_failures`. Its log line carries counts only.

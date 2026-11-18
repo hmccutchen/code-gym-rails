@@ -23,7 +23,10 @@ class ResponsesController < ApplicationController
     return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
     return render_stale_answers if outcome == :stale
 
-    GenerateConceptReferenceJob.queue_missing(current_user, exercise.concept_pairs) if outcome == :newly_submitted
+    if outcome == :newly_submitted
+      GenerateConceptReferenceJob.queue_missing(current_user, exercise.concept_pairs)
+      ExtractLearnerItemsJob.queue_for_submitted(current_user, exercise)
+    end
     render_save_result(outcome != :failed)
   end
 
