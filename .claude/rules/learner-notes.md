@@ -114,7 +114,10 @@ this area.
   `POST /learner_explanation/reply` sits behind `ProviderCallLimits`, like
   the duck, and makes no call with the switch or setting off or without the
   account's own key; the key hold does not stop it, and a failure never
-  counts toward the hold. Under the exercise and note row locks it takes the
+  counts toward the hold. A failure is worded by `ProviderFailureText` on
+  the `explanation_reply` surface (`ProviderFailureRendering`, so a
+  `SetupError` is logged at error level), and the JSON carries its
+  `failure` kind beside the box's html. Under the exercise and note row locks it takes the
   `reply_requested_at` claim and counts the attempt on the set's ledger,
   calls outside the locks, and stores the parsed reply only while its claim
   holds. Two attempts at most per set, kept even when the explanation is

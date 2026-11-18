@@ -32,6 +32,10 @@ RSpec.describe "The reply to an explanation", type: :request do
   end
 
   def ask = post(reply_learner_explanation_path, as: :json)
+  def failure_text(error)
+    ProviderFailureText.new(ProviderFailure.classify(error), provider: user.provider, surface: :explanation_reply,
+                            failed_at: Time.current, zone: user.effective_time_zone, variant: ProviderFailureText.variant_for(user))
+  end
   def reply_attempts = LearnerExtraction.for(exercise.reload).reply_attempts
   def spend_reply_attempts(count) = count.times { LearnerExtraction.count_reply_attempt!(exercise) { Time.current } }
   def reply_box = Nokogiri::HTML.fragment(response.parsed_body["html"]).at_css("#learner-explanation-reply")
@@ -98,7 +102,8 @@ RSpec.describe "The reply to an explanation", type: :request do
 
       ask
       expect(response).to have_http_status(:service_unavailable)
-      expect(response.parsed_body["error"]).to eq("No feedback this time. Your explanation is saved.")
+      expect(response.parsed_body["error"]).to eq(failure_text(ProviderError::TimeoutError.new("slow")).full)
+      expect(response.parsed_body["failure"]).to eq("timeout")
       expect(reply_box.text).to include("No feedback this time. Your explanation is saved.")
       expect(reply_box.at_css("button").text).to eq("Try again")
       expect(reply_attempts).to eq(1)
@@ -118,6 +123,31 @@ RSpec.describe "The reply to an explanation", type: :request do
       expect(response).to have_http_status(:ok)
       expect(reply_attempts).to eq(2)
       expect(note.reload).to have_attributes(explanation_reply: { "sound" => "Right.", "correction" => nil })
+    end
+
+    it "words an out-of-credit failure through ProviderFailureText for the explanation reply, never as a rate limit" do
+      error = ProviderError::BillingError.new("PROVIDER-SAID-THIS")
+      replies.replace([ error ])
+
+      ask
+
+      expect(response).to have_http_status(:service_unavailable)
+      expect(response.parsed_body["failure"]).to eq("out_of_credit")
+      expect(response.parsed_body["error"]).to eq(failure_text(error).full)
+      expect(response.parsed_body["error"]).to include(I18n.t("provider_failures.outcomes.explanation_reply"))
+        .and include(I18n.t("provider_failures.saved.explanation_reply"))
+      expect(response.parsed_body["error"]).not_to include("PROVIDER-SAID-THIS")
+    end
+
+    it "words a setup problem as the account's and logs it at error level with the user's id" do
+      replies.replace([ SetupError.new("no provider") ])
+      allow(Rails.logger).to receive(:error).and_call_original
+
+      ask
+
+      expect(response.parsed_body["failure"]).to eq("setup")
+      expect(Rails.logger).to have_received(:error).with(/Setup error for user #{user.id} on explanation_reply/)
+      expect(reply_box.at_css("button").text).to eq("Try again")
     end
 
     it "counts a malformed reply as a failure" do

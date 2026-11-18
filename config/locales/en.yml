@@ -291,12 +291,14 @@ en:
       critique: "the critique didn't run"
       reference: "the write-up didn't finish"
       key_save: "it wasn't saved"
+      explanation_reply: "the feedback on your explanation didn't come back"
     saved:
       review: "Your answers are saved."
       review_partial: "Your answers are saved."
       duck: "Your message is still in the box."
       follow_up: "Your question is still in the box."
       critique: "Your pseudocode is still there."
+      explanation_reply: "Your explanation is saved."
     daily_limit:
       own_key:
         title: "Your %{provider} key has reached its daily limit, so %{outcome}."

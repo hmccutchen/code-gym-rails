@@ -1,5 +1,6 @@
 class LearnerExplanationsController < ApplicationController
   include ProviderCallLimits
+  include ProviderFailureRendering
   include LearnerNotesGate
   include LearnerNoteQuestions
 
@@ -59,8 +60,13 @@ class LearnerExplanationsController < ApplicationController
     render_reply_box(exercise) { |html| render json: { status: "ok", html: html } }
   rescue ProviderError, SetupError => e
     note.release_reply!(token)
-    Rails.logger.warn("[learner_explanation] reply failed=#{ProviderFailure.classify(e)} user #{current_user.id}")
-    render_reply_box(exercise) { |html| render_json_error(t("learner_notes.reply.failed"), status: :service_unavailable, html: html) }
+    render_reply_failure(exercise, e)
+  end
+
+  def render_reply_failure(exercise, error)
+    text = provider_failure_text(error, :explanation_reply)
+    Rails.logger.warn("[learner_explanation] reply failed=#{text.kind} user #{current_user.id}")
+    render_reply_box(exercise) { |html| render_json_error(text.full, status: :service_unavailable, failure: text.kind, html: html) }
   end
 
   def render_reply_refusal(exercise, outcome)

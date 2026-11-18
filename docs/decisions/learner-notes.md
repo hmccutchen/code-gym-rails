@@ -77,6 +77,12 @@ Three ways to build it were compared:
 The reply is the provider's words, not the engineer's, so it is never
 evidence: extraction and generation never read it.
 
+A failed reply call is worded like every other provider failure
+(`what-a-person-is-told-when-a-provider-fails.md`): `ProviderFailureText`
+on its own `explanation_reply` surface, which says the feedback did not come
+back and that the explanation is saved, with the failure's kind in the
+reply so the page knows which it was.
+
 ## Extraction
 
 `ExtractLearnerItemsJob` makes at most one call per set, with at most two
