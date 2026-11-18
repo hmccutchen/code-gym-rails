@@ -50,7 +50,9 @@ RSpec.describe ExtractLearnerItemsJob do
                         explain_phrasing: "explain.first", explanation: text)
   end
 
-  def run(exercise, kind) = described_class.perform_now(user_id: user.id, daily_exercise_id: exercise.id, run: kind)
+  def run(exercise, kind) = described_class.perform_now(**job_args(exercise), run: kind)
+
+  def job_args(exercise) = { user_id: user.id, daily_exercise_id: exercise.id, daily_response_id: exercise.daily_response&.id }
 
   def note(exercise) = LearnerNote.find_by(daily_exercise: exercise)
 
@@ -59,7 +61,7 @@ RSpec.describe ExtractLearnerItemsJob do
       exercise = submitted_set
 
       expect { described_class.queue_for_submitted(user, exercise) }.to have_enqueued_job(described_class)
-        .with(user_id: user.id, daily_exercise_id: exercise.id, run: "fallback")
+        .with(**job_args(exercise), run: "fallback")
         .at(Time.utc(2026, 11, 17)).on_queue("provider_calls").exactly(:once)
       expect(enqueued_jobs.sole["priority"]).to eq(JobPriority::BACKGROUND)
     end
@@ -292,7 +294,7 @@ RSpec.describe ExtractLearnerItemsJob do
       allow(AdvisoryLock).to receive(:hold).and_return(false)
 
       expect { run(exercise, "fallback") }.to have_enqueued_job(described_class)
-        .with(user_id: user.id, daily_exercise_id: exercise.id, run: "fallback")
+        .with(**job_args(exercise), run: "fallback")
       expect(calls).to be_empty
     end
 

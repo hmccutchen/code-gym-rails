@@ -53,6 +53,11 @@ RSpec.describe "When learner items are extracted", type: :request do
   end
 
   describe "at the explanation's save" do
+    def save_explanation(text)
+      post learner_explanation_path, params: { section: "code_review", explanation: text,
+                                               draft_scope: user.daily_exercises.sole.draft_scope }, as: :json
+    end
+
     before do
       todays_set
       submit
@@ -60,20 +65,21 @@ RSpec.describe "When learner items are extracted", type: :request do
     end
 
     it "runs the early extraction once the explanation is saved" do
-      post learner_explanation_path, params: { section: "code_review", explanation: "One query per row." }, as: :json
+      save_explanation("One query per row.")
 
       expect(response).to have_http_status(:ok)
       expect(extraction_runs).to eq(%w[early])
     end
 
     it "refuses a second save after a failed early run, enqueues nothing, and leaves the last call to the fallback" do
-      post learner_explanation_path, params: { section: "code_review", explanation: "One query per row." }, as: :json
+      save_explanation("One query per row.")
       exercise = user.daily_exercises.sole
       allow_any_instance_of(AiService).to receive(:extract_learner_items).and_raise(ProviderError::TimeoutError.new("slow"))
-      ExtractLearnerItemsJob.perform_now(user_id: user.id, daily_exercise_id: exercise.id, run: "early")
+      ExtractLearnerItemsJob.perform_now(user_id: user.id, daily_exercise_id: exercise.id,
+                                         daily_response_id: exercise.daily_response.id, run: "early")
       clear_enqueued_jobs
 
-      post learner_explanation_path, params: { section: "code_review", explanation: "Second words." }, as: :json
+      save_explanation("Second words.")
 
       note = LearnerNote.find_by(daily_exercise: exercise)
       expect(response).to have_http_status(:conflict)
@@ -85,7 +91,10 @@ RSpec.describe "When learner items are extracted", type: :request do
         calls += 1
         LearnerItemsReply::Result.new(items: [], dropped: {})
       end
-      2.times { ExtractLearnerItemsJob.perform_now(user_id: user.id, daily_exercise_id: exercise.id, run: "fallback") }
+      2.times do
+        ExtractLearnerItemsJob.perform_now(user_id: user.id, daily_exercise_id: exercise.id,
+                                           daily_response_id: exercise.daily_response.id, run: "fallback")
+      end
 
       expect(calls).to eq(1)
       expect(note.reload).to have_attributes(extract_attempts: 2, extracted_at: be_present)
@@ -94,7 +103,7 @@ RSpec.describe "When learner items are extracted", type: :request do
     it "enqueues nothing for a save the closed box refuses" do
       LearnerNote.create!(user: user, daily_exercise: user.daily_exercises.sole, extracted_at: Time.current)
 
-      post learner_explanation_path, params: { section: "code_review", explanation: "Too late." }, as: :json
+      save_explanation("Too late.")
 
       expect(response).to have_http_status(:conflict)
       expect(extraction_runs).to eq([])

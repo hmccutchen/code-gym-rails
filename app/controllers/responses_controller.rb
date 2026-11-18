@@ -59,8 +59,7 @@ class ResponsesController < ApplicationController
     return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
     return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if blocker == :reviewing
 
-    DuckThread.start_over!(@response.daily_exercise)
-    @response.destroy
+    @response.daily_exercise.start_over!(@response)
     redirect_to root_path, notice: t("flash.responses.answers_cleared")
   end
 

@@ -18,7 +18,8 @@ class ExtractLearnerItemsJob < ApplicationJob
 
   # The submit or the explanation is already saved, so a failed enqueue must not fail its request.
   def self.queue(user, exercise, run, **timing)
-    set(priority: JobPriority::BACKGROUND, **timing).perform_later(user_id: user.id, daily_exercise_id: exercise.id, run: run)
+    set(priority: JobPriority::BACKGROUND, **timing)
+      .perform_later(user_id: user.id, daily_exercise_id: exercise.id, daily_response_id: exercise.daily_response&.id, run: run)
   rescue SolidQueue::Job::EnqueueError, ActiveRecord::ConnectionNotEstablished, ActiveRecord::ConnectionFailed => e
     Rails.logger.error("Could not queue learner items (#{run}) for user #{user.id} on #{exercise.date}: #{e.class}")
   end
@@ -27,20 +28,23 @@ class ExtractLearnerItemsJob < ApplicationJob
     [ now.in_time_zone(user.effective_time_zone).tomorrow.beginning_of_day, now + 1.hour ].max
   end
 
-  def perform(user_id:, daily_exercise_id:, run:)
+  def perform(user_id:, daily_exercise_id:, daily_response_id:, run:)
     exercise = DailyExercise.find_by(id: daily_exercise_id, user_id: user_id)
     return unless exercise && User.active.exists?(id: user_id)
 
-    claimed = AdvisoryLock.hold(self.class.claim_key(exercise.id)) { extract(exercise, run) }
+    claimed = AdvisoryLock.hold(self.class.claim_key(exercise.id)) { extract(exercise, daily_response_id, run) }
     return if claimed || run != FALLBACK
 
     self.class.set(priority: JobPriority::BACKGROUND, wait: CLAIM_RETRY_WAIT)
-        .perform_later(user_id: user_id, daily_exercise_id: daily_exercise_id, run: run)
+        .perform_later(user_id: user_id, daily_exercise_id: daily_exercise_id, daily_response_id: daily_response_id, run: run)
   end
 
   private
 
-  def extract(exercise, run)
+  # Start over and regeneration replace the response, so a run queued for the old set finds another one and stops.
+  def extract(exercise, daily_response_id, run)
+    return unless DailyResponse.uncached { DailyResponse.submitted.exists?(id: daily_response_id, daily_exercise_id: exercise.id) }
+
     user, note = LearnerNote.uncached { [ User.active.find_by(id: exercise.user_id), LearnerNote.extraction_row(exercise) ] }
     return if user.nil? || note.extracted?
 

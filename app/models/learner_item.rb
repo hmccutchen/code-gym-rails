@@ -5,6 +5,7 @@ class LearnerItem < ApplicationRecord
   STATUSES = %w[open used dismissed expired].freeze
   EVIDENCE_SOURCES = %w[duck answer note explanation].freeze
   SECTIONLESS_SOURCES = %w[note].freeze
+  WRITTEN_SOURCES = %w[note explanation].freeze
   MAX_OPEN = 5
   MAX_NEW_PER_DAY = 3
   MAX_EARLIER_LABELS = 20
@@ -49,6 +50,19 @@ class LearnerItem < ApplicationRecord
   def self.displace_past_limit!(user, today:)
     open = user.learner_items.where(status: "open").sort_by { |item| [ item.newest_evidence_on, item.created_at, item.id ] }
     open.first([ open.size - MAX_OPEN, 0 ].max).each { |item| item.update!(status: "expired", closed_on: today) }
+  end
+
+  # The caller holds the user row lock, as every writer of items does.
+  def self.forget_evidence!(user, date:, sources:)
+    day = date.iso8601
+    user.learner_items.find_each do |item|
+      kept = item.evidence.reject { |reference| reference["date"] == day && sources.include?(reference["source"]) }
+      next if kept.size == item.evidence.size
+      next item.delete if kept.empty?
+
+      came_up_on = kept.any? { |reference| reference["date"] == day } ? item.came_up_on : item.came_up_on - [ day ]
+      item.update!(evidence: kept, came_up_on: came_up_on)
+    end
   end
 
   def self.prompt_values(item) = { concept: item.concept, bucket: item.bucket, kind: item.kind, term: item.term, label: item.label }

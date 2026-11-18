@@ -49,6 +49,17 @@ class DailyExercise < ApplicationRecord
       .map { |date, opened_at, response_id| UnopenedSets::Entry.new(date: date, opened: opened_at.present?, saved: response_id.present?) }
   end
 
+  def start_over!(response)
+    transaction do
+      User.lock.where(id: user_id).ids
+      DuckThread.start_over!(self)
+      forget_learner_note!
+      response.destroy!
+    end
+  end
+
+  def forget_learner_note! = LearnerNote.forget_set!(self)
+
   def coverage_shown
     plan_notes["coverage_reason"] if active_section_keys.include?(plan_notes["coverage"])
   end

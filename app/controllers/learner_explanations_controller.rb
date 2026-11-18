@@ -10,7 +10,8 @@ class LearnerExplanationsController < ApplicationController
     closed:        [ "learner_notes.explain.closed", :conflict ],
     not_an_option: [ "learner_notes.explain.not_an_option", :unprocessable_content ],
     not_submitted: [ "learner_notes.explain.before_submit", :unprocessable_content ],
-    deleted:       [ "flash.responses.stale_answers", :conflict ]
+    deleted:       [ "flash.responses.stale_answers", :conflict ],
+    stale:         [ "flash.responses.stale_answers", :conflict ]
   }.freeze
 
   # A tab still showing the open box gets the box's current state for these two, since nothing can be saved now.
@@ -28,7 +29,8 @@ class LearnerExplanationsController < ApplicationController
     return render_json_error(refusal, status: :unprocessable_content) if refusal
 
     default_section = explain_box_for(exercise, exercise.daily_response, exercise.learner_note)&.default_section
-    outcome = LearnerNote.save_explanation!(exercise, section: params[:section].to_s, text: text)
+    outcome = LearnerNote.save_explanation!(exercise, section: params[:section].to_s, text: text,
+                                                     expected_scope: params[:draft_scope].to_s)
     render_explanation_outcome(outcome, exercise, default_section)
   end
 
@@ -93,6 +95,6 @@ class LearnerExplanationsController < ApplicationController
 
   def box_html(exercise)
     box = explain_box_for(exercise, exercise.daily_response, LearnerNote.find_by(daily_exercise: exercise))
-    render_to_string(partial: "shared/learner_explanation", formats: [ :html ], locals: { box: box }) if box
+    render_to_string(partial: "shared/learner_explanation", formats: [ :html ], locals: { box: box, draft_scope: exercise.draft_scope }) if box
   end
 end

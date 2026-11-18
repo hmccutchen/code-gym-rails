@@ -30,10 +30,11 @@ class LearnerNote < ApplicationRecord
                        counts: rows.map(&:first).tally)
   end
 
-  def self.save_explanation!(exercise, section:, text:)
+  def self.save_explanation!(exercise, section:, text:, expected_scope:)
     transaction do
       owner = User.lock("FOR SHARE").find_by(id: exercise.user_id)
       next :deleted if owner.nil? || owner.anonymized?
+      next :stale if DailyExercise.find_by(id: exercise.id)&.draft_scope != expected_scope
       next :not_submitted unless exercise.daily_response&.submitted?
 
       write(row_for(exercise)) { |note| note.explain(owner, exercise, section, text) }
@@ -52,6 +53,15 @@ class LearnerNote < ApplicationRecord
   end
 
   def self.extraction_row(exercise) = row_for(exercise)
+
+  # The caller holds the user row lock, since items lose this set's note and explanation evidence with it.
+  def self.forget_set!(exercise)
+    note = find_by(daily_exercise_id: exercise.id)
+    return unless note
+
+    LearnerItem.forget_evidence!(note.user, date: exercise.date, sources: LearnerItem::WRITTEN_SOURCES)
+    note.delete
+  end
 
   def self.under_draft_locks(exercise, expected_scope)
     transaction do

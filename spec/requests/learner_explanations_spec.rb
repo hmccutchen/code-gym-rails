@@ -41,7 +41,8 @@ RSpec.describe "The explain question on the submitted dashboard", type: :request
   def note = LearnerNote.find_by(daily_exercise: user.daily_exercises.for_date.first)
 
   def save_explanation(text, section: "code_review", **extra)
-    post learner_explanation_path, params: { section: section, explanation: text, **extra }, as: :json
+    scope = user.daily_exercises.for_date.first&.draft_scope
+    post learner_explanation_path, params: { section: section, explanation: text, draft_scope: scope, **extra }, as: :json
   end
 
   describe "the open box" do
