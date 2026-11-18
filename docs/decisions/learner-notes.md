@@ -109,7 +109,13 @@ set.
 merge re-checks, under the user row lock it already holds, that the set's
 response is still the one read and that the note and the explanation still
 hold the text the call read. It drops an item citing anything deleted
-meanwhile, and writes nothing once the set was replaced. A note row or a set
+meanwhile, and writes nothing once the set was replaced. Delete all cannot
+know which set a call is reading, so it stamps a text-free forgotten time on
+every ledger the account has; a call whose set's stamp moved after it read
+the set writes nothing, even an item citing only a duck turn (owner's
+decision, 2026-11-18). In both cases the job leaves the ledger as it is,
+since after Start over it belongs to the response that replaced the one
+read. A note row or a set
 deleted mid-call never makes the job or the reply endpoint fail: the job
 logs a named outcome, and the endpoint answers with the box's current state
 or the refusal text as JSON (owner's decision, 2026-11-18).

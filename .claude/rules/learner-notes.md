@@ -98,7 +98,9 @@ this area.
   fallback calls below two and closes the set before its call leaves. The
   merge takes a `still_there:` check from the job, called under the user row
   lock, and writes no item citing a note or explanation deleted during the
-  call, and nothing once the set was replaced. A set or account deleted
+  call, and nothing once the set was replaced or Delete all stamped the
+  set's ledger `forgotten_at` after the call read it; for those the merge
+  returns `:replaced` and the job leaves the ledger alone. A set or account deleted
   mid-call is logged, never raised. An extraction failure never touches
   `generation_account_failures`. Its log line carries counts only.
 - **The reply to an explanation.** `ExplanationReplyPrompt` takes only the
