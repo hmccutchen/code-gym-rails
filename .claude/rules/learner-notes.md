@@ -42,7 +42,9 @@ this area.
 - **The extraction prompt is pure.** `LearnerItemsPrompt` takes values the
   job built: each active section through `SectionContext.render` (no answer
   key), the answer cut to 2,000 characters, the duck turns cut to 1,000 each,
-  the day's note and explanation, open items without ids and earlier labels.
+  the day's note and explanation, open items without ids (only those still
+  open on the owner's local date, `LearnerItem.still_open`, the rule the
+  Account page lists by) and earlier labels.
   It is never sent a review, a rating, `ConceptMastery`, a server stamp or
   another day's text. Every label reaches it as data through
   `UserText.labelled`, and the worst case, every label at its limit, stays

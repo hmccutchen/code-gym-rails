@@ -18,7 +18,7 @@ class LearnerItem::Merge
   def initialize(owner, set_date)
     @owner = owner
     @set_date = set_date
-    @today = Time.current.in_time_zone(owner.effective_time_zone).to_date
+    @today = LearnerItem.today_for(owner)
     @written = 0
     @absorbed = 0
     @dropped = Hash.new(0)

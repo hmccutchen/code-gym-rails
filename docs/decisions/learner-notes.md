@@ -103,7 +103,9 @@ or the refusal text as JSON (owner's decision, 2026-11-18).
 
 **What it reads.** Each active section through `SectionContext.render`, with
 no answer key; the engineer's answer; the duck turns; the note and the
-explanation; the open items without ids; and the labels of items closed in
+explanation; the open items without ids, leaving out any past its expiry
+on the owner's local date, since the merge expires those before it compares
+keys; and the labels of items closed in
 the last 30 days, a few per concept. Every piece of typed text reaches the
 prompt as data inside the engineer's tags, and the duck's own turns have
 those tags defanged, so a duck reply cannot pass its words off as the

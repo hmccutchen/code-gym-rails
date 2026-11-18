@@ -190,4 +190,35 @@ RSpec.describe LearnerItem do
     expect(described_class.open_for_prompt(user)).to eq([ { concept: "open_closed", bucket: "ruby_rails", kind: "concept", term: nil,
                                                             label: "Reaches for a subclass where a new case only needs a new object." } ])
   end
+
+  it "leaves an overdue item out of the extraction prompt, by the owner's local date, as the Account page does" do
+    travel_to(Time.utc(2026, 11, 18, 3)) do
+      user.update!(time_zone: "UTC")
+      item(concept: "memoization", expires_on: Date.new(2026, 11, 17)).save!
+      item(expires_on: Date.new(2026, 11, 18)).save!
+
+      expect(described_class.open_for_prompt(user).map { |values| values[:concept] }).to eq([ "open_closed" ])
+
+      user.update!(time_zone: "Pacific/Honolulu")
+      expect(described_class.open_for_prompt(user).map { |values| values[:concept] }).to eq(%w[memoization open_closed])
+      expect(described_class.listed_open(user, today: described_class.today_for(user)).map(&:concept))
+        .to eq(%w[memoization open_closed])
+    end
+  end
+
+  it "absorbs a repeat of an item the prompt listed, rather than counting it as new" do
+    travel_to(Time.utc(2026, 11, 18, 15)) do
+      listed = item(expires_on: Date.current).tap(&:save!)
+      overdue = item(concept: "memoization", expires_on: Date.current - 1).tap(&:save!)
+      listed_concepts = described_class.open_for_prompt(user).map { |values| values[:concept] }
+      repeats = [ listed, overdue ].select { |row| listed_concepts.include?(row.concept) }.map do |row|
+        LearnerItemsReply::Item.new(concept: row.concept, bucket: "ruby_rails", kind: "concept", term: nil, label: "New wording.",
+                                    evidence: [ duck.merge("date" => Date.current.iso8601) ])
+      end
+
+      result = described_class.merge!(user, repeats, set_date: Date.current, still_there: -> { LearnerItem::EVIDENCE_SOURCES })
+
+      expect(result).to have_attributes(absorbed: 1, written: 0)
+    end
+  end
 end

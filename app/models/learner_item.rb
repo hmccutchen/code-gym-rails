@@ -48,7 +48,7 @@ class LearnerItem < ApplicationRecord
       owner = User.lock.find_by(id: user.id)
       next :account_gone if owner.nil? || owner.anonymized?
 
-      yield owner, Time.current.in_time_zone(owner.effective_time_zone).to_date
+      yield owner, today_for(owner)
     end
   end
 
@@ -68,7 +68,11 @@ class LearnerItem < ApplicationRecord
     under_owner_lock(user) { |owner| owner.learner_items.where(id: id).delete_all.positive? ? :removed : :missing }
   end
 
-  def self.listed_open(user, today:) = user.learner_items.where(status: "open", expires_on: today..).order(:created_at, :id)
+  def self.today_for(user) = Time.current.in_time_zone(user.effective_time_zone).to_date
+
+  def self.still_open(user, today:) = user.learner_items.where(status: "open", expires_on: today..)
+
+  def self.listed_open(user, today:) = still_open(user, today: today).order(:created_at, :id)
 
   def self.recently_dismissed(user, today:)
     user.learner_items.where(status: "dismissed", closed_on: (today - RECENT_DAYS)..).order(closed_on: :desc, id: :desc)
@@ -99,7 +103,7 @@ class LearnerItem < ApplicationRecord
 
   def self.prompt_values(item) = { concept: item.concept, bucket: item.bucket, kind: item.kind, term: item.term, label: item.label }
 
-  def self.open_for_prompt(user) = user.learner_items.where(status: "open").order(:id).map { |item| prompt_values(item) }
+  def self.open_for_prompt(user) = still_open(user, today: today_for(user)).order(:id).map { |item| prompt_values(item) }
 
   def self.earlier_labels(user, set_date:)
     closed = user.learner_items.where.not(status: "open").where(closed_on: (set_date - RECENT_DAYS)..).order(closed_on: :desc, id: :desc)
