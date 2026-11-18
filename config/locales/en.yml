@@ -261,6 +261,8 @@ en:
       start_over_after_review: "This set has already been reviewed — nothing to start over."
       start_over_not_today: "You can only start over on today's set."
       start_over_while_reviewing: "A review is being generated for this — try again in a moment."
+      start_over_stale: "This page is out of date. Refresh it before starting over."
+      start_over_failed: "Couldn't start over. Nothing was cleared."
       answers_cleared: "Today's answers have been cleared — start fresh whenever you're ready."
       no_review_to_email: "No review to email yet."
       review_emailed: "Review sent to %{email}."

@@ -88,6 +88,11 @@ an absent key means zero and keeps the original scope format. A regeneration upd
 moves. The format is written and read only here: `DRAFT_SCOPE_FORMAT` is the
 pattern, and the private `#written_stamp` is the time part.
 
+A non-Hash `plan_notes` also reads as revision zero, with one content-free
+warning per scope read. This keeps the scope reader usable without changing
+stored metadata. It is not general support for malformed historical notes:
+other existing readers require a Hash, and canonical writers supply one.
+
 `#freshness_against(scope)` compares the set with the scope an open page
 shows and names the result, so a caller never has to combine checks in the
 right order:
@@ -116,6 +121,11 @@ revision. Those writes commit together. A failed write rolls all of them
 back. A delayed second reset cannot delete a new response created after the
 first reset.
 
+Before the destructive steps, `#validate_reset_notes!` rejects non-Hash notes
+with `ActiveRecord::RecordInvalid`. The controller logs the record class and
+invalid attribute names, never their contents, then redirects with a failure
+alert. It does not normalize or discard the stored notes.
+
 The answer endpoint already reloads the exercise and checks scope under the
 same locks before finding or creating a response. If its save wins first,
 reset deletes the saved answer; if reset wins first, the old scope gets a
@@ -131,3 +141,8 @@ loaded before the first response existed from an empty page after reset.
 Opening the set, saving answers and using the duck leave the revision alone;
 carry-forward preserves it. Regeneration replaces the plan notes and changes
 `generated_at`, which already invalidates every previous scope.
+
+Old web binaries ignore this revision. Mixed-version writers and rollback
+therefore restore the previous late-save limitation; the local probe and
+upgrade caveat are recorded in
+`docs/decisions/idempotent-saves-and-frozen-evidence.md`.

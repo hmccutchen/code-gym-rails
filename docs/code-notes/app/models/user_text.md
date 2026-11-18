@@ -24,6 +24,10 @@ A blank value renders inline after the label, so a skipped answer stays one shor
 
 Earlier user turns are fenced too. This helper leaves assistant turns unchanged;
 `DuckPrompt` separately neutralizes its stored assistant turns with `.defanged`.
+`FollowUpPrompt` still passes assistant turns through unchanged, leaving its
+pre-existing assistant-tag forgery gap outside the duck-only #819 scope.
+The shared tag-matching rule remains in `.defanged`; `.tag_history` is not
+broadened by that fix.
 
 ## `.defanged`
 

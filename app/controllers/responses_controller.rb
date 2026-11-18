@@ -56,10 +56,13 @@ class ResponsesController < ApplicationController
     when :reviewed then redirect_to root_path, alert: t("flash.responses.start_over_after_review")
     when :not_today then redirect_to root_path, alert: t("flash.responses.start_over_not_today")
     when :reviewing then redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing")
-    when :stale then render_stale_answers
+    when :stale then render_stale_answers(t("flash.responses.start_over_stale"))
     when :cleared then redirect_to root_path, notice: t("flash.responses.answers_cleared")
     else raise ArgumentError, "Unhandled start-over outcome: #{outcome.inspect}"
     end
+  rescue ActiveRecord::RecordInvalid => error
+    Rails.logger.warn("[start_over] user=#{current_user.id} refused=#{error.record.class} on=#{error.record.errors.attribute_names.join(",")}")
+    redirect_to root_path, alert: t("flash.responses.start_over_failed")
   end
 
   # POST /responses/:id/email_review
@@ -197,12 +200,12 @@ class ResponsesController < ApplicationController
     blocker
   end
 
-  def render_stale_answers
+  def render_stale_answers(message = t("flash.responses.stale_answers"))
     respond_to do |format|
       format.json do
-        render_json_error(t("flash.responses.stale_answers"), status: :conflict, outcome: "stale")
+        render_json_error(message, status: :conflict, outcome: "stale")
       end
-      format.html { redirect_to root_path, alert: t("flash.responses.stale_answers") }
+      format.html { redirect_to root_path, alert: message }
     end
   end
 

@@ -58,7 +58,8 @@ class DailyExercise < ApplicationRecord
   end
 
   def draft_scope
-    [ "#{id}-#{written_stamp}", ("r#{draft_revision}" if draft_revision.positive?) ].compact.join("-")
+    revision = draft_revision
+    [ "#{id}-#{written_stamp}", ("r#{revision}" if revision.positive?) ].compact.join("-")
   end
 
   def freshness_against(scope)
@@ -127,6 +128,7 @@ class DailyExercise < ApplicationRecord
       next :not_today unless response.date == Date.current
       next :reviewing if blocker == :reviewing
 
+      validate_reset_notes!
       DuckThread.start_over!(self)
       response.destroy!
       update!(plan_notes: plan_notes.merge("draft_revision" => draft_revision + 1))
@@ -145,7 +147,19 @@ class DailyExercise < ApplicationRecord
 
   private
 
-  def draft_revision = plan_notes["draft_revision"].to_i
+  def draft_revision
+    return plan_notes["draft_revision"].to_i if plan_notes.is_a?(Hash)
+
+    Rails.logger.warn("[draft_scope] exercise_id=#{id} invalid=plan_notes fallback=revision_zero")
+    0
+  end
+
+  def validate_reset_notes!
+    return if plan_notes.is_a?(Hash)
+
+    errors.add(:plan_notes, :invalid)
+    raise ActiveRecord::RecordInvalid, self
+  end
 
   def written_stamp = generated_at.strftime("%s%6N")
 
