@@ -119,12 +119,26 @@ RSpec.describe LearnerExtraction do
   end
 
   describe ".forget_all!" do
+    around { |example| freeze_time(with_usec: true) { example.run } }
+
+    it "writes a new stamp for a second Delete all in the same second" do
+      travel_to(Time.utc(2026, 11, 16, 15, 0, 0, 100_000), with_usec: true)
+      exercise
+      described_class.forget_all!(user)
+      first = described_class.for(exercise.reload).forgotten_at
+
+      travel(0.3.seconds, with_usec: true)
+      described_class.forget_all!(user)
+
+      expect(described_class.for(exercise.reload).forgotten_at).not_to eq(first)
+    end
+
     it "stamps a forgotten time on each of the owner's ledgers, keeping their counts and the plan's notes" do
       described_class.count_attempt!(exercise, close: false, response_id: response_id)
 
       described_class.forget_all!(user)
 
-      expect(described_class.for(exercise.reload)).to have_attributes(attempts: 1, forgotten_at: Time.current.iso8601)
+      expect(described_class.for(exercise.reload)).to have_attributes(attempts: 1, forgotten_at: Time.current.iso8601(6))
       expect(stored).to include("size" => 2, "daily_kinds" => %w[code_review design_comparison])
     end
 
@@ -134,7 +148,7 @@ RSpec.describe LearnerExtraction do
 
       described_class.forget_all!(user)
 
-      expect(unread.reload.plan_notes).to eq("size" => 2, described_class::KEY => { "forgotten_at" => Time.current.iso8601 })
+      expect(unread.reload.plan_notes).to eq("size" => 2, described_class::KEY => { "forgotten_at" => Time.current.iso8601(6) })
       expect(described_class.for(unread)).to have_attributes(attempts: 0, reply_attempts: 0, closed?: false)
     end
 

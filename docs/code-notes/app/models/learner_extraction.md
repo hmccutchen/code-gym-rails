@@ -54,5 +54,8 @@ only existing ledgers would miss that set, and its run would find no stamp
 moved and write its items after Delete all. The job
 keeps the ledger it read before the call, and its `still_there:` check,
 run under the same lock, answers nil when the stamp moved since. The stamp
-is a time, with no text, so keeping it keeps nothing the engineer asked to
+is written to the microsecond (`iso8601(6)`), since the job only compares
+it for equality: a stamp to the second let a second Delete all in the same
+second leave it unchanged, and a run that read the first stamp then wrote
+its duck-only items. The stamp is a time, with no text, so keeping it keeps nothing the engineer asked to
 have deleted (owner's decision, 2026-11-18).

@@ -224,6 +224,25 @@ RSpec.describe ExtractLearnerItemsJob, "when the set moves on before the run wri
     expect(LearnerExtraction.for(exercise.reload)).to have_attributes(closed?: false, attempts: 0)
   end
 
+  it "writes no item when a second Delete all lands during the call in the same second as the first" do
+    travel_to(Time.utc(2026, 11, 16, 15, 0, 0, 100_000), with_usec: true)
+    exercise = submitted_set
+    DuckThread.create!(user: user, daily_exercise: exercise, draft_scope: exercise.draft_scope,
+                       threads: { "code_review" => { "turns" => [ { "role" => "user", "content" => "What does sum do?" },
+                                                                  { "role" => "assistant", "content" => "Look." } ],
+                                                     "version" => 1 } })
+    LearnerNote.remove_all!(user)
+    allow_any_instance_of(FakeService).to receive(:extract_learner_items) do
+      travel(0.3.seconds, with_usec: true)
+      LearnerNote.remove_all!(user)
+      LearnerItemsReply::Result.new(items: [ duck_item ], dropped: {})
+    end
+
+    run(exercise.reload, exercise.daily_response.id)
+
+    expect(LearnerItem.where(user_id: user.id)).to be_empty
+  end
+
   it "writes no item when Delete all lands after the run read a set with no ledger yet" do
     exercise = submitted_set
     expect(exercise.plan_notes).not_to have_key(LearnerExtraction::KEY)
