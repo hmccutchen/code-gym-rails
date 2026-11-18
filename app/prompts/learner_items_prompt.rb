@@ -125,7 +125,7 @@ class LearnerItemsPrompt
     return "Their duck thread: (none)" if turns.empty?
 
     lines = UserText.tag_history(turns, limit: TURN_LIMIT).map do |turn|
-      turn[:role].to_s == "user" ? "Engineer:\n#{turn[:content]}" : "Duck:\n#{UserText.clean(turn[:content], limit: TURN_LIMIT)}"
+      turn[:role].to_s == "user" ? "Engineer:\n#{turn[:content]}" : "Duck:\n#{UserText.defanged(turn[:content], limit: TURN_LIMIT)}"
     end
     "Their duck thread, oldest first:\n#{lines.join("\n")}"
   end
