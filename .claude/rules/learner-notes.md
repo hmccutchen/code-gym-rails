@@ -7,7 +7,7 @@ paths:
   - "app/jobs/extract_learner_items_job.rb"
   - "app/controllers/{learner_notes,learner_explanations}_controller.rb"
   - "app/controllers/concerns/{learner_notes_gate,learner_note_questions}.rb"
-  - "app/views/shared/{_learner_note,_learner_explanation}.html.erb"
+  - "app/views/shared/{_learner_note,_learner_explanation,_learner_explanation_reply}.html.erb"
   - "app/javascript/controllers/{learner_note,learner_explanation}_controller.js"
   - "spec/**/*learner*"
 ---
@@ -77,3 +77,11 @@ Each entry states what a change must not break.
   The purpose is `explanation_reply` (250-token cap, the default read
   timeout, no caching, each provider's default route). The reply is the
   provider's words, so extraction and generation never read it.
+  `POST /learner_explanation/reply` sits behind `ProviderCallLimits`, like
+  the duck, and makes no call with the switch or setting off or without the
+  account's own key; the key hold does not stop it, and a failure never
+  counts toward the hold. Under the note's row lock it takes the
+  `reply_requested_at` claim and counts the attempt, calls outside the lock,
+  and stores the parsed reply only while its claim holds. Two attempts at
+  most: the page shows Try again once, and a third request is refused. The
+  box asks for the reply when a saved box that has not asked yet connects.

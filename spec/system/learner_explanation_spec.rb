@@ -43,4 +43,25 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
       expect(LearnerNote.find_by(user: user).explain_section).to eq("pattern")
     end
   end
+
+  it "asks for the reply once the explanation is saved, and shows it under the not-a-grade heading" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      submitted_set(user)
+      visit_as(user)
+      wait_for_js
+
+      box = find("#learner-explanation")
+      box.find("textarea").fill_in(with: "It runs one query per row.")
+      box.click_button("Save")
+
+      reply = find("#learner-explanation-reply", text: "Feedback on your explanation, not a grade")
+      expect(reply).to have_text("What was sound: You named what the concept does.")
+      expect(reply).to have_no_text("One thing to correct")
+      expect(LearnerNote.find_by(user: user)).to have_attributes(reply_attempts: 1, explanation_reply: include("correction" => nil))
+    end
+  end
 end

@@ -1,6 +1,7 @@
 <%# Local: box (a LearnerNoteQuestions::ExplainBox; its state picks what shows). %>
 <% open = box.state == :open %>
-<section class="learner-explanation" id="learner-explanation"<% if open %> data-controller="learner-explanation" data-learner-explanation-url-value="<%= learner_explanation_path %>" data-learner-explanation-failed-text-value="<%= t("learner_notes.explain.save_failed") %>"<% end %>>
+<% saved = box.state == :saved %>
+<section class="learner-explanation" id="learner-explanation"<% if open %> data-controller="learner-explanation" data-learner-explanation-url-value="<%= learner_explanation_path %>" data-learner-explanation-failed-text-value="<%= t("learner_notes.explain.save_failed") %>"<% elsif saved %> data-controller="learner-explanation" data-learner-explanation-reply-url-value="<%= reply_learner_explanation_path %>" data-learner-explanation-ask-reply-value="<%= box.reply.ask %>" data-learner-explanation-waiting-text-value="<%= t("learner_notes.reply.waiting") %>" data-learner-explanation-reply-failed-text-value="<%= t("learner_notes.reply.failed") %>"<% end %>>
   <h2><%= t("learner_notes.explain.heading") %></h2>
   <p class="learner-explanation-question" id="learner-explanation-question"<% if open %> data-learner-explanation-target="question"<% end %>><%= box.question %></p>
   <% case box.state %>
@@ -18,6 +19,7 @@
     <p class="hint" aria-live="polite" data-learner-explanation-target="status"></p>
   <% when :saved %>
     <%= simple_format(h(box.text), class: "learner-explanation-text") %>
+    <%= render "shared/learner_explanation_reply", reply: box.reply %>
   <% when :closed %>
     <p class="hint"><%= t("learner_notes.explain.closed") %></p>
   <% end %>

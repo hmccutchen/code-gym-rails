@@ -1,0 +1,18 @@
+<%# Local: reply (a LearnerNoteQuestions::ReplyView; its state picks what shows). %>
+<div class="learner-explanation-reply" id="learner-explanation-reply" data-learner-explanation-target="reply">
+  <% case reply.state %>
+  <% when :replied %>
+    <h3><%= t("learner_notes.reply.heading") %></h3>
+    <p><%= t("learner_notes.reply.sound", text: reply.sound) %></p>
+    <% if reply.correction %>
+      <p><%= t("learner_notes.reply.correction", text: reply.correction) %></p>
+    <% end %>
+  <% when :waiting %>
+    <p class="hint" aria-live="polite" data-learner-explanation-target="replyStatus"><%= t("learner_notes.reply.waiting") %></p>
+  <% when :failed_retry %>
+    <p class="hint" aria-live="polite" data-learner-explanation-target="replyStatus"><%= t("learner_notes.reply.failed") %></p>
+    <button type="button" class="btn btn-secondary btn-sm" data-action="learner-explanation#askReply"><%= t("learner_notes.reply.try_again") %></button>
+  <% else %>
+    <p class="hint"><%= t("learner_notes.reply.failed") %></p>
+  <% end %>
+</div>

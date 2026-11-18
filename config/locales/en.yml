@@ -882,6 +882,14 @@ en:
       already_saved: "Your explanation is already saved, so it can't change now."
       not_an_option: "That concept isn't one of today's. Reload the page and choose again."
       before_submit: "Submit today's set before explaining one of its concepts."
+    reply:
+      heading: "Feedback on your explanation, not a grade"
+      sound: "What was sound: %{text}"
+      correction: "One thing to correct: %{text}"
+      waiting: "Getting feedback…"
+      failed: "No feedback this time. Your explanation is saved."
+      try_again: "Try again"
+      no_explanation: "Save an explanation before asking for feedback on it."
   concept_reference:
     summary: "Reference — %{concept}: how it works"
     explain_differently: "This didn't quite land — try a different explanation"

@@ -1,5 +1,6 @@
 module LearnerNoteQuestions
-  ExplainBox = Data.define(:state, :question, :choices, :default_section, :text)
+  ExplainBox = Data.define(:state, :question, :choices, :default_section, :text, :reply)
+  ReplyView = Data.define(:state, :sound, :correction, :ask)
   ExplainChoice = Data.define(:section, :concept, :question)
 
   private
@@ -29,12 +30,17 @@ module LearnerNoteQuestions
     default = ExplainQuestion.default(options: options, recent: history.recent, **day_signals(exercise, response))
     question = choices.find { |choice| choice.section == default.section }.question
     ExplainBox.new(state: note&.extracted_at ? :closed : :open, question: question, choices: choices,
-                   default_section: default.section, text: nil)
+                   default_section: default.section, text: nil, reply: nil)
   end
 
   def saved_explain_box(note)
     ExplainBox.new(state: :saved, question: ExplainQuestion.text(note.explain_phrasing, note.explain_concept),
-                   choices: [], default_section: note.explain_section, text: note.explanation)
+                   choices: [], default_section: note.explain_section, text: note.explanation, reply: reply_view(note))
+  end
+
+  def reply_view(note)
+    reply = note.reply
+    ReplyView.new(state: note.reply_state, sound: reply&.sound, correction: reply&.correction, ask: note.reply_askable?)
   end
 
   def explain_choice(option, history)

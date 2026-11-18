@@ -75,7 +75,9 @@ Rails.application.routes.draw do
   get "dashboard/freshness", to: "dashboard#freshness", as: :dashboard_freshness
 
   resource :learner_note, only: :update
-  resource :learner_explanation, only: :create
+  resource :learner_explanation, only: :create do
+    post :reply
+  end
 
   resources :responses, only: [ :create ] do
     member do

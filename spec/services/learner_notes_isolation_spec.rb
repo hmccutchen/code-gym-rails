@@ -29,6 +29,15 @@ RSpec.describe "Learner notes isolation" do
     end
   end
 
+  it "keeps the explanation's reply, the provider's words, out of extraction and generation" do
+    readers = %w[app/jobs/extract_learner_items_job.rb app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb
+                 app/models/learner_item.rb app/models/learner_item/merge.rb] +
+              Rails.root.glob("app/**/*generat*.rb").map { |file| file.relative_path_from(Rails.root).to_s }
+
+    expect(readers).to include("app/prompts/generation_prompt.rb", "app/jobs/generate_daily_exercises_job.rb")
+    readers.each { |file| expect(File.read(Rails.root.join(file))).not_to match(/explanation_reply|\.reply\b|reply_(?:state|attempts|requested_at|askable)/), file }
+  end
+
   describe "the question pickers" do
     let(:pickers) { %w[app/models/note_question.rb app/models/explain_question.rb] }
 
@@ -49,7 +58,10 @@ RSpec.describe "Learner notes isolation" do
                app/models/note_question.rb app/views/shared/_learner_note.html.erb
                app/views/accounts/_learner_notes.html.erb app/javascript/controllers/learner_note_controller.js
                app/models/explain_question.rb app/controllers/learner_explanations_controller.rb
-               app/views/shared/_learner_explanation.html.erb app/javascript/controllers/learner_explanation_controller.js]
+               app/views/shared/_learner_explanation.html.erb app/javascript/controllers/learner_explanation_controller.js
+               app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb app/models/learner_item/merge.rb
+               app/jobs/extract_learner_items_job.rb app/prompts/explanation_reply_prompt.rb app/models/explanation_reply.rb
+               app/views/shared/_learner_explanation_reply.html.erb]
 
     added.each { |file| expect(File.read(Rails.root.join(file))).not_to include("ConceptMastery"), file }
   end

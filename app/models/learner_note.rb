@@ -5,6 +5,11 @@ class LearnerNote < ApplicationRecord
   MAX_TEXT_LENGTH = 1_000
   MAX_EXTRACT_ATTEMPTS = 2
   MAX_REPLY_ATTEMPTS = 2
+  REPLY_CLAIM_STALE_AFTER = CallProfiles.worst_case_seconds_for("explanation_reply").seconds + DailyExercise::WRITE_MARGIN
+
+  include Claimable
+
+  claim :reply, column: :reply_requested_at, stale_after: REPLY_CLAIM_STALE_AFTER
 
   self.filter_attributes += %i[body explanation explanation_reply]
 
@@ -111,6 +116,40 @@ class LearnerNote < ApplicationRecord
 
       update!(extract_attempts: extract_attempts + 1, extracted_at: (Time.current if close))
       true
+    end
+  end
+
+  def reply = ExplanationReply.from_stored(explanation_reply)
+
+  def reply_state
+    return :replied if reply
+    return :waiting if reply? || reply_attempts.zero?
+
+    reply_attempts < MAX_REPLY_ATTEMPTS ? :failed_retry : :failed_final
+  end
+
+  def reply_askable? = reply_state == :waiting && !reply?
+
+  # Returns the claim's token, or :replied, :busy or :exhausted; the attempt is counted with the claim.
+  def start_reply!
+    with_lock do
+      next :replied if reply
+      next :busy if reply?
+      next :exhausted if reply_attempts >= MAX_REPLY_ATTEMPTS
+
+      token = claim_reply!
+      next :busy unless token
+
+      update!(reply_attempts: reply_attempts + 1)
+      token
+    end
+  end
+
+  def finish_reply!(token, reply)
+    with_lock do
+      next :moved unless reply_requested_at == token
+
+      update!(explanation_reply: reply.to_h, reply_requested_at: nil)
     end
   end
 

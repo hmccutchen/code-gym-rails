@@ -1,6 +1,9 @@
 class LearnerExplanationsController < ApplicationController
+  include ProviderCallLimits
   include LearnerNotesGate
   include LearnerNoteQuestions
+
+  limit_provider_calls only: [ :reply ]
 
   REFUSALS = {
     explained:     [ "learner_notes.explain.already_saved", :conflict ],
@@ -29,7 +32,43 @@ class LearnerExplanationsController < ApplicationController
     render_explanation_outcome(outcome, exercise, default_section)
   end
 
+  # POST /learner_explanation/reply
+  def reply
+    return render_json_error(t("learner_notes.note.unavailable"), status: :not_found) unless learner_notes_on?
+
+    exercise = current_user.daily_exercises.for_date.first
+    note = exercise && LearnerNote.find_by(daily_exercise: exercise)
+    return render_json_error(t("learner_notes.reply.no_explanation"), status: :unprocessable_content) if note&.explanation.blank?
+
+    token = note.start_reply!
+    token.is_a?(Symbol) ? render_reply_refusal(note, token) : ask_for_reply(note, token)
+  end
+
   private
+
+  def ask_for_reply(note, token)
+    reply = AiService.for(current_user).explanation_reply(
+      current_user, concept: note.explain_concept.humanize, explanation: note.explanation,
+                    phrasing: ExplainQuestion.text(note.explain_phrasing, note.explain_concept)
+    )
+    note.finish_reply!(token, reply)
+    render json: { status: "ok", html: reply_html(note) }
+  rescue ProviderError, SetupError => e
+    note.release_reply!(token)
+    Rails.logger.warn("[learner_explanation] reply failed=#{ProviderFailure.classify(e)} user #{current_user.id}")
+    render_json_error(t("learner_notes.reply.failed"), status: :service_unavailable, html: reply_html(note))
+  end
+
+  def render_reply_refusal(note, outcome)
+    return render json: { status: "ok", html: reply_html(note) } if outcome == :replied
+
+    message = outcome == :busy ? "learner_notes.reply.waiting" : "learner_notes.reply.failed"
+    render_json_error(t(message), status: :conflict, html: reply_html(note))
+  end
+
+  def reply_html(note)
+    render_to_string(partial: "shared/learner_explanation_reply", formats: [ :html ], locals: { reply: reply_view(note.reload) })
+  end
 
   def text_refusal(text)
     if text.empty?
