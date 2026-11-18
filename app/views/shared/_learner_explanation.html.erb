@@ -1,8 +1,8 @@
 <%# Locals: box (a LearnerDay::ExplainBox; its state picks what shows), draft_scope and response_id (the set and response shown, posted back with a save). %>
 <% open = box.state == :open %>
 <% saved = box.state == :saved %>
-<section class="learner-explanation" id="learner-explanation"<% if open %> data-controller="learner-explanation" data-learner-explanation-url-value="<%= learner_explanation_path %>" data-learner-explanation-draft-scope-value="<%= draft_scope %>" data-learner-explanation-response-id-value="<%= response_id %>" data-learner-explanation-failed-text-value="<%= t("learner_notes.explain.save_failed") %>"<% elsif saved %> data-controller="learner-explanation" data-learner-explanation-reply-url-value="<%= reply_learner_explanation_path %>" data-learner-explanation-ask-reply-value="<%= box.reply.ask %>" data-learner-explanation-waiting-text-value="<%= t("learner_notes.reply.waiting") %>" data-learner-explanation-reply-failed-text-value="<%= t("learner_notes.reply.failed") %>"<% end %>>
-  <h2><%= t("learner_notes.explain.heading") %></h2>
+<section class="learner-explanation" id="learner-explanation"<% if open %> data-controller="learner-explanation" data-learner-explanation-url-value="<%= learner_explanation_path %>" data-learner-explanation-draft-scope-value="<%= draft_scope %>" data-learner-explanation-response-id-value="<%= response_id %>" data-learner-explanation-failed-text-value="<%= t("learner_notes.explain.save_failed") %>" data-learner-explanation-saved-text-value="<%= t("learner_notes.explain.saved") %>"<% elsif saved %> data-controller="learner-explanation" data-learner-explanation-reply-url-value="<%= reply_learner_explanation_path %>" data-learner-explanation-ask-reply-value="<%= box.reply.ask %>" data-learner-explanation-waiting-text-value="<%= t("learner_notes.reply.waiting") %>" data-learner-explanation-reply-failed-text-value="<%= t("learner_notes.reply.failed") %>"<% end %>>
+  <h2 id="learner-explanation-heading" tabindex="-1"><%= t("learner_notes.explain.heading") %></h2>
   <p class="learner-explanation-question" id="learner-explanation-question"<% if open %> data-learner-explanation-target="question"<% end %>><%= box.question %></p>
   <% case box.state %>
   <% when :open %>
@@ -16,7 +16,7 @@
     <textarea id="learner-explanation-input" class="answer" maxlength="<%= LearnerNote::MAX_TEXT_LENGTH %>" aria-describedby="learner-explanation-question" data-learner-explanation-target="input"></textarea>
     <p class="hint"><%= t("learner_notes.explain.locks") %></p>
     <button type="button" class="btn btn-primary btn-sm" data-learner-explanation-target="save" data-action="learner-explanation#save"><%= t("learner_notes.explain.save") %></button>
-    <p class="hint" aria-live="polite" data-learner-explanation-target="status"></p>
+    <p class="hint" data-learner-explanation-target="status"></p>
   <% when :saved %>
     <%= simple_format(h(box.text), class: "learner-explanation-text") %>
     <%= render "shared/learner_explanation_reply", reply: box.reply %>

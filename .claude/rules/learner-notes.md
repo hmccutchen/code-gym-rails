@@ -124,7 +124,12 @@ this area.
   deleted: the page shows Try again once, and a third request is refused. A
   note deleted during the call gets the no-explanation refusal as JSON,
   never a 404 page. The box asks for the reply when a saved box that has not
-  asked yet connects.
+  asked yet connects. A save moves focus to the new box's heading and Try
+  again to the new reply (`tabindex="-1"`); the reply asked for on load
+  moves no focus. Results are announced only through
+  `#learner-explanation-announcer`, a live region outside the markup a save
+  or a reply replaces, and Try again is enabled again when the request gets
+  no answer.
 - **A replaced set starts with no note.** Regenerating a set
   (`PracticeGeneration#commit_replacement`) and Start over
   (`DailyExercise#start_over!`) delete the day's note row in the same

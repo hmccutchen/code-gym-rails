@@ -888,6 +888,7 @@ en:
       locks: "Saving sends your explanation, and it can't be changed afterwards."
       save: "Save"
       save_failed: "Couldn't save your explanation. Try again."
+      saved: "Your explanation is saved."
       closed: "This question closed at the end of the day you submitted, so there is nothing to save now."
       blank: "Write your explanation before saving."
       too_long: "Keep your explanation to %{max} characters."

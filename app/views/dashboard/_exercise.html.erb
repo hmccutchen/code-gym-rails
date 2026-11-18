@@ -18,6 +18,8 @@
       <%= render "responses/submission", response: response %>
       <% if @explain_box %>
         <%= render "shared/learner_explanation", box: @explain_box, draft_scope: exercise.draft_scope, response_id: response.id %>
+        <%# Outside the box, since a save and a reply replace the box's markup and a live region must stay in place to be heard. %>
+        <p class="visually-hidden" id="learner-explanation-announcer" aria-live="polite"></p>
       <% end %>
       <% if @note_box %>
         <%= render "shared/learner_note", **@note_box %>

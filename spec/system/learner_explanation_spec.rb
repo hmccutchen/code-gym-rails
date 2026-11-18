@@ -66,4 +66,70 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
       expect(LearnerExtraction.for(note.daily_exercise).reply_attempts).to eq(1)
     end
   end
+
+  def explained_set(user, attempts:)
+    exercise = submitted_set(user).daily_exercise
+    LearnerNote.create!(user: user, daily_exercise: exercise, explain_section: "code_review", explain_concept: "n_plus_one",
+                        explain_phrasing: "explain.first", explanation: "One query per row.")
+    attempts.times { LearnerExtraction.count_reply_attempt!(exercise) { Time.current } }
+    exercise
+  end
+
+  it "moves focus to the saved box and announces the reply through one live region outside it" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      submitted_set(user)
+      visit_as(user)
+      wait_for_js
+
+      find("#learner-explanation textarea").fill_in(with: "It runs one query per row.")
+      find("#learner-explanation").click_button("Save")
+
+      expect(page).to have_css("#learner-explanation-reply", text: "Feedback on your explanation, not a grade")
+      wait_for_js_condition("document.activeElement?.id === 'learner-explanation-heading'")
+      announcer = find("#learner-explanation-announcer", visible: :all)
+      expect(announcer[:"aria-live"]).to eq("polite")
+      expect(page).to have_css("#learner-explanation-announcer", visible: :all, text: "What was sound: You named what the concept does.")
+      expect(page).to have_css("#learner-explanation [aria-live]", count: 0)
+    end
+  end
+
+  it "moves focus to the new reply after Try again" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      explained_set(user, attempts: 1)
+      visit_as(user)
+      wait_for_js
+
+      click_button "Try again"
+
+      expect(page).to have_css("#learner-explanation-reply", text: "Feedback on your explanation, not a grade")
+      wait_for_js_condition("document.activeElement?.closest('#learner-explanation-reply') !== null")
+    end
+  end
+
+  it "re-enables Try again after the retry gets no answer" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      explained_set(user, attempts: 1)
+      visit_as(user)
+      wait_for_js
+      expect(page).to have_button("Try again", disabled: false)
+      drop_requests_to("/learner_explanation/reply")
+
+      click_button "Try again"
+
+      expect(page).to have_css("#learner-explanation-reply", text: I18n.t("learner_notes.reply.failed"))
+      expect(page).to have_button("Try again", disabled: false)
+    end
+  end
 end
