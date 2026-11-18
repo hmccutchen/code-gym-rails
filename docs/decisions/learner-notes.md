@@ -252,3 +252,13 @@ what the engineer asked or wrote, which still happened. Regeneration
 replaces `plan_notes` wholesale and Start over drops the ledger's key, so a
 replaced set starts with fresh counts, as it starts with no note. A page still showing the replaced set gets the refresh
 refusal when it saves a note or an explanation.
+
+Regeneration changes the set's draft scope, and Start over does not, so
+each save also carries the response the page was rendered for, or none. The
+server refuses the save with the refresh text when that response is no
+longer the set's (owner's decision, 2026-11-18). The explanation is only
+offered on a submitted day, so it always names one. A note box rendered
+before the first answer save names none, because that save creates the
+response without telling the note box; such a note save is not checked
+against the response. The answers autosave and the draft scope itself are
+unchanged here (GitHub issue #821).

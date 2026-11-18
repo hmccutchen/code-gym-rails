@@ -102,6 +102,81 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
     end
   end
 
+  describe "a page rendered before Start over" do
+    def save_note(response_id)
+      patch learner_note_path, params: { learner_note: "The old tab's note.", draft_scope: user.daily_exercises.sole.draft_scope,
+                                         response_id: response_id }, as: :json
+    end
+
+    it "has its note save refused with the refresh text, since the set keeps its draft scope" do
+      exercise = todays_set(submitted: false)
+      old_response = exercise.daily_response
+      login_as(user)
+      delete start_over_response_path(old_response)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "new" })
+
+      save_note(old_response.id)
+
+      expect(response).to have_http_status(:conflict)
+      expect(JSON.parse(response.body)["error"]).to eq(I18n.t("flash.responses.stale_answers"))
+      expect(LearnerNote.where(daily_exercise: exercise)).to be_empty
+    end
+
+    it "has its note save refused when Start over left no response at all" do
+      exercise = todays_set(submitted: false)
+      old_response = exercise.daily_response
+      login_as(user)
+      delete start_over_response_path(old_response)
+
+      save_note(old_response.id)
+
+      expect(response).to have_http_status(:conflict)
+      expect(LearnerNote.where(daily_exercise: exercise)).to be_empty
+    end
+
+    it "still saves a note from the page showing the current response, or rendered before any response existed" do
+      exercise = todays_set(submitted: false)
+      login_as(user)
+
+      save_note(exercise.daily_response.id)
+      expect(response).to have_http_status(:ok)
+
+      save_note("")
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "renders on each box the response it was rendered for, or none" do
+      exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: 1.hour.ago, language: "ruby_rails",
+                                       problem_set: problem_set)
+      login_as(user)
+
+      get root_path
+      expect(Nokogiri::HTML(response.body).at_css("#learner-note")["data-learner-note-response-id-value"]).to eq("")
+
+      submitted = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "a" * 20 },
+                                        section_ratings: { "code_review" => "right_level" }, submitted_at: Time.current)
+      get root_path
+      box = Nokogiri::HTML(response.body).at_css("#learner-explanation")
+      expect(box["data-learner-explanation-response-id-value"]).to eq(submitted.id.to_s)
+    end
+
+    it "has an old explanation refused after Start over and a second submission" do
+      exercise = todays_set
+      old_response = exercise.daily_response
+      login_as(user)
+      delete start_over_response_path(old_response)
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "a" * 20 },
+                            section_ratings: { "code_review" => "right_level" }, submitted_at: Time.current)
+
+      post learner_explanation_path, params: { section: "code_review", explanation: "The old tab's words.",
+                                               draft_scope: exercise.reload.draft_scope, response_id: old_response.id }, as: :json
+
+      expect(response).to have_http_status(:conflict)
+      expect(JSON.parse(response.body)["error"]).to eq(I18n.t("flash.responses.stale_answers"))
+      expect(LearnerNote.where(daily_exercise: exercise)).to be_empty
+    end
+  end
+
   describe "regenerating the set" do
     def stub_new_set
       service = instance_double(ClaudeService)

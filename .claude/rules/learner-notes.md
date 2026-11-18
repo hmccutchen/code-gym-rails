@@ -127,7 +127,12 @@ this area.
   deletes every item citing that date's `note` or `explanation`, even one
   with other evidence; regeneration replaces `plan_notes` and Start over
   drops the ledger's key, so the set's counts start fresh. The note and explanation saves post the page's draft scope
-  and a replaced set refuses them with the refresh text. An extraction run
+  and the response it was rendered for, and a replaced set refuses them with
+  the refresh text. Start over keeps the draft scope, so the response id is
+  what refuses a page from before it: the explanation must name the current
+  response, and a note naming a response refuses once it is gone. A note box
+  rendered before any response existed posts none and is not checked, since
+  the first answer save creates the response without telling it. An extraction run
   carries the response it was queued for and stops when that response was
   replaced.
 - **The Account section.** Shown while the setting is offered or the account

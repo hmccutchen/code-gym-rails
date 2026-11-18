@@ -31,7 +31,8 @@ class LearnerExplanationsController < ApplicationController
     day = learner_day(exercise, exercise.daily_response)
     default_section = default_explain_section(exercise, day)
     outcome = LearnerNote.save_explanation!(exercise, section: params[:section].to_s, text: text,
-                                                     expected_scope: params[:draft_scope].to_s)
+                                                     expected_scope: params[:draft_scope].to_s,
+                                                     expected_response_id: params[:response_id].to_s)
     render_explanation_outcome(outcome, exercise, day, default_section)
   end
 
@@ -104,6 +105,7 @@ class LearnerExplanationsController < ApplicationController
 
   def box_html(exercise, day)
     box = explain_box_for(exercise.reload, day, LearnerNote.find_by(daily_exercise: exercise))
-    render_to_string(partial: "shared/learner_explanation", formats: [ :html ], locals: { box: box, draft_scope: exercise.draft_scope }) if box
+    render_to_string(partial: "shared/learner_explanation", formats: [ :html ], locals: { box: box, draft_scope: exercise.draft_scope,
+                                                                                            response_id: exercise.daily_response&.id }) if box
   end
 end

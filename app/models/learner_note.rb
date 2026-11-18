@@ -29,14 +29,17 @@ class LearnerNote < ApplicationRecord
                        counts: rows.map(&:first).tally)
   end
 
-  def self.save_explanation!(exercise, section:, text:, expected_scope:)
+  def self.save_explanation!(exercise, section:, text:, expected_scope:, expected_response_id:)
     transaction do
       owner = User.lock("FOR SHARE").find_by(id: exercise.user_id)
       next :deleted if owner.nil? || owner.anonymized?
 
       locked = DailyExercise.lock.find_by(id: exercise.id)
       next :stale if locked&.draft_scope != expected_scope
-      next :not_submitted unless exercise.daily_response&.submitted?
+
+      response = DailyResponse.find_by(daily_exercise_id: exercise.id)
+      next :stale if response&.id.to_s != expected_response_id.to_s
+      next :not_submitted unless response&.submitted?
 
       closed = LearnerExtraction.for(locked).closed?
       write(row_for(exercise)) { |note| note.explain(owner, exercise, section, text, closed: closed) }
@@ -44,9 +47,9 @@ class LearnerNote < ApplicationRecord
   end
 
   # Each writer returns the saved row, or :deleted, :submitted or :stale for what moved while it waited.
-  def self.save_body!(exercise, text, question_key:, expected_scope:)
+  def self.save_body!(exercise, text, question_key:, expected_scope:, expected_response_id:)
     body = UserText.clean(text, limit: MAX_TEXT_LENGTH)
-    under_draft_locks(exercise, expected_scope) do
+    under_draft_locks(exercise, expected_scope, expected_response_id) do
       write(row_for(exercise)) do |note|
         note.body = body
         note.question_key ||= question_key if body.strip.present?
@@ -92,12 +95,14 @@ class LearnerNote < ApplicationRecord
     for_set(exercise)&.forget!(*FORGOTTEN_COLUMNS.keys)
   end
 
-  def self.under_draft_locks(exercise, expected_scope)
+  # A page rendered before any response existed posts none, and its first answer save creates one it never hears about.
+  def self.under_draft_locks(exercise, expected_scope, expected_response_id)
     transaction do
       owner = User.lock("FOR SHARE").find_by(id: exercise.user_id)
       next :deleted if owner.nil? || owner.anonymized?
 
       exercise.with_response_locked do |response|
+        next :stale if expected_response_id.present? && response&.id.to_s != expected_response_id
         next :submitted if response&.submitted?
         next :stale if exercise.draft_scope != expected_scope
 

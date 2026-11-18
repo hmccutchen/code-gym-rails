@@ -79,7 +79,7 @@ class DashboardController < ApplicationController
     note = @exercise.learner_note
     day = learner_day(@exercise, @response)
     question = NoteQuestion.text(LearnerDay.note_question(day, stored: note&.question_key))
-    @note_box = { question: question, body: note&.body, editable: !@response.submitted? }
+    @note_box = { question: question, body: note&.body, editable: !@response.submitted?, response_id: @response.id }
     @note_box = nil unless @note_box[:editable] || note&.body.present?
     @explain_box = explain_box_for(@exercise, day, note) if @response.submitted?
   end

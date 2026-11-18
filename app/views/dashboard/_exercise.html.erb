@@ -17,7 +17,7 @@
       <%= render "responses/answered_sections", exercise: exercise, response: response, pickers: @daily_kind_pickers, folded: true %>
       <%= render "responses/submission", response: response %>
       <% if @explain_box %>
-        <%= render "shared/learner_explanation", box: @explain_box, draft_scope: exercise.draft_scope %>
+        <%= render "shared/learner_explanation", box: @explain_box, draft_scope: exercise.draft_scope, response_id: response.id %>
       <% end %>
       <% if @note_box %>
         <%= render "shared/learner_note", **@note_box %>

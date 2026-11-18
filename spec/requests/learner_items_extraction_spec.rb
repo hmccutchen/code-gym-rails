@@ -55,7 +55,8 @@ RSpec.describe "When learner items are extracted", type: :request do
   describe "at the explanation's save" do
     def save_explanation(text)
       post learner_explanation_path, params: { section: "code_review", explanation: text,
-                                               draft_scope: user.daily_exercises.sole.draft_scope }, as: :json
+                                               draft_scope: user.daily_exercises.sole.draft_scope,
+                                               response_id: user.daily_exercises.sole.daily_response.id }, as: :json
     end
 
     before do

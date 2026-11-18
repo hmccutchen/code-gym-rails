@@ -11,7 +11,8 @@ class LearnerNotesController < ApplicationController
 
     day = learner_day(exercise, exercise.daily_response)
     outcome = LearnerNote.save_body!(exercise, params[:learner_note], question_key: LearnerDay.note_question(day).key,
-                                                                       expected_scope: params[:draft_scope].to_s)
+                                                                       expected_scope: params[:draft_scope].to_s,
+                                                                       expected_response_id: params[:response_id].to_s)
     render_note_outcome(outcome, day)
   end
 
