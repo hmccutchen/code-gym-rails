@@ -175,6 +175,24 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
     end
   end
 
+  it "offers Try again beside the message when reading the reply's status gets an error" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      note = LearnerNote.find_by!(daily_exercise: explained_set(user, attempts: 0))
+      note.start_reply!(stamp: note.explanation_stamp)
+      visit_as(user)
+      fail_requests_to("/learner_explanation/reply_status")
+      wait_for_js
+      expect(page).to have_css("#learner-explanation-reply", text: I18n.t("learner_notes.reply.waiting"))
+
+      expect(page).to have_css("#learner-explanation-reply", text: "nope")
+      expect(page).to have_button(I18n.t("learner_notes.reply.try_again"), disabled: false)
+    end
+  end
+
   it "offers Try again when the reply asked for on load gets no answer" do
     stub_env("LEARNER_NOTES" => "1")
     user = create_fake_provider_user

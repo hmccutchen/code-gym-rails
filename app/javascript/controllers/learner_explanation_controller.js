@@ -94,6 +94,7 @@ export default class extends Controller {
       this.replyTarget.outerHTML = result.data.html
       if (!this.hasReplyPendingTarget) this.announce(this.replyTarget.textContent)
     } else if (result.status !== 0) {
+      this.offerRetry(this.replyTarget.querySelector("button"))
       return this.showReplyMessage(result.message)
     }
     this.pollWhilePending(Math.min(delay * 2, 30000), waited)

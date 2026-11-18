@@ -135,7 +135,9 @@ this area.
   with `replyPending`) reads `GET /learner_explanation/reply_status`, which
   takes no claim, spends no attempt and makes no call, waiting 1 second and
   doubling to at most 30, until the box settles or `REPLY_CLAIM_STALE_AFTER`
-  has passed, when it reveals the waiting box's hidden Try again. A save moves focus to the new box's heading and Try
+  has passed, when it reveals the waiting box's hidden Try again; a status
+  read answered with an error and no box stops the reads and shows its
+  message beside that Try again, while one that gets no answer keeps reading. A save moves focus to the new box's heading and Try
   again to the new reply (`tabindex="-1"`); the reply asked for on load
   moves no focus. Results are announced only through
   `#learner-explanation-announcer`, a live region outside the markup a save
