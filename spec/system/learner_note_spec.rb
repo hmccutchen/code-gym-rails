@@ -3,11 +3,7 @@ require "rails_helper"
 # with_csrf: the script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "The note box", type: :system, with_csrf: true do
   def pause_browser_clock
-    page.driver.with_playwright_page do |pw|
-      now = Time.now.to_i * 1000
-      pw.clock.install(time: now)
-      pw.clock.pause_at(now + 1)
-    end
+    page.driver.with_playwright_page { |pw| pw.clock.pause_at(Time.now.to_i * 1000) }
   end
 
   def advance_browser_clock(milliseconds)
