@@ -164,6 +164,21 @@ RSpec.describe "The Learner notes setting on the Account page", type: :request d
       expect(second.text).to include("Memoization", "A term you asked about", "From your note on Nov 16")
     end
 
+    it "names each button's item, note or explanation in its accessible name" do
+      item(label: "Said an index only speeds up reads.")
+      item(concept: "memoization", status: "dismissed", closed_on: today - 2, label: "Asked what memoize means.")
+      note_on(today - 1)
+      login_as(user)
+
+      get account_path
+
+      open_buttons = section.at_css(".learner-item-open").css("button").map { |button| button["aria-label"] }
+      expect(open_buttons).to eq([ "I've got this: Said an index only speeds up reads.", "Delete: Said an index only speeds up reads." ])
+      expect(section.at_css(".learner-item-closed button")["aria-label"]).to eq("Delete: Asked what memoize means.")
+      expect(section.at_css(".learner-note-row button")["aria-label"]).to eq("Delete the note for Nov 17")
+      expect(section.at_css(".learner-explanation-row button")["aria-label"]).to eq("Delete the explanation for Nov 17")
+    end
+
     it "states a returned item's history as plain fact" do
       item(returned_after: today - 15, evidence: [ reference(today - 6, "answer") ])
       login_as(user)

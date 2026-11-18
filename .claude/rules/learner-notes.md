@@ -155,7 +155,10 @@ this area.
   evidence, and deletes the row once neither is left; Delete all deletes
   every row and item. No empty marker stays: the set's ledger says it was
   read, and the action discards any extraction still waiting for that set
-  (`ExtractLearnerItemsJob.discard_waiting`). Deleting keeps no record. The page reads no
+  (`ExtractLearnerItemsJob.discard_waiting`). Deleting keeps no record.
+  Each "I've got this" and Delete button names its item's label, or the
+  note or explanation and its date, in an `aria-label` from the
+  `accounts.learner_notes.*_label` locale keys. The page reads no
   `ConceptMastery`, and its fixed copy names no tier, score or level.
 - **Retention.** `SweepLearnerNotesJob` (daily, `default`) first expires
   overdue open items under each owner's row lock, by the owner's local date
