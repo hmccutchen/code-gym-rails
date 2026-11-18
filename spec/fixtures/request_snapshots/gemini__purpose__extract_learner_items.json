@@ -4,7 +4,7 @@
   "input": "PROMPT TEXT",
   "store": false,
   "generation_config": {
-    "max_output_tokens": 700,
+    "max_output_tokens": 2124,
     "thinking_level": "minimal"
   }
 }

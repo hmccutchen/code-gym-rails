@@ -62,6 +62,7 @@ RSpec.describe LearnerItemsPrompt do
       .and include("Report a repeat").and include("Its label\n  is ignored")
       .and include("Refine only when there is something new")
       .and include("An\nempty list of items is a valid reply")
+      .and include("as a list of at most #{LearnerItem::MAX_EVIDENCE} references")
   end
 
   it "shows open items without ids, and every label as data" do

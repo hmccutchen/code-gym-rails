@@ -4,6 +4,13 @@ class LearnerItemsReply
   Result = Data.define(:items, :dropped)
   Dropped = Class.new(StandardError)
 
+  MAX_ITEMS = LearnerItem::MAX_OPEN + LearnerItem::MAX_NEW_PER_DAY
+  REFERENCE_CHARS = 64
+  ITEM_FIELD_CHARS = 128
+  MAX_ITEM_CHARS = LearnerItem::MAX_LABEL_LENGTH + LearnerItem::MAX_TERM_LENGTH + (LearnerItem::MAX_EVIDENCE * REFERENCE_CHARS) +
+                   ITEM_FIELD_CHARS
+  MAX_REPLY_CHARS = MAX_ITEMS * MAX_ITEM_CHARS
+
   def self.parse(raw, day:, buckets:)
     unless raw.is_a?(Hash) && raw["items"].is_a?(Array)
       raise ProviderError::InvalidResponseError, "Learner items reply held no list of items"

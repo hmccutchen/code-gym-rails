@@ -1,6 +1,6 @@
 {
   "model": "claude-sonnet-5-5",
-  "max_tokens": 700,
+  "max_tokens": 2124,
   "system": "SYSTEM TEXT",
   "messages": [
     {

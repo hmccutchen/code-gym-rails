@@ -66,7 +66,7 @@ class LearnerItemsPrompt
       out for the other kinds.
     - "label": one sentence of at most #{LearnerItem::MAX_LABEL_LENGTH} characters, on one line, saying in
       plain words what the engineer needs. Never quote the engineer.
-    - "evidence": where it came up, as a list of references:
+    - "evidence": where it came up, as a list of at most #{LearnerItem::MAX_EVIDENCE} references:
       {"source": "duck", "section": "<section key>"} for the engineer's own
       messages in that section's duck thread,
       {"source": "answer", "section": "<section key>"} for their answer to that

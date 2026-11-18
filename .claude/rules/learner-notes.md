@@ -57,6 +57,9 @@ this area.
   or on two lines (never cut), a bad term, and an item with no valid
   evidence. The server stamps each reference with the set's date and ignores
   any id or date in the reply. The reply is parsed with `log_raw: false`.
+  `LearnerItemsReply::MAX_REPLY_CHARS` (a repeat of every open item plus a
+  day's new items, every field at its limit) sets the call's token cap in
+  `CallProfiles`, so raising a limit raises the cap.
 - **One writer of items.** `LearnerItem.merge!` takes the user row lock,
   expires overdue open rows, then applies the five merge rules in order:
   collapse matching items inside the reply; let an open item with the same
