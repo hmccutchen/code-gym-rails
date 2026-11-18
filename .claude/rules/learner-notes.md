@@ -28,7 +28,10 @@ this area.
   except that an account whose setting is on without its own key keeps the
   Account page's turn-off control.
 - **What may read notes and items.** `learner_notes_isolation_spec` names
-  the files that may name `LearnerNote` or `LearnerItem`. The prompt class
+  the files that may name `LearnerNote` or `LearnerItem`, or a
+  `learner_note`/`learner_item` name inside a longer one.
+  `PracticeGeneration` may call `forget_learner_note!` and nothing else of
+  either, since it deletes a replaced set's note and reads nothing. The prompt class
   and the reply boundary read only `LearnerItem`'s limits, never a row.
   Generation, review, the judges, mastery and planning read neither table.
 - **The extraction prompt is pure.** `LearnerItemsPrompt` takes values the

@@ -1,10 +1,11 @@
 require "rails_helper"
 
 RSpec.describe "Learner notes isolation" do
-  let(:guarded) { /\bLearner(?:Note|Item)\b|\blearner_(?:notes?|items?)\b/ }
+  let(:guarded) { /Learner(?:Note|Item)\b|learner_(?:notes?|items?)\b/ }
 
   it "matches the singular and plural names it guards" do
-    expect([ "has_one :learner_note", "exercise.learner_note.body", "has_one :learner_item", "user.learner_notes" ])
+    expect([ "has_one :learner_note", "exercise.learner_note.body", "has_one :learner_item", "user.learner_notes",
+             "exercise.forget_learner_note!", "owner.drop_learner_items" ])
       .to all(match(guarded))
     expect("learner_notes_enabled").not_to match(guarded)
   end
@@ -15,10 +16,21 @@ RSpec.describe "Learner notes isolation" do
     own = %w[app/models/learner_note.rb app/models/learner_item.rb app/models/learner_item/merge.rb app/jobs/extract_learner_items_job.rb app/models/user.rb app/models/account_data.rb
              app/models/daily_exercise.rb app/jobs/sweep_learner_notes_job.rb app/models/privacy_notice.rb] + limit_readers
 
-    readers = (isolation_scope - own).select do |file|
-      File.read(Rails.root.join(file)).match?(guarded)
+    readers = (isolation_scope - own - deleters_on_replacement).select do |file|
+      File.read(Rails.root.join(file)).gsub(purpose_name, "").match?(guarded)
     end
     expect(readers).to eq([])
+  end
+
+  let(:purpose_name) { /\bextract_learner_items\b/ }
+
+  let(:deleters_on_replacement) { %w[app/services/practice_generation.rb] }
+
+  it "lets regeneration only delete the replaced set's note, reading nothing of it" do
+    source = File.read(Rails.root.join("app/services/practice_generation.rb"))
+
+    expect(source.scan(guarded)).to eq([ "learner_note" ])
+    expect(source).to include("exercise.forget_learner_note!")
   end
 
   it "lets the extraction prompt and its reply boundary read LearnerItem's limits and nothing else of either table" do
