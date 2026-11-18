@@ -23,7 +23,11 @@ response and leave the exercise row in place, so the set keeps its id. A run
 queued for the old response would otherwise read the new set, or close its
 extraction before the engineer had explained it. The run checks, before it
 reads the note row, that the submitted response it was queued for
-is still the set's response, and stops quietly when it is not.
+is still the set's response, and stops quietly when it is not. Start over
+can still land after that check, so the run passes the same response to
+`LearnerExtraction.count_attempt!` and `.close!`, which check it again under
+the ledger's locks and answer `:replaced` without writing; the run stops and
+logs `set_replaced`.
 
 ## Deletion during the call
 

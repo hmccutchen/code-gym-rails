@@ -21,17 +21,17 @@ module LearnerExtraction
 
   def self.for(exercise) = Ledger.from(exercise.plan_notes)
 
-  # Returns true when the attempt was counted, false when the set is closed or spent, or :gone.
-  def self.count_attempt!(exercise, close:)
-    change(exercise) do |ledger|
+  # Returns true when the attempt was counted, false when the set is closed or spent, or :gone or :replaced.
+  def self.count_attempt!(exercise, close:, response_id:)
+    change(exercise, response_id: response_id) do |ledger|
       next false if ledger.closed? || ledger.attempts >= MAX_ATTEMPTS
 
       [ true, ledger.with(attempts: ledger.attempts + 1, closed_at: (Time.current.iso8601 if close)) ]
     end
   end
 
-  def self.close!(exercise)
-    change(exercise) do |ledger|
+  def self.close!(exercise, response_id:)
+    change(exercise, response_id: response_id) do |ledger|
       next :closed if ledger.closed?
 
       [ :closed, ledger.with(closed_at: Time.current.iso8601) ]
@@ -61,10 +61,12 @@ module LearnerExtraction
     exercise.clear_attribute_changes([ :plan_notes ])
   end
 
-  def self.change(exercise)
+  def self.change(exercise, response_id: :any)
     exercise.transaction do
       User.lock("FOR SHARE").where(id: exercise.user_id).ids
       exercise.lock!
+      next :replaced unless response_id == :any || still_answered_by?(exercise, response_id)
+
       ledger = Ledger.from(exercise.plan_notes)
       result, changed = yield ledger
       exercise.update!(plan_notes: exercise.plan_notes.merge(KEY => changed.to_h)) if changed
@@ -74,4 +76,9 @@ module LearnerExtraction
     :gone
   end
   private_class_method :change
+
+  def self.still_answered_by?(exercise, response_id)
+    DailyResponse.uncached { DailyResponse.submitted.exists?(id: response_id, daily_exercise_id: exercise.id) }
+  end
+  private_class_method :still_answered_by?
 end

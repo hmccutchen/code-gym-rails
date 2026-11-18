@@ -28,7 +28,7 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
   end
 
   def note_on(exercise, extracted: true)
-    LearnerExtraction.count_attempt!(exercise, close: true) if extracted
+    LearnerExtraction.count_attempt!(exercise, close: true, response_id: exercise.daily_response.id) if extracted
     LearnerNote.create!(user: user, daily_exercise: exercise, body: "The loop confused me.", question_key: "hardest",
                         explain_section: "code_review", explain_concept: "n_plus_one", explain_phrasing: "explain.first",
                         explanation: "It runs one query per row.")

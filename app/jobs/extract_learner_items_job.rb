@@ -7,6 +7,7 @@ class ExtractLearnerItemsJob < ApplicationJob
   CLAIM_RETRY_WAIT = 5.minutes
   LOGGED_OUTCOMES = { deleted: "account_deleted", replaced: "set_replaced" }.freeze
   SET_LEFT_ALONE = LOGGED_OUTCOMES.keys.freeze
+  SET_MOVED_ON = { gone: "set_gone", replaced: "set_replaced" }.freeze
 
   def self.claim_key(daily_exercise_id) = "learner_items/#{daily_exercise_id}"
 
@@ -62,10 +63,10 @@ class ExtractLearnerItemsJob < ApplicationJob
 
     duck = DuckThread.for(fresh)
     reason = no_call_reason(user, fresh, note, duck)
-    return close_without_call(user, fresh, run, reason) if reason
-    return close(user, fresh, run) if run == FALLBACK && ledger.attempts >= LearnerExtraction::MAX_ATTEMPTS
+    return close_without_call(user, fresh, daily_response_id, run, reason) if reason
+    return close(user, fresh, daily_response_id, run) if run == FALLBACK && ledger.attempts >= LearnerExtraction::MAX_ATTEMPTS
     return unless run == FALLBACK || ledger.attempts.zero?
-    return unless LearnerExtraction.count_attempt!(fresh, close: run == FALLBACK) == true
+    return unless LearnerExtraction.count_attempt!(fresh, close: run == FALLBACK, response_id: daily_response_id) == true
 
     call(user, fresh, daily_response_id, note, duck, run, ledger)
   end
@@ -77,22 +78,23 @@ class ExtractLearnerItemsJob < ApplicationJob
     end
   end
 
-  def close_without_call(user, exercise, run, reason)
-    close(user, exercise, run)
+  def close_without_call(user, exercise, daily_response_id, run, reason)
+    close(user, exercise, daily_response_id, run)
     Rails.logger.info("[learner_items] user #{user.id} run=#{run} no_call=#{reason}")
   end
 
-  def close(user, exercise, run)
-    return unless LearnerExtraction.close!(exercise) == :gone
+  def close(user, exercise, daily_response_id, run)
+    outcome = LearnerExtraction.close!(exercise, response_id: daily_response_id)
+    return unless SET_MOVED_ON.key?(outcome)
 
-    Rails.logger.info("[learner_items] user #{user.id} run=#{run} set_gone")
+    Rails.logger.info("[learner_items] user #{user.id} run=#{run} #{SET_MOVED_ON.fetch(outcome)}")
   end
 
   def call(user, exercise, daily_response_id, note, duck, run, ledger)
     reply = AiService.for(user).extract_learner_items(user, **request_values(user, exercise, note, duck))
     outcome = LearnerItem.merge!(user, reply.items, set_date: exercise.date,
                                                     still_there: still_there(exercise, daily_response_id, note, ledger))
-    close(user, exercise, run) unless SET_LEFT_ALONE.include?(outcome)
+    close(user, exercise, daily_response_id, run) unless SET_LEFT_ALONE.include?(outcome)
     log_outcome(user, run, outcome, reply.dropped)
   rescue ProviderError, SetupError => e
     Rails.logger.warn("[learner_items] user #{user.id} run=#{run} failed=#{ProviderFailure.classify(e)}")

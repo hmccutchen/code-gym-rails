@@ -21,6 +21,13 @@ the freshly locked row. It writes back only its own key, merged into the
 locked row's `plan_notes`, so generation's notes are never overwritten. A
 set deleted before the write answers `:gone`.
 
+`.count_attempt!` and `.close!` take the response the run was queued for.
+Under the same locks they check it is still the set's submitted response,
+and answer `:replaced` with nothing written when it is not. Start over drops
+the key and takes the user row lock to do it, so without that check a run
+that read the old ledger first would recreate the key for the replacement:
+counting its attempt, or closing it, before the replacement's own run.
+
 ## When it starts fresh
 
 Regeneration replaces `plan_notes` wholesale, so a replaced set starts with

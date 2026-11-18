@@ -157,3 +157,70 @@ RSpec.describe ExtractLearnerItemsJob, "when the account is deleted during the c
     expect(log.string).to include("[learner_items] user #{user.id} run=fallback account_deleted")
   end
 end
+
+RSpec.describe ExtractLearnerItemsJob, "when the set moves on before the run writes its ledger" do
+  let(:user) do
+    User.create!(email: "ledger-race@example.com", time_zone: "UTC", provider: "fake", api_keys: { "fake" => "fake-key" },
+                 learner_notes_enabled: true)
+  end
+
+  before do
+    stub_env("LEARNER_NOTES" => "1")
+    allow_any_instance_of(FakeService).to receive(:extract_learner_items)
+      .and_return(LearnerItemsReply::Result.new(items: [ duck_item ], dropped: {}))
+  end
+
+  around { |example| travel_to(Time.utc(2026, 11, 16, 15)) { example.run } }
+
+  def submitted_set
+    exercise = DailyExercise.create!(
+      user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end", "concept" => "n_plus_one" } }
+    )
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "It queries per row." },
+                          submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
+    LearnerNote.create!(user: user, daily_exercise: exercise, body: "I got stuck on includes vs preload.")
+    exercise
+  end
+
+  def duck_item
+    LearnerItemsReply::Item.new(concept: "n_plus_one", bucket: "ruby_rails", kind: "concept", term: nil, label: "Practise preloading.",
+                                evidence: [ { "date" => Date.current.iso8601, "source" => "duck", "section" => "code_review" } ])
+  end
+
+  def start_over_and_resubmit(exercise)
+    exercise = DailyExercise.find(exercise.id)
+    exercise.start_over!(exercise.daily_response)
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "New answer." },
+                          submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
+  end
+
+  def run(exercise, response_id)
+    described_class.perform_now(user_id: user.id, daily_exercise_id: exercise.id, daily_response_id: response_id, run: "fallback")
+  end
+
+  it "leaves the replacement's ledger open when Start over lands after the merge returns" do
+    exercise = submitted_set
+    old_response_id = exercise.daily_response.id
+    allow(LearnerItem).to receive(:merge!).and_wrap_original do |original, *args, **kwargs|
+      original.call(*args, **kwargs).tap { start_over_and_resubmit(exercise) }
+    end
+
+    run(exercise, old_response_id)
+
+    expect(LearnerExtraction.for(exercise.reload)).to have_attributes(closed?: false, attempts: 0)
+  end
+
+  it "counts no attempt on the replacement's ledger when Start over lands after the ledger was read" do
+    exercise = submitted_set
+    old_response_id = exercise.daily_response.id
+    allow(DuckThread).to receive(:for).and_wrap_original do |original, *args|
+      start_over_and_resubmit(exercise)
+      original.call(*args)
+    end
+
+    run(exercise, old_response_id)
+
+    expect(LearnerExtraction.for(exercise.reload)).to have_attributes(closed?: false, attempts: 0)
+  end
+end

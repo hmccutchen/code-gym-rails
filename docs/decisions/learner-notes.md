@@ -103,7 +103,9 @@ call, and closes the set, when learner notes are off for the account
 the key is held after repeated failures, or the day has no duck turn, note
 or explanation. A run carries the response it was queued for, so a run
 queued before Start over or a regeneration stops instead of reading the new
-set.
+set. Counting its attempt and closing the set check that response again under
+the ledger's locks, so a run whose set was started over after it read the
+ledger leaves the replacement's ledger untouched.
 
 **Deletion during the call holds.** The call runs outside every lock. The
 merge re-checks, under the user row lock it already holds, that the set's

@@ -146,7 +146,8 @@ this area.
   rendered before any response existed posts none and is not checked, since
   the first answer save creates the response without telling it. An extraction run
   carries the response it was queued for and stops when that response was
-  replaced.
+  replaced; `LearnerExtraction.count_attempt!` and `.close!` check it again
+  under the ledger's locks, so a run never writes the replacement's ledger.
 - **The Account section.** Shown while the setting is offered or the account
   has rows. Delete all shows whenever the account has any learner row,
   including rows the lists leave out (expired, used, or dismissed more than

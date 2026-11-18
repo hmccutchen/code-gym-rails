@@ -103,7 +103,7 @@ RSpec.describe "When learner items are extracted", type: :request do
     end
 
     it "enqueues nothing for a save the closed box refuses" do
-      LearnerExtraction.close!(user.daily_exercises.sole)
+      LearnerExtraction.close!(user.daily_exercises.sole, response_id: user.daily_exercises.sole.daily_response.id)
 
       save_explanation("Too late.")
 

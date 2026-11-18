@@ -221,7 +221,7 @@ RSpec.describe ExtractLearnerItemsJob do
 
     it "makes no call from a run that finds two attempts counted" do
       LearnerNote.create!(user: user, daily_exercise: exercise, body: "Stuck.")
-      2.times { LearnerExtraction.count_attempt!(exercise, close: false) }
+      2.times { LearnerExtraction.count_attempt!(exercise, close: false, response_id: exercise.daily_response.id) }
 
       run(exercise, "fallback")
 

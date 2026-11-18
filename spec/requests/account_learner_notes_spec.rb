@@ -131,7 +131,8 @@ RSpec.describe "The Learner notes setting on the Account page", type: :request d
 
     def note_on(date, body: "The loop confused me.", explanation: "It runs one query per row.")
       exercise = set_on(date)
-      LearnerExtraction.count_attempt!(exercise, close: true)
+      read = DailyResponse.create!(user: user, daily_exercise: exercise, date: date, answers: {}, submitted_at: Time.current)
+      LearnerExtraction.count_attempt!(exercise, close: true, response_id: read.id)
       LearnerNote.create!(user: user, daily_exercise: exercise, body: body, question_key: "hardest",
                           explain_section: ("code_review" if explanation), explain_concept: ("n_plus_one" if explanation),
                           explain_phrasing: ("explain.first" if explanation), explanation: explanation,

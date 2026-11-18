@@ -276,7 +276,7 @@ RSpec.describe "The explain question on the submitted dashboard", type: :request
   describe "the closed box" do
     it "shows the default question and the closed line once the set closed with no explanation, and refuses a save" do
       exercise = submitted_set
-      LearnerExtraction.close!(exercise)
+      LearnerExtraction.close!(exercise, response_id: exercise.daily_response.id)
       login_as(user)
 
       get root_path
