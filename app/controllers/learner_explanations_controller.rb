@@ -28,10 +28,11 @@ class LearnerExplanationsController < ApplicationController
     refusal = text_refusal(text)
     return render_json_error(refusal, status: :unprocessable_content) if refusal
 
-    default_section = explain_box_for(exercise, exercise.daily_response, exercise.learner_note)&.default_section
+    day = learner_day(exercise, exercise.daily_response)
+    default_section = default_explain_section(exercise, day)
     outcome = LearnerNote.save_explanation!(exercise, section: params[:section].to_s, text: text,
                                                      expected_scope: params[:draft_scope].to_s)
-    render_explanation_outcome(outcome, exercise, default_section)
+    render_explanation_outcome(outcome, exercise, day, default_section)
   end
 
   # POST /learner_explanation/reply
@@ -88,21 +89,21 @@ class LearnerExplanationsController < ApplicationController
     end
   end
 
-  def render_explanation_outcome(outcome, exercise, default_section)
+  def render_explanation_outcome(outcome, exercise, day, default_section)
     if outcome.is_a?(LearnerNote)
       pick = outcome.explain_section == default_section ? "default" : "different"
       Rails.logger.info("[learner_explanation] saved pick=#{pick}")
       ExtractLearnerItemsJob.queue_early(current_user, exercise)
-      return render json: { status: "ok", html: box_html(exercise) }
+      return render json: { status: "ok", html: box_html(exercise, day) }
     end
 
     message, status = REFUSALS.fetch(outcome) { raise ArgumentError, "Unhandled explanation outcome: #{outcome.inspect}" }
-    moved_on = SETTLED_REFUSALS.include?(outcome) ? { html: box_html(exercise) } : {}
+    moved_on = SETTLED_REFUSALS.include?(outcome) ? { html: box_html(exercise, day) } : {}
     render_json_error(t(message), status: status, **moved_on)
   end
 
-  def box_html(exercise)
-    box = explain_box_for(exercise, exercise.daily_response, LearnerNote.find_by(daily_exercise: exercise))
+  def box_html(exercise, day)
+    box = explain_box_for(exercise.reload, day, LearnerNote.find_by(daily_exercise: exercise))
     render_to_string(partial: "shared/learner_explanation", formats: [ :html ], locals: { box: box, draft_scope: exercise.draft_scope }) if box
   end
 end

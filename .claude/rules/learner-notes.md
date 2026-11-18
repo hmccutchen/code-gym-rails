@@ -1,7 +1,7 @@
 ---
 paths:
   - "app/prompts/{learner_items_prompt,explanation_reply_prompt}.rb"
-  - "app/models/{learner_note,learner_item,learner_items_reply,explanation_reply,note_question,explain_question,learner_extraction}.rb"
+  - "app/models/{learner_note,learner_item,learner_items_reply,explanation_reply,note_question,explain_question,learner_extraction,learner_day}.rb"
   - "app/models/learner_item/merge.rb"
   - "app/clients/learner_notes.rb"
   - "app/jobs/{extract_learner_items,sweep_learner_notes}_job.rb"
@@ -34,6 +34,11 @@ this area.
   either, since it deletes a replaced set's note and reads nothing. The prompt class
   and the reply boundary read only `LearnerItem`'s limits, never a row.
   Generation, review, the judges, mastery and planning read neither table.
+- **The boxes are decided from values.** `LearnerDay` (pure, like
+  `NoteQuestion` and `ExplainQuestion`) derives the sections passed over,
+  the note question, the explain default and the explain box from values
+  `LearnerNoteQuestions` reads once a request; a controller only picks a
+  status and a partial.
 - **The extraction prompt is pure.** `LearnerItemsPrompt` takes values the
   job built: each active section through `SectionContext.render` (no answer
   key), the answer cut to 2,000 characters, the duck turns cut to 1,000 each,

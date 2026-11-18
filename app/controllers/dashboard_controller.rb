@@ -77,10 +77,11 @@ class DashboardController < ApplicationController
 
   def load_learner_note_boxes
     note = @exercise.learner_note
-    question = NoteQuestion.text(shown_note_question(note, note_question_for(@exercise, @response)))
+    day = learner_day(@exercise, @response)
+    question = NoteQuestion.text(LearnerDay.note_question(day, stored: note&.question_key))
     @note_box = { question: question, body: note&.body, editable: !@response.submitted? }
     @note_box = nil unless @note_box[:editable] || note&.body.present?
-    @explain_box = explain_box_for(@exercise, @response, note) if @response.submitted?
+    @explain_box = explain_box_for(@exercise, day, note) if @response.submitted?
   end
 
   def settle_missing_set

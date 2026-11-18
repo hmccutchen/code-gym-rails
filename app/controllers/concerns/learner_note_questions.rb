@@ -1,67 +1,37 @@
 module LearnerNoteQuestions
-  ExplainBox = Data.define(:state, :question, :choices, :default_section, :text, :reply)
-  ReplyView = Data.define(:state, :sound, :correction, :ask)
-  ExplainChoice = Data.define(:section, :concept, :question)
-
   private
 
-  def note_question_for(exercise, response)
+  def learner_day(exercise, response)
     sections = exercise.active_section_keys
-    signals = day_signals(exercise, response)
-    NoteQuestion.pick(sections: sections,
-                      cleared: signals[:cleared].select { |_, count| count.positive? }.keys,
-                      duck_turns: signals[:duck_turns].select { |_, count| count.positive? }.keys,
-                      too_hard: signals[:too_hard],
-                      skipped: passed_over_sections(sections, response))
+    duck = DuckThread.for(exercise)
+    LearnerDay::Signals.new(sections: sections, duck_turns: sections.index_with { |section| duck.user_turn_count(section) },
+                            cleared: sections.index_with { |section| duck.cleared_count(section) },
+                            too_hard: sections.select { |section| response&.self_rating_for(section) == "too_hard" },
+                            answered: sections.select { |section| response&.answered?(section) })
   end
 
-  def shown_note_question(note, current_pick)
-    NoteQuestion.parse(note&.question_key) || current_pick
+  def default_explain_section(exercise, day)
+    LearnerDay.default_section(day, tags: exercise.section_concepts, recent: explain_history(exercise).recent)
   end
 
-  def explain_box_for(exercise, response, note)
+  def explain_box_for(exercise, day, note)
     ledger = LearnerExtraction.for(exercise)
     return saved_explain_box(note, ledger) if note&.explanation.present?
 
-    options = ExplainQuestion.options(tags: exercise.section_concepts)
-    return if options.empty?
-
-    history = current_user.learner_notes.explain_history(before: exercise.date)
-    choices = options.map { |option| explain_choice(option, history) }
-    default = ExplainQuestion.default(options: options, recent: history.recent, **day_signals(exercise, response))
-    question = choices.find { |choice| choice.section == default.section }.question
-    ExplainBox.new(state: ledger.closed? ? :closed : :open, question: question, choices: choices,
-                   default_section: default.section, text: nil, reply: nil)
+    LearnerDay.explain_box(day, tags: exercise.section_concepts, history: explain_history(exercise), closed: ledger.closed?)
   end
 
   def saved_explain_box(note, ledger)
-    ExplainBox.new(state: :saved, question: ExplainQuestion.text(note.explain_phrasing, note.explain_concept),
-                   choices: [], default_section: note.explain_section, text: note.explanation, reply: reply_view(note, ledger))
+    LearnerDay.saved_box(section: note.explain_section, concept: note.explain_concept, phrasing: note.explain_phrasing,
+                         text: note.explanation, reply: reply_view(note, ledger))
   end
 
   def reply_view(note, ledger)
     reply = note.reply
     attempts = ledger.reply_attempts
-    ReplyView.new(state: note.reply_state(attempts), sound: reply&.sound, correction: reply&.correction,
-                  ask: note.reply_askable?(attempts))
+    LearnerDay::ReplyView.new(state: note.reply_state(attempts), sound: reply&.sound, correction: reply&.correction,
+                              ask: note.reply_askable?(attempts))
   end
 
-  def explain_choice(option, history)
-    phrasing = ExplainQuestion.phrasing(history.counts.fetch(option.concept, 0))
-    ExplainChoice.new(section: option.section, concept: option.concept, question: ExplainQuestion.text(phrasing, option.concept))
-  end
-
-  def day_signals(exercise, response)
-    sections = exercise.active_section_keys
-    duck = DuckThread.for(exercise)
-    { duck_turns: sections.index_with { |section| duck.user_turn_count(section) },
-      cleared: sections.index_with { |section| duck.cleared_count(section) },
-      too_hard: sections.select { |section| response&.self_rating_for(section) == "too_hard" } }
-  end
-
-  # A section counts as skipped once a later one is answered; fold state is never stored, so it cannot count.
-  def passed_over_sections(sections, response)
-    last_answered = response && sections.rindex { |section| response.answered?(section) }
-    last_answered ? sections.first(last_answered).reject { |section| response.answered?(section) } : []
-  end
+  def explain_history(exercise) = current_user.learner_notes.explain_history(before: exercise.date)
 end

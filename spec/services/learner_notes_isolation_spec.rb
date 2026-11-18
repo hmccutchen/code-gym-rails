@@ -51,7 +51,7 @@ RSpec.describe "Learner notes isolation" do
   end
 
   describe "the question pickers" do
-    let(:pickers) { %w[app/models/note_question.rb app/models/explain_question.rb] }
+    let(:pickers) { %w[app/models/note_question.rb app/models/explain_question.rb app/models/learner_day.rb] }
 
     it "take values only: no record, table, mastery, rung, track or trial state" do
       Rails.application.eager_load!
@@ -74,7 +74,8 @@ RSpec.describe "Learner notes isolation" do
                app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb app/models/learner_item/merge.rb
                app/jobs/extract_learner_items_job.rb app/prompts/explanation_reply_prompt.rb app/models/explanation_reply.rb
                app/views/shared/_learner_explanation_reply.html.erb app/controllers/account_learner_items_controller.rb
-               app/controllers/account_learner_notes_controller.rb app/helpers/learner_notes_helper.rb]
+               app/controllers/account_learner_notes_controller.rb app/helpers/learner_notes_helper.rb
+               app/models/learner_day.rb app/models/learner_extraction.rb]
 
     added.each { |file| expect(File.read(Rails.root.join(file))).not_to include("ConceptMastery"), file }
   end

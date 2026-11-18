@@ -294,6 +294,31 @@ RSpec.describe "The explain question on the submitted dashboard", type: :request
     end
   end
 
+  describe "what a request reads" do
+    it "reads the duck thread once for the dashboard's two boxes" do
+      submitted_set
+      login_as(user)
+      allow(DuckThread).to receive(:for).and_call_original
+
+      get root_path
+
+      expect(DuckThread).to have_received(:for).once
+    end
+
+    it "builds no explain box before the save just to log the pick, and reads the duck thread once" do
+      submitted_set
+      login_as(user)
+      allow(DuckThread).to receive(:for).and_call_original
+      allow(LearnerDay).to receive(:explain_box).and_call_original
+
+      save_explanation("One query per row.")
+
+      expect(response).to have_http_status(:ok)
+      expect(DuckThread).to have_received(:for).once
+      expect(LearnerDay).not_to have_received(:explain_box)
+    end
+  end
+
   describe "the log" do
     around do |example|
       Rails.logger.broadcast_to(capture)
