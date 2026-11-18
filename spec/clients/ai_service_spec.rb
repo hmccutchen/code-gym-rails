@@ -184,6 +184,7 @@ RSpec.describe AiService do
       judge_section
       judge_review
       extract_learner_items
+      explanation_reply
     ].freeze
 
     it "covers every profiled purpose except the two conversational ones" do
@@ -254,6 +255,8 @@ RSpec.describe AiService do
                                       explanation: nil, open_items: [], earlier_items: [],
                                       day: LearnerItemsReply::Day.new(date: Date.current, duck_sections: [], answered_sections: [],
                                                                       note: true, explanation_section: nil))
+      spy_class.new(canned_text: { sound: "Right.", correction: nil }.to_json)
+               .explanation_reply(user, concept: "N plus one", phrasing: "What does it do?", explanation: "One query per row.")
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
       expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size + 1)
@@ -3566,6 +3569,30 @@ RSpec.describe AiService do
       expect { extract(double_class.new(canned_text: "not json: the loop confused me")) }
         .to raise_error(ProviderError::InvalidResponseError)
       expect(Rails.logger).not_to have_received(:error).with(/the loop confused me/)
+    end
+  end
+
+  describe "#explanation_reply" do
+    def reply(svc) = svc.explanation_reply(user, concept: "N plus one", phrasing: "What does it do?", explanation: "One query per row.")
+
+    it "takes the user, the concept, the phrasing and the explanation, pinned by its parameter list" do
+      expect(AiService.instance_method(:explanation_reply).parameters)
+        .to eq([ %i[req user], %i[keyreq concept], %i[keyreq phrasing], %i[keyreq explanation] ])
+    end
+
+    it "returns the parsed reply, with a null correction for a correct explanation" do
+      result = reply(double_class.new(canned_text: { sound: "You named the per-row query.", correction: nil }.to_json))
+
+      expect(result).to have_attributes(sound: "You named the per-row query.", correction: nil)
+    end
+
+    it "fails on a malformed reply without logging it" do
+      allow(Rails.logger).to receive(:error)
+
+      expect { reply(double_class.new(canned_text: "One query per row, you said")) }.to raise_error(ProviderError::InvalidResponseError)
+      expect { reply(double_class.new(canned_text: { sound: "x" * 201, correction: nil }.to_json)) }
+        .to raise_error(ProviderError::InvalidResponseError)
+      expect(Rails.logger).not_to have_received(:error).with(/One query per row/)
     end
   end
 

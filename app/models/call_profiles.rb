@@ -41,6 +41,8 @@ module CallProfiles
 
   LEARNER_ITEMS_MAX_TOKENS = 700
 
+  EXPLANATION_REPLY_MAX_TOKENS = 250
+
   JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 654
 
   JUDGE_MAX_TOKENS = 2_000
@@ -65,7 +67,8 @@ module CallProfiles
     "pseudocode_translate"        => {},
     "judge_section"               => { max_tokens: JUDGE_MAX_TOKENS },
     "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true },
-    "extract_learner_items"       => { max_tokens: LEARNER_ITEMS_MAX_TOKENS }
+    "extract_learner_items"       => { max_tokens: LEARNER_ITEMS_MAX_TOKENS },
+    "explanation_reply"           => { max_tokens: EXPLANATION_REPLY_MAX_TOKENS }
   }.freeze
 
   def self.fetch(purpose) = BY_PURPOSE.fetch(purpose)

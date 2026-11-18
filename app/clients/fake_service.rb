@@ -407,7 +407,8 @@ class FakeService < AiService
     "pseudocode_translate"        => PSEUDOCODE_TRANSLATION,
     "judge_section"               => ->(prompt) { judge_verdict(prompt).to_json },
     "judge_review"                => { "status" => "keep" }.to_json,
-    "extract_learner_items"       => { "items" => [] }.to_json
+    "extract_learner_items"       => { "items" => [] }.to_json,
+    "explanation_reply"           => { "sound" => "You named what the concept does.", "correction" => nil }.to_json
   }.freeze
 
   def check_key = :accepted

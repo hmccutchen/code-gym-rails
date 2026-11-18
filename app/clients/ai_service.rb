@@ -313,7 +313,13 @@ class AiService
     LearnerItemsReply.parse(raw, day: day, buckets: buckets)
   end
 
-  def self.error_code_for(error) =error.is_a?(ProviderError) ? error.class.error_code : ProviderError.error_code
+  def explanation_reply(user, concept:, phrasing:, explanation:)
+    result = call_and_log(user, AiService.request_for("explanation_reply",
+      **ExplanationReplyPrompt.generate(concept: concept, phrasing: phrasing, explanation: explanation)))
+    ExplanationReply.parse(parse_json_object(result[:text], subject: "explanation reply", log_raw: false))
+  end
+
+  def self.error_code_for(error) = error.is_a?(ProviderError) ? error.class.error_code : ProviderError.error_code
 
   def self.failure_code_for(error) = error.is_a?(ProviderError) ? error.class.failure_code : ProviderError.failure_code
 

@@ -23,7 +23,8 @@ RSpec.describe AiService, "request values" do
     "judge_section"               => defaults.merge(max_tokens: CallProfiles::JUDGE_MAX_TOKENS),
     "judge_review"                => defaults.merge(max_tokens: CallProfiles::REVIEW_JUDGE_MAX_TOKENS,
                                                    read_timeout: CallProfiles::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true),
-    "extract_learner_items"       => defaults.merge(max_tokens: CallProfiles::LEARNER_ITEMS_MAX_TOKENS)
+    "extract_learner_items"       => defaults.merge(max_tokens: CallProfiles::LEARNER_ITEMS_MAX_TOKENS),
+    "explanation_reply"           => defaults.merge(max_tokens: CallProfiles::EXPLANATION_REPLY_MAX_TOKENS)
   }.freeze
 
   def settings_of(request)
@@ -152,6 +153,7 @@ RSpec.describe AiService, "request values" do
       when "judge_section"               then service.judge_section(user, ExerciseSection::CodeReview, exercise.problem_set["code_review"], rung: "senior", locked: false)
       when "judge_review"                then service.judge_review_prose(user, ExerciseSection::CodeReview, response.ai_review["code_review"], coach: "Rails")
       when "extract_learner_items"       then extract_learner_items
+      when "explanation_reply"           then service.explanation_reply(user, concept: "N plus one", phrasing: "What does it do?", explanation: "One query per row.")
       end
     end
 

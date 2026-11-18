@@ -1,7 +1,7 @@
 ---
 paths:
-  - "app/prompts/learner_items_prompt.rb"
-  - "app/models/{learner_note,learner_item,learner_items_reply,note_question,explain_question}.rb"
+  - "app/prompts/{learner_items_prompt,explanation_reply_prompt}.rb"
+  - "app/models/{learner_note,learner_item,learner_items_reply,explanation_reply,note_question,explain_question}.rb"
   - "app/models/learner_item/merge.rb"
   - "app/clients/learner_notes.rb"
   - "app/jobs/extract_learner_items_job.rb"
@@ -67,3 +67,13 @@ Each entry states what a change must not break.
   attempts and closes the set only on success; the fallback calls below two
   and closes the set before its call leaves. An extraction failure never
   touches `generation_account_failures`. Its log line carries counts only.
+- **The reply to an explanation.** `ExplanationReplyPrompt` takes only the
+  concept's name, the question's phrasing and the explanation: no review
+  text, answer key, answer, duck turn, note, item, other day or
+  `ConceptMastery`. Its system prompt carries the five reply rules, and a
+  correct explanation gets a null `correction`. `ExplanationReply.parse`
+  accepts one `sound` line and a `correction` line or null, each at most
+  `ExplanationReply::MAX_LENGTH` characters; anything else is a failed call.
+  The purpose is `explanation_reply` (250-token cap, the default read
+  timeout, no caching, each provider's default route). The reply is the
+  provider's words, so extraction and generation never read it.
