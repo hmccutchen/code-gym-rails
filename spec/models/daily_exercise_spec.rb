@@ -192,6 +192,116 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe "#start_over!" do
+    let(:exercise) do
+      DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+        problem_set: { "code_review" => { "question" => "q" } },
+        plan_notes: { "daily_kinds" => %w[code_review design_comparison], "size" => 2 })
+    end
+    let!(:draft) { user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => "draft" }) }
+
+    it "keeps the legacy scope for Hash notes with no reset revision" do
+      expect(Rails.logger).not_to receive(:warn)
+      expect(exercise.reload.draft_scope).to eq("#{exercise.id}-#{exercise.generated_at.strftime("%s%6N")}")
+    end
+
+    [ [], nil ].each do |notes|
+      context "with persisted #{notes.inspect} plan notes" do
+        before do
+          DuckThread.append!(exercise, "code_review", message: "why?", answer: "what runs first?",
+                            expected_version: 0, expected_scope: exercise.draft_scope)
+          if notes.nil?
+            DailyExercise.where(id: exercise.id).update_all("plan_notes = 'null'::jsonb")
+          else
+            exercise.update!(plan_notes: notes)
+          end
+          exercise.reload
+        end
+
+        it "reads the legacy scope with a content-free warning without changing notes" do
+          expect(Rails.logger).to receive(:warn).with("[draft_scope] exercise_id=#{exercise.id} invalid=plan_notes fallback=revision_zero")
+          expect(exercise.draft_scope).to eq("#{exercise.id}-#{exercise.generated_at.strftime("%s%6N")}")
+          expect(exercise.reload.plan_notes).to eq(notes)
+        end
+
+        it "rejects reset before touching the duck or response and preserves stored metadata" do
+          original = exercise.attributes
+          duck = DuckThread.find_by!(daily_exercise: exercise)
+          threads = duck.attributes
+          expect(DuckThread).not_to receive(:start_over!)
+
+          expect { exercise.start_over!(response_id: draft.id) }.to raise_error(ActiveRecord::RecordInvalid) { |error|
+            expect(error.record.errors).to be_added(:plan_notes, :invalid)
+          }
+
+          expect(draft.reload.answers).to eq("code_review" => "draft")
+          expect(duck.reload.attributes).to eq(threads)
+          expect(exercise.reload.attributes).to eq(original)
+        end
+      end
+    end
+
+    it "invalidates each reset without changing generation, opening or planning facts" do
+      original = exercise.attributes.except("updated_at", "plan_notes")
+      notes = exercise.plan_notes
+      scope = exercise.draft_scope
+      expect(exercise.start_over!(response_id: draft.id)).to eq(:cleared)
+      expect(exercise.reload.draft_scope).not_to eq(scope)
+      expect(exercise.attributes.except("updated_at", "plan_notes")).to eq(original)
+      expect(exercise.plan_notes).to include(notes)
+      expect(exercise.freshness_against(scope)).to eq(:stale)
+      expect(exercise.freshness_against(exercise.draft_scope)).to eq(:current)
+
+      second = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date)
+      second_scope = exercise.draft_scope
+      exercise.start_over!(response_id: second.id)
+      expect([ scope, second_scope, exercise.reload.draft_scope ].uniq.size).to eq(3)
+    end
+
+    it "keeps offline identity through duck writes, ordinary saves and opening the set" do
+      scope, token = exercise.draft_scope, draft.draft_token
+      DuckThread.append!(exercise, "code_review", message: "why?", answer: "what runs first?",
+                        expected_version: 0, expected_scope: scope)
+      DuckThread.clear!(exercise, "code_review", expected_scope: scope)
+      exercise.mark_opened!
+      expect(exercise.reload.draft_scope).to eq(scope)
+      expect(draft.reload.draft_token).to eq(token)
+      draft.update!(answers: { "code_review" => "An ordinary autosave." })
+      expect(exercise.reload.draft_scope).to eq(scope)
+    end
+
+    it "does not let an old reset delete the response that replaced its target" do
+      old_id = draft.id
+      exercise.start_over!(response_id: old_id)
+      fresh = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => "fresh" })
+      scope = exercise.draft_scope
+
+      expect(exercise.start_over!(response_id: old_id)).to eq(:stale)
+      expect(fresh.reload.answers).to eq("code_review" => "fresh")
+      expect(exercise.reload.draft_scope).to eq(scope)
+    end
+
+    it "rolls back the emptied thread and deleted response if advancing scope fails" do
+      scope = exercise.draft_scope
+      DuckThread.append!(exercise, "code_review", message: "why?", answer: "what runs first?",
+                        expected_version: 0, expected_scope: scope)
+      allow(exercise).to receive(:update!).and_raise(ActiveRecord::RecordInvalid.new(exercise))
+
+      expect { exercise.start_over!(response_id: draft.id) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(draft.reload.answers).to eq("code_review" => "draft")
+      expect(exercise.reload.draft_scope).to eq(scope)
+      expect(DuckThread.for(exercise).user_turn_count("code_review")).to eq(1)
+    end
+
+    it "still recognizes a regeneration after a reset as a replaced set" do
+      exercise.start_over!(response_id: draft.id)
+      scope = exercise.draft_scope
+      exercise.update!(generated_at: exercise.generated_at + 1.second, plan_notes: {})
+
+      expect(exercise.freshness_against(scope)).to eq(:replaced)
+    end
+  end
+
   describe "#with_response_locked" do
     let(:user) { User.create!(email: "locked-#{SecureRandom.hex(3)}@example.com") }
     let(:exercise) do

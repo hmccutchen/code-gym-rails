@@ -36,7 +36,7 @@ class DuckPrompt
 
   def self.generate(section_data:, message:, thread:)
     { system: "#{SYSTEM}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{SectionContext.render(section_data)}",
-      history: UserText.tag_history(thread),
+      history: history(thread),
       prompt: <<~PROMPT }
         Their new message:
         #{UserText.tagged(message, blank: "(nothing said)")}
@@ -44,4 +44,13 @@ class DuckPrompt
         Respond as their Socratic thinking partner, following your system instructions exactly.
       PROMPT
   end
+
+  def self.history(thread)
+    UserText.tag_history(thread).map do |turn|
+      next turn unless turn.is_a?(Hash) && turn[:role].to_s == "assistant"
+
+      turn.merge(content: UserText.defanged(turn[:content]))
+    end
+  end
+  private_class_method :history
 end

@@ -14,6 +14,11 @@ merely in flight (`DailyResponse#reviewing?`, the same stale-claim window
 `#review` claims with) blocks the same way; an abandoned claim past that window
 does not.
 
+Start over now calls `DailyExercise#start_over!`, which rechecks the same
+blocker under `#with_response_locked` before deleting anything or advancing
+the draft scope. A review claim or result that landed while reset waited
+therefore keeps both the response and its scope.
+
 **Accepted consequence of chaining review onto submit:** the reconsider window
 that used to sit between the two clicks is gone. Both guards fire within
 milliseconds of a submit now — `reviewing?` for the length of the provider

@@ -3,6 +3,8 @@ class DuckThread < ApplicationRecord
   belongs_to :user
   belongs_to :daily_exercise
 
+  validate :owned_by_the_sets_owner
+
   KEPT_FOR = 365.days
 
   scope :expired, ->(today = Date.current) { where(daily_exercise: DailyExercise.where(date: ...(today - KEPT_FOR))) }
@@ -104,6 +106,10 @@ class DuckThread < ApplicationRecord
   end
 
   private
+
+  def owned_by_the_sets_owner
+    errors.add(:user, "must own the set") unless daily_exercise && user_id == daily_exercise.user_id
+  end
 
   def entry(section)
     current? ? (threads[section.to_s] || {}) : {}

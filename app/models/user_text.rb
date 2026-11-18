@@ -39,8 +39,9 @@ module UserText
     "<#{TAG}>\n#{text}\n</#{TAG}>"
   end
 
-  def self.defanged(value, limit:)
-    clean(value, limit: limit).gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
+  def self.defanged(value, limit: nil)
+    text = limit ? clean(value, limit: limit) : normalize(value)
+    text.gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
   end
 
   def self.tag_history(history, limit: MAX_ANSWER_LENGTH)

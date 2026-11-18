@@ -16,6 +16,13 @@ performance. #719 removed those two effects: adaptation now requires
 submitted, validly assessed answers. `threads` is keyed by section like
 `answers`, and each entry holds `turns`, `version` and `cleared`.
 
+`DuckThread` validates that its owner owns the exercise, following
+`LearnerNote`'s convention. Account deletion selects threads by `user_id`,
+so a mismatched owner could otherwise leave a thread pointing at an exercise
+being deleted and block deletion on its foreign key. This validation prevents
+mismatched model saves; it does not repair existing rows or cover writes that
+skip validation.
+
 **`DuckThread` is the one authority for a section's thread.** The controller
 asks it for the turns, the user-turn count, the stored size and the version,
 and never reads the JSON. `version` goes up on every append and every clear,
@@ -46,8 +53,13 @@ always wins over a reply.
 `draft_scope` stamps the row with `DailyExercise#draft_scope`; a regenerated
 day has a new scope, so its old thread reads as empty and is overwritten on
 the next write. Start over keeps the row but empties every section and moves
-its version, so a tab still showing the old turns is told to refresh rather
-than lining up with a new thread at a reused version.
+its version. `DailyExercise#start_over!` also advances the exercise's reset
+revision in the same transaction as clearing the thread and deleting the
+response. The resulting new draft scope makes the old thread read as empty,
+with versions starting at zero on the fresh page. An old scope cannot line
+up with a reused version, and a first reply still in flight is refused even
+when no thread existed at reset time. Duck asks and per-section Clear do not
+move the exercise's scope.
 
 One cost is accepted: two devices asking at the same version both pass the
 check before the call and both bill, and the second reply is dropped at the

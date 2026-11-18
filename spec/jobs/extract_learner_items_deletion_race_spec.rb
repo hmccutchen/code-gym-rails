@@ -27,6 +27,12 @@ RSpec.describe ExtractLearnerItemsJob, "when the set's evidence is deleted durin
     exercise
   end
 
+  def start_over_unreviewed(exercise)
+    response = exercise.daily_response
+    response.update_columns(ai_review: nil)
+    expect(exercise.start_over!(response_id: response.id)).to eq(:cleared)
+  end
+
   def item(source)
     ref = { "date" => Date.current.iso8601, "source" => source }
     ref["section"] = "code_review" if %w[explanation duck].include?(source)
@@ -99,7 +105,7 @@ RSpec.describe ExtractLearnerItemsJob, "when the set's evidence is deleted durin
   end
 
   context "with Start over" do
-    let(:during) { ->(exercise) { exercise.reload.start_over!(exercise.daily_response) } }
+    let(:during) { ->(exercise) { start_over_unreviewed(exercise.reload) } }
 
     it "writes no item from the replaced set, logs it by count, and does not raise" do
       exercise = submitted_set
@@ -183,14 +189,19 @@ RSpec.describe ExtractLearnerItemsJob, "when the set moves on before the run wri
     exercise
   end
 
+  def start_over_unreviewed(exercise)
+    response = exercise.daily_response
+    response.update_columns(ai_review: nil)
+    expect(exercise.start_over!(response_id: response.id)).to eq(:cleared)
+  end
+
   def duck_item
     LearnerItemsReply::Item.new(concept: "n_plus_one", bucket: "ruby_rails", kind: "concept", term: nil, label: "Practise preloading.",
                                 evidence: [ { "date" => Date.current.iso8601, "source" => "duck", "section" => "code_review" } ])
   end
 
   def start_over_and_resubmit(exercise)
-    exercise = DailyExercise.find(exercise.id)
-    exercise.start_over!(exercise.daily_response)
+    start_over_unreviewed(DailyExercise.find(exercise.id))
     DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "New answer." },
                           submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
   end

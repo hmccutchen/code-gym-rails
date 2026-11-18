@@ -59,6 +59,10 @@ reads and writes each column:
 
 `docs/decisions/pausing-generation.md` has the rules.
 
+`DailyExercise.plan_notes["draft_revision"]` is a server-owned answer-reset
+counter, absent until the first Start over. `DailyExercise#start_over!`
+advances it atomically with deleting the response; `#draft_scope` reads it.
+It does not change generation timestamps or planning facts.
 
 | Model             | Key fields                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |

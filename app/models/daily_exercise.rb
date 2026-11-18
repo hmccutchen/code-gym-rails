@@ -22,7 +22,7 @@ class DailyExercise < ApplicationRecord
 
   WRITE_MARGIN = 60.seconds
 
-  DRAFT_SCOPE_FORMAT = /\A(\d+)-(\d+)\z/
+  DRAFT_SCOPE_FORMAT = /\A(\d+)-(\d+)(?:-r\d+)?\z/
 
   REGENERATION_STALE_AFTER = REGENERATION_DEADLINE + WRITE_MARGIN
 
@@ -49,15 +49,6 @@ class DailyExercise < ApplicationRecord
       .map { |date, opened_at, response_id| UnopenedSets::Entry.new(date: date, opened: opened_at.present?, saved: response_id.present?) }
   end
 
-  def start_over!(response)
-    transaction do
-      User.lock.where(id: user_id).ids
-      DuckThread.start_over!(self)
-      forget_learner_note!
-      response.destroy!
-    end
-  end
-
   def forget_learner_note!
     LearnerNote.forget_set!(self)
     LearnerExtraction.clear!(self)
@@ -72,7 +63,10 @@ class DailyExercise < ApplicationRecord
     size if size.is_a?(Integer) && User::DAILY_SECTION_COUNTS.cover?(size)
   end
 
-  def draft_scope = "#{id}-#{written_stamp}"
+  def draft_scope
+    revision = draft_revision
+    [ "#{id}-#{written_stamp}", ("r#{revision}" if revision.positive?) ].compact.join("-")
+  end
 
   def freshness_against(scope)
     return :current if regenerating? || draft_scope == scope.to_s
@@ -133,6 +127,27 @@ class DailyExercise < ApplicationRecord
     clear_attribute_changes([ :opened_at ])
   end
 
+  def start_over!(response_id:)
+    transaction do
+      User.lock.where(id: user_id).ids
+      with_response_locked do |response|
+        next :stale unless response && response.id == response_id
+
+        blocker = response.replace_blocker
+        next :reviewed if blocker == :reviewed
+        next :not_today unless response.date == Date.current
+        next :reviewing if blocker == :reviewing
+
+        validate_reset_notes!
+        DuckThread.start_over!(self)
+        forget_learner_note!
+        response.destroy!
+        update!(plan_notes: plan_notes.merge("draft_revision" => draft_revision + 1))
+        :cleared
+      end
+    end
+  end
+
   # The owner first: inserting a response takes a key-share lock on it, which AccountDeletion holds before the exercise.
   def with_response_locked
     transaction do
@@ -143,6 +158,20 @@ class DailyExercise < ApplicationRecord
   end
 
   private
+
+  def draft_revision
+    return plan_notes["draft_revision"].to_i if plan_notes.is_a?(Hash)
+
+    Rails.logger.warn("[draft_scope] exercise_id=#{id} invalid=plan_notes fallback=revision_zero")
+    0
+  end
+
+  def validate_reset_notes!
+    return if plan_notes.is_a?(Hash)
+
+    errors.add(:plan_notes, :invalid)
+    raise ActiveRecord::RecordInvalid, self
+  end
 
   def written_stamp = generated_at.strftime("%s%6N")
 

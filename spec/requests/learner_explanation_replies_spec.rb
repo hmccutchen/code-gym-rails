@@ -237,9 +237,9 @@ RSpec.describe "The reply to an explanation", type: :request do
       expect(note.reload).to have_attributes(explanation: nil, explanation_reply: nil)
     end
 
-    it "answers with the refusal text as JSON when the set is started over during the call" do
+    it "answers with the refusal text as JSON when the set is replaced during the call" do
       allow_any_instance_of(AiService).to receive(:explanation_reply) do
-        exercise.reload.start_over!(exercise.daily_response)
+        exercise.reload.forget_learner_note!
         ExplanationReply::Reply.new(sound: "Late.", correction: nil)
       end
 
