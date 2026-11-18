@@ -15,7 +15,8 @@ module FakeReplies
     "pseudocode_critique"         => "reviewing an engineer's PSEUDOCODE plan",
     "pseudocode_translate"        => "TRANSCRIBER, not a reviewer",
     "judge_section"               => "checking one section of a generated coding exercise",
-    "judge_review"                => "editing the prose of one section's code review"
+    "judge_review"                => "editing the prose of one section's code review",
+    "extract_learner_items"       => "reading what an engineer wrote on one day of practice"
   }.freeze
 
   def purpose_for(system)

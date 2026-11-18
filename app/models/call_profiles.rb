@@ -39,6 +39,8 @@ module CallProfiles
       DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM) +
       DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS).ceil
 
+  LEARNER_ITEMS_MAX_TOKENS = 700
+
   JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 654
 
   JUDGE_MAX_TOKENS = 2_000
@@ -62,7 +64,8 @@ module CallProfiles
     "pseudocode_critique"         => { max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS },
     "pseudocode_translate"        => {},
     "judge_section"               => { max_tokens: JUDGE_MAX_TOKENS },
-    "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true }
+    "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true },
+    "extract_learner_items"       => { max_tokens: LEARNER_ITEMS_MAX_TOKENS }
   }.freeze
 
   def self.fetch(purpose) = BY_PURPOSE.fetch(purpose)

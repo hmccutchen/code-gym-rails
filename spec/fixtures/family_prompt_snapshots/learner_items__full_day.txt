@@ -1,0 +1,55 @@
+The concepts you may choose from, by bucket:
+- ruby_rails: n_plus_one, memoization
+- architecture: caching_strategy
+
+Open items, each of which you may report as a repeat:
+- concept: memoization, bucket: ruby_rails, kind: concept. Label:
+<engineer_text>
+Practise when to memoize.
+</engineer_text>
+
+Earlier closed items, newest first:
+- concept: n_plus_one, bucket: ruby_rails, kind: term, term: eager load, used on 2026-11-02. Label:
+<engineer_text>
+What eager loading means.
+</engineer_text>
+
+The "code_review" section:
+Scenario: a nightly loyalty-tier recalculation job
+Question: This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?
+Code snippet:
+def loyalty_tier(customer)
+  total = customer.orders.sum(&:total_cents)
+  case total
+  when 0...10_000 then "bronze"
+  when 10_000...50_000 then "silver"
+  else "gold"
+  end
+end
+
+customers.each { |c| puts loyalty_tier(c) }
+
+Their answer:
+<engineer_text>
+It queries orders once per customer.
+</engineer_text>
+
+Their duck thread, oldest first:
+Engineer:
+<engineer_text>
+What does sum do here?
+</engineer_text>
+Duck:
+What runs inside the loop?
+
+The day's note, answering "Where did you get stuck?":
+<engineer_text>
+The loop confused me.
+</engineer_text>
+
+The day's explanation, of the concept "n_plus_one" from the "code_review" section, answering "In your own words, what does N plus one do?":
+<engineer_text>
+It runs one query per row.
+</engineer_text>
+
+Return the JSON object your system instructions describe.

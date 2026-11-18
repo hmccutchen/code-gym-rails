@@ -304,7 +304,16 @@ class AiService
     ReviewProseVerdict.parse(raw, projection: projection)
   end
 
-  def self.error_code_for(error) = error.is_a?(ProviderError) ? error.class.error_code : ProviderError.error_code
+  def extract_learner_items(user, buckets:, day:, sections:, note:, explanation:, open_items:, earlier_items:)
+    concepts = buckets.index_with { |bucket| ConceptBucket.vocabulary_for(bucket) }
+    result = call_and_log(user, AiService.request_for("extract_learner_items",
+      **LearnerItemsPrompt.generate(concepts: concepts, sections: sections, note: note, explanation: explanation,
+                                    open_items: open_items, earlier_items: earlier_items)))
+    raw = parse_json_object(result[:text], subject: "learner items", log_raw: false)
+    LearnerItemsReply.parse(raw, day: day, buckets: buckets)
+  end
+
+  def self.error_code_for(error) =error.is_a?(ProviderError) ? error.class.error_code : ProviderError.error_code
 
   def self.failure_code_for(error) = error.is_a?(ProviderError) ? error.class.failure_code : ProviderError.failure_code
 

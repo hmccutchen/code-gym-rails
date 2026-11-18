@@ -22,7 +22,8 @@ RSpec.describe AiService, "request values" do
     "pseudocode_translate"        => defaults,
     "judge_section"               => defaults.merge(max_tokens: CallProfiles::JUDGE_MAX_TOKENS),
     "judge_review"                => defaults.merge(max_tokens: CallProfiles::REVIEW_JUDGE_MAX_TOKENS,
-                                                   read_timeout: CallProfiles::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true)
+                                                   read_timeout: CallProfiles::REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true),
+    "extract_learner_items"       => defaults.merge(max_tokens: CallProfiles::LEARNER_ITEMS_MAX_TOKENS)
   }.freeze
 
   def settings_of(request)
@@ -150,7 +151,14 @@ RSpec.describe AiService, "request values" do
       when "pseudocode_translate"        then service.translate_pseudocode(user, exercise, section: "pseudocode_to_code", pseudocode: "sort then walk")
       when "judge_section"               then service.judge_section(user, ExerciseSection::CodeReview, exercise.problem_set["code_review"], rung: "senior", locked: false)
       when "judge_review"                then service.judge_review_prose(user, ExerciseSection::CodeReview, response.ai_review["code_review"], coach: "Rails")
+      when "extract_learner_items"       then extract_learner_items
       end
+    end
+
+    def extract_learner_items
+      day = LearnerItemsReply::Day.new(date: Date.current, duck_sections: [], answered_sections: [], note: true, explanation_section: nil)
+      service.extract_learner_items(user, buckets: %w[ruby_rails], day: day, sections: [], note: { question: "Q", text: "T" },
+                                          explanation: nil, open_items: [], earlier_items: [])
     end
 
     def retry_one_section

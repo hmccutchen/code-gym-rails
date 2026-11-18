@@ -183,6 +183,7 @@ RSpec.describe AiService do
       pseudocode_translate
       judge_section
       judge_review
+      extract_learner_items
     ].freeze
 
     it "covers every profiled purpose except the two conversational ones" do
@@ -248,6 +249,11 @@ RSpec.describe AiService do
                  rung: "senior", locked: false)
       spy_class.new(canned_text: { status: "keep" }.to_json)
                .judge_review_prose(user, ExerciseSection::CodeReview, response.ai_review["code_review"], coach: "Rails")
+      spy_class.new(canned_text: { items: [] }.to_json)
+               .extract_learner_items(user, buckets: %w[ruby_rails], sections: [], note: { question: "Q", text: "T" },
+                                      explanation: nil, open_items: [], earlier_items: [],
+                                      day: LearnerItemsReply::Day.new(date: Date.current, duck_sections: [], answered_sections: [],
+                                                                      note: true, explanation_section: nil))
 
       expect(ApiUsage.pluck(:purpose).uniq).to match_array(SINGLE_SHOT_PURPOSES)
       expect(histories.size).to eq(SINGLE_SHOT_PURPOSES.size + 1)
@@ -3522,6 +3528,44 @@ RSpec.describe AiService do
         expect(svc.last_prompt).to include(standard)
         expect(ExerciseSection::PseudocodeToCode.grading_note(section: {}, answer: "x")).to include(standard)
       end
+    end
+  end
+
+  describe "#extract_learner_items" do
+    let(:day) do
+      LearnerItemsReply::Day.new(date: Date.new(2026, 11, 16), duck_sections: [], answered_sections: [], note: true, explanation_section: nil)
+    end
+
+    def extract(svc, buckets: %w[ruby_rails architecture])
+      svc.extract_learner_items(user, buckets: buckets, day: day, sections: [], note: { question: "Q", text: "The loop confused me." },
+                                      explanation: nil, open_items: [], earlier_items: [])
+    end
+
+    it "takes the user and values only, pinned by its parameter list" do
+      expect(AiService.instance_method(:extract_learner_items).parameters)
+        .to eq([ %i[req user], %i[keyreq buckets], %i[keyreq day], %i[keyreq sections], %i[keyreq note],
+                 %i[keyreq explanation], %i[keyreq open_items], %i[keyreq earlier_items] ])
+    end
+
+    it "lists the concepts of exactly the buckets it is given, and returns the parsed reply" do
+      prompts = []
+      spy = Class.new(double_class) { define_method(:call) { |request| prompts << request.prompt; super(request) } }
+      reply = { items: [ { concept: "caching_strategy", bucket: "architecture", kind: "concept", label: "Practise cache expiry.",
+                           evidence: [ { source: "note" } ] } ] }.to_json
+
+      result = extract(spy.new(canned_text: reply))
+
+      expect(prompts.sole).to include("- architecture: #{ConceptBucket.vocabulary_for("architecture").join(", ")}")
+      expect(prompts.sole).not_to include("- javascript:")
+      expect(result.items.sole).to have_attributes(concept: "caching_strategy", evidence: [ { "date" => "2026-11-16", "source" => "note" } ])
+    end
+
+    it "fails on invalid JSON without logging the raw reply, which can quote the engineer" do
+      allow(Rails.logger).to receive(:error)
+
+      expect { extract(double_class.new(canned_text: "not json: the loop confused me")) }
+        .to raise_error(ProviderError::InvalidResponseError)
+      expect(Rails.logger).not_to have_received(:error).with(/the loop confused me/)
     end
   end
 

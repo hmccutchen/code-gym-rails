@@ -6,10 +6,15 @@ class LearnerItem < ApplicationRecord
   EVIDENCE_SOURCES = %w[duck answer note explanation].freeze
   SECTIONLESS_SOURCES = %w[note].freeze
   MAX_OPEN = 5
+  MAX_NEW_PER_DAY = 3
+  MAX_EARLIER_LABELS = 20
+  EARLIER_LABELS_PER_CONCEPT = 3
+  RECENT_DAYS = 30
   MAX_EVIDENCE = 5
   MAX_CAME_UP_ON = 10
   MAX_LABEL_LENGTH = 160
-  TERM_SHAPE = %r{\A[A-Za-z0-9 _+#./-]{1,40}\z}
+  MAX_TERM_LENGTH = 40
+  TERM_SHAPE = %r{\A[A-Za-z0-9 _+#./-]{1,#{MAX_TERM_LENGTH}}\z}
   EXPIRES_AFTER_EVIDENCE = 14.days
   LONGEST_LIFE = 42.days
 

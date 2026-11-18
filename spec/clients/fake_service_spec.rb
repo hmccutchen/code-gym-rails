@@ -145,7 +145,7 @@ RSpec.describe FakeService do
     # The purposes whose AiService caller hands the reply to parse_json_object; every other caller reads it as prose.
     let(:json_purposes) do
       %w[generate_exercise retry_section review_response assess_difficulty generate_concept_reference
-         generate_concept_ladder generate_recognition_guide pseudocode_critique judge_section judge_review]
+         generate_concept_ladder generate_recognition_guide pseudocode_critique judge_section judge_review extract_learner_items]
     end
     let(:prompts_with_markers) do
       { "review_response"   => 'Grade ONLY the "code_review" section from the day\'s context above.',
