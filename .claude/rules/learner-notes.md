@@ -139,7 +139,8 @@ this area.
   moves no focus. Results are announced only through
   `#learner-explanation-announcer`, a live region outside the markup a save
   or a reply replaces, and Try again is enabled again when the request gets
-  no answer.
+  no answer; for the request a box sends when it connects, the waiting box's
+  hidden Try again is revealed.
 - **A replaced set starts with no note.** Regenerating a set
   (`PracticeGeneration#commit_replacement`) and Start over
   (`DailyExercise#start_over!`) delete the day's note row in the same

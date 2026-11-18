@@ -57,7 +57,7 @@ export default class extends Controller {
       this.pollWhilePending()
       return
     }
-    retry?.removeAttribute("disabled")
+    this.offerRetry(retry)
     this.showReplyMessage(result.message || this.replyFailedTextValue)
   }
 

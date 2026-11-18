@@ -174,4 +174,23 @@ RSpec.describe "The explain question", type: :system, with_csrf: true do
       expect(LearnerExtraction.for(note.daily_exercise.reload).reply_attempts).to eq(1)
     end
   end
+
+  it "offers Try again when the reply asked for on load gets no answer" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      submitted_set(user)
+      visit_as(user)
+      wait_for_js
+      drop_requests_to("/learner_explanation/reply")
+
+      find("#learner-explanation textarea").fill_in(with: "It runs one query per row.")
+      find("#learner-explanation").click_button("Save")
+
+      expect(page).to have_css("#learner-explanation-reply", text: I18n.t("learner_notes.reply.failed"))
+      expect(page).to have_button(I18n.t("learner_notes.reply.try_again"), disabled: false)
+    end
+  end
 end

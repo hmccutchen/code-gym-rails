@@ -104,7 +104,11 @@ line and does not ask, so it reads the box's state from
 attempt and makes no call. It waits a second, then doubles the wait up to
 30 seconds, and stops once the box shows the reply or Try again. If the
 claim's stale time passes first, it reveals the waiting box's Try again, so
-the engineer can ask once the abandoned claim has lapsed.
+the engineer can ask once the abandoned claim has lapsed. The same hidden
+Try again is revealed when the request a box sends as it connects gets no
+answer at all, so a dropped first request never leaves the box waiting with
+no way to ask again; the server's claim and attempt checks still decide
+whether that second request calls.
 
 ## Extraction
 
