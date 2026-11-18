@@ -141,6 +141,22 @@ RSpec.describe "Stored duck threads", type: :request do
       expect(DuckThread.count).to eq(0)
     end
 
+    it "drops a first reply when Start over lands during the call, even without a stored thread" do
+      row = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, answers: { "code_review" => "draft" })
+      during_the_call do
+        reset_tab = ActionDispatch::Integration::Session.new(Rails.application)
+        key = Rails.application.config.session_options[:key]
+        reset_tab.cookies[key] = cookies[key]
+        reset_tab.delete(start_over_response_path(row))
+      end
+
+      ask
+
+      expect(response).to have_http_status(:conflict)
+      expect(DuckThread.count).to eq(0)
+      expect(user.daily_responses.reload).to be_empty
+    end
+
     it "drops the reply when the account is deleted, so the thread is not written back" do
       during_the_call { User.find(user.id).anonymize! }
 
@@ -209,16 +225,20 @@ RSpec.describe "Stored duck threads", type: :request do
 
   it "empties the thread when the day is started over, and an old tab's next ask is told to refresh" do
     ask
+    old_scope = exercise.draft_scope
     response_row = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                          answers: { "code_review" => "draft" })
 
     delete start_over_response_path(response_row)
 
     expect(stored.turns_for("code_review")).to eq([])
-    ask("from the old tab", version: 1)
+    ask("from the old tab", version: 1, scope: old_scope)
     expect(response).to have_http_status(:conflict)
-    ask("on the fresh page", version: 2)
+    ask("on the fresh page", version: stored.version_for("code_review"))
     expect(response).to have_http_status(:ok)
+    clear(scope: old_scope)
+    expect(response).to have_http_status(:conflict)
+    expect(stored.user_turn_count("code_review")).to eq(1)
   end
 
   it "never reads another user's thread" do

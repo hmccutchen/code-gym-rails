@@ -340,6 +340,50 @@ RSpec.describe "Responses", type: :request do
       expect(response.parsed_body["draft_token"]).to eq(DailyResponse.find_by(daily_exercise: exercise).draft_token)
     end
 
+    it "refuses pre-reset autosaves and submits, then accepts repeated saves from the reloaded page" do
+      scope = exercise.draft_scope
+      save_with_scope(scope)
+      delete start_over_response_path(user.daily_responses.sole)
+
+      [ false, true ].each do |submit|
+        save_with_scope(scope, submit: submit)
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body["status"]).to eq("stale")
+        expect(user.daily_responses.reload).to be_empty
+      end
+
+      get root_path
+      fresh_scope = Nokogiri::HTML(response.body).at_css("[data-answer-form-draft-scope-value]")["data-answer-form-draft-scope-value"]
+      expect(fresh_scope).not_to eq(scope)
+      2.times do
+        save_with_scope(fresh_scope)
+        expect(response).to have_http_status(:ok)
+      end
+      expect(user.daily_responses.reload.sole.answers["code_review"]).to eq(answer)
+    end
+
+    it "rechecks the scope when a reset commits after the save loaded the exercise" do
+      scope = exercise.draft_scope
+      save_with_scope(scope)
+      resetting = false
+      allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
+        unless resetting
+          resetting = true
+          reset_tab = ActionDispatch::Integration::Session.new(Rails.application)
+          key = Rails.application.config.session_options[:key]
+          reset_tab.cookies[key] = cookies[key]
+          reset_tab.delete(start_over_response_path(user.daily_responses.sole))
+          expect(reset_tab.response).to have_http_status(:redirect)
+        end
+        method.call(*args, &block)
+      end
+
+      save_with_scope(scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(user.daily_responses.reload).to be_empty
+    end
+
     it "still saves a payload that names no scope" do
       post responses_path, params: { response: { answers: { "code_review" => answer } } }, as: :json
 
@@ -1532,6 +1576,69 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.exists?(daily_response.id)).to be false
     end
 
+    [ [], nil ].each do |notes|
+      it "refuses reset with persisted #{notes.inspect} plan notes without losing work" do
+        daily_response = create_response_for(user)
+        exercise = daily_response.daily_exercise
+        DuckThread.append!(exercise, "code_review", message: "why?", answer: "what runs first?",
+                          expected_version: 0, expected_scope: exercise.draft_scope)
+        if notes.nil?
+          DailyExercise.where(id: exercise.id).update_all("plan_notes = 'null'::jsonb")
+        else
+          exercise.update!(plan_notes: notes)
+        end
+        original = exercise.reload.attributes
+        answers = daily_response.attributes
+        duck = DuckThread.find_by!(daily_exercise: exercise)
+        threads = duck.attributes
+
+        delete start_over_response_path(daily_response)
+
+        expect(response).to redirect_to(root_path)
+        expect(flash[:alert]).to eq(I18n.t("flash.responses.start_over_failed", raise: true))
+        expect(daily_response.reload.attributes).to eq(answers)
+        expect(duck.reload.attributes).to eq(threads)
+        expect(exercise.reload.attributes).to eq(original)
+      end
+    end
+
+    [ :html, :json ].each do |format|
+      it "uses reset-appropriate #{format} wording when another reset lands after lookup" do
+        daily_response = create_response_for(user)
+        exercise = daily_response.daily_exercise
+        scope = exercise.draft_scope
+        resetting = false
+        allow_any_instance_of(DailyExercise).to receive(:start_over!).and_wrap_original do |method, **args|
+          unless resetting
+            resetting = true
+            reset_tab = ActionDispatch::Integration::Session.new(Rails.application)
+            key = Rails.application.config.session_options[:key]
+            reset_tab.cookies[key] = cookies[key]
+            reset_tab.delete(start_over_response_path(daily_response))
+            expect(reset_tab.response).to have_http_status(:redirect)
+            expect(DailyResponse.exists?(daily_response.id)).to be(false)
+          end
+          method.call(**args)
+        end
+
+        delete start_over_response_path(daily_response, format: format)
+
+        message = "This page is out of date. Refresh it before starting over."
+        if format == :json
+          expect(response).to have_http_status(:conflict)
+          expect(response.parsed_body).to include("status" => "stale", "error" => message)
+        else
+          expect(response).to redirect_to(root_path)
+          expect(flash[:alert]).to eq(message)
+        end
+        expect(I18n.t("flash.responses.start_over_stale", raise: true)).to eq(message)
+        post responses_path, params: { response: { draft_scope: scope, answers: { code_review: "Late answer" } } }, as: :json
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body["error"]).to eq(I18n.t("flash.responses.stale_answers"))
+        expect(user.daily_responses.reload).to be_empty
+      end
+    end
+
     it "refuses to destroy a response with at least one reviewed section, without deleting it" do
       daily_response = create_response_for(user, submitted: true, reviewed: true)
 
@@ -1584,6 +1691,22 @@ RSpec.describe "Responses", type: :request do
 
       expect(response).to redirect_to(root_path)
       expect(DailyResponse.exists?(daily_response.id)).to be false
+    end
+
+    it "keeps the response and scope if a review claims it before reset obtains the lock" do
+      daily_response = create_response_for(user, submitted: true)
+      exercise = daily_response.daily_exercise
+      scope = exercise.draft_scope
+      allow_any_instance_of(DailyExercise).to receive(:with_response_locked).and_wrap_original do |method, *args, &block|
+        DailyResponse.find(daily_response.id).update!(reviewing_since: Time.current)
+        method.call(*args, &block)
+      end
+
+      delete start_over_response_path(daily_response)
+
+      expect(flash[:alert]).to eq(I18n.t("flash.responses.start_over_while_reviewing"))
+      expect(DailyResponse.exists?(daily_response.id)).to be(true)
+      expect(exercise.reload.draft_scope).to eq(scope)
     end
   end
 

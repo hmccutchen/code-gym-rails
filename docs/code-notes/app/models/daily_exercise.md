@@ -3,7 +3,7 @@
 ## `#with_response_locked`
 
 Every writer that touches both rows takes the exercise first, then the
-response: `RegenerateExerciseJob`, `User#carry_forward` and
+response: `RegenerateExerciseJob`, `User#carry_forward`, `#start_over!` and
 `ResponsesController#save_answers_under_lock`. One order means two of them
 wait for each other instead of deadlocking.
 
@@ -80,11 +80,18 @@ once the review lands.
 
 ## `#draft_scope` and `#freshness_against`
 
-A draft scope names one write of one set: the row id, a hyphen, and
-`generated_at` in microseconds. A regeneration updates the row in place
+A draft scope names one write of one set and its answer-reset revision:
+the row id, a hyphen, and `generated_at` in microseconds, with `-rN` appended
+after a Start over. `N` is the server-owned `plan_notes["draft_revision"]`;
+an absent key means zero and keeps the original scope format. A regeneration updates the row in place
 (`PracticeGeneration.commit_replacement`), so the id stays and the time
 moves. The format is written and read only here: `DRAFT_SCOPE_FORMAT` is the
 pattern, and the private `#written_stamp` is the time part.
+
+A non-Hash `plan_notes` also reads as revision zero, with one content-free
+warning per scope read. This keeps the scope reader usable without changing
+stored metadata. It is not general support for malformed historical notes:
+other existing readers require a Hash, and canonical writers supply one.
 
 `#freshness_against(scope)` compares the set with the scope an open page
 shows and names the result, so a caller never has to combine checks in the
@@ -100,4 +107,42 @@ right order:
 A page sends the scope back as a parameter, so the rewrite test (the private
 `#rewritten_since?`) accepts only a value that matches the pattern. Blank, an
 array, extra parts and a trailing newline are `:stale`, and so are another
-row's scope and a time later than the stored one.
+row's scope and a time later than the stored one. A reset with the same
+generation time is `:stale`, not `:replaced`: the problems did not change.
+The pattern also accepts a reset suffix on an older generation, so a later
+regeneration still reports `:replaced`.
+
+## `#start_over!`
+
+Start over uses `#with_response_locked` for the whole operation: check that
+the response still has the requested id, recheck `#replace_blocker` and the
+date, empty the duck thread, destroy the response and advance the reset
+revision. Those writes commit together. A failed write rolls all of them
+back. A delayed second reset cannot delete a new response created after the
+first reset.
+
+Before the destructive steps, `#validate_reset_notes!` rejects non-Hash notes
+with `ActiveRecord::RecordInvalid`. The controller logs the record class and
+invalid attribute names, never their contents, then redirects with a failure
+alert. It does not normalize or discard the stored notes.
+
+The answer endpoint already reloads the exercise and checks scope under the
+same locks before finding or creating a response. If its save wins first,
+reset deletes the saved answer; if reset wins first, the old scope gets a
+409 before any answer write. Duck append and Clear recheck scope there too,
+including a first reply for which no thread row existed at reset time.
+
+The revision belongs in the exercise's existing server-owned metadata,
+not in the generated problem content or the duck thread. No migration is
+needed. Using `generated_at` would falsely report a new generation and
+disconnect `JudgeSolve` rows from their set. Using the response's draft
+token would reject ordinary consecutive saves and cannot distinguish a page
+loaded before the first response existed from an empty page after reset.
+Opening the set, saving answers and using the duck leave the revision alone;
+carry-forward preserves it. Regeneration replaces the plan notes and changes
+`generated_at`, which already invalidates every previous scope.
+
+Old web binaries ignore this revision. Mixed-version writers and rollback
+therefore restore the previous late-save limitation; the local probe and
+upgrade caveat are recorded in
+`docs/decisions/idempotent-saves-and-frozen-evidence.md`.

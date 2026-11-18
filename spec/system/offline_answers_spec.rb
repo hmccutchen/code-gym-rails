@@ -102,7 +102,8 @@ RSpec.describe "Answers through a lost connection", type: :system do
       find(code_review_field).fill_in(with: "An answer that reached the server first.")
       wait_for_js_condition("#{draft_absent_js} && document.querySelector('.section-status[data-status-for=\"code_review\"]')?.textContent.trim() !== ''")
       keep_an_unsent_answer
-      user.daily_responses.sole.destroy
+      row = user.daily_responses.sole
+      row.daily_exercise.start_over!(response_id: row.id)
 
       reopen_dashboard
 
@@ -206,6 +207,23 @@ RSpec.describe "Answers through a lost connection", type: :system do
 
       expect(find(code_review_field).value).not_to eq(answer)
       expect(stored_draft).to be_nil
+    end
+  end
+
+  it "drops a pre-reset copy even when its unconfirmed save matches the empty reloaded form" do
+    travel_to(a_weekday) do
+      open_dashboard
+      plant_copy_of_a_save_this_page_shows(scope: nil, answer: answer)
+      exercise = user.daily_exercises.sole
+      row = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
+                                         answers: { "code_review" => "Saved in another tab." })
+      exercise.start_over!(response_id: row.id)
+
+      reopen_dashboard
+
+      expect(find(code_review_field).value).not_to eq(answer)
+      expect(stored_draft).to be_nil
+      expect(user.daily_responses.reload).to be_empty
     end
   end
 

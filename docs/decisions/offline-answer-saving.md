@@ -30,6 +30,13 @@ says the answers were not submitted and are kept, and stays enabled.
 Parsons answers are not restored, and opening the app offline still shows
 the browser's offline page, since nothing caches the dashboard.
 
+Start over changes the exercise's draft scope by advancing a server-owned
+reset revision, atomically with deleting the response. Both restoration
+paths therefore discard a pre-reset copy, even when one of its unconfirmed
+saves matches the now-empty form. An old tab retrying after reset gets the
+existing stale-save refusal and reloads. Ordinary saves, duck asks and duck
+Clear leave the scope unchanged, so they do not disturb offline retries.
+
 **Partial submission still incurs a full-day review.** The existing review
 fan-out reviews every active section; an unanswered one gets an ungraded
 walkthrough. It also calls the difficulty assessment. Skipping a section does

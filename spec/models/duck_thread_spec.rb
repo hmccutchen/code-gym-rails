@@ -18,6 +18,38 @@ RSpec.describe DuckThread do
                             expected_version: version, expected_scope: exercise.draft_scope)
   end
 
+  describe "ownership" do
+    it "allows a thread owned by its set's owner" do
+      thread = described_class.new(user: user, daily_exercise: exercise, draft_scope: exercise.draft_scope)
+
+      expect(thread.save).to be(true)
+    end
+
+    it "rejects a thread owned by another account" do
+      other = create_user_with_key(email: "other@example.com")
+      thread = described_class.new(user: other, daily_exercise: exercise, draft_scope: exercise.draft_scope)
+
+      expect(thread.save).to be(false)
+      expect(thread.errors[:user]).to include("must own the set")
+    end
+
+    it "rejects changing a stored thread's owner without changing its set" do
+      append
+      other = create_user_with_key(email: "other@example.com")
+      thread = described_class.for(exercise.reload)
+
+      expect(thread.update(user_id: other.id)).to be(false)
+      expect(thread.reload.user_id).to eq(user.id)
+    end
+
+    it "rejects a missing set without raising" do
+      thread = described_class.new(user: user)
+
+      expect(thread).not_to be_valid
+      expect(thread.errors[:daily_exercise]).to be_present
+    end
+  end
+
   describe ".for" do
     it "reads as an empty thread at version 0 before anything is stored, without writing a row" do
       thread = described_class.for(exercise)
