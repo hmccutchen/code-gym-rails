@@ -40,6 +40,37 @@ class LearnerItem < ApplicationRecord
 
   def self.merge!(user, items, set_date:) = Merge.call(user, items, set_date: set_date)
 
+  def self.under_owner_lock(user)
+    transaction do
+      owner = User.lock.find_by(id: user.id)
+      next :account_gone if owner.nil? || owner.anonymized?
+
+      yield owner, Time.current.in_time_zone(owner.effective_time_zone).to_date
+    end
+  end
+
+  def self.dismiss!(user, id)
+    under_owner_lock(user) do |owner, today|
+      expire_overdue!(owner, today: today)
+      item = owner.learner_items.find_by(id: id)
+      next :missing unless item
+      next :closed unless item.status == "open"
+
+      item.update!(status: "dismissed", closed_on: today)
+      :dismissed
+    end
+  end
+
+  def self.remove!(user, id)
+    under_owner_lock(user) { |owner| owner.learner_items.where(id: id).delete_all.positive? ? :removed : :missing }
+  end
+
+  def self.listed_open(user, today:) = user.learner_items.where(status: "open", expires_on: today..).order(:created_at, :id)
+
+  def self.recently_dismissed(user, today:)
+    user.learner_items.where(status: "dismissed", closed_on: (today - RECENT_DAYS)..).order(closed_on: :desc, id: :desc)
+  end
+
   def self.open_by_key(user) = user.learner_items.where(status: "open").index_by(&:matching_key)
 
   def self.expire_overdue!(user, today:)
@@ -85,6 +116,10 @@ class LearnerItem < ApplicationRecord
   def term_item? = kind == "term"
 
   def newest_evidence_on = evidence.map { |reference| Date.iso8601(reference["date"]) }.max
+
+  def first_reference = evidence.min_by { |reference| reference["date"] }
+
+  def came_up_dates = came_up_on.map { |date| Date.iso8601(date) }.sort
 
   private
 

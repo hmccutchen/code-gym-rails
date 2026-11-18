@@ -61,7 +61,8 @@ RSpec.describe "Learner notes isolation" do
                app/views/shared/_learner_explanation.html.erb app/javascript/controllers/learner_explanation_controller.js
                app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb app/models/learner_item/merge.rb
                app/jobs/extract_learner_items_job.rb app/prompts/explanation_reply_prompt.rb app/models/explanation_reply.rb
-               app/views/shared/_learner_explanation_reply.html.erb]
+               app/views/shared/_learner_explanation_reply.html.erb app/controllers/account_learner_items_controller.rb
+               app/controllers/account_learner_notes_controller.rb app/helpers/learner_notes_helper.rb]
 
     added.each { |file| expect(File.read(Rails.root.join(file))).not_to include("ConceptMastery"), file }
   end

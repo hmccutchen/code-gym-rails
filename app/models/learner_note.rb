@@ -54,6 +54,34 @@ class LearnerNote < ApplicationRecord
 
   def self.extraction_row(exercise) = row_for(exercise)
 
+  FORGOTTEN_COLUMNS = {
+    note: { body: nil, question_key: nil },
+    explanation: { explain_section: nil, explain_concept: nil, explain_phrasing: nil, explanation: nil,
+                   explanation_reply: nil, reply_requested_at: nil }
+  }.freeze
+
+  scope :written, -> { where("btrim(coalesce(body, '')) <> '' OR explanation IS NOT NULL") }
+
+  def self.listed(user) = user.learner_notes.written.joins(:daily_exercise).includes(:daily_exercise).order("daily_exercises.date DESC")
+
+  def self.remove!(user, id, part)
+    LearnerItem.under_owner_lock(user) do |owner|
+      note = owner.learner_notes.includes(:daily_exercise).find_by(id: id)
+      next :missing unless note&.holds?(part)
+
+      note.forget!(part)
+      :removed
+    end
+  end
+
+  def self.remove_all!(user)
+    LearnerItem.under_owner_lock(user) do |owner|
+      owner.learner_items.delete_all
+      owner.learner_notes.includes(:daily_exercise).find_each { |note| note.forget!(*FORGOTTEN_COLUMNS.keys) }
+      :removed
+    end
+  end
+
   # The caller holds the user row lock, since items lose this set's note and explanation evidence with it.
   def self.forget_set!(exercise)
     note = find_by(daily_exercise_id: exercise.id)
@@ -162,6 +190,17 @@ class LearnerNote < ApplicationRecord
       update!(explanation_reply: reply.to_h, reply_requested_at: nil)
     end
   end
+
+  def holds?(part) = part == :note ? body.to_s.strip.present? : explanation.present?
+
+  def forget!(*parts)
+    LearnerItem.forget_evidence!(user, date: daily_exercise.date, sources: parts.map(&:to_s))
+    assign_attributes(parts.map { |part| FORGOTTEN_COLUMNS.fetch(part) }.reduce(:merge))
+    nothing_left = !holds?(:note) && !holds?(:explanation)
+    nothing_left && !read_by_a_request? ? delete : save!
+  end
+
+  def read_by_a_request? = extract_attempts.positive? || extracted? || reply_attempts.positive?
 
   def something_to_read? = body.to_s.strip.present? || explanation.to_s.strip.present?
 

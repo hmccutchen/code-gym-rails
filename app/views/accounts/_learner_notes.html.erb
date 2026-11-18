@@ -1,10 +1,74 @@
-<section class="card" id="learner-notes-setting">
+<%# Local: lists (an AccountsController::LearnerLists of open items, recently dismissed items and written notes). %>
+<% open_items, dismissed, written = lists.open, lists.dismissed, lists.written %>
+<section class="card" id="learner-notes">
   <h2><%= t("accounts.learner_notes.heading") %></h2>
-  <p class="card-note"><%= t(current_user.learner_notes_enabled? ? "accounts.learner_notes.state_on" : "accounts.learner_notes.state_off") %></p>
-  <p class="card-note"><%= t("accounts.learner_notes.about") %></p>
-  <% if current_user.learner_notes_enabled? %>
-    <%= button_to t("accounts.learner_notes.turn_off"), learner_notes_account_path, method: :patch, params: { enabled: "0" }, class: "btn btn-ghost btn-block" %>
-  <% else %>
-    <%= button_to t("accounts.learner_notes.turn_on"), learner_notes_account_path, method: :patch, params: { enabled: "1" }, class: "btn btn-ghost btn-block" %>
+  <% if learner_notes_offered? %>
+    <div id="learner-notes-setting">
+      <p class="card-note"><%= t(current_user.learner_notes_enabled? ? "accounts.learner_notes.state_on" : "accounts.learner_notes.state_off") %></p>
+      <p class="card-note"><%= t("accounts.learner_notes.about") %></p>
+      <% if current_user.learner_notes_enabled? %>
+        <%= button_to t("accounts.learner_notes.turn_off"), learner_notes_account_path, method: :patch, params: { enabled: "0" }, class: "btn btn-ghost btn-block" %>
+      <% else %>
+        <%= button_to t("accounts.learner_notes.turn_on"), learner_notes_account_path, method: :patch, params: { enabled: "1" }, class: "btn btn-ghost btn-block" %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <h3><%= t("accounts.learner_notes.open_heading") %></h3>
+  <% if open_items.empty? %>
+    <p class="card-note"><%= t("accounts.learner_notes.open_empty") %></p>
+  <% end %>
+  <% open_items.each do |item| %>
+    <div class="learner-item learner-item-open">
+      <p class="learner-item-label"><%= item.label %></p>
+      <p class="card-note"><%= item.concept.humanize %> · <%= t("accounts.learner_notes.kinds.#{item.kind}") %></p>
+      <p class="card-note"><%= learner_item_origin(item) %>. <%= t("accounts.learner_notes.came_up", dates: learner_days(item.came_up_dates)) %>. <%= t("accounts.learner_notes.expires", date: learner_day(item.expires_on)) %>.</p>
+      <% if item.returned_after %>
+        <p class="card-note"><%= learner_item_returned(item) %></p>
+      <% end %>
+      <div class="learner-item-actions">
+        <%= button_to t("accounts.learner_notes.got_it"), got_it_account_learner_item_path(item), method: :patch, class: "btn btn-ghost btn-sm" %>
+        <%= button_to t("accounts.learner_notes.delete"), account_learner_item_path(item), method: :delete, class: "btn btn-ghost btn-sm" %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if dismissed.any? %>
+    <h3><%= t("accounts.learner_notes.closed_heading") %></h3>
+    <% dismissed.each do |item| %>
+      <div class="learner-item learner-item-closed">
+        <p class="learner-item-label"><%= item.label %></p>
+        <p class="card-note"><%= t("accounts.learner_notes.marked_got", date: learner_day(item.closed_on)) %> <%= t("accounts.learner_notes.came_up", dates: learner_days(item.came_up_dates)) %>.</p>
+        <%= button_to t("accounts.learner_notes.delete"), account_learner_item_path(item), method: :delete, class: "btn btn-ghost btn-sm" %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if written.any? %>
+    <h3><%= t("accounts.learner_notes.written_heading") %></h3>
+    <% written.each do |note| %>
+      <% day = learner_day(note.daily_exercise.date) %>
+      <% if note.holds?(:note) %>
+        <div class="learner-item learner-note-row">
+          <p class="learner-item-label"><%= t("accounts.learner_notes.note_heading", date: day) %></p>
+          <p class="card-note"><%= learner_note_question(note) %></p>
+          <%= simple_format(h(note.body), class: "learner-written-text") %>
+          <%= button_to t("accounts.learner_notes.delete"), note_account_learner_note_path(note), method: :delete, class: "btn btn-ghost btn-sm" %>
+        </div>
+      <% end %>
+      <% if note.holds?(:explanation) %>
+        <div class="learner-item learner-explanation-row">
+          <p class="learner-item-label"><%= t("accounts.learner_notes.explanation_heading", date: day) %></p>
+          <p class="card-note"><%= ExplainQuestion.text(note.explain_phrasing, note.explain_concept) %></p>
+          <%= simple_format(h(note.explanation), class: "learner-written-text") %>
+          <%= button_to t("accounts.learner_notes.delete"), explanation_account_learner_note_path(note), method: :delete, class: "btn btn-ghost btn-sm" %>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if open_items.any? || dismissed.any? || written.any? %>
+    <%= button_to t("accounts.learner_notes.delete_all"), all_account_learner_notes_path, method: :delete,
+          class: "btn btn-danger btn-block", form: { data: loading_form_data(confirm_message: t("accounts.learner_notes.delete_all_confirm")) } %>
   <% end %>
 </section>

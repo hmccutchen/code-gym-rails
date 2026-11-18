@@ -5,6 +5,8 @@ class AccountsController < ApplicationController
   # The log-out and delete buttons live here, so a keyless user must not be redirected to /setup.
   skip_before_action :require_provider
 
+  LearnerLists = Data.define(:open, :dismissed, :written)
+
   PAUSE_NOTICES = { paused: "flash.accounts.generation_paused", kept: "flash.accounts.generation_kept_paused" }.freeze
 
   # GET /account
@@ -12,6 +14,7 @@ class AccountsController < ApplicationController
     now = Time.current.in_time_zone(current_user.effective_time_zone)
     @usage_since = now.beginning_of_month
     @usage = MonthlySpend.new(totals: ApiUsage.own_key_totals(current_user, since: @usage_since), today: now.to_date, paused: current_user.paused_generation_at?)
+    @learner_lists = learner_lists(now.to_date) if learner_notes_listed?
   end
 
   # DELETE /account
@@ -52,6 +55,12 @@ class AccountsController < ApplicationController
   end
 
   private
+
+  def learner_lists(today)
+    LearnerLists.new(open: LearnerItem.listed_open(current_user, today: today).to_a,
+                     dismissed: LearnerItem.recently_dismissed(current_user, today: today).to_a,
+                     written: LearnerNote.listed(current_user).to_a)
+  end
 
   def learner_notes_notice
     current_user.learner_notes_enabled? ? "flash.accounts.learner_notes_on" : "flash.accounts.learner_notes_off"
