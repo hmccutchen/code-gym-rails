@@ -31,10 +31,27 @@ Both are pure decision objects. They take values, read no record and make no
 provider call. The server picks, and the page holds no copy of either rule.
 
 **The stuck-point question** (`NoteQuestion`) is asked before submission in
-the note box, at most 1,000 characters, autosaved to its own endpoint. Text
-typed before the box's script loaded is saved when the script connects, as
-the answer form does. It
-picks one question from signals the app already has, first match wins: a
+the note box, at most 1,000 characters, autosaved to its own endpoint after
+an 800 ms typing pause, matching the answer form. The timer counts as pending
+through `saveStatus.watch`, so a save-aware navigation waits for unsent text.
+The watcher is registered once per controller; disconnect cancels the timer
+but keeps the pending edit for reconnect to reschedule, even when the text
+has returned to the box's original value, including an empty box.
+Text typed before the box's script loaded schedules that same save when the
+script connects. Saves still queue with `latest: true`, reading the text when
+sent so edits during a request are kept.
+
+Submit flushes a pending typing timer before posting the answers, since a
+note arriving after submission would be refused. The note stays inert while
+Submit runs, even though its box sits outside the answer form. If the flush
+gets a 409 because the page is stale, Submit uses the existing stale-page
+reload without posting answers. That reload ignores the note conflict
+alone; unrelated saves and failures still hold it. Other failed flushes keep
+the text, show the existing save error and unlock the page; the next Submit
+retries that flush. Saves already in flight keep their existing submission
+handling below.
+
+`NoteQuestion` picks from signals the app already has, first match wins: a
 cleared duck thread, duck turns, a "too hard" rating, a skipped section, or
 none of these. It names a section kind, never a concept, because some kinds
 hide their concept until submission. The pick is stored with the note on its

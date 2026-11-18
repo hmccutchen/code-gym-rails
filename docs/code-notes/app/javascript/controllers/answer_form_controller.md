@@ -87,6 +87,26 @@ the module has connected. `spec/system/deferred_module_spec.rb` answers the
 missing comparison module with a 404 and expects the stale pick to stay
 unsubmitted.
 
+## Submit flushes a pending note
+
+The learner-note box sits inside this controller's wrapper but outside
+`formTarget`, so its text never joins the answer payload. Once the modules
+are ready, `flushPendingNote` asks that box's controller to send any pending
+typing timer and waits for its result before posting Submit. Waiting only
+at the later leave gate would let Submit close the day before the note
+could save. A missing note controller uses the existing controls-not-ready
+message; no note box means no extra save.
+
+`lockForSubmit` makes the note inert too, so a new edit cannot appear while
+the flush is running. A 409 from the flush takes the existing stale-page
+reload path without posting answers. Its leave gate ignores that note
+conflict, but still waits for unrelated saves and failures; the form stays
+locked until recovery. Other failed flushes call the existing `unlock`,
+restoring both the answer form and the note. The note controller keeps the
+failed flush for the next explicit Submit, without adding automatic retries.
+An already-sent note with no pending typing timer retains the existing
+post-submit leave handling.
+
 ## Leaving the page waits for other saves
 
 Every way the form leaves the page by itself goes through

@@ -265,6 +265,11 @@ export default class extends Controller {
       saveStatus.report("submit", this.controlsNotReadyValue)
       return this.unlock()
     }
+    const note = await this.flushPendingNote()
+    if (note.status === 409) {
+      return this.leaveWhenOtherSavesLand(() => this.reloadAfterSubmit(note, true), "submit", "learner_note")
+    }
+    if (!note.ok) return this.unlock()
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
@@ -300,10 +305,20 @@ export default class extends Controller {
         this.application.getControllerForElementAndIdentifier(element, identifier)))
   }
 
+  async flushPendingNote() {
+    const element = this.element.querySelector('[data-controller~="learner-note"]')
+    if (!element) return { ok: true }
+    const note = this.application.getControllerForElementAndIdentifier(element, "learner-note")
+    if (note) return note.flush()
+    saveStatus.report("submit", this.controlsNotReadyValue)
+    return { ok: false }
+  }
+
   lockForSubmit() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     this.formTarget.inert = true
+    this.element.querySelector("#learner-note")?.toggleAttribute("inert", true)
     this.submitButtonTarget.disabled = true
     this.setReplaceButtonsDisabled(true)
     this.submitButtonTarget.classList.add("btn-loading")
@@ -373,6 +388,7 @@ export default class extends Controller {
 
   unlock() {
     this.formTarget.inert = false
+    this.element.querySelector("#learner-note")?.toggleAttribute("inert", false)
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
     this.submitButtonTarget.disabled = false
