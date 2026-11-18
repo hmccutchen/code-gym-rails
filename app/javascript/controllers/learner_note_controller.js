@@ -10,12 +10,13 @@ export default class extends Controller {
 
   initialize() {
     this.saveTimer = null
+    this.pendingEdit = false
     saveStatus.watch(() => this.saveTimer !== null)
   }
 
   // Text typed before the module loaded fired its input event with no controller to hear it.
   connect() {
-    if (this.inputTarget.value !== this.inputTarget.defaultValue) this.save()
+    if (this.pendingEdit || this.inputTarget.value !== this.inputTarget.defaultValue) this.save()
   }
 
   disconnect() {
@@ -24,6 +25,7 @@ export default class extends Controller {
   }
 
   save() {
+    this.pendingEdit = true
     clearTimeout(this.saveTimer)
     this.saveTimer = setTimeout(() => this.sendSave(), AUTOSAVE_DELAY_MS)
   }
@@ -39,6 +41,7 @@ export default class extends Controller {
   async sendSave() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
+    this.pendingEdit = false
     const result = await saveStatus.queue("learner_note", "PATCH", this.urlValue,
       () => ({ learner_note: this.inputTarget.value, draft_scope: this.draftScope(), response_id: this.responseIdValue,
         question_key: this.questionKeyValue }), { latest: true })

@@ -34,7 +34,9 @@ provider call. The server picks, and the page holds no copy of either rule.
 the note box, at most 1,000 characters, autosaved to its own endpoint after
 an 800 ms typing pause, matching the answer form. The timer counts as pending
 through `saveStatus.watch`, so a save-aware navigation waits for unsent text.
-The watcher is registered once per controller; disconnect cancels the timer.
+The watcher is registered once per controller; disconnect cancels the timer
+but keeps the pending edit for reconnect to reschedule, even when the text
+has returned to the box's original value, including an empty box.
 Text typed before the box's script loaded schedules that same save when the
 script connects. Saves still queue with `latest: true`, reading the text when
 sent so edits during a request are kept.

@@ -161,6 +161,54 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
     end
   end
 
+  [ "", "The original thought." ].each do |original|
+    it "resumes a pending edit back to #{original.empty? ? 'an empty box' : 'the original text'} after repeated reconnects" do
+      stub_env("LEARNER_NOTES" => "1")
+      user = create_fake_provider_user
+      user.update!(learner_notes_enabled: true)
+
+      travel_to(a_weekday) do
+        visit_with_todays_set(user)
+        if original.present?
+          LearnerNote.create!(user: user, daily_exercise: user.daily_exercises.sole, body: original)
+          visit root_path
+          wait_for_js
+        end
+        pause_browser_clock
+        type_note("An autosaved revision.")
+        advance_browser_clock(800)
+        wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+        expect(LearnerNote.find_by(user: user)&.body).to eq("An autosaved revision.")
+
+        type_note(original)
+        page.execute_script(<<~JS)
+          window.__noteBox = document.querySelector("#learner-note");
+          window.__noteParent = window.__noteBox.parentNode;
+          window.__noteController = window.Stimulus.getControllerForElementAndIdentifier(window.__noteBox, "learner-note");
+          window.__extraWatchers = 0;
+          const watch = window.CodeGymSaveStatus.watch;
+          window.CodeGymSaveStatus.watch = (probe) => { window.__extraWatchers++; watch(probe); };
+        JS
+
+        2.times do
+          page.execute_script("window.__noteBox.remove()")
+          wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+          advance_browser_clock(800)
+          expect(LearnerNote.find_by(user: user)&.body).to eq("An autosaved revision.")
+
+          page.execute_script("window.__noteParent.appendChild(window.__noteBox)")
+          wait_for_js_condition("window.Stimulus.getControllerForElementAndIdentifier(window.__noteBox, 'learner-note') === window.__noteController")
+          advance_browser_clock(400)
+        end
+
+        expect(page.evaluate_script("window.__extraWatchers")).to eq(0)
+        advance_browser_clock(400)
+        wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
+        expect(LearnerNote.find_by(user: user)&.body).to eq(original)
+      end
+    end
+  end
+
   it "keeps edits made during an in-flight save in the latest queued body" do
     stub_env("LEARNER_NOTES" => "1")
     user = create_fake_provider_user
