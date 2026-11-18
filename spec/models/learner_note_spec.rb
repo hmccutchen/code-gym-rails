@@ -31,6 +31,35 @@ RSpec.describe LearnerNote do
     expect { user.anonymize! }.to change { described_class.where(user: user).count }.from(1).to(0)
   end
 
+  it "is deleted with its set, as the set's duck thread is" do
+    note.save!
+
+    expect(exercise.learner_note).to eq(described_class.last)
+    expect { exercise.destroy! }.to change(described_class, :count).from(1).to(0)
+  end
+
+  describe ".explain_history" do
+    def explained_on(date, concept)
+      set = DailyExercise.create!(user: user, date: date, generated_at: Time.current, language: "ruby_rails",
+                                  problem_set: { "code_review" => { "question" => "q", "snippet" => "x" } })
+      described_class.create!(user: user, daily_exercise: set, explain_concept: concept, explanation: "words")
+    end
+
+    it "counts each concept's earlier explanations and names those on sets dated in the 7 days before" do
+      today = Date.current + 30
+      explained_on(today - 7, "n_plus_one")
+      explained_on(today - 8, "callbacks")
+      explained_on(today - 20, "n_plus_one")
+      explained_on(today, "service_objects")
+      described_class.create!(user: user, daily_exercise: exercise, body: "a note, no explanation")
+
+      history = user.learner_notes.explain_history(before: today)
+
+      expect(history.recent).to eq([ "n_plus_one" ])
+      expect(history.counts).to eq("n_plus_one" => 2, "callbacks" => 1)
+    end
+  end
+
   it "keeps one row per exercise" do
     note.save!
 
@@ -44,28 +73,8 @@ RSpec.describe LearnerNote do
     expect(refused(note(explanation: "b" * 1_001))).to include(:explanation)
   end
 
-  it "never counts more than two extraction attempts" do
-    expect(note(extract_attempts: 2)).to be_valid
-    expect(refused(note(extract_attempts: 3))).to include(:extract_attempts)
-    expect(refused(note(extract_attempts: -1))).to include(:extract_attempts)
-  end
-
-  it "refuses a third attempt in the database too" do
-    row = note.tap(&:save!)
-
-    expect { row.update_columns(extract_attempts: 3) }.to raise_error(ActiveRecord::StatementInvalid, /extract_attempts_range/)
-  end
-
-  it "never counts more than two reply attempts" do
-    expect(note(reply_attempts: 2)).to be_valid
-    expect(refused(note(reply_attempts: 3))).to include(:reply_attempts)
-    expect(refused(note(reply_attempts: -1))).to include(:reply_attempts)
-  end
-
-  it "refuses a third reply attempt in the database too" do
-    row = note.tap(&:save!)
-
-    expect { row.update_columns(reply_attempts: 3) }.to raise_error(ActiveRecord::StatementInvalid, /reply_attempts_range/)
+  it "leaves the old extraction and reply counts unused, since the set's ledger holds them now" do
+    expect(described_class.column_names).not_to include("extract_attempts", "extracted_at", "reply_attempts")
   end
 
   it "hides the note, the explanation and its reply from inspect" do

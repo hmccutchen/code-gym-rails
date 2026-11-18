@@ -1,20 +1,82 @@
 require "rails_helper"
 
 RSpec.describe "Learner notes isolation" do
-  let(:guarded) { /\bLearner(?:Note|Item)\b|\blearner_(?:notes?|items?)\b/ }
+  let(:guarded) { /Learner(?:Note|Item)\b|learner_(?:notes?|items?)\b/ }
 
   it "matches the singular and plural names it guards" do
-    expect([ "has_one :learner_note", "exercise.learner_note.body", "has_one :learner_item", "user.learner_notes" ])
+    expect([ "has_one :learner_note", "exercise.learner_note.body", "has_one :learner_item", "user.learner_notes",
+             "exercise.forget_learner_note!", "owner.drop_learner_items" ])
       .to all(match(guarded))
     expect("learner_notes_enabled").not_to match(guarded)
   end
 
-  it "keeps learner notes and items to their own models, the user and the account deletion list" do
-    own = %w[app/models/learner_note.rb app/models/learner_item.rb app/models/user.rb app/models/account_data.rb]
+  let(:limit_readers) { %w[app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb] }
 
-    readers = (isolation_scope - own).select do |file|
-      File.read(Rails.root.join(file)).match?(guarded)
+  it "keeps learner notes and items to their own models, the user, the set's association, the account deletion list, the sweep and the privacy numbers" do
+    own = %w[app/models/learner_note.rb app/models/learner_item.rb app/models/learner_item/merge.rb app/jobs/extract_learner_items_job.rb app/models/user.rb app/models/account_data.rb
+             app/models/daily_exercise.rb app/jobs/sweep_learner_notes_job.rb app/models/privacy_notice.rb] + limit_readers
+
+    readers = (isolation_scope - own - deleters_on_replacement).select do |file|
+      File.read(Rails.root.join(file)).gsub(purpose_name, "").match?(guarded)
     end
     expect(readers).to eq([])
+  end
+
+  let(:purpose_name) { /\bextract_learner_items\b/ }
+
+  let(:deleters_on_replacement) { %w[app/services/practice_generation.rb] }
+
+  it "lets regeneration only delete the replaced set's note, reading nothing of it" do
+    source = File.read(Rails.root.join("app/services/practice_generation.rb"))
+
+    expect(source.scan(guarded)).to eq([ "learner_note" ])
+    expect(source).to include("exercise.forget_learner_note!")
+  end
+
+  it "lets the extraction prompt and its reply boundary read LearnerItem's limits and nothing else of either table" do
+    limit_readers.each do |file|
+      source = File.read(Rails.root.join(file))
+
+      expect(source.gsub(/\bLearnerItem::[A-Z][A-Z_]*\b/, "")).not_to match(guarded), "#{file} names more than LearnerItem's constants"
+    end
+  end
+
+  it "keeps the explanation's reply, the provider's words, out of extraction and generation" do
+    readers = %w[app/jobs/extract_learner_items_job.rb app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb
+                 app/models/learner_item.rb app/models/learner_item/merge.rb] +
+              Rails.root.glob("app/**/*generat*.rb").map { |file| file.relative_path_from(Rails.root).to_s }
+
+    expect(readers).to include("app/prompts/generation_prompt.rb", "app/jobs/generate_daily_exercises_job.rb")
+    readers.each { |file| expect(File.read(Rails.root.join(file))).not_to match(/explanation_reply|\.reply\b|reply_(?:state|attempts|requested_at|askable)/), file }
+  end
+
+  describe "the question pickers" do
+    let(:pickers) { %w[app/models/note_question.rb app/models/explain_question.rb app/models/learner_day.rb] }
+
+    it "take values only: no record, table, mastery, rung, track or trial state" do
+      Rails.application.eager_load!
+      records = ApplicationRecord.descendants.filter_map(&:name)
+      forbidden = /\b(?:#{Regexp.union(records).source}|ApplicationRecord|ActiveRecord)\b|\brungs?\b|\btrack|trial|\.(?:where|find_by|pluck)\b/
+
+      pickers.each do |file|
+        expect(File.read(Rails.root.join(file))).not_to match(forbidden), "#{file} reads more than values"
+      end
+    end
+  end
+
+  it "keeps ConceptMastery out of every file added for learner notes" do
+    added = %w[app/clients/learner_notes.rb app/controllers/concerns/learner_notes_gate.rb
+               app/controllers/concerns/learner_note_questions.rb app/controllers/learner_notes_controller.rb
+               app/models/note_question.rb app/views/shared/_learner_note.html.erb
+               app/views/accounts/_learner_notes.html.erb app/javascript/controllers/learner_note_controller.js
+               app/models/explain_question.rb app/controllers/learner_explanations_controller.rb
+               app/views/shared/_learner_explanation.html.erb app/javascript/controllers/learner_explanation_controller.js
+               app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb app/models/learner_item/merge.rb
+               app/jobs/extract_learner_items_job.rb app/prompts/explanation_reply_prompt.rb app/models/explanation_reply.rb
+               app/views/shared/_learner_explanation_reply.html.erb app/controllers/account_learner_items_controller.rb
+               app/controllers/account_learner_notes_controller.rb app/helpers/learner_notes_helper.rb
+               app/models/learner_day.rb app/models/learner_extraction.rb]
+
+    added.each { |file| expect(File.read(Rails.root.join(file))).not_to include("ConceptMastery"), file }
   end
 end

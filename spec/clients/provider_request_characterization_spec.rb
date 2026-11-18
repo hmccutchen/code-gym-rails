@@ -31,7 +31,9 @@ RSpec.describe "provider request characterization" do
     "pseudocode_critique"         => {},
     "pseudocode_translate"        => {},
     "judge_section"               => { response_schema: JudgeVerdict.schema_for(ExerciseSection::CodeReview) },
-    "judge_review"                => { response_schema: ReviewProseVerdict.schema }
+    "judge_review"                => { response_schema: ReviewProseVerdict.schema },
+    "extract_learner_items"       => {},
+    "explanation_reply"           => {}
   }.freeze
 
   REQUEST_SNAPSHOT_SHAPES = (KEYWORD_SHAPES.keys + PURPOSE_SHAPES.keys.map { |shape| "purpose__#{shape}" }).freeze

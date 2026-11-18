@@ -35,7 +35,8 @@ RSpec.describe "Per-user request limits", type: :request do
       "duck_thread" => -> { post duck_thread_responses_path, params: {}, as: :json },
       "follow_ups" => -> { post follow_ups_response_path(0), params: {}, as: :json },
       "explain_differently on a review" => -> { post explain_differently_response_path(0), params: {}, as: :json },
-      "explain_differently on a concept reference" => -> { post explain_differently_concept_reference_path(0), as: :json }
+      "explain_differently on a concept reference" => -> { post explain_differently_concept_reference_path(0), as: :json },
+      "the reply to an explanation" => -> { post reply_learner_explanation_path, as: :json }
     }.each do |label, request|
       it "counts #{label} toward the shared limit" do
         (ProviderCallLimits::HOURLY - 1).times { critique }

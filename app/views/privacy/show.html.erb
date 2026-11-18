@@ -9,9 +9,13 @@
 
   <section aria-labelledby="privacy-stored">
     <h2 id="privacy-stored"><%= t("privacy.show.stored.heading") %></h2>
-    <p><%= t("privacy.show.stored.body") %></p>
+    <p><%= t(@learner_notes_shown ? "privacy.show.stored.body_with_learner_notes" : "privacy.show.stored.body") %></p>
     <p><%= t("privacy.show.stored.kept") %></p>
     <p><%= t("privacy.show.stored.retention", duck_days: @facts[:duck_days]) %></p>
+    <% if @learner_notes_shown %>
+      <p><%= t("privacy.show.stored.learner_notes", **@facts.slice(:item_lookback_days, :open_items, :listed_closed_days, :note_days, :item_days)) %></p>
+      <p><%= t("privacy.show.stored.learner_notes_reply") %></p>
+    <% end %>
     <p><%= t("privacy.show.stored.authenticator") %></p>
   </section>
 

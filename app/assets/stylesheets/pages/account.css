@@ -18,6 +18,13 @@
 .api-usage-row dd { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
 .api-usage-row-unpriced dd { color: var(--muted); }
 
+#learner-notes h3 { font-size: .9rem; margin: 1rem 0 .4rem; }
+.learner-item { border-top: 1px solid var(--border); padding: .6rem 0; }
+.learner-item-label { margin-bottom: .25rem; font-weight: 600; }
+.learner-item .card-note { margin-bottom: .35rem; }
+.learner-item-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.learner-written-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
 @media (min-width: 900px) {
   .account-page { max-width: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .account-page > h1, .account-page > .account-id-card { grid-column: 1 / -1; }

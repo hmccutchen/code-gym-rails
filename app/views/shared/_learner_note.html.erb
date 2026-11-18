@@ -1,0 +1,12 @@
+<%# Locals: question and question_key (the question shown and its NoteQuestion key), body (the stored note or nil), editable (false once the day is submitted), response_id (the response shown, or nil). %>
+<section class="learner-note" id="learner-note"<% if editable %> data-controller="learner-note" data-learner-note-url-value="<%= learner_note_path %>" data-learner-note-response-id-value="<%= response_id %>" data-learner-note-question-key-value="<%= question_key %>"<% end %>>
+  <h2 class="learner-note-heading"><%= t("learner_notes.note.label") %></h2>
+  <% if editable %>
+    <label for="learner-note-input" data-learner-note-target="question"><%= question %></label>
+    <textarea id="learner-note-input" class="answer" maxlength="<%= LearnerNote::MAX_TEXT_LENGTH %>" data-learner-note-target="input" data-action="input->learner-note#save"><%= body %></textarea>
+    <p class="hint"><%= t("learner_notes.note.hint") %></p>
+  <% else %>
+    <p><%= question %></p>
+    <%= simple_format(h(body), class: "learner-note-body") %>
+  <% end %>
+</section>

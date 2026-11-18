@@ -33,6 +33,17 @@ Rails.application.routes.draw do
 
   resource :account, only: [ :show, :destroy ] do
     patch :toggle_generation, on: :member
+    patch :learner_notes, on: :member
+    resources :learner_items, only: :destroy, controller: "account_learner_items" do
+      patch :got_it, on: :member
+    end
+    resources :learner_notes, only: [], controller: "account_learner_notes" do
+      member do
+        delete :note, action: :destroy_note
+        delete :explanation, action: :destroy_explanation
+      end
+      delete :all, on: :collection, action: :destroy_all
+    end
     resource :authenticator, only: [ :show, :create, :destroy ] do
       delete :sign_in_again
     end
@@ -72,6 +83,12 @@ Rails.application.routes.draw do
 
   get "dashboard/status", to: "dashboard#status", as: :dashboard_status
   get "dashboard/freshness", to: "dashboard#freshness", as: :dashboard_freshness
+
+  resource :learner_note, only: :update
+  resource :learner_explanation, only: :create do
+    post :reply
+    get :reply_status
+  end
 
   resources :responses, only: [ :create ] do
     member do

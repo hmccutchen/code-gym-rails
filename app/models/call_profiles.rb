@@ -30,14 +30,21 @@ module CallProfiles
       ExerciseSection::PseudocodeToCode::MAX_CRITIQUE_POINT_LENGTH / 3) +
     PSEUDOCODE_CRITIQUE_JSON_OVERHEAD_TOKENS
 
+  PROSE_CHARS_PER_TOKEN = 2.5
+
   DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS = 150
-  DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN = 2.5
+  DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN = PROSE_CHARS_PER_TOKEN
   DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM = 2
   DIFFICULTY_ASSESSMENT_MAX_TOKENS =
     ((ExerciseSection::MAX_SECTIONS *
       (DailyResponse::MAX_DIFFICULTY_REASON_LENGTH / DIFFICULTY_ASSESSMENT_CHARS_PER_TOKEN) *
       DIFFICULTY_ASSESSMENT_OVERRUN_HEADROOM) +
       DIFFICULTY_ASSESSMENT_JSON_OVERHEAD_TOKENS).ceil
+
+  LEARNER_ITEMS_JSON_OVERHEAD_TOKENS = 50
+  LEARNER_ITEMS_MAX_TOKENS = ((LearnerItemsReply::MAX_REPLY_CHARS / PROSE_CHARS_PER_TOKEN) + LEARNER_ITEMS_JSON_OVERHEAD_TOKENS).ceil
+
+  EXPLANATION_REPLY_MAX_TOKENS = 250
 
   JUDGE_MEASURED_MAX_OUTPUT_TOKENS = 654
 
@@ -62,7 +69,9 @@ module CallProfiles
     "pseudocode_critique"         => { max_tokens: PSEUDOCODE_CRITIQUE_MAX_TOKENS },
     "pseudocode_translate"        => {},
     "judge_section"               => { max_tokens: JUDGE_MAX_TOKENS },
-    "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true }
+    "judge_review"                => { max_tokens: REVIEW_JUDGE_MAX_TOKENS, read_timeout: REVIEW_JUDGE_READ_TIMEOUT, single_attempt: true },
+    "extract_learner_items"       => { max_tokens: LEARNER_ITEMS_MAX_TOKENS },
+    "explanation_reply"           => { max_tokens: EXPLANATION_REPLY_MAX_TOKENS }
   }.freeze
 
   def self.fetch(purpose) = BY_PURPOSE.fetch(purpose)

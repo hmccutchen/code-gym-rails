@@ -60,6 +60,24 @@ RSpec.describe "Work in flight when an account is deleted", type: :model do
     expect([ DailyResponse, ConceptMastery, ApiUsage ].map { |model| model.where(user_id: user.id).count }).to eq([ 0, 0, 0 ])
   end
 
+  it "removes a learner items fallback still waiting for its time, and leaves another account's" do
+    staying = create_fake_provider_user(email: "staying-notes@example.com")
+    waiting = [ user, staying ].map do |owner|
+      response = submitted_response(todays_set(owner))
+      job = ExtractLearnerItemsJob.new(user_id: owner.id, daily_exercise_id: response.daily_exercise_id,
+                                       daily_response_id: response.id, run: ExtractLearnerItemsJob::FALLBACK)
+      SolidQueue::Job.create!(queue_name: job.queue_name, class_name: job.class.name, arguments: job.serialize,
+                              active_job_id: job.job_id, priority: JobPriority::BACKGROUND, scheduled_at: 1.day.from_now)
+    end
+    expect(SolidQueue::ScheduledExecution.where(job_id: waiting.map(&:id)).count).to eq(2)
+
+    AccountDeletion.call(user)
+
+    expect(SolidQueue::Job.where(id: waiting.first.id)).to be_empty
+    expect(SolidQueue::ScheduledExecution.where(job_id: waiting.first.id)).to be_empty
+    expect(SolidQueue::Job.where(id: waiting.last.id)).to exist
+  end
+
   it "stores no duck reply that lands after the deletion" do
     exercise = todays_set
     AccountDeletion.call(user)

@@ -66,6 +66,7 @@ class PracticeGeneration
         next outcome(response.replace_blocker, exercise) if response&.replace_blocker
 
         response&.destroy!
+        exercise.forget_learner_note!
         exercise.update!(**content, plan_notes: replacement_notes(exercise), generated_at: Time.current,
           regenerated_at: Time.current, regenerating_since: nil)
         record_judge_solves(exercise)

@@ -90,6 +90,16 @@ RSpec.describe "per-purpose model routing" do
     end
   end
 
+  [ ClaudeService, GeminiService, OpenaiService ].each do |service_class|
+    it "sends both learner-notes calls on #{service_class}'s default route, which can take a capped call" do
+      %w[extract_learner_items explanation_reply].each do |purpose|
+        expect(service_class::MODEL_FOR_PURPOSE).not_to have_key(purpose)
+        body = posted_body(service_class, purpose: purpose, max_tokens: CallProfiles.fetch(purpose).fetch(:max_tokens))
+        expect(body["model"]).to eq(service_class::DEFAULT_ROUTE[:model])
+      end
+    end
+  end
+
   # The examples above call #call directly and would miss call_and_log dropping the purpose.
   it "routes the generation call made through call_and_log, not only a direct #call" do
     user     = User.create!(email: "routing@example.com")

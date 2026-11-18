@@ -4,4 +4,6 @@ module KeyHold
   COVERED_COUNTS = (...AFTER)
 
   def self.counts?(kind) = KINDS.include?(kind.to_s)
+
+  def self.holds?(failures) = !COVERED_COUNTS.cover?(failures)
 end

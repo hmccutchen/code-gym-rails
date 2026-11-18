@@ -294,3 +294,12 @@ it returns true.
 It skips an account with no keys map, since anonymized and trial accounts can
 name a provider while holding no keys. An account that removed its last key
 holds no provider either.
+
+## `#write_learner_notes_setting!`
+
+Turning the setting on needs the account's own key, which the caller passes
+in as `offered:` from `LearnerNotes.offered_to?`, since a model may not read
+`app/clients`. Turning it off needs no key, so an account that lost its own
+key can still stop its notes. It returns `:turned_on`, `:turned_off`,
+`:own_key_needed` or `:deleted`, and `AccountsController#learner_notes` maps
+each to a redirect.

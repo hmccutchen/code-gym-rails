@@ -1,0 +1,42 @@
+The concepts you may choose from, by bucket:
+- ruby_rails: n_plus_one, memoization
+- architecture: caching_strategy
+
+Open items: none.
+
+Earlier closed items: none.
+
+The "code_review" section:
+Scenario: a nightly loyalty-tier recalculation job
+Question: This method recalculates a customer's loyalty tier every time it's called, even inside a loop over the whole customer list. What's the issue and how would you fix it?
+Code snippet:
+def loyalty_tier(customer)
+  total = customer.orders.sum(&:total_cents)
+  case total
+  when 0...10_000 then "bronze"
+  when 10_000...50_000 then "silver"
+  else "gold"
+  end
+end
+
+customers.each { |c| puts loyalty_tier(c) }
+
+Their answer: (none)
+
+Their duck thread, oldest first:
+Engineer:
+<engineer_text>
+Where should I look?
+</engineer_text>
+Duck:
+Maybe you think sum runs in Ruby rather than SQL?
+Engineer:
+<engineer_text>
+Let me check the loop.
+</engineer_text>
+
+The day's note: (none)
+
+The day's explanation: (none)
+
+Return the JSON object your system instructions describe.

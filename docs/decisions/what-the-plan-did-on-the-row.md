@@ -33,3 +33,11 @@ their old map. The plan does not query difficulty or suggestion state.
 The workload reader validates registry keys and rungs. Absent legacy maps
 fall back to observed section rungs; old setting changes while a kind was
 absent cannot be inferred. No current setting relabels delivered work.
+
+One key is not the plan's: `learner_extraction`, the set's learner notes
+ledger (`LearnerExtraction`, `docs/decisions/learner-notes.md`). It holds
+text-free counts of the extraction and reply attempts and the time the set
+closed to extraction. It is written after generation, under the exercise
+row lock, merging only that key, so the plan's notes are never rewritten
+by it; a regeneration replaces `plan_notes` and so starts it fresh, and
+Start over drops it.

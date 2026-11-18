@@ -1,0 +1,9 @@
+The concept: N plus one
+The question they answered: In your own words, what does N plus one do?
+
+Their explanation:
+<engineer_text>
+It runs one query per row, I think, but I'm not sure about includes.
+</engineer_text>
+
+Return the JSON object your system instructions describe.

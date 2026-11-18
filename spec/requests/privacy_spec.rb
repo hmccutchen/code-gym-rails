@@ -46,6 +46,46 @@ RSpec.describe "Privacy page", type: :request do
     expect(text).not_to include("%{")
   end
 
+  it "is exactly as before learner notes while the switch is unset" do
+    stub_env("LEARNER_NOTES" => nil)
+    get privacy_path
+    paragraphs = page.css("section[aria-labelledby='privacy-stored'] p").map(&:text)
+
+    expect(paragraphs).to eq([ I18n.t("privacy.show.stored.body"), I18n.t("privacy.show.stored.kept"),
+                               I18n.t("privacy.show.stored.retention", duck_days: DuckThread::KEPT_FOR.in_days.to_i),
+                               I18n.t("privacy.show.stored.authenticator") ])
+    expect(page.at_css("main").text).not_to match(/learner notes|notes and explanations|short reminders/i)
+  end
+
+  it "states what learner notes store, what reads them and how long they are kept, with the numbers from the code" do
+    stub_env("LEARNER_NOTES" => "1")
+    get privacy_path
+    text = page.at_css("main").text
+
+    expect(PrivacyNotice.facts).to include(note_days: LearnerNote::KEPT_FOR.in_days.to_i,
+                                           item_days: LearnerItem::KEPT_AFTER_CLOSE.in_days.to_i,
+                                           item_lookback_days: LearnerItem::RECENT_DAYS, open_items: LearnerItem::MAX_OPEN,
+                                           listed_closed_days: LearnerItem::RECENT_DAYS)
+    expect(text).to include(
+      "If you turn on learner notes in Account, the note you write with each set and your answer to the explain " \
+      "question are stored. After you submit, one request sent with your key reads them, along with your " \
+      "thinking-partner conversation and your answers for that day and your reminders from the last " \
+      "#{LearnerItem::RECENT_DAYS} days, and keeps up to #{LearnerItem::MAX_OPEN} short reminders of what to practise next. " \
+      "Your Account page lists your notes and explanations, your open reminders and the ones you marked as got in the " \
+      "last #{LearnerItem::RECENT_DAYS} days, and its Delete all button deletes every note, explanation and reminder, " \
+      "including the ones it no longer lists. Notes are deleted automatically after " \
+      "#{LearnerNote::KEPT_FOR.in_days.to_i} days, reminders #{LearnerItem::KEPT_AFTER_CLOSE.in_days.to_i} days after they " \
+      "close, and everything is deleted with your account."
+    )
+    expect(text).to include("When you save an explanation, a second short request sent with your key reads only that " \
+                            "explanation and the question it answered, and stores a brief reply under it, which is " \
+                            "deleted with the explanation.")
+    expect(text).to include(I18n.t("privacy.show.stored.body_with_learner_notes"))
+    expect(I18n.t("privacy.show.stored.body_with_learner_notes"))
+      .to include("the notes and explanations you write with each set, the short feedback on each explanation, and the " \
+                  "reminders written from them, which later requests sent with your key also read")
+  end
+
   it "makes no claim about database backups, which are off" do
     get privacy_path
 
@@ -65,7 +105,7 @@ RSpec.describe "Privacy page", type: :request do
     get privacy_path
     text = page.at_css("main").text
 
-    %w[stored.body key.use deleting.body].each do |key|
+    %w[stored.body stored.body_with_learner_notes key.use deleting.body].each do |key|
       expect(I18n.t("privacy.show.#{key}")).to include("write-ups and guides")
     end
     expect(text).not_to match(/stay on Learn for everyone/i)

@@ -83,6 +83,19 @@ truncated the longest valid replies mid-JSON.
 Both margins in the difficulty cap are chosen, not measured. A cap that is too
 tight loses the note silently.
 
+## `LEARNER_ITEMS_MAX_TOKENS`
+
+Derived from the longest extraction reply the merge can use:
+`LearnerItemsReply::MAX_REPLY_CHARS`, a repeat for each of the five open
+items plus the three new items a day may add, each with a label, a term and
+five references at their limits. A flat 700 could cut that reply off
+mid-JSON, and the whole call then failed. `PROSE_CHARS_PER_TOKEN` is the
+difficulty cap's chosen 2.5 characters a token, shared, and
+`call_profiles_spec` builds the worst-case reply from the longest concept,
+bucket and section key to hold the character margins in
+`LearnerItemsReply` to the vocabularies. At an assumed 60 output tokens a
+second, the cap's 2,124 tokens take about 35 seconds, inside `READ_TIMEOUT`.
+
 ## `JUDGE_MEASURED_MAX_OUTPUT_TOKENS`
 
 The largest finished section-judge reply measured in production, in output

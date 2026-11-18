@@ -8,6 +8,7 @@ class DailyExercise < ApplicationRecord
   belongs_to :user
   has_one    :daily_response, dependent: :destroy
   has_one    :duck_thread, dependent: :delete
+  has_one    :learner_note, dependent: :delete
   has_many   :judge_solves, dependent: :destroy
 
   # Excludes "mixed": a stored "mixed" would flow back into generation through RegenerateExerciseJob.
@@ -46,6 +47,11 @@ class DailyExercise < ApplicationRecord
     left_joins(:daily_response).order(date: :desc).limit(limit)
       .pluck(:date, :opened_at, "daily_responses.id")
       .map { |date, opened_at, response_id| UnopenedSets::Entry.new(date: date, opened: opened_at.present?, saved: response_id.present?) }
+  end
+
+  def forget_learner_note!
+    LearnerNote.forget_set!(self)
+    LearnerExtraction.clear!(self)
   end
 
   def coverage_shown
@@ -91,6 +97,8 @@ class DailyExercise < ApplicationRecord
     active_section_keys.select { |key| ExerciseSection.for(key).adaptation_evidence?(problem_set[key]) }
   end
 
+  def section_concepts = active_section_keys.map { |key| [ key, tagged_concept(key) ] }
+
   def concept_pairs(before_submission: false)
     withheld = before_submission ? concepts_withheld_before_submission : []
     active_section_keys.filter_map do |key|
@@ -120,19 +128,23 @@ class DailyExercise < ApplicationRecord
   end
 
   def start_over!(response_id:)
-    with_response_locked do |response|
-      next :stale unless response && response.id == response_id
+    transaction do
+      User.lock.where(id: user_id).ids
+      with_response_locked do |response|
+        next :stale unless response && response.id == response_id
 
-      blocker = response.replace_blocker
-      next :reviewed if blocker == :reviewed
-      next :not_today unless response.date == Date.current
-      next :reviewing if blocker == :reviewing
+        blocker = response.replace_blocker
+        next :reviewed if blocker == :reviewed
+        next :not_today unless response.date == Date.current
+        next :reviewing if blocker == :reviewing
 
-      validate_reset_notes!
-      DuckThread.start_over!(self)
-      response.destroy!
-      update!(plan_notes: plan_notes.merge("draft_revision" => draft_revision + 1))
-      :cleared
+        validate_reset_notes!
+        DuckThread.start_over!(self)
+        forget_learner_note!
+        response.destroy!
+        update!(plan_notes: plan_notes.merge("draft_revision" => draft_revision + 1))
+        :cleared
+      end
     end
   end
 

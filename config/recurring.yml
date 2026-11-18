@@ -7,6 +7,10 @@ production:
     class: SweepDuckThreadsJob
     schedule: "17 3 * * *"
     description: "Delete duck threads past DuckThread::KEPT_FOR"
+  sweep_learner_notes:
+    class: SweepLearnerNotesJob
+    schedule: "23 3 * * *"
+    description: "Delete learner notes past LearnerNote::KEPT_FOR and closed items past LearnerItem::KEPT_AFTER_CLOSE"
   clear_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     queue: default

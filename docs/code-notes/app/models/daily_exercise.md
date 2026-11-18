@@ -121,6 +121,12 @@ revision. Those writes commit together. A failed write rolls all of them
 back. A delayed second reset cannot delete a new response created after the
 first reset.
 
+Start over also forgets the set's learner note and its extraction ledger
+(`#forget_learner_note!`), which deletes learner items across the whole
+account. It takes the owner's row lock for update before
+`#with_response_locked`, so lock order stays user → exercise → response and
+the item deletes are serialized with Delete all.
+
 Before the destructive steps, `#validate_reset_notes!` rejects non-Hash notes
 with `ActiveRecord::RecordInvalid`. The controller logs the record class and
 invalid attribute names, never their contents, then redirects with a failure

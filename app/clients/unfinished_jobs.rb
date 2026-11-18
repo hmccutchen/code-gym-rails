@@ -10,6 +10,18 @@ module UnfinishedJobs
     SolidQueue::Job.transaction { SolidQueue::Job.where(id: still_waiting(ids)).delete_all }
   end
 
+  def self.discard_job(class_name, **arguments)
+    wanted = arguments.compact.stringify_keys
+    unfinished = SolidQueue::Job.where(finished_at: nil, class_name: class_name).select(:id, :arguments)
+    ids = unfinished.find_each.select { |job| carries?(job.arguments, wanted) }.map(&:id)
+    SolidQueue::Job.transaction { SolidQueue::Job.where(id: still_waiting(ids)).delete_all }
+  end
+
+  def self.carries?(serialized, wanted)
+    Array(serialized.is_a?(Hash) ? serialized["arguments"] : nil)
+      .any? { |entry| entry.is_a?(Hash) && wanted.all? { |key, value| entry[key] == value } }
+  end
+
   def self.still_waiting(job_ids)
     locked = WAITING_EXECUTIONS.flat_map { |execution| execution.where(job_id: job_ids).order(:job_id).non_blocking_lock.pluck(:job_id) }
     locked - SolidQueue::ClaimedExecution.where(job_id: locked).pluck(:job_id)
@@ -23,5 +35,5 @@ module UnfinishedJobs
     else false
     end
   end
-  private_class_method :still_waiting, :names?
+  private_class_method :still_waiting, :names?, :carries?
 end

@@ -1,0 +1,165 @@
+require "rails_helper"
+
+RSpec.describe LearnerExtraction do
+  let(:user) { User.create!(email: "ledger@example.com", provider: "fake", api_keys: { "fake" => "fake-key" }) }
+  let(:exercise) do
+    DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                          problem_set: { "code_review" => { "question" => "Find the bug", "snippet" => "def a; end" } },
+                          plan_notes: { "size" => 2, "daily_kinds" => %w[code_review design_comparison] })
+  end
+
+  let(:response_id) do
+    DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, answers: { "code_review" => "A" },
+                          submitted_at: Time.current).id
+  end
+
+  def stored = exercise.reload.plan_notes
+
+  it "reads an untouched set as unread, with no attempts" do
+    expect(described_class.for(exercise)).to have_attributes(attempts: 0, reply_attempts: 0, closed?: false)
+  end
+
+  it "counts an attempt on the set as text-free counts, leaving the plan's own notes alone" do
+    expect(described_class.count_attempt!(exercise, close: false, response_id: response_id)).to be(true)
+
+    expect(stored).to eq("size" => 2, "daily_kinds" => %w[code_review design_comparison],
+                         "learner_extraction" => { "attempts" => 1, "reply_attempts" => 0 })
+  end
+
+  it "closes the set with the attempt when asked, and counts no attempt on a closed set" do
+    described_class.count_attempt!(exercise, close: true, response_id: response_id)
+
+    expect(described_class.for(exercise.reload)).to have_attributes(attempts: 1, closed?: true)
+    expect(described_class.count_attempt!(exercise, close: false, response_id: response_id)).to be(false)
+    expect(described_class.for(exercise.reload).attempts).to eq(1)
+  end
+
+  it "counts at most two attempts" do
+    2.times { described_class.count_attempt!(exercise, close: false, response_id: response_id) }
+
+    expect(described_class.count_attempt!(exercise, close: false, response_id: response_id)).to be(false)
+    expect(described_class.for(exercise.reload).attempts).to eq(described_class::MAX_ATTEMPTS)
+  end
+
+  it "closes a set once, keeping the first time" do
+    described_class.close!(exercise, response_id: response_id)
+    first = described_class.for(exercise.reload).closed_at
+
+    travel 1.minute do
+      described_class.close!(exercise, response_id: response_id)
+    end
+
+    expect(described_class.for(exercise.reload).closed_at).to eq(first)
+  end
+
+  it "reads and writes under the exercise row lock, after the user's" do
+    locks = []
+    allow(User).to receive(:lock).and_wrap_original { |original, *args| locks << [ :user, *args ] && original.call(*args) }
+    allow(exercise).to receive(:lock!).and_wrap_original { |original, *args| (locks << :exercise) && original.call(*args) }
+
+    described_class.close!(exercise, response_id: response_id)
+
+    expect(locks).to eq([ [ :user, "FOR SHARE" ], :exercise ])
+  end
+
+  it "answers :gone for a set deleted before the write" do
+    stale = DailyExercise.find(exercise.id)
+    exercise.destroy!
+
+    expect(described_class.close!(stale, response_id: 0)).to eq(:gone)
+    expect(described_class.count_attempt!(stale, close: true, response_id: 0)).to eq(:gone)
+  end
+
+  context "when the response the run was queued for is no longer the set's" do
+    let(:replaced_id) do
+      DailyResponse.find(response_id).destroy!
+      DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, answers: { "code_review" => "B" },
+                            submitted_at: Time.current)
+      response_id
+    end
+
+    it "answers :replaced and counts no attempt" do
+      expect(described_class.count_attempt!(exercise, close: true, response_id: replaced_id)).to eq(:replaced)
+
+      expect(stored).not_to have_key(described_class::KEY)
+    end
+
+    it "answers :replaced and leaves the set open" do
+      expect(described_class.close!(exercise, response_id: replaced_id)).to eq(:replaced)
+
+      expect(stored).not_to have_key(described_class::KEY)
+    end
+  end
+
+  it "counts reply attempts apart from extraction attempts, at most two, when the block takes the claim" do
+    token = Time.current.floor(6)
+
+    take = ->(spent) { spent ? :exhausted : token }
+
+    expect(described_class.count_reply_attempt!(exercise, &take)).to eq(token)
+    expect(described_class.count_reply_attempt!(exercise, &take)).to eq(token)
+    expect(described_class.count_reply_attempt!(exercise, &take)).to eq(:exhausted)
+
+    expect(described_class.for(exercise.reload)).to have_attributes(reply_attempts: 2, attempts: 0)
+  end
+
+  it "counts no reply attempt when the block refuses with a symbol" do
+    expect(described_class.count_reply_attempt!(exercise) { :busy }).to eq(:busy)
+
+    expect(described_class.for(exercise.reload).reply_attempts).to eq(0)
+  end
+
+  it "is dropped by .clear!, leaving the rest of the plan's notes" do
+    described_class.count_attempt!(exercise, close: true, response_id: response_id)
+
+    described_class.clear!(exercise)
+
+    expect(stored).to eq("size" => 2, "daily_kinds" => %w[code_review design_comparison])
+    expect(exercise.plan_notes).not_to have_key("learner_extraction")
+  end
+
+  describe ".forget_all!" do
+    around { |example| freeze_time(with_usec: true) { example.run } }
+
+    it "writes a new stamp for a second Delete all in the same second" do
+      travel_to(Time.utc(2026, 11, 16, 15, 0, 0, 100_000), with_usec: true)
+      exercise
+      described_class.forget_all!(user)
+      first = described_class.for(exercise.reload).forgotten_at
+
+      travel(0.3.seconds, with_usec: true)
+      described_class.forget_all!(user)
+
+      expect(described_class.for(exercise.reload).forgotten_at).not_to eq(first)
+    end
+
+    it "stamps a forgotten time on each of the owner's ledgers, keeping their counts and the plan's notes" do
+      described_class.count_attempt!(exercise, close: false, response_id: response_id)
+
+      described_class.forget_all!(user)
+
+      expect(described_class.for(exercise.reload)).to have_attributes(attempts: 1, forgotten_at: Time.current.iso8601(6))
+      expect(stored).to include("size" => 2, "daily_kinds" => %w[code_review design_comparison])
+    end
+
+    it "creates the ledger on a set no run has read yet, so a run that read none sees the stamp" do
+      unread = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: exercise.problem_set, plan_notes: { "size" => 2 })
+
+      described_class.forget_all!(user)
+
+      expect(unread.reload.plan_notes).to eq("size" => 2, described_class::KEY => { "forgotten_at" => Time.current.iso8601(6) })
+      expect(described_class.for(unread)).to have_attributes(attempts: 0, reply_attempts: 0, closed?: false)
+    end
+
+    it "leaves another account's sets alone" do
+      other = User.create!(email: "other-ledger@example.com", provider: "fake", api_keys: { "fake" => "fake-key" })
+      theirs = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: exercise.problem_set, plan_notes: { "size" => 2 })
+
+      described_class.forget_all!(user)
+
+      expect(theirs.reload.plan_notes).to eq("size" => 2)
+    end
+  end
+end

@@ -244,6 +244,19 @@ class User < ApplicationRecord
 
   def give_back_invite_seat! = invite_code&.give_back_seat!
 
+  def write_learner_notes_setting!(wanted, offered:)
+    return :own_key_needed if wanted && !offered
+
+    with_lock do
+      next :deleted if anonymized?
+
+      update!(learner_notes_enabled: wanted)
+      wanted ? :turned_on : :turned_off
+    end
+  rescue ActiveRecord::RecordNotFound
+    :deleted
+  end
+
   def api_key = api_keys&.dig(provider)
 
   def api_key_present?

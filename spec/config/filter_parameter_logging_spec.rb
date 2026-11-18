@@ -27,6 +27,13 @@ RSpec.describe "Request log parameter filtering" do
                                                 "an earlier framing", "an earlier turn")
   end
 
+  it "filters a learner note and an explanation, matched exactly so plan_notes and notes stay readable" do
+    expect(outcome("learner_note" => "stuck", "explanation" => "mine", "body" => "text"))
+      .to eq("learner_note" => "[FILTERED]", "explanation" => "[FILTERED]", "body" => "[FILTERED]")
+    expect(outcome("plan_notes" => "x", "learner_notes" => "y", "explanation_section" => "z"))
+      .to eq("plan_notes" => "x", "learner_notes" => "y", "explanation_section" => "z")
+  end
+
   it "filters a person's name" do
     expect(outcome("user" => { "name" => "Ada" })).to eq("user" => { "name" => "[FILTERED]" })
   end
