@@ -2,6 +2,7 @@ class LearnerItemsPrompt
   ANSWER_LIMIT = 2_000
   TURN_LIMIT = 1_000
   MAX_ITEMS_BLOCK_CHARS = 10_000
+  LABEL_TARGET_LENGTH = 140
 
   SYSTEM = <<~PROMPT.chomp
     You are reading what an engineer wrote on one day of practice, to note what
@@ -64,8 +65,11 @@ class LearnerItemsPrompt
     - "term": for a "term" item only, the word or phrase asked about, at most
       #{LearnerItem::MAX_TERM_LENGTH} characters of letters, digits, spaces and _ + # . / -. Leave it
       out for the other kinds.
-    - "label": one sentence of at most #{LearnerItem::MAX_LABEL_LENGTH} characters, on one line, saying in
-      plain words what the engineer needs. Never quote the engineer.
+    - "label": one sentence on one line, under #{LABEL_TARGET_LENGTH} characters, that states in the
+      third person what the engineer asked or wrote, such as "Said an index only
+      speeds up reads." or "Asked what eager loading means." Never address the
+      engineer ("You believe..."), and never a verdict on them ("Needs practice
+      with..."). Put it in your own words; never quote the engineer.
     - "evidence": where it came up, as a list of at most #{LearnerItem::MAX_EVIDENCE} references:
       {"source": "duck", "section": "<section key>"} for the engineer's own
       messages in that section's duck thread,

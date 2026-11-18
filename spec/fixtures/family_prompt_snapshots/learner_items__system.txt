@@ -58,8 +58,11 @@ Each item has these fields:
 - "term": for a "term" item only, the word or phrase asked about, at most
   40 characters of letters, digits, spaces and _ + # . / -. Leave it
   out for the other kinds.
-- "label": one sentence of at most 160 characters, on one line, saying in
-  plain words what the engineer needs. Never quote the engineer.
+- "label": one sentence on one line, under 140 characters, that states in the
+  third person what the engineer asked or wrote, such as "Said an index only
+  speeds up reads." or "Asked what eager loading means." Never address the
+  engineer ("You believe..."), and never a verdict on them ("Needs practice
+  with..."). Put it in your own words; never quote the engineer.
 - "evidence": where it came up, as a list of at most 5 references:
   {"source": "duck", "section": "<section key>"} for the engineer's own
   messages in that section's duck thread,

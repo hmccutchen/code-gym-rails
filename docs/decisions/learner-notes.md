@@ -121,6 +121,16 @@ is not a sign of difficulty.
 
 ## The items and the merge
 
+A label states in the third person what the engineer asked or wrote, such
+as "Said an index only speeds up reads." or "Asked what eager loading
+means." It never addresses the engineer ("You believe...") and never passes
+a verdict ("Needs practice with..."): the engineer reads these labels on the
+Account page, and a statement of what they wrote is something they can
+check, where a verdict reads as a grade. The prompt asks for under 140
+characters, which leaves room inside the 160-character limit the boundary
+enforces, so a label that runs a little long is still kept (owner's
+decision, 2026-11-18).
+
 `LearnerItemsReply.parse` checks the reply at the boundary and writes nothing.
 It drops an item with an unknown kind, a concept outside the engineer's
 vocabularies, a label over one line or 160 characters, a bad term, or no

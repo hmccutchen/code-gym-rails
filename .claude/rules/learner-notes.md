@@ -48,7 +48,11 @@ this area.
   It is never sent a review, a rating, `ConceptMastery`, a server stamp or
   another day's text. Every label reaches it as data through
   `UserText.labelled`, and the worst case, every label at its limit, stays
-  within `LearnerItemsPrompt::MAX_ITEMS_BLOCK_CHARS`. Its kind triggers,
+  within `LearnerItemsPrompt::MAX_ITEMS_BLOCK_CHARS`. It asks for a label
+  under `LearnerItemsPrompt::LABEL_TARGET_LENGTH` (140) characters stating in
+  the third person what the engineer asked or wrote, never addressing them
+  and never a verdict; the boundary's hard limit stays
+  `LearnerItem::MAX_LABEL_LENGTH` (160). Its kind triggers, label wording,
   reading rules, report-a-repeat and refine-only-when-new lines are each
   pinned by a snapshot.
 - **The reply is checked at the boundary.** `LearnerItemsReply.parse` is
