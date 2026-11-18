@@ -3,6 +3,7 @@ class LearnerNote < ApplicationRecord
   belongs_to :daily_exercise
 
   MAX_TEXT_LENGTH = 1_000
+  KEPT_FOR = 365.days
   MAX_EXTRACT_ATTEMPTS = 2
   MAX_REPLY_ATTEMPTS = 2
   REPLY_CLAIM_STALE_AFTER = CallProfiles.worst_case_seconds_for("explanation_reply").seconds + DailyExercise::WRITE_MARGIN
@@ -59,6 +60,8 @@ class LearnerNote < ApplicationRecord
     explanation: { explain_section: nil, explain_concept: nil, explain_phrasing: nil, explanation: nil,
                    explanation_reply: nil, reply_requested_at: nil }
   }.freeze
+
+  scope :expired, ->(today = Date.current) { where(daily_exercise: DailyExercise.where(date: ...(today - KEPT_FOR))) }
 
   scope :written, -> { where("btrim(coalesce(body, '')) <> '' OR explanation IS NOT NULL") }
 

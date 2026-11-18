@@ -46,6 +46,30 @@ RSpec.describe "Privacy page", type: :request do
     expect(text).not_to include("%{")
   end
 
+  it "states what learner notes store, what reads them and how long they are kept, with the numbers from the code" do
+    get privacy_path
+    text = page.at_css("main").text
+
+    expect(PrivacyNotice.facts).to include(note_days: LearnerNote::KEPT_FOR.in_days.to_i,
+                                           item_days: LearnerItem::KEPT_AFTER_CLOSE.in_days.to_i,
+                                           item_lookback_days: LearnerItem::RECENT_DAYS, open_items: LearnerItem::MAX_OPEN)
+    expect(text).to include(
+      "If you turn on learner notes in Account, the note you write with each set and your answer to the explain " \
+      "question are stored. After you submit, one request sent with your key reads them, along with your " \
+      "thinking-partner conversation and your answers for that day and your reminders from the last " \
+      "#{LearnerItem::RECENT_DAYS} days, and keeps up to #{LearnerItem::MAX_OPEN} short reminders of what to practise next. " \
+      "You can read and delete all of them on your Account page. Notes are deleted automatically after " \
+      "#{LearnerNote::KEPT_FOR.in_days.to_i} days, reminders #{LearnerItem::KEPT_AFTER_CLOSE.in_days.to_i} days after they " \
+      "close, and everything is deleted with your account."
+    )
+    expect(text).to include("When you save an explanation, a second short request sent with your key reads only that " \
+                            "explanation and the question it answered, and stores a brief reply under it, which is " \
+                            "deleted with the explanation.")
+    expect(I18n.t("privacy.show.stored.body"))
+      .to include("the notes and explanations you write with each set, the short feedback on each explanation, and the " \
+                  "reminders written from them, which later requests sent with your key also read")
+  end
+
   it "makes no claim about database backups, which are off" do
     get privacy_path
 

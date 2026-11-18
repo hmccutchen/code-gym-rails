@@ -11,9 +11,9 @@ RSpec.describe "Learner notes isolation" do
 
   let(:limit_readers) { %w[app/prompts/learner_items_prompt.rb app/models/learner_items_reply.rb] }
 
-  it "keeps learner notes and items to their own models, the user, the set's association and the account deletion list" do
+  it "keeps learner notes and items to their own models, the user, the set's association, the account deletion list, the sweep and the privacy numbers" do
     own = %w[app/models/learner_note.rb app/models/learner_item.rb app/models/learner_item/merge.rb app/jobs/extract_learner_items_job.rb app/models/user.rb app/models/account_data.rb
-             app/models/daily_exercise.rb] + limit_readers
+             app/models/daily_exercise.rb app/jobs/sweep_learner_notes_job.rb app/models/privacy_notice.rb] + limit_readers
 
     readers = (isolation_scope - own).select do |file|
       File.read(Rails.root.join(file)).match?(guarded)

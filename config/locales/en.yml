@@ -89,9 +89,11 @@ en:
       heading: "What Coding Gym keeps, and what it doesn't"
       stored:
         heading: "What's stored"
-        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, your progress on each concept, the concept write-ups and guides written for you on Learn, and a record of each request sent with your key: what it was for and how many tokens it used."
+        body: "Your email address, your settings, the exercises generated for you, your answers, the reviews of them, the follow-up questions you ask, your thinking-partner conversations, the notes and explanations you write with each set, the short feedback on each explanation, and the reminders written from them, which later requests sent with your key also read, your progress on each concept, the concept write-ups and guides written for you on Learn, and a record of each request sent with your key: what it was for and how many tokens it used."
         kept: "Your sets, answers, reviews and usage records are kept until you delete your account."
         retention: "Thinking-partner conversations are deleted automatically once their set is more than %{duck_days} days old."
+        learner_notes: "If you turn on learner notes in Account, the note you write with each set and your answer to the explain question are stored. After you submit, one request sent with your key reads them, along with your thinking-partner conversation and your answers for that day and your reminders from the last %{item_lookback_days} days, and keeps up to %{open_items} short reminders of what to practise next. You can read and delete all of them on your Account page. Notes are deleted automatically after %{note_days} days, reminders %{item_days} days after they close, and everything is deleted with your account."
+        learner_notes_reply: "When you save an explanation, a second short request sent with your key reads only that explanation and the question it answered, and stores a brief reply under it, which is deleted with the explanation."
         authenticator: "If you turn on an authenticator app, its secret is stored encrypted, and your recovery codes are stored only in a scrambled form that can't be turned back into the codes."
       key:
         heading: "Your API key"

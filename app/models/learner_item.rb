@@ -18,6 +18,7 @@ class LearnerItem < ApplicationRecord
   TERM_SHAPE = %r{\A[A-Za-z0-9 _+#./-]{1,#{MAX_TERM_LENGTH}}\z}
   EXPIRES_AFTER_EVIDENCE = 14.days
   LONGEST_LIFE = 42.days
+  KEPT_AFTER_CLOSE = 90.days
 
   self.filter_attributes += %i[label term]
 
@@ -33,6 +34,8 @@ class LearnerItem < ApplicationRecord
   validate :concept_in_vocabulary, if: -> { new_record? || will_save_change_to_concept? || will_save_change_to_bucket? }
   validate :evidence_holds_references, if: -> { new_record? || will_save_change_to_evidence? }
   validate :came_up_on_holds_dates
+
+  scope :expired_after_close, ->(today = Date.current) { where.not(status: "open").where(closed_on: ...(today - KEPT_AFTER_CLOSE)) }
 
   def self.expiry_for(newest_evidence_on:, created_on:)
     [ newest_evidence_on + EXPIRES_AFTER_EVIDENCE, created_on + LONGEST_LIFE ].min
