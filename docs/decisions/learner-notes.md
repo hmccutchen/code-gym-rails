@@ -41,10 +41,13 @@ sent so edits during a request are kept.
 
 Submit flushes a pending typing timer before posting the answers, since a
 note arriving after submission would be refused. The note stays inert while
-Submit runs, even though its box sits outside the answer form. A failed
-flush keeps the text, shows the existing save error and unlocks the page;
-the next Submit retries that flush. Saves already in flight keep their
-existing submission handling below.
+Submit runs, even though its box sits outside the answer form. If the flush
+gets a 409 because the page is stale, Submit uses the existing stale-page
+reload without posting answers. That reload ignores the note conflict
+alone; unrelated saves and failures still hold it. Other failed flushes keep
+the text, show the existing save error and unlock the page; the next Submit
+retries that flush. Saves already in flight keep their existing submission
+handling below.
 
 `NoteQuestion` picks from signals the app already has, first match wins: a
 cleared duck thread, duck turns, a "too hard" rating, a skipped section, or

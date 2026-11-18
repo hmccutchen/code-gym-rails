@@ -29,10 +29,10 @@ export default class extends Controller {
   }
 
   async flush() {
-    if (this.saveTimer === null && !this.flushFailed) return true
+    if (this.saveTimer === null && !this.flushFailed) return { ok: true }
     const result = await this.sendSave()
     this.flushFailed = !result.ok && !result.data?.submitted
-    return !this.flushFailed
+    return { ...result, ok: !this.flushFailed }
   }
 
   // The body is read when the queue sends it, so edits during an in-flight save use the latest text.

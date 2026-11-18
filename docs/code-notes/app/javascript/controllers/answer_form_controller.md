@@ -98,9 +98,12 @@ could save. A missing note controller uses the existing controls-not-ready
 message; no note box means no extra save.
 
 `lockForSubmit` makes the note inert too, so a new edit cannot appear while
-the flush is running. A failed flush calls the existing `unlock`, restoring
-both the answer form and the note. The note controller keeps the failed
-flush for the next explicit Submit, without adding automatic retries.
+the flush is running. A 409 from the flush takes the existing stale-page
+reload path without posting answers. Its leave gate ignores that note
+conflict, but still waits for unrelated saves and failures; the form stays
+locked until recovery. Other failed flushes call the existing `unlock`,
+restoring both the answer form and the note. The note controller keeps the
+failed flush for the next explicit Submit, without adding automatic retries.
 An already-sent note with no pending typing timer retains the existing
 post-submit leave handling.
 

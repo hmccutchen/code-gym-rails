@@ -265,7 +265,11 @@ export default class extends Controller {
       saveStatus.report("submit", this.controlsNotReadyValue)
       return this.unlock()
     }
-    if (!await this.flushPendingNote()) return this.unlock()
+    const note = await this.flushPendingNote()
+    if (note.status === 409) {
+      return this.leaveWhenOtherSavesLand(() => this.reloadAfterSubmit(note, true), "submit", "learner_note")
+    }
+    if (!note.ok) return this.unlock()
 
     const result = await request.send("POST", this.formTarget.action, this.payload({ submit: "1" }), { fallback: this.submitFailedValue })
     if (result.ok) saveStatus.clear("submit")
@@ -303,11 +307,11 @@ export default class extends Controller {
 
   async flushPendingNote() {
     const element = this.element.querySelector('[data-controller~="learner-note"]')
-    if (!element) return true
+    if (!element) return { ok: true }
     const note = this.application.getControllerForElementAndIdentifier(element, "learner-note")
     if (note) return note.flush()
     saveStatus.report("submit", this.controlsNotReadyValue)
-    return false
+    return { ok: false }
   }
 
   lockForSubmit() {

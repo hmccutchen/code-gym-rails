@@ -225,6 +225,49 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
     end
   end
 
+  [ false, true ].each do |other_failure|
+    it "reloads after another tab starts over during a pending note#{' once an unrelated save failure clears' if other_failure}" do
+      stub_env("LEARNER_NOTES" => "1")
+      user = create_fake_provider_user
+      user.update!(learner_notes_enabled: true)
+      travel_to(a_weekday) do
+        visit_with_todays_set(user)
+        fill_in_answer("code_review", "It queries once per row in the loop.")
+        rate_section("code_review")
+        expect_ready_to_submit
+        wait_for_answers_settled
+        visit root_path
+        wait_for_js
+        old_scope = find("[data-answer-form-draft-scope-value]")["data-answer-form-draft-scope-value"]
+        second_tab = open_new_window
+        within_window(second_tab) do
+          visit root_path
+          wait_for_js
+        end
+        pause_browser_clock
+        type_note("The old tab's unsent edit.")
+        within_window(second_tab) do
+          page.execute_script("window.confirm = () => true")
+          click_button I18n.t("dashboard.exercise.start_over")
+          expect(page).to have_content(I18n.t("flash.responses.answers_cleared"))
+        end
+        page.execute_script("window.CodeGymSaveStatus.report('other_control', 'Another change has not saved.')") if other_failure
+        page.execute_script("document.querySelector('#submit-answers').click()")
+        page.driver.with_playwright_page { |pw| pw.clock.resume }
+
+        if other_failure
+          expect(page).to have_css("#leave-held")
+          expect(page).to have_css(%([data-answer-form-draft-scope-value="#{old_scope}"]))
+          expect(user.daily_responses).to be_empty
+          page.execute_script("window.CodeGymSaveStatus.clear('other_control')")
+        end
+        expect(page).to have_no_css(%([data-answer-form-draft-scope-value="#{old_scope}"]))
+        expect(LearnerNote.find_by(user: user)).to be_nil
+        expect(user.daily_responses).to be_empty
+      end
+    end
+  end
+
   it "starts the review when Submit lands before a note save it held back" do
     stub_env("LEARNER_NOTES" => "1")
     user = create_fake_provider_user
@@ -263,49 +306,49 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
     end
   end
 
-    it "does not recreate a reset note when its typing timer fires from the old page" do
-      stub_env("LEARNER_NOTES" => "1")
-      user = create_fake_provider_user
-      user.update!(learner_notes_enabled: true)
-
-      travel_to(a_weekday) do
-        visit_with_todays_set(user)
-        fill_in_answer("code_review", "It queries once per row in the loop.")
-        type_note("A note for the old response.")
-        wait_for_answers_settled
-        visit root_path
-        wait_for_js
-        pause_browser_clock
-        type_note("An unsent edit to the old note.")
-        response = user.daily_responses.sole
-        expect(response.daily_exercise.start_over!(response_id: response.id)).to eq(:cleared)
-        advance_browser_clock(800)
-
-        expect(page).to have_css("#save-status", text: I18n.t("flash.responses.stale_answers"))
-        expect(LearnerNote.find_by(user: user)).to be_nil
-        expect(user.daily_responses).to be_empty
-      end
-    end
-
-    it "settles a pending note flush refused because another tab already submitted" do
+  it "does not recreate a reset note when its typing timer fires from the old page" do
     stub_env("LEARNER_NOTES" => "1")
-      user = create_fake_provider_user
-      user.update!(learner_notes_enabled: true)
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
 
-      travel_to(a_weekday) do
-        visit_with_todays_set(user)
-        fill_in_answer("code_review", "It queries once per row in the loop.")
-        rate_section("code_review")
-        expect_ready_to_submit
-        wait_for_answers_settled
-        pause_browser_clock
-        type_note("The old tab's unsent edit.")
-        user.daily_responses.sole.update!(submitted_at: Time.current)
-        page.execute_script("document.querySelector('#submit-answers').click()")
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      fill_in_answer("code_review", "It queries once per row in the loop.")
+      type_note("A note for the old response.")
+      wait_for_answers_settled
+      visit root_path
+      wait_for_js
+      pause_browser_clock
+      type_note("An unsent edit to the old note.")
+      response = user.daily_responses.sole
+      expect(response.daily_exercise.start_over!(response_id: response.id)).to eq(:cleared)
+      advance_browser_clock(800)
 
-        expect(page).to have_no_css("#gym-form")
-        expect(page).to have_no_css("#leave-held")
-        expect(LearnerNote.find_by(user: user)).to be_nil
-      end
+      expect(page).to have_css("#save-status", text: I18n.t("flash.responses.stale_answers"))
+      expect(LearnerNote.find_by(user: user)).to be_nil
+      expect(user.daily_responses).to be_empty
+    end
+  end
+
+  it "settles a pending note flush refused because another tab already submitted" do
+    stub_env("LEARNER_NOTES" => "1")
+    user = create_fake_provider_user
+    user.update!(learner_notes_enabled: true)
+
+    travel_to(a_weekday) do
+      visit_with_todays_set(user)
+      fill_in_answer("code_review", "It queries once per row in the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
+      wait_for_answers_settled
+      pause_browser_clock
+      type_note("The old tab's unsent edit.")
+      user.daily_responses.sole.update!(submitted_at: Time.current)
+      page.execute_script("document.querySelector('#submit-answers').click()")
+
+      expect(page).to have_no_css("#gym-form")
+      expect(page).to have_no_css("#leave-held")
+      expect(LearnerNote.find_by(user: user)).to be_nil
+    end
   end
 end
