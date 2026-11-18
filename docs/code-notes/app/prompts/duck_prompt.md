@@ -6,8 +6,8 @@ The duck's prompt, moved out of `AiService` (#431). `AiService#duck_response` st
 
 It takes one section's data and renders it only through `SectionContext.render`, so no answer key reaches the duck before submission, and it never sees the response, the review or another section. The engineer's new message and their earlier turns are fenced (`UserText.tagged`, `UserText.tag_history`). Earlier turns come from the stored thread.
 
-Earlier duck replies keep their assistant role and pass through
-`UserText.defanged` without an engineer-text wrapper or an answer-length cap.
+Earlier duck replies keep their assistant role. `UserText.tag_history` passes
+them through `UserText.defanged` without an engineer-text wrapper or an answer-length cap.
 This neutralizes forged engineer tags in provider text before the next call,
 so a duck reply cannot mark its own words as the engineer's.
 

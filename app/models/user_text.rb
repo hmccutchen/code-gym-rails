@@ -47,9 +47,16 @@ module UserText
   def self.tag_history(history, limit: MAX_ANSWER_LENGTH)
     Array(history).map do |turn|
       turn = turn.respond_to?(:symbolize_keys) ? turn.symbolize_keys : turn
-      next turn unless turn.is_a?(Hash) && turn[:role].to_s == "user"
+      next turn unless turn.is_a?(Hash)
 
-      turn.merge(content: tagged(turn[:content], blank: "", limit: limit))
+      case turn[:role].to_s
+      when "user"
+        turn.merge(content: tagged(turn[:content], blank: "", limit: limit))
+      when "assistant"
+        turn.merge(content: defanged(turn[:content]))
+      else
+        turn
+      end
     end
   end
 end

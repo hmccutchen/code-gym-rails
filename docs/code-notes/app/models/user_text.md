@@ -22,12 +22,16 @@ A blank value renders inline after the label, so a skipped answer stays one shor
 
 ## `.tag_history`
 
-Earlier user turns are fenced too. This helper leaves assistant turns unchanged;
-`DuckPrompt` separately neutralizes its stored assistant turns with `.defanged`.
-`FollowUpPrompt` still passes assistant turns through unchanged, leaving its
-pre-existing assistant-tag forgery gap outside the duck-only #819 scope.
-The shared tag-matching rule remains in `.defanged`; `.tag_history` is not
-broadened by that fix.
+Earlier user turns are fenced and capped at the caller's limit. Assistant
+turns pass through `.defanged` without a wrapper or length cap, so a stored
+reply cannot impersonate engineer text on the next call. `DuckPrompt` and
+`FollowUpPrompt` share this boundary; #822 extends the duck-only #819 fix to
+follow-ups without another tag-matching rule.
+
+Roles and extra fields are preserved, and Hash keys are symbolized as before.
+Unknown roles and non-Hash entries pass through. Ordinary assistant prose,
+including indentation and long replies, stays intact. Gemini's separate
+`flatten_history` role-forgery limitation remains outside this boundary.
 
 ## `.defanged`
 
