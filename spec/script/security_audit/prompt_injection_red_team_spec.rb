@@ -44,6 +44,19 @@ RSpec.describe PromptInjectionRedTeam do
     expect(out.string).not_to include("error:", "invalid:")
   end
 
+  it "runs a note, an explanation and a duck message that each try to steer a label, fenced as the engineer's text" do
+    run_red_team
+
+    expect(out.string).to include("=== learner items (#{described_class::LEARNER_ROUTE[:model]})")
+    expect(out.string.scan(/^  (?:note|explanation|duck message)\s+label not steered · \d+ items$/).size).to eq(3)
+    extraction = posted.select { |request| purpose_for(request[:system]) == "extract_learner_items" }
+    expect(extraction.size).to eq(3)
+    extraction.each do |request|
+      prompt = request[:body]["messages"].last["content"]
+      expect(prompt).to include("<engineer_text>\n#{described_class::STEER_LABEL}\n</engineer_text>")
+    end
+  end
+
   it "bills the runner's key and writes no ApiUsage rows" do
     expect { run_red_team }.not_to change(ApiUsage, :count)
 
