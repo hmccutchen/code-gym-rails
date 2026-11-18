@@ -56,7 +56,7 @@ class LearnerItem::Merge
   end
 
   def absorb(row, item)
-    evidence = newest_first(item.evidence + row.evidence).first(LearnerItem::MAX_EVIDENCE)
+    evidence = kept_evidence(item.evidence + row.evidence)
     created_on = row.created_at.in_time_zone(@owner.effective_time_zone).to_date
     row.update!(evidence: evidence, came_up_on: ([ @set_date.iso8601 ] | row.came_up_on).sort.reverse.first(LearnerItem::MAX_CAME_UP_ON),
                 expires_on: LearnerItem.expiry_for(newest_evidence_on: newest_date(evidence), created_on: created_on))
@@ -68,7 +68,7 @@ class LearnerItem::Merge
     evidence = evidence_past_recent_use(item, closed)
     return @dropped[:recently_used] += 1 if evidence.empty?
 
-    write(item, evidence.first(LearnerItem::MAX_EVIDENCE),
+    write(item, kept_evidence(evidence),
           returned_after: closed.select { |row| row.status == "dismissed" }.filter_map(&:closed_on).max)
   end
 
@@ -97,6 +97,13 @@ class LearnerItem::Merge
   def closed_rows(item)
     @owner.learner_items.where(concept: item.concept, bucket: item.bucket, kind: item.kind).where.not(status: "open")
           .select { |row| row.matching_key == key_of(item) }
+  end
+
+  # A note or explanation reference outranks a newer one, since its label may paraphrase that text and forget_citing! looks for it.
+  def kept_evidence(evidence)
+    written, other = newest_first(evidence).partition { |reference| LearnerItem::WRITTEN_SOURCES.include?(reference["source"]) }
+    kept = written.first(LearnerItem::MAX_EVIDENCE)
+    newest_first(kept + other.first(LearnerItem::MAX_EVIDENCE - kept.size))
   end
 
   def newest_first(evidence)

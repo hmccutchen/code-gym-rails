@@ -5,6 +5,7 @@ class LearnerItem < ApplicationRecord
   STATUSES = %w[open used dismissed expired].freeze
   EVIDENCE_SOURCES = %w[duck answer note explanation].freeze
   SECTIONLESS_SOURCES = %w[note].freeze
+  WRITTEN_SOURCES = %w[note explanation].freeze
   MAX_OPEN = 5
   MAX_NEW_PER_DAY = 3
   MAX_EARLIER_LABELS = 20

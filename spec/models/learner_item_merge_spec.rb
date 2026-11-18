@@ -55,6 +55,33 @@ RSpec.describe LearnerItem, ".merge!" do
       expect(open_item.evidence).not_to include(reference(set_date - 5))
     end
 
+    it "keeps a note or explanation reference in preference to newer duck and answer ones" do
+      open_item = stored
+      note_reference = { "date" => (set_date - 6).iso8601, "source" => "note" }
+      explanation_reference = reference(set_date - 7, source: "explanation")
+      open_item.update!(evidence: [ note_reference, explanation_reference ])
+
+      (1..5).each { |back| merge(reply_item(evidence: [ reference(set_date - back + 1) ]), date: set_date - back + 1) }
+
+      evidence = open_item.reload.evidence
+      expect(evidence.size).to eq(LearnerItem::MAX_EVIDENCE)
+      expect(evidence).to include(note_reference, explanation_reference)
+      expect(evidence.first).to eq(reference)
+    end
+
+    it "lets deleting the note delete the item after five later duck references" do
+      exercise = DailyExercise.create!(user: user, date: set_date - 6, generated_at: Time.current, language: "ruby_rails",
+                                       problem_set: { "code_review" => { "question" => "Q", "snippet" => "def a; end" } })
+      note = LearnerNote.create!(user: user, daily_exercise: exercise, body: "I got stuck on includes vs preload.")
+      merge(reply_item(label: "Paraphrase of the note.", evidence: [ { "date" => (set_date - 6).iso8601, "source" => "note" } ]),
+            date: set_date - 6)
+      (1..5).each { |back| merge(reply_item(evidence: [ reference(set_date - 6 + back) ]), date: set_date - 6 + back) }
+
+      LearnerNote.remove!(user, note.id, :note)
+
+      expect(described_class.where(user_id: user.id)).to be_empty
+    end
+
     it "never moves the expiry past the longest life from creation" do
       open_item = stored(evidence_on: set_date - 35)
       open_item.update!(evidence: [ reference(set_date - 2) ], expires_on: set_date + 1)

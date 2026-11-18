@@ -131,7 +131,9 @@ it expires overdue open rows, then:
 1. collapses items in the reply that share a key (concept, bucket, kind and,
    for a term, the term);
 2. lets an open item with the same key absorb its repeat, keeping the label
-   the engineer already read;
+   the engineer already read and at most five references, note and
+   explanation references first, so deleting that text still finds the
+   item;
 3. holds back a match for an item used in the last 30 days;
 4. inserts the rest, at most three new a day, with `returned_after` when the
    engineer closed the same key with "I've got this";

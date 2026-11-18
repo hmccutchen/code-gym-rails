@@ -58,7 +58,8 @@ this area.
 - **One writer of items.** `LearnerItem.merge!` takes the user row lock,
   expires overdue open rows, then applies the five merge rules in order:
   collapse matching items inside the reply; let an open item with the same
-  key absorb its repeat (evidence newest 5, the day in `came_up_on`, a moved
+  key absorb its repeat (evidence capped at 5, note and explanation
+  references kept first and the rest newest first, the day in `came_up_on`, a moved
   expiry, its own label kept); count repeats apart from new items and drop
   new items past `LearnerItem::MAX_NEW_PER_DAY` as `over_limit`; hold back a
   match for an item used in the last 30 days (a term outright, another kind

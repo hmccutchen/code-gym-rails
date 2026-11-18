@@ -15,6 +15,15 @@ After the reply collapses on its keys, a repeat of an open item can only add
 a day to that item, so repeats have no limit beyond one per open item. Only
 new items, closed-item repeats included, count toward the three a day.
 
+## Which five references stay
+
+An item keeps at most five references. A note or explanation reference is
+kept before any duck or answer reference, however much newer those are,
+since the item's label may paraphrase the note or the explanation.
+Deleting that text finds the items to delete by their references
+(`LearnerItem.forget_citing!`), so a reference dropped by the cap would
+leave the paraphrase behind.
+
 ## A unique violation is a merge
 
 The partial unique index allows one open row per key. If a row for the key
