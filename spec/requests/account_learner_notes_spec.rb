@@ -61,6 +61,30 @@ RSpec.describe "The Learner notes setting on the Account page", type: :request d
       expect(response.body).to include("Learner notes need your own API key.")
       expect(trial_user.reload.learner_notes_enabled).to be(false)
     end
+
+    it "lets an account that lost its own key turn its notes off, and says nothing runs without one" do
+      user.update!(learner_notes_enabled: true)
+      user.update_columns(api_keys: {}, provider: nil)
+      login_as(user)
+
+      get account_path
+
+      expect(setting_section.text).to include(I18n.t("accounts.learner_notes.state_needs_key"))
+      expect(setting_section.at_css("form[action='#{learner_notes_account_path}'] input[name=enabled][value='0']")).to be_present
+
+      patch learner_notes_account_path, params: { enabled: "0" }
+
+      expect(user.reload.learner_notes_enabled).to be(false)
+    end
+
+    it "shows a keyless account whose setting is off no setting at all" do
+      user.update_columns(api_keys: {}, provider: nil)
+      login_as(user)
+
+      get account_path
+
+      expect(setting_section).to be_nil
+    end
   end
 
   context "with LEARNER_NOTES off" do

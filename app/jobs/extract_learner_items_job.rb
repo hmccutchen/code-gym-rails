@@ -9,7 +9,7 @@ class ExtractLearnerItemsJob < ApplicationJob
   def self.claim_key(daily_exercise_id) = "learner_items/#{daily_exercise_id}"
 
   def self.queue_for_submitted(user, exercise)
-    return unless LearnerNotes.enabled? && user.learner_notes_enabled?
+    return unless LearnerNotes.on_for?(user)
 
     queue(user, exercise, FALLBACK, wait_until: fallback_at(user))
     queue_early(user, exercise) if ExplainQuestion.options(tags: exercise.section_concepts).empty?
@@ -59,8 +59,7 @@ class ExtractLearnerItemsJob < ApplicationJob
   end
 
   def no_call_reason(user, exercise, note, duck)
-    if !(LearnerNotes.enabled? && user.learner_notes_enabled?) then "off"
-    elsif user.api_key.blank? then "no_key"
+    if !LearnerNotes.on_for?(user) then user.api_key_present? ? "off" : "no_key"
     elsif KeyHold.holds?(user.generation_account_failures) then "key_hold"
     elsif duck_sections(exercise, duck).empty? && !note.something_to_read? then "nothing_to_read"
     end

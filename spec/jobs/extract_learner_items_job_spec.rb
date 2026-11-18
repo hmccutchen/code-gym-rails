@@ -98,6 +98,15 @@ RSpec.describe ExtractLearnerItemsJob do
 
       expect(enqueued_jobs).to be_empty
     end
+
+    it "queues nothing for an account with the setting on but no key of its own" do
+      exercise = submitted_set
+      user.update!(api_keys: nil, provider: nil)
+
+      described_class.queue_for_submitted(user, exercise)
+
+      expect(enqueued_jobs).to be_empty
+    end
   end
 
   describe "what a run sends" do

@@ -1032,6 +1032,7 @@ en:
       heading: "Learner notes"
       state_on: "Learner notes: on"
       state_off: "Learner notes: off"
+      state_needs_key: "Learner notes: on, but nothing runs until you add your own API key in Setup."
       about: "With learner notes on, each set offers a note box and, after you submit, one question asking you to explain a concept in your own words."
       turn_on: "Turn on learner notes"
       turn_off: "Turn off learner notes"

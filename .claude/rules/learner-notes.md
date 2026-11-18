@@ -20,10 +20,13 @@ Each entry states what a change must not break. The full decision, with its
 reasoning, is `docs/decisions/learner-notes.md`; read it before changing
 this area.
 
-- **Off by default.** Nothing here runs unless `LearnerNotes.enabled?`
-  (`LEARNER_NOTES` exactly `"1"`) and the account's
-  `learner_notes_enabled` setting are both on, and the setting needs the
-  account's own key. With either off, every page and prompt is unchanged.
+- **Off by default.** Nothing here runs unless `LearnerNotes.on_for?(user)`:
+  `LEARNER_NOTES` exactly `"1"`, the account's `learner_notes_enabled`
+  setting on, and the account's own key. It is the one statement of that
+  rule; the gate, the job and its queueing read it, and a view reads the
+  gate's helpers. With any of them off, every page and prompt is unchanged,
+  except that an account whose setting is on without its own key keeps the
+  Account page's turn-off control.
 - **What may read notes and items.** `learner_notes_isolation_spec` names
   the files that may name `LearnerNote` or `LearnerItem`. The prompt class
   and the reply boundary read only `LearnerItem`'s limits, never a row.
