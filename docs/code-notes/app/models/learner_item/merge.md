@@ -17,12 +17,21 @@ new items, closed-item repeats included, count toward the three a day.
 
 ## Which five references stay
 
-An item keeps at most five references. A note or explanation reference is
-kept before any duck or answer reference, however much newer those are,
-since the item's label may paraphrase the note or the explanation.
-Deleting that text finds the items to delete by their references
-(`LearnerItem.forget_citing!`), so a reference dropped by the cap would
-leave the paraphrase behind.
+An item keeps at most five references. The note and explanation
+references dated on the row's oldest evidence date always stay, at most
+two, since the label was written from that day's text. Deleting that text
+finds the items to delete by their references (`LearnerItem.forget_citing!`),
+so a dropped one would leave the paraphrase behind. The other slots go
+newest first whatever the source, so a newer duck or answer repeat is kept
+and `newest_evidence_on` moves forward.
+
+Pinning every note and explanation reference instead let five written
+citations fill the cap and turn every later repeat away, and pinning by
+date alone let five later notes push out the label's source. The owner
+chose this middle rule on 2026-11-18, without a column naming the label's
+source. Its cost: a later written citation can drop off, and deleting it
+then leaves the item; and an older set's run that merges late moves the
+oldest date, so the pinned day can change.
 
 ## A unique violation is a merge
 

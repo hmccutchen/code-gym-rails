@@ -99,11 +99,16 @@ class LearnerItem::Merge
           .select { |row| row.matching_key == key_of(item) }
   end
 
-  # A note or explanation reference outranks a newer one, since its label may paraphrase that text and forget_citing! looks for it.
+  # The label paraphrases the oldest day's note or explanation, so those stay for forget_citing! to find; the rest go newest first.
   def kept_evidence(evidence)
-    written, other = newest_first(evidence).partition { |reference| LearnerItem::WRITTEN_SOURCES.include?(reference["source"]) }
-    kept = written.first(LearnerItem::MAX_EVIDENCE)
-    newest_first(kept + other.first(LearnerItem::MAX_EVIDENCE - kept.size))
+    ordered = newest_first(evidence)
+    oldest_on = ordered.map { |reference| Date.iso8601(reference["date"]) }.min
+    pinned = ordered.select { |reference| label_source?(reference, oldest_on) }
+    newest_first(pinned + (ordered - pinned).first(LearnerItem::MAX_EVIDENCE - pinned.size))
+  end
+
+  def label_source?(reference, oldest_on)
+    LearnerItem::WRITTEN_SOURCES.include?(reference["source"]) && Date.iso8601(reference["date"]) == oldest_on
   end
 
   def newest_first(evidence)

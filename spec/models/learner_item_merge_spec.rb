@@ -55,18 +55,52 @@ RSpec.describe LearnerItem, ".merge!" do
       expect(open_item.evidence).not_to include(reference(set_date - 5))
     end
 
-    it "keeps a note or explanation reference in preference to newer duck and answer ones" do
+    it "keeps the oldest day's note and explanation references in preference to newer duck and answer ones" do
       open_item = stored
-      note_reference = { "date" => (set_date - 6).iso8601, "source" => "note" }
-      explanation_reference = reference(set_date - 7, source: "explanation")
-      open_item.update!(evidence: [ note_reference, explanation_reference ])
+      oldest = set_date - 7
+      note_reference = { "date" => oldest.iso8601, "source" => "note" }
+      explanation_reference = reference(oldest, source: "explanation")
+      later_note_reference = { "date" => (set_date - 6).iso8601, "source" => "note" }
+      open_item.update!(evidence: [ note_reference, explanation_reference, later_note_reference ])
 
       (1..5).each { |back| merge(reply_item(evidence: [ reference(set_date - back + 1) ]), date: set_date - back + 1) }
 
       evidence = open_item.reload.evidence
       expect(evidence.size).to eq(LearnerItem::MAX_EVIDENCE)
       expect(evidence).to include(note_reference, explanation_reference)
-      expect(evidence.first).to eq(reference)
+      expect(evidence).not_to include(later_note_reference)
+      expect(evidence.first(3)).to eq([ reference, reference(set_date - 1), reference(set_date - 2) ])
+    end
+
+    it "keeps the label's source note through five later written citations, so deleting it still deletes the item" do
+      start = set_date - 14
+      label_note = { "date" => start.iso8601, "source" => "note" }
+      merge(reply_item(label: "Paraphrase of the first note.", evidence: [ label_note ]), date: start)
+      (1..5).each do |day|
+        merge(reply_item(evidence: [ { "date" => (start + day).iso8601, "source" => "note" } ]), date: start + day)
+      end
+
+      row = described_class.sole
+      expect(row.label).to eq("Paraphrase of the first note.")
+      expect(row.evidence).to include(label_note)
+      expect(row.evidence).not_to include({ "date" => (start + 1).iso8601, "source" => "note" })
+      described_class.forget_citing!(user, date: start, sources: %w[note])
+      expect(described_class.where(user_id: user.id)).to be_empty
+    end
+
+    it "counts a newer duck repeat once five written citations fill the cap" do
+      start = set_date - 14
+      (0..4).each do |day|
+        merge(reply_item(evidence: [ { "date" => (start + day).iso8601, "source" => "note" } ]), date: start + day)
+      end
+
+      merge(reply_item(evidence: [ reference(set_date) ]))
+
+      row = described_class.sole
+      expect(row.evidence.first).to eq(reference(set_date))
+      expect(row.evidence).to include({ "date" => start.iso8601, "source" => "note" })
+      expect(row.came_up_on.first).to eq(set_date.iso8601)
+      expect(row.newest_evidence_on).to eq(set_date)
     end
 
     it "lets deleting the note delete the item after five later duck references" do

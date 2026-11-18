@@ -188,9 +188,15 @@ it expires overdue open rows, then:
 1. collapses items in the reply that share a key (concept, bucket, kind and,
    for a term, the term);
 2. lets an open item with the same key absorb its repeat, keeping the label
-   the engineer already read and at most five references, note and
-   explanation references first, so deleting that text still finds the
-   item;
+   the engineer already read and at most five references. The note and
+   explanation references dated on the row's oldest evidence date always
+   stay (at most two), since the label paraphrases that day's text and
+   deleting it must still find the item; the other slots go newest first,
+   whatever the source, so a newer duck or answer repeat still moves the
+   item's evidence and expiry forward (owner's decision, 2026-11-18). A
+   later note or explanation citation can therefore drop off, and deleting
+   it then leaves the item. One rare gap stays open: an older set's run that
+   merges late moves the oldest date, so the pinned day can change;
 3. holds back a match for an item used in the last 30 days;
 4. inserts the rest, at most three new a day, with `returned_after` when the
    engineer closed the same key with "I've got this";
