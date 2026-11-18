@@ -4,16 +4,19 @@ module LearnerExtraction
   MAX_ATTEMPTS = 2
   MAX_REPLY_ATTEMPTS = 2
 
-  Ledger = Data.define(:attempts, :closed_at, :reply_attempts) do
+  Ledger = Data.define(:attempts, :closed_at, :reply_attempts, :forgotten_at) do
     def self.from(plan_notes)
       stored = plan_notes.is_a?(Hash) ? plan_notes[KEY] : nil
       stored = {} unless stored.is_a?(Hash)
-      new(attempts: stored["attempts"].to_i, closed_at: stored["closed_at"], reply_attempts: stored["reply_attempts"].to_i)
+      new(attempts: stored["attempts"].to_i, closed_at: stored["closed_at"], reply_attempts: stored["reply_attempts"].to_i,
+          forgotten_at: stored["forgotten_at"])
     end
 
     def closed? = closed_at.present?
 
-    def to_h = { "attempts" => attempts, "closed_at" => closed_at, "reply_attempts" => reply_attempts }.compact
+    def to_h
+      { "attempts" => attempts, "closed_at" => closed_at, "reply_attempts" => reply_attempts, "forgotten_at" => forgotten_at }.compact
+    end
   end
 
   def self.for(exercise) = Ledger.from(exercise.plan_notes)
@@ -43,6 +46,13 @@ module LearnerExtraction
 
       [ token, ledger.with(reply_attempts: ledger.reply_attempts + 1) ]
     end
+  end
+
+  # The caller holds the user row lock, so an extraction's merge sees the stamp before it writes.
+  def self.forget_all!(user)
+    DailyExercise.where(user_id: user.id).where("plan_notes ? :key", key: KEY)
+                 .update_all([ "plan_notes = jsonb_set(plan_notes, ARRAY[:key, 'forgotten_at'], to_jsonb(CAST(:at AS text)))",
+                               { key: KEY, at: Time.current.iso8601 } ])
   end
 
   def self.clear!(exercise)

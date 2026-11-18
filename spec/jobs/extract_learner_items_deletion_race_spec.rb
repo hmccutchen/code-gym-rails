@@ -78,6 +78,24 @@ RSpec.describe ExtractLearnerItemsJob, "when the set's evidence is deleted durin
       run_with(submitted_set, "note")
       expect(LearnerItem.where(user_id: user.id)).to be_empty
     end
+
+    it "leaves no item behind when the item cites only the duck" do
+      run_with(submitted_set, "duck")
+      expect(LearnerItem.where(user_id: user.id)).to be_empty
+    end
+  end
+
+  context "with Delete all pressed before the call read the set" do
+    it "still writes the call's items" do
+      exercise = submitted_set
+      LearnerExtraction.count_reply_attempt!(exercise) { Time.current }
+      LearnerNote.remove_all!(user)
+      LearnerNote.create!(user: user, daily_exercise: exercise, body: "Written again after Delete all.")
+
+      run_with(exercise.reload, "duck")
+
+      expect(LearnerItem.where(user_id: user.id).size).to eq(1)
+    end
   end
 
   context "with Start over" do
@@ -92,7 +110,13 @@ RSpec.describe ExtractLearnerItemsJob, "when the set's evidence is deleted durin
 
       expect(LearnerNote.where(daily_exercise_id: exercise.id)).to be_empty
       expect(LearnerItem.where(user_id: user.id)).to be_empty
-      expect(log.string).to include("written=0 absorbed=0 dropped=set_replaced:1")
+      expect(log.string).to include("[learner_items] user #{user.id} run=fallback set_replaced")
+    end
+
+    it "leaves the fresh ledger of the replacement response open" do
+      exercise = submitted_set
+      run_with(exercise, "duck")
+      expect(LearnerExtraction.for(exercise.reload)).not_to be_closed
     end
   end
 

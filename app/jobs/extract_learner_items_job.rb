@@ -5,6 +5,8 @@ class ExtractLearnerItemsJob < ApplicationJob
   EARLY = "early".freeze
   FALLBACK = "fallback".freeze
   CLAIM_RETRY_WAIT = 5.minutes
+  LOGGED_OUTCOMES = { deleted: "account_deleted", replaced: "set_replaced" }.freeze
+  SET_LEFT_ALONE = LOGGED_OUTCOMES.keys.freeze
 
   def self.claim_key(daily_exercise_id) = "learner_items/#{daily_exercise_id}"
 
@@ -65,7 +67,7 @@ class ExtractLearnerItemsJob < ApplicationJob
     return unless run == FALLBACK || ledger.attempts.zero?
     return unless LearnerExtraction.count_attempt!(fresh, close: run == FALLBACK) == true
 
-    call(user, fresh, daily_response_id, note, duck, run)
+    call(user, fresh, daily_response_id, note, duck, run, ledger)
   end
 
   def no_call_reason(user, exercise, note, duck)
@@ -86,26 +88,32 @@ class ExtractLearnerItemsJob < ApplicationJob
     Rails.logger.info("[learner_items] user #{user.id} run=#{run} set_gone")
   end
 
-  def call(user, exercise, daily_response_id, note, duck, run)
+  def call(user, exercise, daily_response_id, note, duck, run, ledger)
     reply = AiService.for(user).extract_learner_items(user, **request_values(user, exercise, note, duck))
     outcome = LearnerItem.merge!(user, reply.items, set_date: exercise.date,
-                                                    still_there: still_there(exercise, daily_response_id, note))
-    close(user, exercise, run) unless outcome == :deleted
+                                                    still_there: still_there(exercise, daily_response_id, note, ledger))
+    close(user, exercise, run) unless SET_LEFT_ALONE.include?(outcome)
     log_outcome(user, run, outcome, reply.dropped)
   rescue ProviderError, SetupError => e
     Rails.logger.warn("[learner_items] user #{user.id} run=#{run} failed=#{ProviderFailure.classify(e)}")
   end
 
-  # Runs under the merge's user row lock: nil once the set was replaced, else the sources whose text is still the one read.
-  def still_there(exercise, daily_response_id, read)
+  # Runs under the merge's user row lock: nil once the set was replaced or forgotten, else the sources whose text is still the one read.
+  def still_there(exercise, daily_response_id, read, ledger)
     lambda do
       LearnerNote.uncached do
         next unless DailyResponse.submitted.exists?(id: daily_response_id, daily_exercise_id: exercise.id)
+        next unless forgotten_at(exercise) == ledger.forgotten_at
 
         now = LearnerNote.for_set(exercise)
         %w[duck answer] + written_sources_kept(read, now)
       end
     end
+  end
+
+  def forgotten_at(exercise)
+    plan_notes = DailyExercise.where(id: exercise.id).pick(:plan_notes)
+    plan_notes && LearnerExtraction::Ledger.from(plan_notes).forgotten_at
   end
 
   def written_sources_kept(read, now)
@@ -116,7 +124,7 @@ class ExtractLearnerItemsJob < ApplicationJob
   end
 
   def log_outcome(user, run, outcome, dropped)
-    return Rails.logger.info("[learner_items] user #{user.id} run=#{run} account_deleted") if outcome == :deleted
+    return Rails.logger.info("[learner_items] user #{user.id} run=#{run} #{LOGGED_OUTCOMES.fetch(outcome)}") if outcome.is_a?(Symbol)
 
     counts = dropped.merge(outcome.dropped) { |_reason, parsed, merged| parsed + merged }
     Rails.logger.info("[learner_items] user #{user.id} run=#{run} written=#{outcome.written} absorbed=#{outcome.absorbed} " \

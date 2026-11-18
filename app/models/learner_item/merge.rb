@@ -2,13 +2,16 @@
 class LearnerItem::Merge
   Result = Data.define(:written, :absorbed, :dropped)
 
-  # still_there returns the evidence sources that still exist for the set read, or nil once the set was replaced.
+  # still_there returns the evidence sources that still exist for the set read, or nil once the set was replaced or forgotten.
   def self.call(user, items, set_date:, still_there:)
     LearnerItem.transaction do
       owner = User.lock.find_by(id: user.id)
       next :deleted if owner.nil? || owner.anonymized?
 
-      new(owner, set_date).run(items, still_there.call)
+      sources = still_there.call
+      next :replaced unless sources
+
+      new(owner, set_date).run(items, sources)
     end
   end
 
@@ -35,8 +38,8 @@ class LearnerItem::Merge
   private
 
   def still_supported(items, sources)
-    kept, gone = sources ? items.partition { |item| cites_only(item, sources) } : [ [], items ]
-    @dropped[sources ? :evidence_deleted : :set_replaced] += gone.size if gone.any?
+    kept, gone = items.partition { |item| cites_only(item, sources) }
+    @dropped[:evidence_deleted] += gone.size if gone.any?
     kept
   end
 

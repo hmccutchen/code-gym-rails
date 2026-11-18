@@ -82,6 +82,7 @@ class LearnerNote < ApplicationRecord
     LearnerItem.under_owner_lock(user) do |owner|
       owner.learner_items.delete_all
       owner.learner_notes.delete_all
+      LearnerExtraction.forget_all!(owner)
       :removed
     end
   end

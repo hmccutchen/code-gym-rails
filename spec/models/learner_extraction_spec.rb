@@ -91,4 +91,29 @@ RSpec.describe LearnerExtraction do
     expect(stored).to eq("size" => 2, "daily_kinds" => %w[code_review design_comparison])
     expect(exercise.plan_notes).not_to have_key("learner_extraction")
   end
+
+  describe ".forget_all!" do
+    it "stamps a forgotten time on each of the owner's existing ledgers, keeping their counts and the plan's notes" do
+      described_class.count_attempt!(exercise, close: false)
+      untouched = DailyExercise.create!(user: user, date: Date.current - 1, generated_at: Time.current, language: "ruby_rails",
+                                        problem_set: exercise.problem_set, plan_notes: { "size" => 2 })
+
+      described_class.forget_all!(user)
+
+      expect(described_class.for(exercise.reload)).to have_attributes(attempts: 1, forgotten_at: Time.current.iso8601)
+      expect(stored).to include("size" => 2, "daily_kinds" => %w[code_review design_comparison])
+      expect(untouched.reload.plan_notes).to eq("size" => 2)
+    end
+
+    it "leaves another account's ledgers alone" do
+      other = User.create!(email: "other-ledger@example.com", provider: "fake", api_keys: { "fake" => "fake-key" })
+      theirs = DailyExercise.create!(user: other, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: exercise.problem_set)
+      described_class.count_attempt!(theirs, close: false)
+
+      described_class.forget_all!(user)
+
+      expect(described_class.for(theirs.reload).forgotten_at).to be_nil
+    end
+  end
 end

@@ -31,7 +31,13 @@ The engineer can delete the note or the explanation, press Delete all or
 Start over while the call is out. The merge asks `#still_there` under the
 user row lock whether the response is still the one read and which of the
 note and the explanation still hold the text the call read, and writes no
-item citing anything gone. Closing the set afterwards answers `:gone` when
+item citing anything gone. It also compares the ledger's `forgotten_at`
+with the one read before the call, so a Delete all pressed meanwhile
+leaves no item behind, even one citing only the duck. When the check
+answers nil the merge returns `:replaced`, logged as `set_replaced`, and
+the run does not close the ledger: after Start over the ledger belongs to
+the replacement response, which has its own extraction to come. Closing
+the set afterwards answers `:gone` when
 the set itself was deleted with the account, and the run logs
 `set_gone` instead of failing; the merge's own `:deleted` logs
 `account_deleted`.

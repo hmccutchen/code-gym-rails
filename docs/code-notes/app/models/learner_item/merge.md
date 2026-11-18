@@ -31,7 +31,10 @@ the one read, and otherwise the evidence sources whose text is still the
 text the call read. Every account-page deletion and Start over take the
 same lock, so the answer holds until the merge commits. An item citing a
 source of the set's date that is gone is not written and cannot be
-absorbed, and is counted as `evidence_deleted`; when the set itself moved,
-nothing is written and every item counts as `set_replaced`. The merge never
+absorbed, and is counted as `evidence_deleted`. When the set itself moved,
+or Delete all stamped its ledger as forgotten after the call read it, the
+check answers nil: the merge writes nothing, expires nothing and returns
+`:replaced`, so the job leaves the ledger alone. Closing it then would
+close the ledger of the response that replaced the one read. The merge never
 names the note model, which keeps it inside `learner_notes_isolation_spec`;
 the job builds the check.

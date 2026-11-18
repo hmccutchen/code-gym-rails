@@ -34,3 +34,14 @@ which removes it in one statement.
 `reply_requested_at` claim and returns its token, or a symbol naming why it
 did not. Only a token counts an attempt, so a refused request spends
 nothing.
+
+## The forgotten time
+
+Delete all cannot tell which set an extraction call is reading, and an
+item that cites only a duck turn or an answer would survive the note
+checks. So `.forget_all!`, called under the user row lock Delete all
+holds, stamps `forgotten_at` on every ledger the account has. The job
+keeps the ledger it read before the call, and its `still_there:` check,
+run under the same lock, answers nil when the stamp moved since. The stamp
+is a time, with no text, so keeping it keeps nothing the engineer asked to
+have deleted (owner's decision, 2026-11-18).

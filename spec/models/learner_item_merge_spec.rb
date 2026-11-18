@@ -260,7 +260,7 @@ RSpec.describe LearnerItem, ".merge!" do
       result = merge(reply_item, reply_item(concept: "caching", kind: "concept"), still_there: -> { })
 
       expect(described_class.pluck(:concept)).to eq([ "memoization" ])
-      expect(result).to have_attributes(written: 0, absorbed: 0, dropped: { set_replaced: 2 })
+      expect(result).to eq(:replaced)
     end
 
     it "asks what is still there after it takes the user row lock" do
