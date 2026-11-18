@@ -76,6 +76,22 @@ RSpec.describe AccountDeletion, type: :model do
     expect(invite.reload.redeemed_count).to eq(0)
   end
 
+  it "rejects another account's duck thread before it can block deleting the set's owner" do
+    exercise = DailyExercise.create!(user: leaving, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+                                     problem_set: { "design_comparison" => section("leaving") })
+    kept_exercise = give_rows(staying, "staying")
+    thread = DuckThread.new(user: staying, daily_exercise: exercise, draft_scope: exercise.draft_scope)
+    thread.save
+
+    expect(described_class.call(leaving).status).to eq(:deleted)
+    expect(thread).not_to be_persisted
+    expect(thread.errors[:user]).to include("must own the set")
+    expect(User.exists?(leaving.id)).to be(false)
+    expect(DailyExercise.exists?(exercise.id)).to be(false)
+    expect(User.exists?(staying.id)).to be(true)
+    expect(DuckThread.exists?(daily_exercise: kept_exercise)).to be(true)
+  end
+
   def learn_text(user, concept: "open_closed")
     reference = ConceptReference.create!(user: user, concept: concept, language: "ruby_rails", tagline: "t", explanation: "e",
                                          code_example: "c", senior_lens: "s", generation_version: 1)

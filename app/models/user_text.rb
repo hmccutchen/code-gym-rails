@@ -33,11 +33,15 @@ module UserText
 
   # Capped here too because older rows were never backfilled to the write-boundary caps.
   def self.tagged(value, blank: "(skipped)", limit: MAX_ANSWER_LENGTH)
-    text = clean(value, limit: limit)
+    text = defanged(value, limit: limit)
     return blank if text.strip.empty?
 
-    fenced = text.gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
-    "<#{TAG}>\n#{fenced}\n</#{TAG}>"
+    "<#{TAG}>\n#{text}\n</#{TAG}>"
+  end
+
+  def self.defanged(value, limit: nil)
+    text = limit ? clean(value, limit: limit) : normalize(value)
+    text.gsub(%r{<\s*/?\s*#{TAG}\b[^<>]*>}i) { |tag| tag.tr("<>", "[]") }
   end
 
   def self.tag_history(history, limit: MAX_ANSWER_LENGTH)

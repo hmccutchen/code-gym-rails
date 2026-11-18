@@ -21,7 +21,7 @@ class DailyExercise < ApplicationRecord
 
   WRITE_MARGIN = 60.seconds
 
-  DRAFT_SCOPE_FORMAT = /\A(\d+)-(\d+)\z/
+  DRAFT_SCOPE_FORMAT = /\A(\d+)-(\d+)(?:-r\d+)?\z/
 
   REGENERATION_STALE_AFTER = REGENERATION_DEADLINE + WRITE_MARGIN
 
@@ -57,7 +57,9 @@ class DailyExercise < ApplicationRecord
     size if size.is_a?(Integer) && User::DAILY_SECTION_COUNTS.cover?(size)
   end
 
-  def draft_scope = "#{id}-#{written_stamp}"
+  def draft_scope
+    [ "#{id}-#{written_stamp}", ("r#{draft_revision}" if draft_revision.positive?) ].compact.join("-")
+  end
 
   def freshness_against(scope)
     return :current if regenerating? || draft_scope == scope.to_s
@@ -116,6 +118,22 @@ class DailyExercise < ApplicationRecord
     clear_attribute_changes([ :opened_at ])
   end
 
+  def start_over!(response_id:)
+    with_response_locked do |response|
+      next :stale unless response && response.id == response_id
+
+      blocker = response.replace_blocker
+      next :reviewed if blocker == :reviewed
+      next :not_today unless response.date == Date.current
+      next :reviewing if blocker == :reviewing
+
+      DuckThread.start_over!(self)
+      response.destroy!
+      update!(plan_notes: plan_notes.merge("draft_revision" => draft_revision + 1))
+      :cleared
+    end
+  end
+
   # The owner first: inserting a response takes a key-share lock on it, which AccountDeletion holds before the exercise.
   def with_response_locked
     transaction do
@@ -126,6 +144,8 @@ class DailyExercise < ApplicationRecord
   end
 
   private
+
+  def draft_revision = plan_notes["draft_revision"].to_i
 
   def written_stamp = generated_at.strftime("%s%6N")
 

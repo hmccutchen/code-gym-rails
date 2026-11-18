@@ -22,4 +22,11 @@ A blank value renders inline after the label, so a skipped answer stays one shor
 
 ## `.tag_history`
 
-Earlier user turns are fenced too. Assistant turns pass through unchanged, even though the duck's assistant turns come from the client.
+Earlier user turns are fenced too. This helper leaves assistant turns unchanged;
+`DuckPrompt` separately neutralizes its stored assistant turns with `.defanged`.
+
+## `.defanged`
+
+Normalizes text and neutralizes engineer tags without adding a wrapper that
+would identify the text as the engineer's. `.tagged` uses the same rule with
+its existing length cap. Callers that omit `limit:` keep the full text.

@@ -51,14 +51,15 @@ class ResponsesController < ApplicationController
 
   # DELETE /responses/:id/start_over
   def start_over
-    blocker = @response.replace_blocker
-    return redirect_to root_path, alert: t("flash.responses.start_over_after_review") if blocker == :reviewed
-    return redirect_to root_path, alert: t("flash.responses.start_over_not_today") unless @response.date == Date.current
-    return redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing") if blocker == :reviewing
-
-    DuckThread.start_over!(@response.daily_exercise)
-    @response.destroy
-    redirect_to root_path, notice: t("flash.responses.answers_cleared")
+    outcome = @response.daily_exercise.start_over!(response_id: @response.id)
+    case outcome
+    when :reviewed then redirect_to root_path, alert: t("flash.responses.start_over_after_review")
+    when :not_today then redirect_to root_path, alert: t("flash.responses.start_over_not_today")
+    when :reviewing then redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing")
+    when :stale then render_stale_answers
+    when :cleared then redirect_to root_path, notice: t("flash.responses.answers_cleared")
+    else raise ArgumentError, "Unhandled start-over outcome: #{outcome.inspect}"
+    end
   end
 
   # POST /responses/:id/email_review

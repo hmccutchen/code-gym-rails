@@ -89,7 +89,9 @@ read it before changing that area.
   submission time are immutable, and a stale autosave gets `submitted: true`
   with nothing changed. A repeated submit returns the existing review URL.
   Each save carries `DailyExercise#draft_scope`, and a mismatched scope gets
-  `409 "stale"` and writes nothing.
+  `409 "stale"` and writes nothing. Start over advances the scope's reset
+  revision while deleting the response under the same locks, so late saves
+  cannot recreate cleared answers.
 - **One reviewed-response invariant**
   (`docs/decisions/one-reviewed-response-invariant.md`): No action destroys a
   reviewed response, since `ConceptMastery.record_review!` has already moved
