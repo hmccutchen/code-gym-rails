@@ -141,6 +141,18 @@ RSpec.describe "Requests from a page left open on a paused user's held set", typ
       expect(flash[:alert]).to eq(I18n.t("flash.responses.start_over_not_today"))
       expect(stray_draft.reload.date).to eq(yesterday - 2)
     end
+
+    it "leaves the held set where it is when Start over names a response on another set" do
+      lookup(true)
+      stray = set_on(yesterday - 2)
+      stray_draft = user.daily_responses.create!(daily_exercise: stray, date: stray.date, answers: { "code_review" => "Old." })
+
+      delete start_over_response_path(stray_draft)
+
+      expect(flash[:alert]).to eq(I18n.t("flash.responses.start_over_not_today"))
+      expect(held.reload.date).to eq(yesterday)
+      expect(draft.reload.date).to eq(yesterday)
+    end
   end
 
   describe "Generate a new set" do

@@ -91,11 +91,18 @@ User opens dashboard:
        moves, a key is pressed), at most once a minute
        (DashboardController::FRESHNESS_CHECK_GAP), it asks
        GET /dashboard/freshness?shown=<draft scope>, and
-       DashboardController#freshness maps today's set's own answer
-       (DailyExercise#freshness_against) to its reply: stale only when
-       the set exists, is not regenerating and is not the set shown, and
-       replaced as well when the set shown is an earlier write of
-       today's row; the page then reloads once pending saves land. After
+       DashboardController#freshness reads the user's current set and
+       maps its own answer (DailyExercise#freshness_against) to the
+       reply. The current set is today's; under HELD_SET_LOOKUP a paused
+       user's held set counts too (User#todays_or_held_exercise), read
+       where it sits and never moved. The reply is stale only when that
+       set exists, is not regenerating and is not the set shown, and
+       replaced as well when the set shown is an earlier write of the
+       same row; the page then reloads once pending saves land. Under
+       STALE_SET_BANNER, a page that names a set when there is no
+       current set gets out_of_date, and any reply other than current
+       carries banner:, the sentence StaleSetNotice picks; the page shows
+       that banner and does not reload on out_of_date. After
        a replaced reply the reloaded page says the set was replaced, in
        the save-status banner under a key of its own, so no answer save
        clears it. The notice stays until the first presence signal at

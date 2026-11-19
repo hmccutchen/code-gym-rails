@@ -135,9 +135,13 @@ there is nothing to move; the locked path reads again. A held row that cannot
 be saved is logged and left in place, because raising would return a 500 on
 every dashboard load while the user is paused.
 
+`only:` names the set the caller may move. When the held set is another one,
+nothing moves. Start over passes the response's set, so a request about an
+older stray set never moves the held set as a side effect.
+
 ## `#current_exercise!`
 
-Today's set, or, when there is none and `carry:` is true, the held set after `#carry_held_set_forward!` moved it. It re-reads today's set after the move rather than trusting the move's return value, because a concurrent request may have moved it first and this call then moves nothing. The re-read runs inside `uncached`: the first read put a nil for the same query in the request's query cache, and a call that moves nothing writes nothing to clear it, so a cached re-read would answer that the set is gone. The caller passes `HeldSetLookup.enabled?`, since a model may not read `app/clients`. `docs/decisions/a-held-set-stays-current.md` has the rule.
+`#todays_exercise` is the one by-date read, used here, as the default in `#todays_or_held_exercise`, and by `DashboardController`. Today's set, or, when there is none and `carry:` is true, the held set after `#carry_held_set_forward!` moved it. It re-reads today's set after the move rather than trusting the move's return value, because a concurrent request may have moved it first and this call then moves nothing. The re-read runs inside `uncached`: the first read put a nil for the same query in the request's query cache, and a call that moves nothing writes nothing to clear it, so a cached re-read would answer that the set is gone. The caller passes `HeldSetLookup.enabled?`, since a model may not read `app/clients`. `docs/decisions/a-held-set-stays-current.md` has the rule.
 
 ## `#anonymize!`
 

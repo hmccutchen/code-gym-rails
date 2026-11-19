@@ -2152,6 +2152,19 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
       expect(today.reload.date).to eq(Date.current)
     end
   end
+
+  it "moves the held set only when it is the one named by only:" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      stray = exercise_on(Date.current - 3)
+      pause_on(Date.current - 1)
+
+      expect(user.carry_held_set_forward!(only: stray.id)).to be_nil
+      expect(held.reload.date).to eq(Date.current - 1)
+      expect(user.carry_held_set_forward!(only: held.id)).to eq(held)
+      expect(held.reload.date).to eq(Date.current)
+    end
+  end
 end
 
 RSpec.describe User, "#current_exercise!", type: :model do
@@ -2168,6 +2181,14 @@ RSpec.describe User, "#current_exercise!", type: :model do
 
   def hold(date)
     exercise_on(date).tap { user.update!(paused_generation_at: date.in_time_zone("UTC") + 9.hours) }
+  end
+
+  it "matches #todays_exercise, which reads only the set dated today" do
+    hold(Date.current - 1)
+    expect(user.todays_exercise).to be_nil
+
+    today = exercise_on(Date.current)
+    expect(user.todays_exercise).to eq(today)
   end
 
   it "returns today's set without moving anything" do

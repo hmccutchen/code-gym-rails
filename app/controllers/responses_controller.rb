@@ -55,7 +55,7 @@ class ResponsesController < ApplicationController
 
   # DELETE /responses/:id/start_over
   def start_over
-    current_set
+    carry_held_set_forward_if_named
     outcome = @response.daily_exercise.start_over!(response_id: @response.id)
     case outcome
     when :reviewed then redirect_to root_path, alert: t("flash.responses.start_over_after_review")
@@ -389,6 +389,10 @@ class ResponsesController < ApplicationController
 
   def set_response
     @response = current_user.daily_responses.find(params[:id])
+  end
+
+  def carry_held_set_forward_if_named
+    current_user.carry_held_set_forward!(only: @response.daily_exercise_id) if HeldSetLookup.enabled?
   end
 
   def require_reviewed_section!

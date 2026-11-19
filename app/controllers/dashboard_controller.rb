@@ -36,7 +36,7 @@ class DashboardController < ApplicationController
 
   # GET /dashboard/status — polled by dashboard/_generating.
   def status
-    exercise = todays_exercise
+    exercise = current_user.todays_exercise
 
     if exercise&.regenerating?
       render json: { status: "pending" }
@@ -51,7 +51,7 @@ class DashboardController < ApplicationController
 
   # GET /dashboard/freshness
   def freshness
-    exercise = HeldSetLookup.enabled? ? current_user.todays_or_held_exercise : todays_exercise
+    exercise = HeldSetLookup.enabled? ? current_user.todays_or_held_exercise : current_user.todays_exercise
     outcome = exercise&.freshness_against(params[:shown]) || :current
     outcome = :out_of_date if StaleSetBanner.enabled? && exercise.nil? && params[:shown].present?
 
@@ -59,8 +59,6 @@ class DashboardController < ApplicationController
   end
 
   private
-
-  def todays_exercise = current_user.daily_exercises.for_date.first
 
   def freshness_reply(outcome)
     reply = FRESHNESS_REPLIES.fetch(outcome)

@@ -35,7 +35,7 @@ module CurrentSetLookup
   end
 
   def shown_set(scope)
-    id = scope.to_s[DailyExercise::DRAFT_SCOPE_FORMAT, 1]
+    id = DailyExercise.set_id_from_scope(scope)
     id && current_user.daily_exercises.find_by(id: id)
   end
 

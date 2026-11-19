@@ -13,7 +13,7 @@ is not generation progress.
 `HELD_SET_LOOKUP` says, as it always has. That method re-reads today's set
 outside the query cache after the move: a load that lost the race to another
 tab's move used to re-read a cached nil and show the paused panel.
-`#todays_exercise` is the read `#status` and `#freshness` use.
+`#status` and `#freshness` read `User#todays_exercise`, the same by-date read.
 
 `#load_todays_set` gives the stored response `current_user` as its user, so the review's
 short version reads the exposure index the page already built for the

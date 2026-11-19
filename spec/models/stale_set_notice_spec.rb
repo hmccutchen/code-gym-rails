@@ -38,6 +38,17 @@ RSpec.describe StaleSetNotice do
     expect(key(held_is_shown: true)).to eq("dashboard.stale_set.starts_generation")
   end
 
+  it "has a sentence for every state MissingSetState returns when no generation was just asked for" do
+    flags = %i[trial_ended provider_ready failed_today weekend paused]
+    [ true, false ].repeated_permutation(flags.size).each do |values|
+      inputs = flags.zip(values).to_h
+      state = MissingSetState.for(manual_trigger: false, **inputs)
+
+      sentence = key(paused: inputs[:paused], missing_set: state)
+      expect(I18n.exists?(sentence, :en)).to be(true), "#{inputs} -> #{state.inspect}"
+    end
+  end
+
   it "raises on a missing-set answer it has no sentence for" do
     expect { key(missing_set: :generating) }.to raise_error(ArgumentError)
   end
