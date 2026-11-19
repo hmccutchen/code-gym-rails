@@ -13,6 +13,8 @@ class DuckThread < ApplicationRecord
     exercise.duck_thread || new(user: exercise.user, daily_exercise: exercise, draft_scope: exercise.draft_scope)
   end
 
+  def self.stored?(outcome) = outcome.is_a?(Integer)
+
   # Each writer returns the new version, or :deleted, :submitted or :stale for what moved while it waited.
   def self.append!(exercise, section, message:, answer:, expected_version:, expected_scope:, point: nil)
     under_locks(exercise, expected_scope) do

@@ -2,10 +2,14 @@
 
 One duck reply, and the `DUCK_NARROWING` trial around it, in one object. It
 lives in `app/services` because it makes the provider call through
-`AiService` and writes the trial's log lines, which are side effects. The
-controller hands it the switch value (`DuckNarrowing.enabled?`) and the
-section's stored thread, and still stores the reply itself through
-`DuckThread.append!`.
+`AiService` and writes the trial's log lines, which are side effects. It
+reads the switch itself: `narrowing:` defaults to `DuckNarrowing.enabled?`,
+the one read of the switch for the duck, and a spec passes a plain boolean.
+The controller hands it the section's stored thread and still stores the
+reply itself through `DuckThread.append!`.
+
+`.ask` is the only way in: `.new` is private, and the reply's state is set
+once, in the constructor. `#text`, `#point` and `#log_stored` are public.
 
 ## `.ask`
 
@@ -32,4 +36,6 @@ reply that ends in a question gets `quote=found|missing|none` from
 `DuckReply.quote_outcome`, against the same `SectionContext.render` text the
 duck was shown. A reply that explains directly, a kind 1 answer, gets
 `narrowing=skipped` and no quote result, so it doesn't count against the
-trial's "In the text" check.
+trial's "In the text" check. A reply the token cap cut short ends in `…`, not
+`?`, so it is checked first and logged as `narrowing=cut`: "skipped" keeps
+the owner's meaning, a direct explanation.

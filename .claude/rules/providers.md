@@ -115,9 +115,8 @@ read it before changing that area.
   or one that is empty, one word, over five words or not last stores no
   point. `DuckThread#narrowing_due?` opens the gate only when the last two
   stored assistant turns share a point and both end in `?`; the new message
-  and a posted `thread` are never read. `ResponsesController` reads the
-  switch and hands it to `DuckAnswer`, the one owner of the trial: it reads
-  the gate and passes `narrow:` through `AiService#labelled_duck_response`
+  and a posted `thread` are never read. `DuckAnswer`, the one owner of the
+  trial, reads the switch and the gate and passes `narrow:` through `AiService#labelled_duck_response`
   to `DuckPrompt.generate`, which adds `NARROWING` after the two kinds. With
   the switch off the call, the prompt, the history and the stored turns are
   today's, byte for byte. With it on, the duck's history comes from
@@ -129,7 +128,9 @@ read it before changing that area.
   backticked quote (`PlantedKey.checkable?`) checked against
   `SectionContext.render`, ignoring whitespace, and logged as
   `[duck_narrowing] quote=found|missing|none`; one that explains directly
-  logs `narrowing=skipped`. Every labelled-mode reply logs `[duck_point]`.
+  logs `narrowing=skipped`, and one the token cap cut short logs
+  `narrowing=cut`. Only `DuckAnswer` reads `#turns_for_duck`
+  (`duck_history_isolation_spec`). Every labelled-mode reply logs `[duck_point]`.
   Neither log holds text, and the reply is shown either way.
   The cap, Clear (which empties turns and points together), the section
   allowlist and `CallProfiles` are unchanged, and narrowing replies count

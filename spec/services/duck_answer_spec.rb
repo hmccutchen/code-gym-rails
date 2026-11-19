@@ -17,6 +17,20 @@ RSpec.describe DuckAnswer do
 
   def ask(narrowing:) = described_class.ask(user, exercise, section: "code_review", message: "hmm", store: store, narrowing: narrowing)
 
+  it "is entered only through .ask" do
+    expect(described_class).not_to respond_to(:new)
+    expect(described_class.public_instance_methods(false)).to contain_exactly(:text, :point, :log_stored)
+  end
+
+  it "reads the switch itself when none is passed" do
+    allow(DuckNarrowing).to receive(:enabled?).and_return(false)
+    allow(service).to receive(:duck_response).and_return("What runs first?")
+
+    described_class.ask(user, exercise, section: "code_review", message: "hmm", store: store)
+
+    expect(DuckNarrowing).to have_received(:enabled?)
+  end
+
   it "with the switch off sends the plain history, reads no gate and logs nothing" do
     allow(service).to receive(:duck_response).and_return("What runs first?")
 

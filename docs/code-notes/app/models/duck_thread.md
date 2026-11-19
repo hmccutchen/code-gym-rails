@@ -29,6 +29,9 @@ always continues the history the duck actually saw.
 while they waited: `:deleted`, `:submitted` or `:stale`. `.under_locks` checks
 the account, the submitted state and the set; `.append!` adds the version.
 The controller maps them to messages, so the model never picks wording.
+`.stored?` is the one statement that an outcome means the write landed (the
+new version, an Integer). The controller asks it before writing the trial
+log lines and in `#duck_outcome`, so neither spells the rule out again.
 
 ## `.clear!`
 

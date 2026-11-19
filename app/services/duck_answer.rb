@@ -2,34 +2,28 @@
 class DuckAnswer
   attr_reader :text
 
-  def self.ask(user, exercise, section:, message:, store:, narrowing:)
+  def self.ask(user, exercise, section:, message:, store:, narrowing: DuckNarrowing.enabled?)
     service = AiService.for(user)
-    answer = new(user: user, exercise: exercise, section: section)
-    return answer.plain(service.duck_response(user, exercise, section: section, message: message, thread: store.turns_for(section))) unless narrowing
+    unless narrowing
+      return new(user, exercise, section, text: service.duck_response(user, exercise, section: section, message: message,
+                                                                                         thread: store.turns_for(section)))
+    end
 
     narrow = store.narrowing_due?(section)
     reply = service.labelled_duck_response(user, exercise, section: section, message: message,
                                                            thread: store.turns_for_duck(section), narrow: narrow)
-    answer.labelled(reply, narrow: narrow, previous_point: store.last_point(section))
+    new(user, exercise, section, text: reply.text, reply: reply, narrow: narrow, previous_point: store.last_point(section))
   end
+  private_class_method :new
 
-  def initialize(user:, exercise:, section:)
-    @user     = user
-    @exercise = exercise
-    @section  = section
-  end
-
-  def plain(text)
-    @text = text
-    self
-  end
-
-  def labelled(reply, narrow:, previous_point:)
-    @text           = reply.text
+  def initialize(user, exercise, section, text:, reply: nil, narrow: false, previous_point: nil)
+    @user           = user
+    @exercise       = exercise
+    @section        = section
+    @text           = text
     @reply          = reply
     @narrow         = narrow
     @previous_point = previous_point
-    self
   end
 
   def point = @reply&.point
@@ -47,6 +41,7 @@ class DuckAnswer
   def tag = "user=#{@user.id} section=#{@section}"
 
   def narrowing_result
+    return "narrowing=cut" if @reply.cut
     return "narrowing=skipped" unless @reply.question?
 
     within = SectionContext.render(@exercise.problem_set[@section])

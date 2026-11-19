@@ -57,6 +57,18 @@ RSpec.describe DuckReply do
     end
   end
 
+  describe ".with_point" do
+    it "writes a label back so .read gives the same text and point" do
+      written = described_class.with_point("What does each pass ask for?", "the loop body")
+
+      expect(described_class.read(written, truncated: false)).to eq(described_class.new(text: "What does each pass ask for?", point: "the loop body"))
+    end
+
+    it "leaves a text with no point as it is" do
+      expect(described_class.with_point("What runs first?", nil)).to eq("What runs first?")
+    end
+  end
+
   describe ".quote_outcome" do
     let(:context) { "Question: Find the bug\nCode snippet:\nCustomer.all.each do |customer|\n  customer.invoices.open.sum(:total)\nend" }
 

@@ -46,10 +46,10 @@ only after the reply, under `DuckThread.append!`'s checks.
 
 ## `DuckAnswer` and the trial logs
 
-`#duck_thread` hands the call to `DuckAnswer.ask` with
-`DuckNarrowing.enabled?`, the one read of the switch for the duck, and stores
-`#text` and `#point` through `DuckThread.append!`. It calls `#log_stored`
-only when `append!` returns the new version, an Integer, so a reply dropped
+`#duck_thread` hands the call to `DuckAnswer.ask`, which reads the switch
+itself, and stores `#text` and `#point` through `DuckThread.append!`. It
+calls `#log_stored` only when `DuckThread.stored?` says the write landed, so
+a reply dropped
 as `:stale`, `:deleted` or `:submitted` writes no trial log line. The gate,
 the history and the log lines are described in
 `docs/code-notes/app/services/duck_answer.md`.

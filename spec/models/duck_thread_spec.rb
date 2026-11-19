@@ -190,6 +190,13 @@ RSpec.describe DuckThread do
     end
   end
 
+  describe ".stored?" do
+    it "is true only for the new version a writer returns" do
+      expect(described_class.stored?(3)).to be(true)
+      expect([ :stale, :deleted, :submitted ].map { |outcome| described_class.stored?(outcome) }).to all(be(false))
+    end
+  end
+
   describe "point labels" do
     def labelled(answer, point, version)
       described_class.append!(exercise, "code_review", message: "stuck", answer: answer, point: point,

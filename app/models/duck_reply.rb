@@ -1,6 +1,7 @@
 # Design notes: docs/code-notes/app/models/duck_reply.md
-class DuckReply < Data.define(:text, :point)
-  POINT_LINE = /(?:\A|\n)[ \t]*Point:([^\n]*)\z/
+class DuckReply < Data.define(:text, :point, :cut)
+  POINT_TAG = "Point:"
+  POINT_LINE = /(?:\A|\n)[ \t]*#{Regexp.escape(POINT_TAG)}([^\n]*)\z/
   POINT_WORDS = 2..5
 
   def self.read(raw, truncated:)
@@ -8,8 +9,10 @@ class DuckReply < Data.define(:text, :point)
     shown = (match ? match.pre_match : raw).rstrip
     raise ProviderError::InvalidResponseError, "Provider returned a duck reply with nothing but its point label" if shown.empty?
 
-    truncated ? new(text: "#{shown}…", point: nil) : new(text: shown, point: (point_from(match[1]) if match))
+    truncated ? new(text: "#{shown}…", point: nil, cut: true) : new(text: shown, point: (point_from(match[1]) if match))
   end
+
+  def initialize(text:, point:, cut: false) = super
 
   def self.point_from(label)
     words = label.squish.delete_suffix(".").split
@@ -17,7 +20,7 @@ class DuckReply < Data.define(:text, :point)
   end
   private_class_method :point_from
 
-  def self.with_point(text, point) = point.present? ? "#{text}\nPoint: #{point}" : text
+  def self.with_point(text, point) = point.present? ? "#{text}\n#{POINT_TAG} #{point}" : text
 
   def self.question?(text) = text.to_s.rstrip.end_with?("?")
 

@@ -16,13 +16,16 @@ written with different spacing or case still matches.
 A reply the token cap cut short gets no point, even when its last line looks
 like a whole label, because the line may itself be cut. This keeps the gate
 shut after a cut-off reply. Its text still gets the `…` mark, as
-`#duck_response` gives it. A reply that is nothing but its label raises
+`#duck_response` gives it, and `cut` is true, so `DuckAnswer` can log it as
+cut rather than as a reply that explained instead of asking. `cut` defaults
+to false, so a reply built by hand needs only `text:` and `point:`. A reply that is nothing but its label raises
 `ProviderError::InvalidResponseError`, as an empty reply does.
 
 ## `.with_point`
 
-Writes a stored label back as the last line of a reply's text, in the shape
-`.read` parses, so the two stay one format. `DuckThread#turns_for_duck` uses
+Writes a stored label back as the last line of a reply's text. It writes
+`POINT_TAG`, the same tag `POINT_LINE` is built from, so `.read` gives back
+the same text and point and the two stay one format. `DuckThread#turns_for_duck` uses
 it; nothing else does.
 
 ## `.question?`
@@ -40,7 +43,8 @@ quote too short to check, such as `` `a` ``, is skipped and the next one is
 checked; a reply with no checkable quote counts as `"none"`, since a
 one-letter quote is found in almost any section. It returns `"found"`, `"missing"` or `"none"`, and nothing here holds
 text for a log. `DuckAnswer` asks it only for a gate-open reply that ends in a
-question; a direct explanation is logged as `narrowing=skipped` instead.
+question; a direct explanation is logged as `narrowing=skipped` and a cut-off
+reply as `narrowing=cut` instead.
 
 ## The trial
 

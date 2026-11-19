@@ -251,6 +251,16 @@ RSpec.describe "Duck narrowing", type: :request do
         expect(Rails.logger).not_to have_received(:info).with(/quote=/)
       end
 
+      it "logs a gate-open reply the token cap cut short as cut, not skipped, with no quote result" do
+        store_questions("the loop body", "the loop body")
+        service.replies = [ [ "Look at `customer.invoices`. What runs", true ] ]
+
+        ask("hmm")
+
+        expect(Rails.logger).to have_received(:info).with("[duck_narrowing] user=#{user.id} section=code_review narrowing=cut")
+        expect(Rails.logger).not_to have_received(:info).with(/narrowing=skipped|quote=/)
+      end
+
       it "logs a quote result only for a gate-open reply that ends in a question" do
         store_questions("the loop body", "the loop body")
         service.replies = [ "Look at `customer.invoices`. What runs there?\nPoint: the loop body" ]
