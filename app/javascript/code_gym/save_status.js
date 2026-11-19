@@ -57,8 +57,8 @@ function clean(ignored) {
   return !pending() && !failedOutside(ignored);
 }
 
-export function unsaved() {
-  return pending() || failedOutside([]) || unsentProbes.some((probe) => probe());
+export function unsaved(...ignored) {
+  return pending() || failedOutside(ignored) || unsentProbes.some((probe) => probe());
 }
 
 export function leaveWhenSaved(leave, stranded, ...ignored) {

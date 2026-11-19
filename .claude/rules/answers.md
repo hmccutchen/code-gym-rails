@@ -111,9 +111,11 @@ read it before changing that area.
   finds its response by id, so it moves the held set only when that is the
   response's own set. Regenerate posts the page's draft scope, refuses a
   missing or mismatched one before moving anything
-  (`CurrentSetLookup#shown_set_at`), and moves the held set only when it is
-  the shown one. Finding none answers `errors.set_not_current` with a 404
-  through `#render_set_not_current`, switch or no switch.
+  (`CurrentSetLookup#shown_set_at`), moves the held set only when it is
+  the shown one, and checks the scope again under the locks where it takes
+  the claim (`DailyExercise#claim_regeneration!`). Finding none answers
+  `errors.set_not_current` with a 404 through `#render_set_not_current`,
+  switch or no switch.
   `DashboardController#freshness` only reads (`#todays_or_held_exercise`),
   so freshness never writes. Under `STALE_SET_BANNER` it adds the
   `out_of_date` answer, which never reloads the page by itself, and every
@@ -121,9 +123,11 @@ read it before changing that area.
   sentence `StaleSetNotice` picks; with it off every reply is today's.
   `code_gym/request` turns that reply into one `code-gym:set-not-current`
   event, and `fresh_day_controller` shows the banner. The page reloads by
-  itself on `stale` only while `saveStatus.unsaved()` is false. Unsent duck
-  or explanation text counts through `watchUnsent`, never `watch`, so it
-  never holds a reload gate. Yesterday's unsubmitted set stays lost from
+  itself on `stale`, from freshness or an answer save's 409, only while
+  `saveStatus.unsaved()` is false; the 409 carries the freshness reply's
+  sentence. Reload and discard changes clears the tab's draft copy first.
+  Unsent duck or explanation text counts through `watchUnsent`, never
+  `watch`, so it never holds a reload gate. Yesterday's unsubmitted set stays lost from
   view after a reload without a pause, by the owner's decision of
   2026-11-19: it happens only when someone works past midnight without
   pausing, and the banner says so before they reload. Detail is in

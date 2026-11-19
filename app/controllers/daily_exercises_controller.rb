@@ -1,9 +1,11 @@
 class DailyExercisesController < ApplicationController
   include CurrentSetLookup
 
-  REGENERATION_BLOCKED = {
-    reviewed:  "flash.daily_exercises.already_reviewed",
-    reviewing: "flash.daily_exercises.review_in_progress"
+  REGENERATION_REFUSED = {
+    stale:               "flash.daily_exercises.regenerate_stale",
+    reviewed:            "flash.daily_exercises.already_reviewed",
+    reviewing:           "flash.daily_exercises.review_in_progress",
+    already_regenerated: "flash.daily_exercises.already_regenerated"
   }.freeze
 
   GENERATE_PER_HOUR = 3
@@ -33,11 +35,8 @@ class DailyExercisesController < ApplicationController
     exercise, refusal = set_to_regenerate
     return redirect_to root_path, alert: t(refusal) if refusal
 
-    blocker = exercise.daily_response&.replace_blocker
-    return redirect_to root_path, alert: t(REGENERATION_BLOCKED.fetch(blocker)) if blocker
-
-    claim = exercise.claim_regenerating!(regenerated_at: nil)
-    return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated") unless claim
+    claim, refused = exercise.claim_regeneration!(shown_scope: params[:draft_scope])
+    return redirect_to root_path, alert: t(REGENERATION_REFUSED.fetch(refused)) if refused
 
     current_user.clear_generation_failure!
     # The claim is committed, so release it on an enqueue failure or the user waits behind a spinner nobody clears.

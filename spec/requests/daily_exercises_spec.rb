@@ -47,6 +47,35 @@ RSpec.describe "DailyExercises", type: :request do
       expect(today.reload.regenerating_since).to be_nil
     end
 
+    it "refuses a page whose set was started over after its scope was checked, keeping the new draft" do
+      exercise = create_exercise
+      old_draft = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "Old." })
+      page_scope = exercise.draft_scope
+      new_draft = nil
+      allow_any_instance_of(User).to receive(:todays_exercise).and_wrap_original do |original|
+        found = original.call
+        new_draft ||= begin
+          exercise.start_over!(response_id: old_draft.id)
+          DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current, answers: { "code_review" => "New." })
+        end
+        found
+      end
+      replacement = AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "replaced", "snippet" => "s" } },
+                                             dropped_sections: [], outcomes: {}, plan_notes: {})
+      fake_service = instance_double(ClaudeService)
+      allow(fake_service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
+        with_practice_context(replacement, user: caller, language: language, schedule_context: schedule_context)
+      end
+      allow(AiService).to receive(:for).with(user).and_return(fake_service)
+
+      post regenerate_path, params: { draft_scope: page_scope }
+      perform_enqueued_jobs
+
+      expect(flash[:alert]).to eq("This page was out of date, so nothing was replaced.")
+      expect(exercise.reload).to have_attributes(regenerating_since: nil, regenerated_at: nil)
+      expect(DailyResponse.find_by(id: new_draft.id)&.answers).to eq("code_review" => "New.")
+    end
+
     it "refuses a request that posts no scope" do
       exercise = create_exercise
 

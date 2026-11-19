@@ -199,6 +199,49 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
       end
     end
 
+    it "shows the banner and keeps unsent duck text when an autosave is refused as stale" do
+      travel_to(a_weekday) do
+        open_dashboard
+        duck = open_duck
+        duck.find(".duck-input").fill_in(with: "Not sent yet")
+        replace_todays_set
+
+        find(%(textarea[data-field="code_review"])).fill_in(with: "An answer to the replaced set")
+
+        expect_banner(:replaced, unsaved: true)
+        expect(duck.find(".duck-input").value).to eq("Not sent yet")
+        expect(same_load?).to be(true)
+      end
+    end
+
+    it "shows the banner and keeps unsent duck text when a submit is refused as stale" do
+      travel_to(a_weekday) do
+        open_dashboard
+        duck = open_duck
+        duck.find(".duck-input").fill_in(with: "Not sent yet")
+        replace_todays_set
+
+        find("#submit-answers").click
+
+        expect_banner(:replaced, unsaved: true)
+        expect(duck.find(".duck-input").value).to eq("Not sent yet")
+        expect(same_load?).to be(true)
+      end
+    end
+
+    it "reloads by itself when an autosave is refused as stale and nothing else is unsaved" do
+      travel_to(a_weekday) do
+        open_dashboard
+        newer_scope = replace_todays_set
+
+        find(%(textarea[data-field="code_review"])).fill_in(with: "An answer to the replaced set")
+
+        expect(page).to have_css(%([data-answer-form-draft-scope-value="#{newer_scope}"]))
+        expect(same_load?).to be(false)
+        expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.stale_reloaded"))
+      end
+    end
+
     it "shows the banner and stays when the explanation box holds unsaved text" do
       stub_env("LEARNER_NOTES" => "1")
       user.update!(learner_notes_enabled: true)
@@ -243,6 +286,30 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
         expect(page).to have_css(%([data-answer-form-draft-scope-value="#{shown.draft_scope}"]))
         expect(find(%(textarea[data-field="code_review"])).value).to eq("An answer saved before midnight")
         expect(shown.reload.date).to eq(Date.current)
+      end
+    end
+
+    it "discards a refused edit on Reload and discard changes, so the reloaded page shows the saved answer" do
+      travel_to(a_weekday) do
+        open_dashboard
+        find(%(textarea[data-field="code_review"])).fill_in(with: "An answer saved before midnight")
+        wait_for { user.daily_responses.first&.answers&.dig("code_review") == "An answer saved before midnight" }
+        wait_for_answers_settled
+        shown = pass_midnight
+        user.update!(paused_generation_at: shown.date.beginning_of_day + 9.hours)
+
+        find(%(textarea[data-field="code_review"])).fill_in(with: "An edit refused as not current")
+        expect_banner(:carried_forward, unsaved: true)
+        expect(page.evaluate_script("#{stored_draft_js}?.answers?.code_review")).to eq("An edit refused as not current")
+
+        banner.click_button(discard_label)
+
+        expect(page).to have_no_css("#stale-set-banner", visible: true)
+        wait_for_js
+        expect(same_load?).to be(false)
+        expect(find(%(textarea[data-field="code_review"])).value).to eq("An answer saved before midnight")
+        wait_for_answers_settled
+        expect(shown.reload.daily_response.answers["code_review"]).to eq("An answer saved before midnight")
       end
     end
   end

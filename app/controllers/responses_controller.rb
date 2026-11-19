@@ -22,7 +22,7 @@ class ResponsesController < ApplicationController
 
     outcome = save_answers_under_lock(exercise)
     return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
-    return render_stale_answers if outcome == :stale
+    return render_stale_answers(**stale_set_banner(exercise)) if outcome == :stale
 
     if outcome == :newly_submitted
       GenerateConceptReferenceJob.queue_missing(current_user, exercise.concept_pairs)
@@ -212,10 +212,10 @@ class ResponsesController < ApplicationController
     end
   end
 
-  def render_stale_answers(message = t("flash.responses.stale_answers"))
+  def render_stale_answers(message = t("flash.responses.stale_answers"), **banner)
     respond_to do |format|
       format.json do
-        render_json_error(message, status: :conflict, outcome: "stale")
+        render_json_error(message, status: :conflict, outcome: "stale", **banner)
       end
       format.html { redirect_to root_path, alert: message }
     end

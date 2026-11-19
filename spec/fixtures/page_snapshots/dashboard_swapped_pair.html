@@ -554,12 +554,12 @@
      data-fresh-day-minimum-gap-value="60000"
      data-fresh-day-notice-shown-for-value="10000"
      data-fresh-day-replaced-text-value="This set was replaced, so the page now shows the current one."
-     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present code-gym:set-not-current@window->fresh-day#notCurrent"></div>
+     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present code-gym:set-not-current@window->fresh-day#notCurrent code-gym:stale-save@window->fresh-day#staleSave"></div>
 
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
-  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow"
+  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft"
        data-answer-form-answered-sections-value="[]"
        data-answer-form-submit-blocker-value="unanswered"
        data-answer-form-draft-scope-value="900002-1790694000000000"

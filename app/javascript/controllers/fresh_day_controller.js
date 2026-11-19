@@ -76,6 +76,14 @@ export default class extends Controller {
     if (this.bannerValue && this.hasBannerTarget) this.showBanner(event.detail?.banner)
   }
 
+  staleSave(event) {
+    if (!this.bannerValue || !this.hasBannerTarget) return
+    if (this.bannerTarget.hidden && !saveStatus.unsaved(...(event.detail?.ignored ?? []))) return
+
+    event.preventDefault()
+    this.showBanner(event.detail?.banner)
+  }
+
   showBanner(sentence) {
     this.stopped = true
     if (this.bannerTarget.hidden) {
@@ -94,9 +102,13 @@ export default class extends Controller {
   }
 
   reloadNow() {
+    const discarding = saveStatus.unsaved()
     this.reloadTarget.disabled = true
     clearInterval(this.bannerRefresh)
-    saveStatus.leaveDiscarding(() => window.location.reload())
+    saveStatus.leaveDiscarding(() => {
+      if (discarding) window.dispatchEvent(new CustomEvent("code-gym:discard-draft"))
+      window.location.reload()
+    })
   }
 
   reload(replaced) {

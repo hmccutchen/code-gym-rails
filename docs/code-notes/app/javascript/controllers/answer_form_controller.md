@@ -129,6 +129,26 @@ has no application timeout or cancellation; this controller adds none.
 The browser regression holds and releases a request to verify the ordering,
 without measuring browser or network timeouts.
 
+## A stale refusal under the out-of-date banner
+
+Before an autosave's or a submit's `409 stale` reloads the page, the form
+raises a cancelable `code-gym:stale-save` window event carrying the reply's
+`banner` sentence and, for the autosave, `answers` as a key to leave out of
+the unsaved check. `fresh_day_controller` cancels it under `STALE_SET_BANNER`
+when `saveStatus.unsaved()` holds or its banner already shows, and shows the
+banner. The form then clears its own draft copy and stops autosaving
+(`stopSavingBehindBanner`), so unsent duck or explanation text stays on the
+page until the person presses the banner's button. A refused submit is
+reported under `submit` and the form unlocks, as a not-current submit is.
+When nobody cancels the event, which is always the case with the switch
+off, the reload below runs as before.
+
+The banner's "Reload and discard changes" raises `code-gym:discard-draft`
+right before it reloads, and `#discardDraft` clears the copy this tab owns.
+Without it, a refused edit to a held set that the reload carries forward
+under the same scope and token would be restored and autosaved by the
+reloaded page.
+
 ## Leaving the page waits for other saves
 
 Every way the form leaves the page by itself goes through

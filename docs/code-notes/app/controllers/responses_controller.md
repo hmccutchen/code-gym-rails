@@ -97,6 +97,15 @@ refused with a 409 rather than saved in part.
 
 ## `#stale_draft_scope?`
 
+Under `STALE_SET_BANNER` the 409 also carries `banner:`, the sentence the
+freshness reply would give (`CurrentSetLookup#stale_set_banner`:
+`dashboard.stale_set.replaced` when the posted scope names an earlier write
+of this row, `dashboard.stale_set.newer` otherwise), so the page's banner
+shows the server's words. Its `status` stays `stale`, so `code_gym/request`
+raises no not-current event for it. With the switch off the reply is
+unchanged.
+
+
 Runs under the exercise lock, after `lock!` has re-read the row, so a
 regeneration cannot land between the check and the save. A post that names no
 scope still saves, so a page loaded before the scope existed keeps working.

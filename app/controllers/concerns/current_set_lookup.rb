@@ -15,6 +15,13 @@ module CurrentSetLookup
     { outcome: "not_current", banner: out_of_date_sentence(posted_draft_scope) }
   end
 
+  def stale_set_banner(exercise)
+    return {} unless StaleSetBanner.enabled?
+
+    outcome = exercise.freshness_against(posted_draft_scope) == :replaced ? :replaced : :stale
+    { banner: t(StaleSetNotice.newer_set(outcome)) }
+  end
+
   def out_of_date_sentence(shown_scope)
     shown = shown_set(shown_scope)
     paused = current_user.paused_generation_at?

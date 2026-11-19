@@ -126,6 +126,9 @@ The out-of-date banner (`docs/code-notes/app/javascript/controllers/fresh_day_co
 needs to know whether a reload would lose anything the person typed.
 `unsaved()` is the one statement of that rule: `pending()`, a failure under
 any key that was not carried, or a probe registered through `watchUnsent`.
+It takes keys to leave out, as `settled` does: the answer form's refused
+autosave asks with `answers` left out, since that refusal is the conflict
+being handled, not something else a reload would lose.
 
 Those probes are kept apart from `watch` on purpose. A `watch` probe counts
 toward `pending()`, and every gate above waits for `pending()` to clear. Text

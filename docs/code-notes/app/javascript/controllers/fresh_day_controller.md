@@ -123,7 +123,7 @@ holds the decision. The partial renders `banner: true` and the banner's
 fixed text as values only while `StaleSetBanner.enabled?`, and with
 `bannerValue` false every path above runs as it did before.
 
-With it on, the controller shows the banner in three cases:
+With it on, the controller shows the banner in four cases:
 
 - an `out_of_date` freshness reply, which never reloads by itself;
 - a `stale` reply while `saveStatus.unsaved()` holds. With nothing
@@ -132,7 +132,13 @@ With it on, the controller shows the banner in three cases:
 - the `code-gym:set-not-current` window event, which `code_gym/request`
   raises for any reply whose `status` is `not_current`. The partial binds it
   with `data-action`, so the duck, autosave, submit, the critique, the note
-  and the explanation need no handling of their own.
+  and the explanation need no handling of their own;
+- the cancelable `code-gym:stale-save` window event the answer form raises
+  before an autosave's or submit's `409 stale` would reload, while
+  `saveStatus.unsaved()` holds (leaving out the keys the event names) or the
+  banner already shows. The controller cancels it, and the form stays. With
+  nothing unsaved the event is left alone and the form reloads as before
+  (`docs/code-notes/app/javascript/controllers/answer_form_controller.md`).
 
 The sentence always comes from the server, in the reply or the event's
 `detail.banner`, so the script holds no copy of `StaleSetNotice`. A later
@@ -178,3 +184,10 @@ stranded callback. A save already in flight lands first; a failed save, or
 one that fails while the button waits, never holds the reload, and after the
 ten-second wait limit it reloads whatever is still pending. The person asked
 for the reload, and a save refused as not current can never succeed.
+
+When `saveStatus.unsaved()` holds at the press, the button reads "Reload
+and discard changes", and the leave raises `code-gym:discard-draft` right
+before `window.location.reload()`, after the saves have settled. The answer
+form clears the draft copy it owns, so the reloaded page cannot restore the
+changes the button discarded. A plain Reload, with nothing unsaved, raises
+nothing and keeps the copy's usual rules.

@@ -150,6 +150,18 @@ class DailyExercise < ApplicationRecord
     end
   end
 
+  def claim_regeneration!(shown_scope:)
+    with_response_locked do |response|
+      next [ nil, :stale ] unless draft_scope == shown_scope.to_s
+
+      blocker = response&.replace_blocker
+      next [ nil, blocker ] if blocker
+
+      claim = claim_regenerating!(regenerated_at: nil)
+      claim ? [ claim, nil ] : [ nil, :already_regenerated ]
+    end
+  end
+
   # The owner first: inserting a response takes a key-share lock on it, which AccountDeletion holds before the exercise.
   def with_response_locked
     transaction do
