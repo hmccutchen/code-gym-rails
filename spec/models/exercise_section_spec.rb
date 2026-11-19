@@ -290,7 +290,7 @@ RSpec.describe ExerciseSection do
 
   describe ".miss_reason" do
     it "is nil for every kind that does not opt in, so shared code never branches on kind" do
-      (described_class.keys - %w[challenge architecture pattern]).each do |key|
+      (described_class.keys - %w[challenge architecture pattern ambiguity_hunt pseudocode_to_code]).each do |key|
         expect(described_class.find(key).miss_reason).to be_nil, key
       end
     end
@@ -305,6 +305,12 @@ RSpec.describe ExerciseSection do
       expect(described_class::Pattern.miss_reason).to eq(
         "which caller, change or case the stated problem describes that the structure as written would break. " \
         "Never give 'it isn't the named pattern' as the reason")
+      expect(described_class::AmbiguityHunt.miss_reason).to eq(
+        "what a team would likely build wrong if nobody asked, described in this request's terms. " \
+        "Give this reason only for a planted ambiguity they missed")
+      expect(described_class::PseudocodeToCode.miss_reason).to eq(
+        "an input or case that the plan, followed literally, would handle wrongly, or a requirement the problem statement states that the plan misses. " \
+        "Attribute it to the plan, never to the translated code's syntax")
     end
   end
 

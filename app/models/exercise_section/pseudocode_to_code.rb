@@ -164,6 +164,11 @@ class ExerciseSection::PseudocodeToCode < ExerciseSection
     "If the context above shows a critique was requested, credit any revision that addressed a point it raised. NEVER treat an unaddressed critique point as a miss on its own: the critique is advisory, the engineer may have judged it wrong, and it is permitted to find nothing at all."
   end
 
+  def self.miss_reason
+    "an input or case that the plan, followed literally, would handle wrongly, or a requirement the problem statement states that the plan misses. " \
+      "Attribute it to the plan, never to the translated code's syntax"
+  end
+
   def self.improved_code_instruction(section:, answered:)
     return "a straightforward implementation of a plan that solves the problem" unless answered
 
