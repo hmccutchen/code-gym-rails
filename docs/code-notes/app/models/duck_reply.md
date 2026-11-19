@@ -12,7 +12,8 @@ text whether or not it parses, so a malformed label never reaches the page.
 Any other line of its own that starts with `Point:` is removed too
 (`STANDALONE_POINT_LINE`) but never becomes the point, so a label the duck
 wrote too early is neither shown, stored nor passed to learner-items
-extraction.
+extraction. A label written at the end of the last line instead of on its own
+(`TRAILING_INLINE_POINT`) is cut off the same way and never becomes the point.
 It counts as a point only when the label is two to five words. The point is
 kept squished, lower-cased and without a closing full stop, so the same label
 written with different spacing or case still matches.

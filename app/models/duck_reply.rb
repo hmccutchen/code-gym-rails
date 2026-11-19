@@ -4,10 +4,11 @@ class DuckReply < Data.define(:text, :point, :cut)
   POINT_LINE = /(?:\A|\n)[ \t]*#{Regexp.escape(POINT_TAG)}([^\n]*)\z/
   POINT_WORDS = 2..5
   STANDALONE_POINT_LINE = /^[ \t]*#{Regexp.escape(POINT_TAG)}[^\n]*(?:\n|\z)/
+  TRAILING_INLINE_POINT = /[ \t]+#{Regexp.escape(POINT_TAG)}[^\n]*\z/
 
   def self.read(raw, truncated:)
     match = raw.match(POINT_LINE)
-    shown = (match ? match.pre_match : raw).gsub(STANDALONE_POINT_LINE, "").rstrip
+    shown = (match ? match.pre_match : raw).gsub(STANDALONE_POINT_LINE, "").rstrip.sub(TRAILING_INLINE_POINT, "")
     raise ProviderError::InvalidResponseError, "Provider returned a duck reply with nothing but its point label" if shown.empty?
 
     truncated ? new(text: "#{shown}…", point: nil, cut: true) : new(text: shown, point: (point_from(match[1]) if match))

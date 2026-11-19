@@ -41,8 +41,8 @@ RSpec.describe DuckReply do
       expect(reply).to have_attributes(text: "Look at the loop.\nWhat runs first?", point: "the loop body")
     end
 
-    it "gives no point when the label shares a line with the question" do
-      expect(read("What runs first? Point: the loop body").point).to be_nil
+    it "gives no point when the label shares a line with the question, and hides the label" do
+      expect(read("What runs first? Point: the loop body")).to have_attributes(text: "What runs first?", point: nil)
     end
 
     it "gives a reply the token cap cut short no point, even when its last line looks like a label" do
