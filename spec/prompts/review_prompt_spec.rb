@@ -226,7 +226,7 @@ RSpec.describe ReviewPrompt do
       planted = "PLANTED_KEY_TEXT_7f3a"
       opted_in.each do |key|
         kind = ExerciseSection.for(key)
-        keyed = kind.answer_key_fields.index_with { [ planted ] }
+        keyed = kind.answer_key_fields.excluding("answer_key").index_with { [ planted ] }
         section = fake_section(key).merge("answer_key" => { "issue" => planted, "missable_requirements" => [ planted ] }, **keyed)
         render = lambda do |why|
           [ described_class.day_system(coach: "Rails", sections: [ { key: key, section: section, answer: long, rating: "right_level" } ]),
