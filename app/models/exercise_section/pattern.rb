@@ -52,15 +52,21 @@ class ExerciseSection::Pattern < ExerciseSection
   end
 
   def self.review_context(section:, answer:, rating:)
-    <<~CONTEXT.chomp
-      Pattern question (#{section["title"]}): #{section["question"]}
-      #{answer_lines(answer, rating)}
-    CONTEXT
+    [
+      "Pattern question (#{section["title"]}): #{section["question"]}",
+      ("Scenario: #{section["scenario"]}" if section["scenario"].present?),
+      answer_lines(answer, rating)
+    ].compact.join("\n")
   end
 
   def self.grading_note(section:, answer:)
     "Main point: the structure the problem calls for.\n" \
     "Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (#{scaffold_labels(section).map { |label| label.delete_suffix(':') }.join('; ')}), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it."
+  end
+
+  def self.miss_reason
+    "which caller, change or case the stated problem describes that the structure as written would break. " \
+      "Never give 'it isn't the named pattern' as the reason"
   end
 
   def self.improved_code_instruction(section:, answered:)

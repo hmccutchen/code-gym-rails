@@ -283,6 +283,10 @@ class ExerciseSection
       false
     end
 
+    def miss_reason
+      nil
+    end
+
     def body_partial
       "responses/bodies/#{key}"
     end

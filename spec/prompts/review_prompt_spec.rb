@@ -142,9 +142,122 @@ RSpec.describe ReviewPrompt do
     end
   end
 
+  describe "the miss reason" do
+    let(:opted_in) { %w[challenge architecture pattern] }
+
+    def fake_section(key) = FakeService::EXERCISE_PROBLEM_SET.fetch(key).deep_dup.merge("rounds" => {})
+
+    let(:opening) { %(In each "missed" entry, after naming the gap) }
+
+    def recorded(name) = File.read(PromptSnapshotHelpers::PROMPT_SNAPSHOT_DIR.join("#{name}.txt"))
+
+    def graded(key, section: fake_section(key), **switches)
+      described_class.section_prompt(key: key, section: section, answer: long, rung: "mid_level", **switches)
+    end
+
+    it "records challenge's and architecture's graded prompt as it is today" do
+      %w[challenge architecture].each do |key|
+        expect_prompt_snapshot("review__#{key}__prompt",
+                               described_class.section_prompt(key: key, section: fake_section(key), answer: long, rung: "mid_level"))
+      end
+    end
+
+    it "renders each opted-in kind's graded prompt byte for byte as recorded when why is off" do
+      { "challenge" => "review__challenge__prompt", "architecture" => "review__architecture__prompt",
+        "pattern" => "review__pattern__improved_code__prompt" }.each do |key, name|
+        expect(graded(key, why: false)).to eq(recorded(name)), key
+        expect(graded(key)).to eq(recorded(name)), key
+      end
+      pattern = day_a.find { |entry| entry[:key] == "pattern" }
+      expect(described_class.section_prompt(key: "pattern", section: pattern[:section], answer: pattern[:answer], rung: pattern[:rung], why: false))
+        .to eq(recorded("review__day_a__pattern__prompt"))
+    end
+
+    it "renders each opted-in kind's graded prompt exactly as recorded when why is on" do
+      opted_in.each do |key|
+        expect_prompt_snapshot("review__#{key}__miss_reason__prompt", graded(key, why: true))
+      end
+    end
+
+    it "opts in only challenge, architecture and pattern" do
+      expect(ExerciseSection.all.select(&:miss_reason).map(&:key)).to match_array(opted_in)
+    end
+
+    it "puts the kind's line right after its grading note only when why is on and the kind opts in, for every kind" do
+      ExerciseSection.all.each do |kind|
+        section = fake_section(kind.key)
+        note = kind.grading_note(section: section, answer: long)
+        on = graded(kind.key, section: section, why: true)
+
+        expect(graded(kind.key, section: section, why: false)).not_to include(opening), kind.key
+        if opted_in.include?(kind.key)
+          line = format(described_class::MISS_REASON, reason: kind.miss_reason)
+          expect(on).to include("#{note}\n#{line}\n\n"), kind.key
+          expect(on.scan(opening).size).to eq(1), kind.key
+        else
+          expect(on).not_to include(opening), kind.key
+        end
+      end
+    end
+
+    it "never asks a walkthrough for a reason, for any kind" do
+      ExerciseSection.all.each do |kind|
+        walked = described_class.for_section(key: kind.key, section: fake_section(kind.key), answer: nil, answered: false, rung: "senior", why: true)
+
+        expect(walked).not_to include(opening), kind.key
+        expect(walked).to eq(described_class.walkthrough_prompt(key: kind.key, section: fake_section(kind.key), rung: "senior")), kind.key
+      end
+    end
+
+    it "passes why through for_section to the graded prompt" do
+      prompt = described_class.for_section(key: "challenge", section: fake_section("challenge"), answer: long, answered: true, rung: "mid_level", why: true)
+
+      expect(prompt).to eq(graded("challenge", why: true))
+    end
+
+    it "fills in the kind's reason where the shared line leaves a place for it" do
+      opted_in.each do |key|
+        expect(graded(key, why: true)).to include("why it matters for this problem: #{ExerciseSection.for(key).miss_reason}. This is your reasoning"), key
+      end
+    end
+
+    it "shows a planted key no more often with why on than with it off, and never on a step 1 kind" do
+      planted = "PLANTED_KEY_TEXT_7f3a"
+      opted_in.each do |key|
+        section = fake_section(key).merge("answer_key" => { "issue" => planted, "missable_requirements" => [ planted ] })
+        render = lambda do |why|
+          [ described_class.day_system(coach: "Rails", sections: [ { key: key, section: section, answer: long, rating: "right_level" } ]),
+            graded(key, section: section, why: why) ].join("\n").scan(planted).size
+        end
+
+        expect(render.call(true)).to be <= render.call(false), key
+        expect(render.call(true)).to eq(0), key
+      end
+    end
+
+    it "names no key field in the shared line or any kind's reason" do
+      ([ described_class::MISS_REASON ] + opted_in.map { |key| ExerciseSection.for(key).miss_reason }).each do |text|
+        expect(text).not_to match(/answer_key|planted|missable/i)
+      end
+    end
+
+    it "forbids architecture's reason from naming a right option" do
+      expect(ExerciseSection::Architecture.miss_reason)
+        .to include("There is no single correct option, so never give 'it didn't pick option X' as the reason")
+    end
+
+    it "forbids pattern's reason from naming a pattern" do
+      expect(ExerciseSection::Pattern.miss_reason).to include("Never give 'it isn't the named pattern' as the reason")
+    end
+
+    it "never reads the environment, so the switch is a value it is handed" do
+      expect(File.read(Rails.root.join("app/prompts/review_prompt.rb"))).not_to include("ENV", "ReviewMissReason")
+    end
+  end
+
   it "takes the rung as a value, so it never reads a user's difficulty settings" do
     expect(described_class.method(:section_prompt).parameters)
-      .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :rung ], [ :key, :approach ] ])
+      .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :rung ], [ :key, :approach ], [ :key, :why ] ])
   end
 
   describe ".walkthrough_prompt" do
@@ -236,7 +349,7 @@ RSpec.describe ReviewPrompt do
 
     it "takes the answer state as a value, so it never reads a response" do
       expect(described_class.method(:for_section).parameters)
-        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :answered ], [ :keyreq, :rung ], [ :key, :approach ] ])
+        .to eq([ [ :keyreq, :key ], [ :keyreq, :section ], [ :keyreq, :answer ], [ :keyreq, :answered ], [ :keyreq, :rung ], [ :key, :approach ], [ :key, :why ] ])
     end
   end
 

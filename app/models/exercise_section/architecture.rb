@@ -77,4 +77,9 @@ class ExerciseSection::Architecture < ExerciseSection
     "There is no single correct option, so a different defensible choice with sound reasoning is not a miss. " \
     "Considering alternatives the question did not list is the kind of addition the rubric credits beyond solid."
   end
+
+  def self.miss_reason
+    "which constraint the scenario states that the decision or its reasoning leaves unaddressed, and what could happen to this system because of it. " \
+      "There is no single correct option, so never give 'it didn't pick option X' as the reason"
+  end
 end

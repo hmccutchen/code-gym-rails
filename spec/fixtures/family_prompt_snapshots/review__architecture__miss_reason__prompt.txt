@@ -1,0 +1,20 @@
+Grade ONLY the "architecture" section from the day's context above.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. Choose among viable options; infer the tradeoffs from the stated constraints.
+
+Main point: a decision that addresses the constraints the scenario states.
+Essential pieces: the tradeoffs between the options, weighed rather than asserted, and each constraint the scenario actually states (such as scale, team, reliability or tech debt); a constraint it never mentions is not a miss. There is no single correct option, so a different defensible choice with sound reasoning is not a miss. Considering alternatives the question did not list is the kind of addition the rubric credits beyond solid.
+In each "missed" entry, after naming the gap, say in the same entry why it matters for this problem: which constraint the scenario states that the decision or its reasoning leaves unaddressed, and what could happen to this system because of it. There is no single correct option, so never give 'it didn't pick option X' as the reason. This is your reasoning from what the problem states and what the answer wrote, not a checked result. When the reason depends on something the problem doesn't state, say so with "likely" or "could". Never claim the code was run or tested.
+
+Return a single JSON object (NOT wrapped in a "architecture" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — must be an empty string for this section
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

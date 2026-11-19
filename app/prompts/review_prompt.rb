@@ -25,6 +25,11 @@ class ReviewPrompt
 
   APPROACH_NEXT_STEP_WALKTHROUGH = "a short paragraph of two or three sentences: #{APPROACH_START}, then #{NEXT_STEP}".freeze
 
+  MISS_REASON = "In each \"missed\" entry, after naming the gap, say in the same entry why it matters for this problem: %{reason}. " \
+                "This is your reasoning from what the problem states and what the answer wrote, not a checked result. " \
+                "When the reason depends on something the problem doesn't state, say so with \"likely\" or \"could\". " \
+                "Never claim the code was run or tested.".freeze
+
   def self.day_system(coach:, sections:)
     others = sections.size - 1
     others_clause =
@@ -50,20 +55,20 @@ class ReviewPrompt
     CONTEXT
   end
 
-  def self.for_section(key:, section:, answer:, answered:, rung:, approach: false)
+  def self.for_section(key:, section:, answer:, answered:, rung:, approach: false, why: false)
     return walkthrough_prompt(key: key, section: section, rung: rung, approach: approach) unless answered
 
-    section_prompt(key: key, section: section, answer: answer, rung: rung, approach: approach)
+    section_prompt(key: key, section: section, answer: answer, rung: rung, approach: approach, why: why)
   end
 
-  def self.section_prompt(key:, section:, answer:, rung:, approach: false)
+  def self.section_prompt(key:, section:, answer:, rung:, approach: false, why: false)
     kind = ExerciseSection.for(key)
 
     <<~PROMPT
       Grade ONLY the "#{key}" section from the day's context above.
       Pitched at: #{rung} — #{kind.difficulty_definition(rung: rung, section: section)}
 
-      #{kind.grading_note(section: section, answer: answer)}
+      #{kind.grading_note(section: section, answer: answer)}#{miss_reason_line(kind, why)}
 
       #{json_header(key)}
       - "rating": "beginner" | "developing" | "solid" | "strong"
@@ -97,6 +102,11 @@ class ReviewPrompt
     note.empty? ? "" : "#{note}\n\n"
   end
 
+  def self.miss_reason_line(kind, why)
+    reason = kind.miss_reason if why
+    reason ? "\n#{format(MISS_REASON, reason: reason)}" : ""
+  end
+
   def self.json_header(key)
     %(Return a single JSON object (NOT wrapped in a "#{key}" key) with:)
   end
@@ -115,5 +125,5 @@ class ReviewPrompt
     answered ? APPROACH_NEXT_STEP : APPROACH_NEXT_STEP_WALKTHROUGH
   end
 
-  private_class_method :walkthrough_note_block, :json_header, :shared_review_fields, :next_step_instruction
+  private_class_method :walkthrough_note_block, :miss_reason_line, :json_header, :shared_review_fields, :next_step_instruction
 end
