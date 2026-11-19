@@ -251,11 +251,16 @@ class AiService
   end
 
   def duck_response(user, exercise, section:, message:, thread: [])
-    result = call_and_log(user, AiService.request_for("duck_thread",
-      **DuckPrompt.generate(section_data: exercise.problem_set[section.to_s], message: message, thread: thread)))
+    result = duck_call(user, exercise, section, message: message, thread: thread)
 
     text = text_or_raise(result, subject: "duck response")
     result[:truncated] ? "#{text}…" : text
+  end
+
+  def labelled_duck_response(user, exercise, section:, message:, thread:, narrow:)
+    result = duck_call(user, exercise, section, message: message, thread: thread, labelled: true, narrow: narrow)
+
+    DuckReply.read(text_or_raise(result, subject: "duck response"), truncated: result[:truncated])
   end
 
   def critique_pseudocode(user, exercise, section:, pseudocode:)
@@ -397,6 +402,10 @@ class AiService
   end
 
   def problem_statement(exercise, section) = exercise.problem_set.dig(section.to_s, "problem_statement")
+
+  def duck_call(user, exercise, section, **turn)
+    call_and_log(user, AiService.request_for("duck_thread", **DuckPrompt.generate(section_data: exercise.problem_set[section.to_s], **turn)))
+  end
 
   def log_pseudocode_critique(user, gaps_found, gaps)
     Rails.logger.info(

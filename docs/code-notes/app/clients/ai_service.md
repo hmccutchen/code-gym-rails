@@ -138,6 +138,16 @@ language-independent buckets here.
 Returns a plain string, not JSON: there is nothing to parse, and
 `parse_json_object` would only add a way to fail.
 
+## `#labelled_duck_response`
+
+The duck call under `DUCK_NARROWING`. It shares `#duck_call` with
+`#duck_response`, which keeps today's arguments and its plain string, so the
+switch-off path and its specs are untouched. This one asks `DuckPrompt` for
+the label line, passes `narrow:` through, and returns a `DuckReply` built
+from the reply and its `truncated` flag, so a cut-off reply carries no label.
+It reads no switch and no thread state: `ResponsesController#duck_answer`
+decides both.
+
 ## `#critique_pseudocode`
 
 `gaps_found` is a typed boolean because a malformed response also normalizes to

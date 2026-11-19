@@ -1,8 +1,8 @@
 ---
 paths:
-  - "app/clients/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store}.rb"
+  - "app/clients/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store,duck_narrowing}.rb"
   - "app/prompts/{duck_prompt,follow_up_prompt}.rb"
-  - "app/models/{ai_provider,call_profiles,api_usage,monthly_spend,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user}.rb"
+  - "app/models/{ai_provider,call_profiles,api_usage,monthly_spend,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user,duck_reply,duck_thread}.rb"
   - "app/controllers/concerns/{provider_call_limits,provider_failure_rendering,json_errors}.rb"
   - "app/controllers/{application,api_keys,responses,concept_references,daily_exercises}_controller.rb"
   - "app/helpers/generation_failure_helper.rb"
@@ -106,6 +106,30 @@ read it before changing that area.
   cap is six user turns a thread, counted on the server, and a posted `thread`
   is ignored. Threads are kept 365 days (`SweepDuckThreadsJob`), emptied on
   start over, deleted on account deletion, and never rendered after submit.
+- **Duck narrowing when stuck**: a trial behind `DUCK_NARROWING`, on only
+  when exactly `"1"` (`DuckNarrowing.enabled?`), decided by the owner on
+  2026-11-18. The duck stays Socratic. With the switch on, the prompt asks
+  each guiding question to end with a `Point: <two to five words>` line,
+  which `DuckReply.read` strips from the shown text and `DuckThread.append!`
+  stores on that assistant turn as `point`. A cut-off reply, a missing line,
+  or one that is empty, one word, over five words or not last stores no
+  point. `DuckThread#narrowing_due?` opens the gate only when the last two
+  stored assistant turns share a point and both end in `?`; the new message
+  and a posted `thread` are never read. `ResponsesController` alone reads
+  the switch and the gate and passes `narrow:` through
+  `AiService#labelled_duck_response` to `DuckPrompt.generate`, which adds
+  `NARROWING` after the two kinds. With the switch off the call, the prompt
+  and the stored turns are today's, byte for byte. A narrowing reply's first
+  backticked quote is checked against `SectionContext.render`, ignoring
+  whitespace, and logged as `[duck_narrowing] quote=found|missing|none`;
+  every labelled-mode reply logs `[duck_point]`. Neither log holds text, and
+  the reply is shown either way. `#turns_for` returns only role and content,
+  so the point reaches neither the duck's history nor `ExtractLearnerItemsJob`.
+  The cap, Clear (which empties turns and points together), the section
+  allowlist and `CallProfiles` are unchanged, and narrowing replies count
+  toward the cap. A gate that ignores labels is never the fallback: when the
+  labels prove unreliable, the switch goes off and the design returns to the
+  owner. Detail is in `docs/code-notes/app/models/duck_reply.md`.
 - **Per-user request limits** (`docs/decisions/per-user-request-limits.md`):
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call

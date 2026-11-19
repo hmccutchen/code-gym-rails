@@ -66,6 +66,25 @@ that has since been regenerated, and starts over empty.
 
 ## `#turns_for`
 
-Builds each turn from `role` and `content` only. The page's turns value and
-the duck's history both come from here, so anything else stored in an entry,
-such as `cleared`, can't reach either.
+Builds each turn from `role` and `content` only. The page's turns value, the
+duck's history and `ExtractLearnerItemsJob`'s turns all come from here, so
+anything else stored in an entry or a turn, such as `cleared` or an
+assistant turn's `point`, can't reach any of them.
+
+## `.append!`'s `point:`
+
+Stored on the assistant turn only, and left out when nil, so a thread written
+with `DUCK_NARROWING` off is byte for byte what it was. A label typed in a
+user message is just content: nothing parses it.
+
+## `#narrowing_due?`
+
+The duck narrowing gate. It reads the last two stored assistant turns and
+opens only when both end in `?` and share a present point. It compares with
+`uniq.size == 1`, because `uniq.one?` counts truthy values and would read
+`["the loop", nil]` as one label. A dropped label on either turn shuts it,
+and Clear and Start over empty the turns, so they shut it too.
+
+## `#last_point`
+
+The newest assistant turn's point, for the `[duck_point]` log's `matched=`.

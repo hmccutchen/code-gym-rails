@@ -14,12 +14,13 @@ class DuckThread < ApplicationRecord
   end
 
   # Each writer returns the new version, or :deleted, :submitted or :stale for what moved while it waited.
-  def self.append!(exercise, section, message:, answer:, expected_version:, expected_scope:)
+  def self.append!(exercise, section, message:, answer:, expected_version:, expected_scope:, point: nil)
     under_locks(exercise, expected_scope) do
       write(row_for(exercise)) do |row|
         next :stale unless row.version_for(section) == expected_version
 
-        pair = [ { "role" => "user", "content" => message }, { "role" => "assistant", "content" => answer } ]
+        reply = { "role" => "assistant", "content" => answer, "point" => point }.compact
+        pair = [ { "role" => "user", "content" => message }, reply ]
         row.put(section, "turns" => row.stored_turns(section) + pair, "version" => expected_version + 1)
       end
     end
@@ -86,6 +87,14 @@ class DuckThread < ApplicationRecord
   def turns_for(section)
     stored_turns(section).map { |turn| { role: turn["role"], content: turn["content"] } }
   end
+
+  def narrowing_due?(section)
+    last_two = stored_turns(section).select { |turn| turn["role"] == "assistant" }.last(2)
+    last_two.size == 2 && last_two.all? { |turn| DuckReply.question?(turn["content"]) } &&
+      last_two.first["point"].present? && last_two.map { |turn| turn["point"] }.uniq.size == 1
+  end
+
+  def last_point(section) = stored_turns(section).reverse.find { |turn| turn["role"] == "assistant" }&.dig("point")
 
   def user_turn_count(section) = stored_turns(section).count { |turn| turn["role"] == "user" }
   def byte_size(section)       = stored_turns(section).sum { |turn| turn["content"].to_s.bytesize }

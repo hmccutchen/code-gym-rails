@@ -15,3 +15,22 @@ so a duck reply cannot mark its own words as the engineer's.
 
 Owned by the server so its wording sits beside the prompt it is tuned against.
 It counts against the turn cap like any other message.
+
+## `KINDS`, `CONDUCT` and `SYSTEM`
+
+`SYSTEM` is `KINDS` and `CONDUCT` joined the way the single heredoc used to
+be, so its bytes are unchanged and `duck_prompt_characterization_spec` and
+the `duck__*` snapshots hold it. The split is only there so `NARROWING` can
+sit right after the two kinds.
+
+## `labelled:` and `narrow:`
+
+Both default to false, and with both false `.generate` returns today's
+prompt. `labelled: true` adds `POINT_LABEL` after `CONDUCT`, asking each
+guiding question to end on a `Point:` line. The duck never sees its earlier
+labels, because `DuckThread#turns_for` leaves them out, so the line asks for
+the same wording each time rather than telling it to copy a label.
+`narrow: true` adds `NARROWING`, the owner's wording, after `KINDS`. The
+controller passes `narrow:` only together with `labelled: true`. Either
+line changes the system prompt, so a turn that flips one misses the
+provider's cached system prompt once.
