@@ -118,7 +118,7 @@ asks again.
 
 ## The out-of-date banner (`STALE_SET_BANNER`)
 
-`docs/decisions/a-held-set-stays-current.md` ("The out-of-date banner")
+The `A held set stays current` entry in `.claude/rules/answers.md`
 holds the decision. The partial renders `banner: true` and the banner's
 fixed text as values only while `StaleSetBanner.enabled?`, and with
 `bannerValue` false every path above runs as it did before.

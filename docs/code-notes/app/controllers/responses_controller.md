@@ -2,7 +2,7 @@
 
 ## Finding the set
 
-`#create`, `#load_duck_section` (the duck send and Clear) and `#load_pseudocode_context` find their set through `CurrentSetLookup#current_set`, and answer `#render_set_not_current` when it finds none: `errors.set_not_current` with a 404, never a bare `head :not_found`. `#start_over` calls `#carry_held_set_forward_if_named` before `DailyExercise#start_over!`. Under `HELD_SET_LOOKUP` it moves the held set to today only when that set is the response's own (`User#carry_held_set_forward!(only:)`), so a held set's response is dated today before the model's not-today check. Start over on an older stray set moves nothing, and the not-today check still refuses it. `docs/decisions/a-held-set-stays-current.md` lists every caller.
+`#create`, `#load_duck_section` (the duck send and Clear) and `#load_pseudocode_context` find their set through `CurrentSetLookup#current_set`, and answer `#render_set_not_current` when it finds none: `errors.set_not_current` with a 404, never a bare `head :not_found`. `#start_over` calls `#carry_held_set_forward_if_named` before `DailyExercise#start_over!`. Under `HELD_SET_LOOKUP` it moves the held set to today only when that set is the response's own (`User#carry_held_set_forward!(only:)`), so a held set's response is dated today before the model's not-today check. Start over on an older stray set moves nothing, and the not-today check still refuses it. The `A held set stays current` entry in `.claude/rules/answers.md` states the rule.
 
 ## `MAX_DUCK_TURNS_PER_SECTION`
 

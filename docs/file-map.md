@@ -98,7 +98,7 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/trial_allowance.rb` — `TrialAllowance.check!`: the per-account cap and the house-key guard, run ahead of every house-key call
 - `app/models/house_keys.rb` / `trial_mode.rb` — the house keys and guards from ENV, and the kill switch
 - `app/controllers/trials_controller.rb` — `/trial/start` for someone signed out and `/trial` for a keyless account: the code, the provider, the data notice and consent, and a trial's standing once it has begun
-- `app/models/stale_set_notice.rb` — `StaleSetNotice`: the locale key of the out-of-date banner's sentence, from plain values (whether the held set is the shown one, whether the shown set was submitted, the pause, and `MissingSetState`'s answer), and of the newer-set and replaced sentences; reads no record (`docs/decisions/a-held-set-stays-current.md`)
+- `app/models/stale_set_notice.rb` — `StaleSetNotice`: the locale key of the out-of-date banner's sentence, from plain values (whether the held set is the shown one, whether the shown set was submitted, the pause, and `MissingSetState`'s answer), and of the newer-set and replaced sentences; reads no record (the `A held set stays current` entry in `.claude/rules/answers.md`)
 - `app/models/missing_set_state.rb` — `MissingSetState.for`: what a day with no set shows (trial ended, waiting for a provider, generating, failed today, weekend, paused, or start generating), from plain values
 - `app/models/trial_status.rb` — `TrialStatus`: a trial's standing for its pages: days left, today's calls against the cap, the day it ended
 - `script/mint_invite_code.rb` — mints one invite code and prints it once

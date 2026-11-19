@@ -70,7 +70,7 @@ a presence signal may take it away. Both are read only by
 `dashboard/_fresh_day`, which renders them in milliseconds for the
 controller; nothing on the server limits requests by them.
 
-With `HELD_SET_LOOKUP` on, the set that answers is `User#todays_or_held_exercise`, so a held set whose scope matches the page answers `current`: the page's next real request moves it. With `STALE_SET_BANNER` on, a page that shows a set (a non-empty `shown`) when no set answers gets `FRESHNESS_REPLIES[:out_of_date]`, and every reply but `current` carries `banner:`, the sentence `StaleSetNotice` picks (`CurrentSetLookup#out_of_date_sentence`, shared with every not-current reply). With it off the replies are today's, byte for byte. `@stale_set_banner` tells `dashboard/_fresh_day` whether to render the banner's strings. `docs/decisions/a-held-set-stays-current.md` has the rules.
+With `HELD_SET_LOOKUP` on, the set that answers is `User#todays_or_held_exercise`, so a held set whose scope matches the page answers `current`: the page's next real request moves it. With `STALE_SET_BANNER` on, a page that shows a set (a non-empty `shown`) when no set answers gets `FRESHNESS_REPLIES[:out_of_date]`, and every reply but `current` carries `banner:`, the sentence `StaleSetNotice` picks (`CurrentSetLookup#out_of_date_sentence`, shared with every not-current reply). With it off the replies are today's, byte for byte. `@stale_set_banner` tells `dashboard/_fresh_day` whether to render the banner's strings. The rule is the `A held set stays current` entry in `.claude/rules/answers.md`.
 
 Like `#status`, it only reads. It does not call `mark_opened!`, enqueue a
 job, or carry a paused user's held set forward; those belong to `#show`,

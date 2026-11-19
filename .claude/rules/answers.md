@@ -101,25 +101,37 @@ read it before changing that area.
   over and regenerate refuse on it, and `RegenerateExerciseJob` re-checks it
   under `DailyExercise#with_response_locked`. A review in flight
   (`#reviewing?`) blocks too; a claim past its stale window does not.
-- **A held set stays current** (`docs/decisions/a-held-set-stays-current.md`):
-  every action an open dashboard sends finds its set through
-  `CurrentSetLookup#current_set` (`User#current_exercise!`), which carries a
-  paused user's held set forward only under `HELD_SET_LOOKUP`, with the move
-  and locks unchanged. Start over finds its response by id, so it moves the
-  held set only when that is the response's own set. Regenerate posts the
-  page's draft scope, refuses a missing or mismatched one before moving
-  anything (`CurrentSetLookup#shown_set_at`), and moves the held set only when
-  it is the shown one. Finding none answers `errors.set_not_current` with a
-  404 through `#render_set_not_current`, switch or no switch.
-  `DashboardController#freshness` only reads (`#todays_or_held_exercise`).
-  Under `STALE_SET_BANNER` it adds the `out_of_date` answer, and every
+- **A held set stays current**: the owner decided it on 2026-11-18, and on
+  2026-11-19 for #829 and the regenerate guard. Two switches, each on only
+  when exactly `"1"` and deleted after its trial passes: `HELD_SET_LOOKUP`
+  and `STALE_SET_BANNER`. Every action an open dashboard sends finds its set
+  through the one lookup, `CurrentSetLookup#current_set`
+  (`User#current_exercise!`), which carries a paused user's held set forward
+  only under `HELD_SET_LOOKUP`, with the move and locks unchanged. Start over
+  finds its response by id, so it moves the held set only when that is the
+  response's own set. Regenerate posts the page's draft scope, refuses a
+  missing or mismatched one before moving anything
+  (`CurrentSetLookup#shown_set_at`), and moves the held set only when it is
+  the shown one. Finding none answers `errors.set_not_current` with a 404
+  through `#render_set_not_current`, switch or no switch.
+  `DashboardController#freshness` only reads (`#todays_or_held_exercise`),
+  so freshness never writes. Under `STALE_SET_BANNER` it adds the
+  `out_of_date` answer, which never reloads the page by itself, and every
   not-current reply carries `status: "not_current"` and `banner:`, the
   sentence `StaleSetNotice` picks; with it off every reply is today's.
   `code_gym/request` turns that reply into one `code-gym:set-not-current`
-  event, and `fresh_day_controller` shows the banner, never reloading on
-  `out_of_date` and reloading on `stale` only while `saveStatus.unsaved()`
-  is false. Unsent duck or explanation text counts through `watchUnsent`,
-  never `watch`, so it never holds a reload gate.
+  event, and `fresh_day_controller` shows the banner. The page reloads by
+  itself on `stale` only while `saveStatus.unsaved()` is false. Unsent duck
+  or explanation text counts through `watchUnsent`, never `watch`, so it
+  never holds a reload gate. Yesterday's unsubmitted set stays lost from
+  view after a reload without a pause, by the owner's decision of
+  2026-11-19: it happens only when someone works past midnight without
+  pausing, and the banner says so before they reload. Detail is in
+  `docs/code-notes/app/controllers/dashboard_controller.md`,
+  `docs/code-notes/app/controllers/responses_controller.md`,
+  `docs/code-notes/app/controllers/daily_exercises_controller.md`,
+  `docs/code-notes/app/javascript/controllers/fresh_day_controller.md` and
+  `docs/code-notes/app/models/user.md`.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and
