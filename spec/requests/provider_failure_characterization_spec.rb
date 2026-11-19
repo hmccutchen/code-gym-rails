@@ -279,12 +279,13 @@ RSpec.describe "Provider failures as users see them", type: :request do
       end
 
       it "a pseudocode critique under a #{failure} answers 503 and releases its round" do
-        create_exercise("code_review" => { "question" => "q", "snippet" => "s" },
-                        "pseudocode_to_code" => { "title" => "t", "problem_statement" => "Reverse a list in place." })
+        exercise = create_exercise("code_review" => { "question" => "q", "snippet" => "s" },
+                                   "pseudocode_to_code" => { "title" => "t", "problem_statement" => "Reverse a list in place." })
         stub_gemini(FAILURES[failure])
         login_as(user)
 
-        post pseudocode_critique_responses_path, params: { section: "pseudocode_to_code", pseudocode: "loop and swap ends" }, as: :json
+        post pseudocode_critique_responses_path,
+             params: { section: "pseudocode_to_code", pseudocode: "loop and swap ends", draft_scope: exercise.draft_scope }, as: :json
 
         expect_failure_json(kind, "the critique didn't run")
         expect(user.daily_responses.first&.pseudocode_rounds.to_h.dig("pseudocode_to_code", "critiqued_at")).to be_nil

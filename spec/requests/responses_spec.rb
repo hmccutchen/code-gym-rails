@@ -317,6 +317,24 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.find_by(daily_exercise: exercise).answers["code_review"]).to eq("Earlier saved text here.")
     end
 
+    it "adds the server's replaced or newer sentence to the refusal only with STALE_SET_BANNER on" do
+      replaced_scope = exercise.draft_scope
+      exercise.update!(generated_at: 1.second.from_now)
+      yesterday = user.daily_exercises.create!(date: Date.current - 1, generated_at: 1.day.ago, language: "ruby_rails",
+                                               problem_set: exercise.problem_set)
+
+      save_with_scope(replaced_scope)
+      expect(response.parsed_body.keys).to contain_exactly("status", "error")
+
+      stub_env("STALE_SET_BANNER" => "1")
+      save_with_scope(replaced_scope)
+      expect(response.parsed_body).to include("status" => "stale", "banner" => I18n.t("dashboard.stale_set.replaced"))
+
+      save_with_scope(yesterday.draft_scope, submit: true)
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body).to include("status" => "stale", "banner" => I18n.t("dashboard.stale_set.newer"))
+    end
+
     it "refuses a payload written for another day's set" do
       yesterday = user.daily_exercises.create!(date: Date.current - 1, generated_at: 1.day.ago, language: "ruby_rails",
                                                problem_set: exercise.problem_set)

@@ -206,16 +206,26 @@ class User < ApplicationRecord
     end
   end
 
-  def carry_held_set_forward!
+  def carry_held_set_forward!(only: nil)
     Time.use_zone(effective_time_zone) do
       return nil if held_exercise.nil?
 
-      with_lock { recover_held_set }
+      with_lock { recover_held_set(only: only) }
     end
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.warn("Left held exercise in place for user #{id}: #{e.record.errors.full_messages.to_sentence}")
     nil
   end
+
+  def current_exercise!(carry:)
+    today = todays_exercise
+    return today if today || !carry
+
+    carry_held_set_forward!
+    DailyExercise.uncached { todays_exercise }
+  end
+
+  def todays_exercise = daily_exercises.for_date.first
 
   def anonymize!
     with_lock do
@@ -511,7 +521,7 @@ class User < ApplicationRecord
 
   def section_kind_settings = SectionKindSettings.for(self)
 
-  def todays_or_held_exercise(todays = daily_exercises.for_date.first) = todays || held_exercise
+  def todays_or_held_exercise(todays = todays_exercise) = todays || held_exercise
 
   def held_exercise
     return nil unless paused_generation_at?
@@ -571,9 +581,10 @@ class User < ApplicationRecord
     nil
   end
 
-  def recover_held_set
+  def recover_held_set(only: nil)
     held = held_exercise
     return nil if held.nil? || daily_exercises.for_date.exists?
+    return nil if only && held.id != only
 
     carry_forward(held)
   end

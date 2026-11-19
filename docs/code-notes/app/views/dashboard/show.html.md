@@ -36,8 +36,8 @@ its resume link.
 ## Freshness check
 
 `dashboard/_fresh_day` is rendered in every state but `:generating`, where
-the panel's own poll already reloads the page. It is an empty hidden
-element inside `.today-page`: its actions listen on the window and the
-document, so it needs to wrap nothing, and the page's markup stays as it
-was. `docs/code-notes/app/javascript/controllers/fresh_day_controller.md`
+the panel's own poll already reloads the page. It sits right under the page
+header, so the out-of-date banner it holds under `STALE_SET_BANNER` shows
+near the top. With the switch off it is an empty hidden element: its actions
+listen on the window and the document, so it needs to wrap nothing. `docs/code-notes/app/javascript/controllers/fresh_day_controller.md`
 says when it checks.

@@ -1,5 +1,9 @@
 # app/controllers/responses_controller.rb
 
+## Finding the set
+
+`#create`, `#load_duck_section` (the duck send and Clear) and `#load_pseudocode_context` find their set through `CurrentSetLookup#current_set`, and answer `#render_set_not_current` when it finds none: `errors.set_not_current` with a 404, never a bare `head :not_found`. `#start_over` calls `#carry_held_set_forward_if_named` before `DailyExercise#start_over!`. Under `HELD_SET_LOOKUP` it moves the held set to today only when that set is the response's own (`User#carry_held_set_forward!(only:)`), so a held set's response is dated today before the model's not-today check. Start over on an older stray set moves nothing, and the not-today check still refuses it. The `A held set stays current` entry in `.claude/rules/answers.md` states the rule.
+
 ## `MAX_DUCK_TURNS_PER_SECTION`
 
 Double `DailyResponse::MAX_FOLLOW_UPS_PER_SECTION`, because a duck thread is a
@@ -40,16 +44,24 @@ A missing exercise still gets a JSON body, because the client calls
 The provider is called with the stored thread, and the exchange is stored
 only after the reply, under `DuckThread.append!`'s checks.
 
-## `#stale_duck_page?`
+## `#stale_page_scope?`
 
 A page names the set it shows by its draft scope. A tab loaded before a
 regeneration, or left open since yesterday, still reads version 0 for a
 section, which would match the current set's empty thread: the duck would be
 asked about one problem and answer against another, and its Clear would erase
-the current set's thread. So both actions refuse a scope that isn't today's
+the current set's thread. So both duck actions refuse a scope that isn't today's
 set before the provider call or any write, with the same 409 text a stale
 autosave gets. A page loaded before threads were stored sends no scope at
 all, so it gets the same refusal, and its reload loads the new script.
+
+The pseudocode critique uses the same check, through `#stale_page_refusal`,
+which answers the way a stale autosave does: 409, `status: "stale"`, and
+under `STALE_SET_BANNER` the `banner:` from `#stale_set_banner`. Under
+`HELD_SET_LOOKUP` a paused user can have generated a newer set after opening
+an older one, and `#current_set` then carries the newer one forward; without
+this check the older page's plan would be sent to the provider and would use
+up the newer set's single critique.
 
 ## `#stored_thread_refusal`
 
@@ -80,7 +92,10 @@ truthy value and would let the action carry on.
 
 Round 1: one text-only critique of the engineer's plan. The claim, the write
 and the release are `DailyResponse`'s (`#claim_pseudocode_critique!`), and
-the action keeps only the token. A critique whose claim went stale and was
+the action keeps only the token. The posted scope is checked twice: before the
+response is created (`#stale_page_scope?`), and again under the locks where
+the claim is taken, since a regeneration or a start over can land between the
+two; a `:stale` refusal from the claim gets the same 409. A critique whose claim went stale and was
 taken over is still shown to the engineer, since it was paid for, but it is
 not stored: the newer call's result is the one the round keeps, so a reload
 can show a different critique from the one first shown. If the newer call
@@ -92,6 +107,15 @@ Parsons tokens that can't be read mean the set was replaced. The whole post is
 refused with a 409 rather than saved in part.
 
 ## `#stale_draft_scope?`
+
+Under `STALE_SET_BANNER` the 409 also carries `banner:`, the sentence the
+freshness reply would give (`CurrentSetLookup#stale_set_banner`:
+`dashboard.stale_set.replaced` when the posted scope names an earlier write
+of this row, `dashboard.stale_set.newer` otherwise), so the page's banner
+shows the server's words. Its `status` stays `stale`, so `code_gym/request`
+raises no not-current event for it. With the switch off the reply is
+unchanged.
+
 
 Runs under the exercise lock, after `lock!` has re-read the row, so a
 regeneration cannot land between the check and the save. A post that names no

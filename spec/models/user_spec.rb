@@ -2152,6 +2152,88 @@ RSpec.describe User, "#carry_held_set_forward!", type: :model do
       expect(today.reload.date).to eq(Date.current)
     end
   end
+
+  it "moves the held set only when it is the one named by only:" do
+    travel_to(wednesday) do
+      held = exercise_on(Date.current - 1)
+      stray = exercise_on(Date.current - 3)
+      pause_on(Date.current - 1)
+
+      expect(user.carry_held_set_forward!(only: stray.id)).to be_nil
+      expect(held.reload.date).to eq(Date.current - 1)
+      expect(user.carry_held_set_forward!(only: held.id)).to eq(held)
+      expect(held.reload.date).to eq(Date.current)
+    end
+  end
+end
+
+RSpec.describe User, "#current_exercise!", type: :model do
+  include ActiveSupport::Testing::TimeHelpers
+
+  let(:wednesday) { Time.utc(2026, 7, 22, 12) }
+  let(:user) { User.create!(email: "current@example.com", time_zone: "UTC") }
+
+  around { |example| travel_to(wednesday) { example.run } }
+
+  def exercise_on(date)
+    user.daily_exercises.create!(date: date, generated_at: Time.current, problem_set: { "code_review" => { "question" => "q" } })
+  end
+
+  def hold(date)
+    exercise_on(date).tap { user.update!(paused_generation_at: date.in_time_zone("UTC") + 9.hours) }
+  end
+
+  it "matches #todays_exercise, which reads only the set dated today" do
+    hold(Date.current - 1)
+    expect(user.todays_exercise).to be_nil
+
+    today = exercise_on(Date.current)
+    expect(user.todays_exercise).to eq(today)
+  end
+
+  it "returns today's set without moving anything" do
+    held = hold(Date.current - 1)
+    today = exercise_on(Date.current)
+
+    expect(user.current_exercise!(carry: true)).to eq(today)
+    expect(held.reload.date).to eq(Date.current - 1)
+  end
+
+  it "carries the held set and its draft forward and returns it when told to" do
+    held = hold(Date.current - 1)
+    draft = user.daily_responses.create!(daily_exercise: held, date: Date.current - 1, answers: { "code_review" => "wip" })
+
+    expect(user.current_exercise!(carry: true)).to eq(held)
+    expect(held.reload.date).to eq(Date.current)
+    expect(draft.reload.date).to eq(Date.current)
+  end
+
+  it "is today's date lookup with no move when told not to carry" do
+    held = hold(Date.current - 1)
+
+    expect(user.current_exercise!(carry: false)).to be_nil
+    expect(held.reload.date).to eq(Date.current - 1)
+  end
+
+  it "returns nil when nothing is held" do
+    exercise_on(Date.current - 1)
+
+    expect(user.current_exercise!(carry: true)).to be_nil
+  end
+
+  it "keeps evidence dates true: never moves a set whose response was submitted after the held read" do
+    held = hold(Date.current - 1)
+    response = user.daily_responses.create!(daily_exercise: held, date: Date.current - 1, answers: { "code_review" => "wip" })
+    allow(held).to receive(:with_response_locked).and_wrap_original do |original, &work|
+      response.update_columns(submitted_at: Time.current)
+      original.call(&work)
+    end
+    allow(user).to receive(:held_exercise).and_return(held)
+
+    expect(user.current_exercise!(carry: true)).to be_nil
+    expect(held.reload.date).to eq(Date.current - 1)
+    expect(response.reload.date).to eq(Date.current - 1)
+  end
 end
 
 RSpec.describe User, "#recent_exercise_history with dropped sections", type: :model do

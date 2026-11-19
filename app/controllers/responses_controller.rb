@@ -1,6 +1,7 @@
 class ResponsesController < ApplicationController
   include ProviderCallLimits
   include ProviderFailureRendering
+  include CurrentSetLookup
 
   limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
   before_action :set_response, only: [ :review, :review_status, :email_review, :explain_differently, :follow_ups, :start_over ]
@@ -16,12 +17,12 @@ class ResponsesController < ApplicationController
     (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
 
   def create
-    exercise = current_user.daily_exercises.for_date.first
-    return head :not_found unless exercise
+    exercise = current_set
+    return reply_set_not_current unless exercise
 
     outcome = save_answers_under_lock(exercise)
     return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
-    return render_stale_answers if outcome == :stale
+    return render_stale_answers(**stale_set_banner(exercise)) if outcome == :stale
 
     if outcome == :newly_submitted
       GenerateConceptReferenceJob.queue_missing(current_user, exercise.concept_pairs)
@@ -54,6 +55,7 @@ class ResponsesController < ApplicationController
 
   # DELETE /responses/:id/start_over
   def start_over
+    carry_held_set_forward_if_named
     outcome = @response.daily_exercise.start_over!(response_id: @response.id)
     case outcome
     when :reviewed then redirect_to root_path, alert: t("flash.responses.start_over_after_review")
@@ -119,7 +121,7 @@ class ResponsesController < ApplicationController
     exercise, section, message = load_duck_turn
     return unless exercise
     store = DuckThread.for(exercise)
-    return duck_outcome(:stale) if stale_duck_page?(exercise) || params[:version].to_i != store.version_for(section)
+    return duck_outcome(:stale) if stale_page_scope?(exercise) || params[:version].to_i != store.version_for(section)
 
     refusal = stored_thread_refusal(store, section)
     return render_section_error(refusal) if refusal
@@ -137,7 +139,7 @@ class ResponsesController < ApplicationController
   def clear_duck_thread
     exercise, section = load_duck_section
     return unless exercise
-    return duck_outcome(:stale) if stale_duck_page?(exercise)
+    return duck_outcome(:stale) if stale_page_scope?(exercise)
 
     outcome = DuckThread.clear!(exercise, section, expected_scope: params[:draft_scope].to_s)
     duck_outcome(outcome) { |version| { version: version } }
@@ -148,8 +150,9 @@ class ResponsesController < ApplicationController
     return unless (context = load_pseudocode_context)
 
     row, section, pseudocode = context
-    token = row.claim_pseudocode_critique!(section)
-    return render_section_error(critique_busy_message(row, section)) unless token
+    token, refusal = row.claim_pseudocode_critique!(section, shown_scope: params[:draft_scope])
+    return stale_page_refusal(row.daily_exercise) if refusal == :stale
+    return render_section_error(t("errors.responses.pseudocode.#{refusal}")) if refusal
 
     result = AiService.for(current_user).critique_pseudocode(
       current_user, row.daily_exercise, section: section, pseudocode: pseudocode
@@ -203,10 +206,17 @@ class ResponsesController < ApplicationController
     blocker
   end
 
-  def render_stale_answers(message = t("flash.responses.stale_answers"))
+  def reply_set_not_current
+    respond_to do |format|
+      format.json { render_set_not_current }
+      format.html { redirect_to root_path, alert: t("errors.set_not_current") }
+    end
+  end
+
+  def render_stale_answers(message = t("flash.responses.stale_answers"), **banner)
     respond_to do |format|
       format.json do
-        render_json_error(message, status: :conflict, outcome: "stale")
+        render_json_error(message, status: :conflict, outcome: "stale", **banner)
       end
       format.html { redirect_to root_path, alert: message }
     end
@@ -257,8 +267,8 @@ class ResponsesController < ApplicationController
   end
 
   def load_duck_section
-    exercise = current_user.daily_exercises.for_date.first
-    return duck_refusal(t("errors.no_exercise_today"), status: :not_found) unless exercise
+    exercise = current_set
+    return not_current_refusal unless exercise
 
     section = params[:section].to_s
     return duck_refusal(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
@@ -306,7 +316,7 @@ class ResponsesController < ApplicationController
     t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
   end
 
-  def stale_duck_page?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
+  def stale_page_scope?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
 
   # An Integer is the new version; :stale covers a moved version, a regenerated set and a deleted account.
   def duck_outcome(outcome)
@@ -317,17 +327,20 @@ class ResponsesController < ApplicationController
     end
   end
 
+  def not_current_refusal
+    render_set_not_current
+    nil
+  end
+
   def duck_refusal(message, status: :unprocessable_content)
     render_json_error(message, status: status)
     nil
   end
 
   def load_pseudocode_context
-    exercise = current_user.daily_exercises.for_date.first
-    unless exercise
-      render_json_error(t("errors.no_exercise_today"), status: :not_found)
-      return
-    end
+    exercise = current_set
+    return not_current_refusal unless exercise
+    return stale_page_refusal(exercise) if stale_page_scope?(exercise)
 
     section = ExerciseSection::PseudocodeToCode.key
     return pseudocode_error(t("errors.responses.pseudocode.no_section")) unless exercise.active_section_keys.include?(section)
@@ -363,8 +376,9 @@ class ResponsesController < ApplicationController
     current_user.daily_responses.find_by!(date: Date.current)
   end
 
-  def critique_busy_message(row, section)
-    t(row.critiqued?(section) ? "errors.responses.pseudocode.already_checked" : "errors.responses.pseudocode.check_running")
+  def stale_page_refusal(exercise)
+    render_stale_answers(**stale_set_banner(exercise))
+    nil
   end
 
   def pseudocode_error(message)
@@ -378,6 +392,10 @@ class ResponsesController < ApplicationController
 
   def set_response
     @response = current_user.daily_responses.find(params[:id])
+  end
+
+  def carry_held_set_forward_if_named
+    current_user.carry_held_set_forward!(only: @response.daily_exercise_id) if HeldSetLookup.enabled?
   end
 
   def require_reviewed_section!

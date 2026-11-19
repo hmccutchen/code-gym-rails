@@ -179,13 +179,15 @@ class DailyResponse < ApplicationRecord
     Time.zone.parse(claimed_at) > REVIEW_CLAIM_STALE_AFTER.ago
   end
 
-  def claim_pseudocode_critique!(section)
+  def claim_pseudocode_critique!(section, shown_scope:)
     token = Time.current.iso8601(6)
-    with_lock do
-      next if critiqued?(section) || pseudocode_critique_claimed?(section)
+    daily_exercise.with_response_locked do |locked|
+      next [ nil, :stale ] unless locked&.id == id && daily_exercise.draft_scope == shown_scope.to_s
+      next [ nil, :already_checked ] if locked.critiqued?(section)
+      next [ nil, :check_running ] if locked.pseudocode_critique_claimed?(section)
 
-      merge_pseudocode_round!(section, "critique_claimed_at" => token)
-      token
+      locked.merge_pseudocode_round!(section, "critique_claimed_at" => token)
+      [ token, nil ]
     end
   end
 

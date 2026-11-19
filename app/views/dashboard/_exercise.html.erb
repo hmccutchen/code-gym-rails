@@ -41,7 +41,7 @@
   <% submit_blocker = response.submit_blocker %>
   <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
                        unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
-  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow"
+  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft"
        data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
        data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"

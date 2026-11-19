@@ -1,7 +1,11 @@
 class DailyExercisesController < ApplicationController
-  REGENERATION_BLOCKED = {
-    reviewed:  "flash.daily_exercises.already_reviewed",
-    reviewing: "flash.daily_exercises.review_in_progress"
+  include CurrentSetLookup
+
+  REGENERATION_REFUSED = {
+    stale:               "flash.daily_exercises.regenerate_stale",
+    reviewed:            "flash.daily_exercises.already_reviewed",
+    reviewing:           "flash.daily_exercises.review_in_progress",
+    already_regenerated: "flash.daily_exercises.already_regenerated"
   }.freeze
 
   GENERATE_PER_HOUR = 3
@@ -28,14 +32,11 @@ class DailyExercisesController < ApplicationController
   def regenerate
     return redirect_to root_path, alert: trial_ended_text(:regeneration) if current_user.trial_ended?
 
-    exercise = current_user.daily_exercises.for_date.first
-    return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
+    exercise, refusal = set_to_regenerate
+    return redirect_to root_path, alert: t(refusal) if refusal
 
-    blocker = exercise.daily_response&.replace_blocker
-    return redirect_to root_path, alert: t(REGENERATION_BLOCKED.fetch(blocker)) if blocker
-
-    claim = exercise.claim_regenerating!(regenerated_at: nil)
-    return redirect_to root_path, alert: t("flash.daily_exercises.already_regenerated") unless claim
+    claim, refused = exercise.claim_regeneration!(shown_scope: params[:draft_scope])
+    return redirect_to root_path, alert: t(REGENERATION_REFUSED.fetch(refused)) if refused
 
     current_user.clear_generation_failure!
     # The claim is committed, so release it on an enqueue failure or the user waits behind a spinner nobody clears.
@@ -51,6 +52,17 @@ class DailyExercisesController < ApplicationController
   end
 
   private
+
+  def set_to_regenerate
+    shown = shown_set_at(params[:draft_scope])
+    return [ nil, "flash.daily_exercises.regenerate_stale" ] unless shown
+
+    current_user.carry_held_set_forward!(only: shown.id) if HeldSetLookup.enabled?
+    today = DailyExercise.uncached { current_user.todays_exercise }
+    return [ nil, "flash.daily_exercises.nothing_to_regenerate" ] unless today
+
+    today == shown ? [ today, nil ] : [ nil, "flash.daily_exercises.regenerate_stale" ]
+  end
 
   def trial_ended_text(surface)
     ProviderFailureText.new("trial_ended", provider: current_user.provider, surface: surface, failed_at: Time.current,

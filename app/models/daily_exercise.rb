@@ -39,6 +39,8 @@ class DailyExercise < ApplicationRecord
 
   def self.acknowledge_unopened!(today:, at: Time.current) = unopened_before(today).update_all(opened_at: at)
 
+  def self.set_id_from_scope(scope) = scope.to_s[DRAFT_SCOPE_FORMAT, 1]
+
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
   end
@@ -148,6 +150,18 @@ class DailyExercise < ApplicationRecord
     end
   end
 
+  def claim_regeneration!(shown_scope:)
+    with_response_locked do |response|
+      next [ nil, :stale ] unless draft_scope == shown_scope.to_s
+
+      blocker = response&.replace_blocker
+      next [ nil, blocker ] if blocker
+
+      claim = claim_regenerating!(regenerated_at: nil)
+      claim ? [ claim, nil ] : [ nil, :already_regenerated ]
+    end
+  end
+
   # The owner first: inserting a response takes a key-share lock on it, which AccountDeletion holds before the exercise.
   def with_response_locked
     transaction do
@@ -176,10 +190,9 @@ class DailyExercise < ApplicationRecord
   def written_stamp = generated_at.strftime("%s%6N")
 
   def rewritten_since?(scope)
-    shown = scope.to_s.match(DRAFT_SCOPE_FORMAT)
-    return false unless shown
+    return false unless self.class.set_id_from_scope(scope) == id.to_s
 
-    shown[1] == id.to_s && shown[2].to_i < written_stamp.to_i
+    scope.to_s[DRAFT_SCOPE_FORMAT, 2].to_i < written_stamp.to_i
   end
 
   def tagged_concept(key)

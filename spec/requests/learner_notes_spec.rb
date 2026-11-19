@@ -119,6 +119,32 @@ RSpec.describe "PATCH /learner_note", type: :request do
     expect(note).to be_nil
   end
 
+  describe "the conflict reply's banner sentence" do
+    def save_to_replaced_set
+      exercise = create_exercise_for(user)
+      shown_scope = exercise.draft_scope
+      exercise.update!(generated_at: 1.minute.from_now)
+      login_as(user)
+      save_note("for the replaced set", scope: shown_scope)
+      expect(response).to have_http_status(:conflict)
+    end
+
+    it "carries the sentence the server picks with STALE_SET_BANNER on" do
+      stub_env("STALE_SET_BANNER" => "1")
+
+      save_to_replaced_set
+
+      expect(reply["banner"]).to eq(I18n.t("dashboard.stale_set.replaced"))
+      expect(note).to be_nil
+    end
+
+    it "has no banner key with STALE_SET_BANNER off" do
+      save_to_replaced_set
+
+      expect(reply).to eq("status" => "error", "error" => I18n.t("flash.responses.stale_answers"))
+    end
+  end
+
   it "is read-only once the day is submitted" do
     exercise = create_exercise_for(user)
     login_as(user)

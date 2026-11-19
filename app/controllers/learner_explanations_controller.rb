@@ -3,6 +3,7 @@ class LearnerExplanationsController < ApplicationController
   include ProviderFailureRendering
   include LearnerNotesGate
   include LearnerNoteQuestions
+  include CurrentSetLookup
 
   limit_provider_calls only: [ :reply ]
 
@@ -22,8 +23,8 @@ class LearnerExplanationsController < ApplicationController
   def create
     return render_json_error(t("learner_notes.note.unavailable"), status: :not_found) unless learner_notes_on?
 
-    exercise = current_user.daily_exercises.for_date.first
-    return render_json_error(t("errors.no_exercise_today"), status: :not_found) unless exercise
+    exercise = current_set
+    return render_set_not_current unless exercise
 
     text = UserText.normalize(params[:explanation]).strip
     refusal = text_refusal(text)
@@ -41,8 +42,10 @@ class LearnerExplanationsController < ApplicationController
   def reply
     return render_json_error(t("learner_notes.note.unavailable"), status: :not_found) unless learner_notes_on?
 
-    exercise = current_user.daily_exercises.for_date.first
-    note = exercise && LearnerNote.find_by(daily_exercise: exercise)
+    exercise = current_set
+    return render_set_not_current unless exercise
+
+    note = LearnerNote.find_by(daily_exercise: exercise)
     return render_json_error(t("learner_notes.reply.no_explanation"), status: :unprocessable_content) if note&.explanation.blank?
     return render_moved(exercise) unless note.shows_explanation?(**shown_explanation)
 
@@ -54,8 +57,8 @@ class LearnerExplanationsController < ApplicationController
   def reply_status
     return render_json_error(t("learner_notes.note.unavailable"), status: :not_found) unless learner_notes_on?
 
-    exercise = current_user.daily_exercises.for_date.first
-    return render_json_error(t("learner_notes.reply.no_explanation"), status: :conflict) unless exercise
+    exercise = current_set
+    return render_set_not_current unless exercise
 
     render_reply_box(exercise) { |html| render json: { status: "ok", html: html } }
   end

@@ -120,6 +120,31 @@ later save from the same out-of-date page. The level suggestion card and the
 exercise mix both use it. Pull-to-refresh keeps its own loop, because it polls
 faster, cancels when the pull ends and resets its spinner instead.
 
+## `watchUnsent()`, `unsaved()` and `leaveDiscarding()`
+
+The out-of-date banner (`docs/code-notes/app/javascript/controllers/fresh_day_controller.md`)
+needs to know whether a reload would lose anything the person typed.
+`unsaved()` is the one statement of that rule: `pending()`, a failure under
+any key that was not carried, or a probe registered through `watchUnsent`.
+It takes keys to leave out, as `settled` does: the answer form's refused
+autosave asks with `answers` left out, since that refusal is the conflict
+being handled, not something else a reload would lose.
+
+Those probes are kept apart from `watch` on purpose. A `watch` probe counts
+toward `pending()`, and every gate above waits for `pending()` to clear. Text
+typed into the duck box or the explanation box is never saved on its own, so
+a probe for it would never clear: the answer form's reloads and the fresh-day
+reload would wait out the ten-second limit and strand, and pull-to-refresh
+would never reload. An unsent box only matters to the banner, so only
+`unsaved()` reads it. The duck and explanation controllers each register one
+in `initialize()`, guarded by `isConnected`, since the explanation box
+replaces its own element and the old controller's probe stays in the list.
+
+`leaveDiscarding(leave)` is the banner's Reload: `leaveWhenSaved` with every
+key that has a failure ignored, and `leave` as the stranded callback too, run
+once. So an in-flight save lands first, and nothing that failed, before the
+press or during the wait, holds the reload past the wait limit.
+
 ## `queue()` and `queued()`
 
 A control whose saves must not overlap queues them under its key. Without

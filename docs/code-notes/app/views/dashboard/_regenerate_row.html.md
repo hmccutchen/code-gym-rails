@@ -11,7 +11,9 @@ it.
 
 `turbo_confirm` would do nothing here, because Turbo JS is not loaded. The
 layout's loading-form script provides the confirmation and the in-flight
-spinner. The request then blocks on the provider (10 to 30 seconds) until the
+spinner. The form posts `exercise.draft_scope`, which
+`DailyExercisesController#regenerate` checks before it replaces anything.
+The request then blocks on the provider (10 to 30 seconds) until the
 redirect lands.
 
 ## Locked while a submit runs

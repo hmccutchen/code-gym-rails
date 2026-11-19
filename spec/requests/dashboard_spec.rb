@@ -97,7 +97,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
     source = Rails.root.join("app/javascript/controllers/answer_form_controller.js").read
     carried = source.scan(/saveStatus\.carry\("answers",[^\n]*\n\s*(?:window\.location\.reload\(\)|return this\.reloadWhenOtherSavesLand\(\))/)
-    delegated = source.scan(/if \((\w+)\.status === 409\) \{\s*return this\.leaveWhenOtherSavesLand\(\(\) => this\.reloadAfterSubmit\(\1, true\)/)
+    delegated = source.scan(/if \((\w+)\.status === 409\) \{\s*(?:if \(this\.bannerTookStale\(\1\.data[^\n]*\n\s*)?return this\.leaveWhenOtherSavesLand\(\(\) => this\.reloadAfterSubmit\(\1, true\)/)
     expect(carried.length + delegated.length).to eq(source.scan(/status === 409/).length)
     expect(carried).not_to be_empty
   end
@@ -176,11 +176,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       expect(page_html.css(".regenerate-row").size).to eq(1)
     end
 
-    it "reloads the answer form through its controller when the browser restores the page from its back-forward cache" do
+    it "binds the answer form's back-forward-cache restore and the banner's discard to its controller" do
       create_exercise
       get root_path
 
-      expect(page_html.at_css(".today-day")["data-action"]).to eq("pageshow@window->answer-form#pageShow")
+      expect(page_html.at_css(".today-day")["data-action"])
+        .to eq("pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft")
     end
 
     it "drives the review button on a submitted day with the loading-form controller" do

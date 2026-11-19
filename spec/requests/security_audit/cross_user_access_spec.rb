@@ -74,7 +74,7 @@ RSpec.describe "Cross-user access", type: :request do
 
   describe "POST /regenerate" do
     it "leaves another user's set alone" do
-      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+      expect { post regenerate_path, params: { draft_scope: owner_exercise.draft_scope } }.not_to have_enqueued_job(RegenerateExerciseJob)
 
       expect(owner_exercise.reload.regenerating_since).to be_nil
       expect(owner_exercise.regenerated_at).to be_nil

@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import request from "code_gym/request"
+import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
   static targets = ["question", "section", "input", "save", "status", "reply", "replyStatus", "replyFocus", "replyPending"]
@@ -7,6 +8,10 @@ export default class extends Controller {
   static values = { url: String, draftScope: String, responseId: String, failedText: String, savedText: String, replyUrl: String,
                     askReply: Boolean, waitingText: String, replyFailedText: String, noteId: String, explanationStamp: String,
                     replyStatusUrl: String, pollSeconds: Number }
+
+  initialize() {
+    saveStatus.watchUnsent(() => this.element.isConnected && this.hasInputTarget && this.inputTarget.value.trim() !== this.inputTarget.defaultValue.trim())
+  }
 
   connect() {
     if (this.askReplyValue) this.askReply()
@@ -67,7 +72,7 @@ export default class extends Controller {
   }
 
   shownExplanation() {
-    return { note_id: this.noteIdValue, explanation_stamp: this.explanationStampValue }
+    return { note_id: this.noteIdValue, explanation_stamp: this.explanationStampValue, draft_scope: this.draftScopeValue }
   }
 
   offerRetry(retry) {

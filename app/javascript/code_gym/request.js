@@ -16,6 +16,11 @@ function appMessage(data) {
   return data && typeof data.status === "string" && typeof data.error === "string" ? data.error : null;
 }
 
+function announceNotCurrent(data) {
+  if (data?.status !== "not_current") return;
+  window.dispatchEvent(new CustomEvent("code-gym:set-not-current", { detail: { banner: data.banner } }));
+}
+
 export async function send(method, url, body, options) {
   const fallback = options?.fallback ?? "";
   const headers = { "Accept": "application/json", "X-CSRF-Token": csrf() };
@@ -38,6 +43,7 @@ export async function send(method, url, body, options) {
   }
 
   const data = await read(response);
+  announceNotCurrent(data);
   if (response.ok) return { ok: true, status: response.status, data: data, message: null, signedOut: false };
   return { ok: false, status: response.status, data: data, message: appMessage(data) || fallback, signedOut: false };
 }

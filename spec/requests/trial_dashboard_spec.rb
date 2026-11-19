@@ -82,7 +82,7 @@ RSpec.describe "Trial accounts on the dashboard", type: :request do
       expect(response.body).to include("Your trial has ended.")
       expect(response.body).not_to include(regenerate_path)
 
-      post regenerate_path
+      post regenerate_path, params: { draft_scope: exercise.draft_scope }
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq(ended_sentence("the new set wasn't generated"))

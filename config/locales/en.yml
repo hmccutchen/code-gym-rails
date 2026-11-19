@@ -254,7 +254,8 @@ en:
       no_changes: "No changes made."
       preferences_saved: "Preferences saved!"
     daily_exercises:
-      nothing_to_regenerate: "No exercise set to regenerate yet."
+      nothing_to_regenerate: "This set is no longer current, so it wasn't replaced."
+      regenerate_stale: "This page was out of date, so nothing was replaced."
       generate_limited: "You've asked for a new set several times in the last hour. Try again later."
       already_reviewed: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
       review_in_progress: "A review is being generated for today's set — try again in a moment."
@@ -363,7 +364,7 @@ en:
       trial:
         next: "Try again. If it keeps happening, tell the person who runs Coding Gym."
   errors:
-    no_exercise_today: "No exercise set for today."
+    set_not_current: "This set is no longer current. Reload the page to get today's set."
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
     section_not_in_exercise: "That section isn't part of this exercise."
     responses:
@@ -451,6 +452,17 @@ en:
       bug_hunt: "A weekend set's code review is a bug hunt: a few lines of code with one planted trap to find."
     fresh_day:
       replaced: "This set was replaced, so the page now shows the current one."
+    stale_set:
+      starts_generation: "This set is from yesterday, so changes to it can't be saved or submitted. Reloading starts today's set, and yesterday's unsubmitted answers won't be shown again."
+      shows_today: "This set is from yesterday, so changes to it can't be saved or submitted. Reloading shows today's page, and yesterday's unsubmitted answers won't be shown again."
+      carried_forward: "This page is from yesterday, so changes can't be saved or submitted until you reload. Reloading brings this same set forward to today, with the answers saved so far."
+      paused: "This set is from yesterday, so changes to it can't be saved or submitted. Generation is paused, so reloading won't start a new set, and yesterday's unsubmitted answers won't be shown again."
+      submitted: "This page is from yesterday. Reload it to see today's page."
+      newer: "A newer set is ready, so changes to this one can't be saved. Reloading shows the new set."
+      replaced: "This set was replaced, so changes to it can't be saved. Reloading shows the current one."
+      unsaved: "You have changes that weren't saved. Reloading discards them, so copy anything you want to keep first."
+      reload: "Reload"
+      reload_and_discard: "Reload and discard changes"
     teaching_hint:
       summary: "Need a nudge? 💡"
       locked: "Available after you attempt this section"

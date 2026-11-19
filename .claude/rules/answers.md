@@ -1,6 +1,8 @@
 ---
 paths:
   - "app/controllers/{responses,dashboard,daily_exercises}_controller.rb"
+  - "app/controllers/concerns/current_set_lookup.rb"
+  - "app/models/stale_set_notice.rb"
   - "app/models/{daily_response,daily_exercise,concept_exposure_index}.rb"
   - "app/models/exercise_section/**"
   - "app/helpers/{answer_scaffolds,section_status,self_rating}_helper.rb"
@@ -99,6 +101,44 @@ read it before changing that area.
   over and regenerate refuse on it, and `RegenerateExerciseJob` re-checks it
   under `DailyExercise#with_response_locked`. A review in flight
   (`#reviewing?`) blocks too; a claim past its stale window does not.
+- **A held set stays current**: the owner decided it on 2026-11-18, and on
+  2026-11-19 for #829 and the regenerate guard. Two switches, each on only
+  when exactly `"1"` and deleted after its trial passes: `HELD_SET_LOOKUP`
+  and `STALE_SET_BANNER`. Every action an open dashboard sends finds its set
+  through the one lookup, `CurrentSetLookup#current_set`
+  (`User#current_exercise!`), which carries a paused user's held set forward
+  only under `HELD_SET_LOOKUP`, with the move and locks unchanged. Start over
+  finds its response by id, so it moves the held set only when that is the
+  response's own set. Regenerate posts the page's draft scope, refuses a
+  missing or mismatched one before moving anything
+  (`CurrentSetLookup#shown_set_at`), moves the held set only when it is
+  the shown one, and checks the scope again under the locks where it takes
+  the claim (`DailyExercise#claim_regeneration!`). The pseudocode critique
+  refuses a missing or mismatched scope with autosave's 409 before creating,
+  claiming or sending anything, and checks it again under the locks where it
+  claims (`DailyResponse#claim_pseudocode_critique!`). Finding none answers
+  `errors.set_not_current` with a 404 through `#render_set_not_current`,
+  switch or no switch.
+  `DashboardController#freshness` only reads (`#todays_or_held_exercise`),
+  so freshness never writes. Under `STALE_SET_BANNER` it adds the
+  `out_of_date` answer, which never reloads the page by itself, and every
+  not-current reply carries `status: "not_current"` and `banner:`, the
+  sentence `StaleSetNotice` picks; with it off every reply is today's.
+  `code_gym/request` turns that reply into one `code-gym:set-not-current`
+  event, and `fresh_day_controller` shows the banner. The page reloads by
+  itself on `stale`, from freshness or an answer save's 409, only while
+  `saveStatus.unsaved()` is false. A 409 from an answer save, or from the
+  note save Submit sends first, carries the freshness reply's sentence. Reload and discard changes clears the tab's draft copy first.
+  Unsent duck or explanation text counts through `watchUnsent`, never
+  `watch`, so it never holds a reload gate. Yesterday's unsubmitted set stays lost from
+  view after a reload without a pause, by the owner's decision of
+  2026-11-19: it happens only when someone works past midnight without
+  pausing, and the banner says so before they reload. Detail is in
+  `docs/code-notes/app/controllers/dashboard_controller.md`,
+  `docs/code-notes/app/controllers/responses_controller.md`,
+  `docs/code-notes/app/controllers/daily_exercises_controller.md`,
+  `docs/code-notes/app/javascript/controllers/fresh_day_controller.md` and
+  `docs/code-notes/app/models/user.md`.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and

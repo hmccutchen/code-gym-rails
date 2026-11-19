@@ -1,6 +1,7 @@
 // Design notes: docs/code-notes/app/javascript/controllers/duck_thread_controller.md
 import { Controller } from "@hotwired/stimulus"
 import request from "code_gym/request"
+import saveStatus from "code_gym/save_status"
 
 export default class extends Controller {
   static targets = ["body", "toggle", "turns", "input", "send", "explain", "status"]
@@ -17,6 +18,10 @@ export default class extends Controller {
     assistantSpeaker: String,
     turns: Array,
     version: Number
+  }
+
+  initialize() {
+    saveStatus.watchUnsent(() => this.element.isConnected && this.inputTarget.value.trim() !== "")
   }
 
   connect() {

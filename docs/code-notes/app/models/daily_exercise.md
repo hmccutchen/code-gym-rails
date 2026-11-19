@@ -86,7 +86,8 @@ after a Start over. `N` is the server-owned `plan_notes["draft_revision"]`;
 an absent key means zero and keeps the original scope format. A regeneration updates the row in place
 (`PracticeGeneration.commit_replacement`), so the id stays and the time
 moves. The format is written and read only here: `DRAFT_SCOPE_FORMAT` is the
-pattern, and the private `#written_stamp` is the time part.
+pattern, `.set_id_from_scope` reads the id part for every caller, and the
+private `#written_stamp` is the time part.
 
 A non-Hash `plan_notes` also reads as revision zero, with one content-free
 warning per scope read. This keeps the scope reader usable without changing

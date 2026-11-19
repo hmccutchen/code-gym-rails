@@ -13,6 +13,7 @@ let counter = 0;
 
 let requests = 0;
 const probes = [];
+const unsentProbes = [];
 const held = [];
 const carriedKeys = new Set();
 
@@ -22,6 +23,10 @@ function generic() {
 
 export function watch(probe) {
   probes.push(probe);
+}
+
+export function watchUnsent(probe) {
+  unsentProbes.push(probe);
 }
 
 export function queued(key) {
@@ -44,8 +49,16 @@ function waitToSettle(ignored, resolve, waited) {
   resolve(clean(ignored));
 }
 
+function failedOutside(ignored) {
+  return [...failures.keys()].some((key) => !ignored.includes(key) && !carriedKeys.has(key));
+}
+
 function clean(ignored) {
-  return !pending() && ![...failures.keys()].some((key) => !ignored.includes(key) && !carriedKeys.has(key));
+  return !pending() && !failedOutside(ignored);
+}
+
+export function unsaved(...ignored) {
+  return pending() || failedOutside(ignored) || unsentProbes.some((probe) => probe());
 }
 
 export function leaveWhenSaved(leave, stranded, ...ignored) {
@@ -64,6 +77,16 @@ function resumeHeld() {
       entry.leave();
     });
   }, 0);
+}
+
+export function leaveDiscarding(leave) {
+  let left = false;
+  const leaveOnce = () => {
+    if (left) return;
+    left = true;
+    leave();
+  };
+  return leaveWhenSaved(leaveOnce, leaveOnce, ...failures.keys());
 }
 
 export function reloadWhenSaved(conflict, stranded) {
@@ -202,4 +225,5 @@ function reportCarried() {
 
 reportCarried();
 
-export default { save, queue, queued, watch, pending, settled, leaveWhenSaved, reloadWhenSaved, carry, report, clear };
+export default { save, queue, queued, watch, watchUnsent, pending, unsaved, settled, leaveWhenSaved, leaveDiscarding, reloadWhenSaved, carry,
+                 report, clear };

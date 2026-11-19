@@ -101,7 +101,8 @@ no extra save.
 
 `lockForSubmit` makes the note inert too, so a new edit cannot appear while
 the flush is running. A 409 returned by the flush takes the existing
-stale-page reload path without posting answers. A completed autosave's 409
+stale-page path without posting answers: the banner below may take it, and
+otherwise the page reloads. A completed autosave's 409
 is reused without another PATCH only when no new edit is pending; editing
 still schedules a save. The leave gate ignores that note conflict, but
 still waits for unrelated saves and failures; the form stays locked until
@@ -128,6 +129,28 @@ disabled, both boxes stay inert, and no answer POST begins. `request.send`
 has no application timeout or cancellation; this controller adds none.
 The browser regression holds and releases a request to verify the ordering,
 without measuring browser or network timeouts.
+
+## A stale refusal under the out-of-date banner
+
+Before an autosave's, a submit's or the submit's note flush's `409 stale`
+reloads the page, the form raises a cancelable `code-gym:stale-save` window
+event carrying the reply's `banner` sentence and the keys to leave out of
+the unsaved check: `answers` for the autosave, `submit` and `learner_note`
+for the note flush. `fresh_day_controller` cancels it under `STALE_SET_BANNER`
+when `saveStatus.unsaved()` holds or its banner already shows, and shows the
+banner. The form then clears its own draft copy and stops autosaving
+(`stopSavingBehindBanner`), so unsent duck or explanation text stays on the
+page until the person presses the banner's button. A refused submit, or
+a refused note flush, is reported under `submit` and the form unlocks, as a
+not-current submit is.
+When nobody cancels the event, which is always the case with the switch
+off, the reload below runs as before.
+
+The banner's "Reload and discard changes" raises `code-gym:discard-draft`
+right before it reloads, and `#discardDraft` clears the copy this tab owns.
+Without it, a refused edit to a held set that the reload carries forward
+under the same scope and token would be restored and autosaved by the
+reloaded page.
 
 ## Leaving the page waits for other saves
 

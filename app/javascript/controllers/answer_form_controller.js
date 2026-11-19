@@ -167,6 +167,7 @@ export default class extends Controller {
         if (ok) this.settleDraft(data)
         if (!ok && status === 409 && data?.status === "stale") {
           this.draft.clearOwn()
+          if (this.bannerTookStale(data, "answers")) return this.stopSavingBehindBanner()
           saveStatus.carry("answers", this.staleReloadedValue)
           return this.reloadWhenOtherSavesLand()
         }
@@ -188,6 +189,29 @@ export default class extends Controller {
     this.saveTimer = null
     if (!this.formTarget.inert) this.freezeAnswers()
     return saveStatus.leaveWhenSaved(() => this.relockAndLeave(leave), () => this.holdForOtherSaves(), "answers", ...ignored)
+  }
+
+  bannerTookStale(data, ...ignored) {
+    const stale = new CustomEvent("code-gym:stale-save", { cancelable: true, detail: { banner: data?.banner, ignored: ignored } })
+    return !window.dispatchEvent(stale)
+  }
+
+  stopSavingBehindBanner() {
+    this.submitHeld = true
+    clearTimeout(this.saveTimer)
+    this.saveTimer = null
+  }
+
+  discardDraft() {
+    this.stopSavingBehindBanner()
+    this.draft.clearOwn()
+  }
+
+  showStaleSubmitBehindBanner(result) {
+    this.draft.clearOwn()
+    saveStatus.report("submit", result.message)
+    this.unlock()
+    this.stopSavingBehindBanner()
   }
 
   relockAndLeave(leave) {
@@ -267,6 +291,7 @@ export default class extends Controller {
     }
     const note = await this.flushPendingNote()
     if (note.status === 409) {
+      if (this.bannerTookStale(note.data, "submit", "learner_note")) return this.showStaleSubmitBehindBanner(note)
       return this.leaveWhenOtherSavesLand(() => this.reloadAfterSubmit(note, true), "submit", "learner_note")
     }
     if (!note.ok) return this.unlock()
@@ -275,6 +300,7 @@ export default class extends Controller {
     if (result.ok) saveStatus.clear("submit")
     if (result.ok) this.draft.discard()
     const stale = result.status === 409
+    if (stale && this.bannerTookStale(result.data)) return this.showStaleSubmitBehindBanner(result)
     if (result.ok || stale) return this.leaveWhenOtherSavesLand(() => this.leaveAfterSubmit(result, stale), "submit")
 
     const refused = result.status === 422 && Boolean(result.data?.submit_blocker)

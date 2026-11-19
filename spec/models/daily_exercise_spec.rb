@@ -344,6 +344,26 @@ RSpec.describe DailyExercise, type: :model do
     end
   end
 
+  describe ".set_id_from_scope" do
+    it "reads the set id from a draft scope, with or without a revision" do
+      expect(DailyExercise.set_id_from_scope("42-1700000000123456")).to eq("42")
+      expect(DailyExercise.set_id_from_scope("42-1700000000123456-r3")).to eq("42")
+    end
+
+    it "matches the id in a set's own scope" do
+      set = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
+                                  problem_set: { "code_review" => { "question" => "q" } })
+
+      expect(DailyExercise.set_id_from_scope(set.draft_scope)).to eq(set.id.to_s)
+    end
+
+    it "is nil for a blank or malformed scope" do
+      [ nil, "", "42", "abc-123", "42-123-x" ].each do |scope|
+        expect(DailyExercise.set_id_from_scope(scope)).to be_nil
+      end
+    end
+  end
+
   describe "#freshness_against" do
     let(:user) { User.create!(email: "fresh-model@example.com") }
     let(:set) do

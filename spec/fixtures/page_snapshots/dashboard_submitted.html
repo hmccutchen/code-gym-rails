@@ -548,6 +548,15 @@
     </div>
   </div>
 
+    <div hidden
+     data-controller="fresh-day"
+     data-fresh-day-url-value="/dashboard/freshness"
+     data-fresh-day-shown-value="900001-1790694000000000"
+     data-fresh-day-minimum-gap-value="60000"
+     data-fresh-day-notice-shown-for-value="10000"
+     data-fresh-day-replaced-text-value="This set was replaced, so the page now shows the current one."
+     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present code-gym:set-not-current@window->fresh-day#notCurrent code-gym:stale-save@window->fresh-day#staleSave"></div>
+
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
@@ -918,15 +927,6 @@
   </div>
 
   </div>
-
-    <div hidden
-     data-controller="fresh-day"
-     data-fresh-day-url-value="/dashboard/freshness"
-     data-fresh-day-shown-value="900001-1790694000000000"
-     data-fresh-day-minimum-gap-value="60000"
-     data-fresh-day-notice-shown-for-value="10000"
-     data-fresh-day-replaced-text-value="This set was replaced, so the page now shows the current one."
-     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present"></div>
 
 </div>
 
