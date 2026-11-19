@@ -199,26 +199,43 @@ RSpec.describe DailyResponse, type: :model do
       let(:section) { "pseudocode_to_code" }
       let(:response) { response_for({}) }
 
+      def claim(scope = response.daily_exercise.reload.draft_scope)
+        response.claim_pseudocode_critique!(section, shown_scope: scope)
+      end
+
       def record(token)
         response.record_pseudocode_critique!(section, token, pseudocode: "sort then walk", gaps_found: false, gaps: [])
       end
 
       it "returns a token, then refuses a second claim while the first is fresh" do
-        token = response.claim_pseudocode_critique!(section)
+        token, refusal = claim
 
         expect(token).to be_present
+        expect(refusal).to be_nil
         expect(response.reload.pseudocode_round(section)["critique_claimed_at"]).to eq(token)
-        expect(response.claim_pseudocode_critique!(section)).to be_nil
+        expect(claim).to eq([ nil, :check_running ])
       end
 
       it "refuses a claim once the round has been critiqued" do
-        record(response.claim_pseudocode_critique!(section))
+        record(claim.first)
 
-        expect(response.claim_pseudocode_critique!(section)).to be_nil
+        expect(claim).to eq([ nil, :already_checked ])
+      end
+
+      it "refuses a page scope the exercise no longer has, and writes no claim" do
+        expect(claim("#{response.daily_exercise_id}-1")).to eq([ nil, :stale ])
+        expect(response.reload.pseudocode_round(section)).not_to have_key("critique_claimed_at")
+      end
+
+      it "refuses as stale once start over has deleted the response" do
+        scope = response.daily_exercise.draft_scope
+        DailyResponse.where(id: response.id).delete_all
+
+        expect(claim(scope)).to eq([ nil, :stale ])
       end
 
       it "records the critique and releases the claim with the token that took it" do
-        token = response.claim_pseudocode_critique!(section)
+        token, = claim
 
         expect(record(token)).to be(true)
         round = response.reload.pseudocode_round(section)
@@ -228,9 +245,9 @@ RSpec.describe DailyResponse, type: :model do
       end
 
       it "lets a stale claim be taken over, and leaves the new claim alone when the old caller writes or releases" do
-        stale = response.claim_pseudocode_critique!(section)
+        stale, = claim
         travel DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute
-        fresh = response.claim_pseudocode_critique!(section)
+        fresh, = claim
 
         expect(fresh).to be_present
         expect(fresh).not_to eq(stale)
@@ -242,11 +259,11 @@ RSpec.describe DailyResponse, type: :model do
       end
 
       it "hands the round back on release with its own token" do
-        token = response.claim_pseudocode_critique!(section)
+        token, = claim
         response.release_pseudocode_critique!(section, token)
 
         expect(response.reload.pseudocode_round(section)).not_to have_key("critique_claimed_at")
-        expect(response.claim_pseudocode_critique!(section)).to be_present
+        expect(claim.first).to be_present
       end
     end
   end

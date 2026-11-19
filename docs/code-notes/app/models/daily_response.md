@@ -83,8 +83,14 @@ It reuses `REVIEW_CLAIM_STALE_AFTER` on purpose: both checks ask whether a paid 
 ## `#claim_pseudocode_critique!`
 
 Claims the round before the provider call, so the once-per-section cap on a
-paid call also bounds the spend. It returns the token it wrote, or nil when
-the round is critiqued or a fresh claim is in flight.
+paid call also bounds the spend. It returns `[token, nil]`, or `[nil,
+refusal]`: `:stale` when the exercise's draft scope no longer matches the
+page's or the response is gone, `:already_checked` when the round is
+critiqued and `:check_running` while a fresh claim is in flight. The last two
+name the locale keys the controller shows. It takes the locks through
+`DailyExercise#with_response_locked` (user, exercise, response), so the
+scope is read from the locked exercise row and a regeneration or start over
+cannot land between the check and the claim.
 
 This claim doesn't use `Claimable`, because it is a key inside the
 `pseudocode_rounds` JSON column, one per section, and `Claimable` takes a

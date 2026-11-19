@@ -113,7 +113,10 @@ read it before changing that area.
   missing or mismatched one before moving anything
   (`CurrentSetLookup#shown_set_at`), moves the held set only when it is
   the shown one, and checks the scope again under the locks where it takes
-  the claim (`DailyExercise#claim_regeneration!`). Finding none answers
+  the claim (`DailyExercise#claim_regeneration!`). The pseudocode critique
+  refuses a missing or mismatched scope with autosave's 409 before creating,
+  claiming or sending anything, and checks it again under the locks where it
+  claims (`DailyResponse#claim_pseudocode_critique!`). Finding none answers
   `errors.set_not_current` with a 404 through `#render_set_not_current`,
   switch or no switch.
   `DashboardController#freshness` only reads (`#todays_or_held_exercise`),

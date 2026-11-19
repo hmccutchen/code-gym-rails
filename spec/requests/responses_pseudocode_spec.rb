@@ -20,7 +20,8 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
   def critique(params = {})
     post pseudocode_critique_responses_path,
-         params: { section: "pseudocode_to_code", pseudocode: "sort the ranges then walk them" }.merge(params),
+         params: { section: "pseudocode_to_code", pseudocode: "sort the ranges then walk them",
+                   draft_scope: exercise.draft_scope }.merge(params),
          as: :json
   end
 
@@ -224,6 +225,32 @@ RSpec.describe "Pseudocode rounds", type: :request do
 
       critique
       expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    [ [ "a scope from before a regeneration", ->(set) { "#{set.id}-1" } ], [ "no scope", ->(_set) { nil } ] ].each do |name, scope_for|
+      it "refuses #{name} as stale, creating no response and calling no provider" do
+        expect_any_instance_of(FakeService).not_to receive(:critique_pseudocode)
+
+        critique(draft_scope: scope_for.call(exercise))
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body).to include("status" => "stale", "error" => I18n.t("flash.responses.stale_answers"))
+        expect(user.daily_responses).to be_empty
+      end
+    end
+
+    it "claims nothing when the set is regenerated between the scope check and the claim" do
+      expect_any_instance_of(FakeService).not_to receive(:critique_pseudocode)
+      allow_any_instance_of(DailyResponse).to receive(:claim_pseudocode_critique!).and_wrap_original do |original, *args, **kwargs|
+        exercise.update_columns(generated_at: 1.minute.from_now)
+        original.call(*args, **kwargs)
+      end
+
+      critique
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body["status"]).to eq("stale")
+      expect(round).not_to have_key("critique_claimed_at")
     end
 
     it "404s when there is no exercise for today" do

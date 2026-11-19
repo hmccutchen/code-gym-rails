@@ -14,7 +14,7 @@ export default class extends Controller {
     failedText: String
   }
 
-  // One-shot round: stays locked on success, re-enables on failure since the cap wasn't consumed.
+  // One-shot round: stays locked on success or a stale-page refusal, re-enables on other failures since the cap wasn't consumed.
   async critique() {
     if (this.buttonTarget.disabled) return
     this.buttonTarget.disabled = true
@@ -30,8 +30,17 @@ export default class extends Controller {
       this.statusTarget.textContent = ""
     } else {
       this.statusTarget.textContent = result.message || this.failedTextValue
+      if (this.refusedAsStale(result)) return this.offerBanner(data)
       this.buttonTarget.disabled = false
     }
+  }
+
+  refusedAsStale(result) {
+    return result.status === 409 && result.data?.status === "stale"
+  }
+
+  offerBanner(data) {
+    window.dispatchEvent(new CustomEvent("code-gym:stale-save", { cancelable: true, detail: { banner: data.banner, ignored: [] } }))
   }
 
   renderCritique(data) {

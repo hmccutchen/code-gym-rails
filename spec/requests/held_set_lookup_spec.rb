@@ -108,6 +108,50 @@ RSpec.describe "Requests from a page left open on a paused user's held set", typ
     end
   end
 
+  describe "a pseudocode critique from an older set after a newer one was generated while paused" do
+    let!(:older) { set_on(yesterday - 1) }
+
+    before do
+      lookup(true)
+      user.update!(paused_generation_at: older.date.in_time_zone("UTC") + 9.hours)
+    end
+
+    def critique_from(scope)
+      post pseudocode_critique_responses_path,
+           params: { section: "pseudocode_to_code", pseudocode: "the older page's plan", draft_scope: scope }, as: :json
+    end
+
+    it "refuses as stale, creating no response, claiming nothing and calling no provider" do
+      stub_env("STALE_SET_BANNER" => "1")
+      expect_any_instance_of(AiService).not_to receive(:critique_pseudocode)
+
+      critique_from(older.draft_scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(body).to include("status" => "stale", "banner" => I18n.t(StaleSetNotice.newer_set(:stale)))
+      expect(DailyResponse.where(daily_exercise: [ held, older ])).to be_empty
+    end
+
+    it "refuses a request that posts no scope the same way" do
+      expect_any_instance_of(AiService).not_to receive(:critique_pseudocode)
+
+      critique_from(nil)
+
+      expect(response).to have_http_status(:conflict)
+      expect(body["status"]).to eq("stale")
+      expect(DailyResponse.where(daily_exercise: [ held, older ])).to be_empty
+    end
+
+    it "leaves the newer set's critique unclaimed when its response already exists" do
+      draft = user.daily_responses.create!(daily_exercise: held, date: yesterday, answers: { "code_review" => "Draft." })
+
+      critique_from(older.draft_scope)
+
+      expect(response).to have_http_status(:conflict)
+      expect(draft.reload.pseudocode_rounds).to eq({})
+    end
+  end
+
   describe "Start over" do
     let!(:draft) { user.daily_responses.create!(daily_exercise: held, date: yesterday, answers: { "code_review" => "Draft." }) }
 

@@ -121,7 +121,7 @@ class ResponsesController < ApplicationController
     exercise, section, message = load_duck_turn
     return unless exercise
     store = DuckThread.for(exercise)
-    return duck_outcome(:stale) if stale_duck_page?(exercise) || params[:version].to_i != store.version_for(section)
+    return duck_outcome(:stale) if stale_page_scope?(exercise) || params[:version].to_i != store.version_for(section)
 
     refusal = stored_thread_refusal(store, section)
     return render_section_error(refusal) if refusal
@@ -139,7 +139,7 @@ class ResponsesController < ApplicationController
   def clear_duck_thread
     exercise, section = load_duck_section
     return unless exercise
-    return duck_outcome(:stale) if stale_duck_page?(exercise)
+    return duck_outcome(:stale) if stale_page_scope?(exercise)
 
     outcome = DuckThread.clear!(exercise, section, expected_scope: params[:draft_scope].to_s)
     duck_outcome(outcome) { |version| { version: version } }
@@ -150,8 +150,9 @@ class ResponsesController < ApplicationController
     return unless (context = load_pseudocode_context)
 
     row, section, pseudocode = context
-    token = row.claim_pseudocode_critique!(section)
-    return render_section_error(critique_busy_message(row, section)) unless token
+    token, refusal = row.claim_pseudocode_critique!(section, shown_scope: params[:draft_scope])
+    return stale_page_refusal(row.daily_exercise) if refusal == :stale
+    return render_section_error(t("errors.responses.pseudocode.#{refusal}")) if refusal
 
     result = AiService.for(current_user).critique_pseudocode(
       current_user, row.daily_exercise, section: section, pseudocode: pseudocode
@@ -315,7 +316,7 @@ class ResponsesController < ApplicationController
     t("review.follow_ups_used", count: DailyResponse::MAX_FOLLOW_UPS_PER_SECTION)
   end
 
-  def stale_duck_page?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
+  def stale_page_scope?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
 
   # An Integer is the new version; :stale covers a moved version, a regenerated set and a deleted account.
   def duck_outcome(outcome)
@@ -339,6 +340,7 @@ class ResponsesController < ApplicationController
   def load_pseudocode_context
     exercise = current_set
     return not_current_refusal unless exercise
+    return stale_page_refusal(exercise) if stale_page_scope?(exercise)
 
     section = ExerciseSection::PseudocodeToCode.key
     return pseudocode_error(t("errors.responses.pseudocode.no_section")) unless exercise.active_section_keys.include?(section)
@@ -374,8 +376,9 @@ class ResponsesController < ApplicationController
     current_user.daily_responses.find_by!(date: Date.current)
   end
 
-  def critique_busy_message(row, section)
-    t(row.critiqued?(section) ? "errors.responses.pseudocode.already_checked" : "errors.responses.pseudocode.check_running")
+  def stale_page_refusal(exercise)
+    render_stale_answers(**stale_set_banner(exercise))
+    nil
   end
 
   def pseudocode_error(message)

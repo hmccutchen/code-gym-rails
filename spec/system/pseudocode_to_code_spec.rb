@@ -44,6 +44,47 @@ RSpec.describe "Pseudocode to code", type: :system, with_csrf: true do
     end
   end
 
+  describe "a critique from a page whose set was replaced" do
+    def check_a_replaced_page(user)
+      open_dashboard(user)
+      write_plan(PLAN)
+      page.execute_script("document.activeElement.blur()")
+      wait_for_answers_settled
+      yield if block_given?
+      user.daily_exercises.sole.update!(generated_at: 1.minute.from_now)
+      click_button "Check my plan"
+      expect(page).to have_css(".pseudocode-status", text: I18n.t("flash.responses.stale_answers"))
+    end
+
+    it "says the page is out of date, keeps the button disabled and claims nothing" do
+      user = create_fake_provider_user
+
+      travel_to(a_weekday) do
+        check_a_replaced_page(user)
+
+        expect(page).to have_button("Check my plan", disabled: true)
+        expect(page).to have_no_css(".pseudocode-critique li")
+        expect(user.daily_responses.sole.pseudocode_round("pseudocode_to_code")).to eq({})
+      end
+    end
+
+    it "shows the out-of-date banner when other text on the page is unsent" do
+      user = create_fake_provider_user
+      stub_env("STALE_SET_BANNER" => "1")
+
+      travel_to(a_weekday) do
+        check_a_replaced_page(user) do
+          duck = first(".duck-thread[data-duck-thread-section-value='code_review']")
+          duck.find(".duck-toggle").click
+          duck.find(".duck-input").fill_in(with: "Not sent yet")
+        end
+
+        expect(page).to have_css("#stale-set-banner[role='status']", text: I18n.t(StaleSetNotice.newer_set(:replaced)))
+        expect(page).to have_button("Check my plan", disabled: true)
+      end
+    end
+  end
+
   it "keeps the critique button disabled after a reload once the plan has been critiqued" do
     user = create_fake_provider_user
 

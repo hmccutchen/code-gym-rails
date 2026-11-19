@@ -44,16 +44,24 @@ A missing exercise still gets a JSON body, because the client calls
 The provider is called with the stored thread, and the exchange is stored
 only after the reply, under `DuckThread.append!`'s checks.
 
-## `#stale_duck_page?`
+## `#stale_page_scope?`
 
 A page names the set it shows by its draft scope. A tab loaded before a
 regeneration, or left open since yesterday, still reads version 0 for a
 section, which would match the current set's empty thread: the duck would be
 asked about one problem and answer against another, and its Clear would erase
-the current set's thread. So both actions refuse a scope that isn't today's
+the current set's thread. So both duck actions refuse a scope that isn't today's
 set before the provider call or any write, with the same 409 text a stale
 autosave gets. A page loaded before threads were stored sends no scope at
 all, so it gets the same refusal, and its reload loads the new script.
+
+The pseudocode critique uses the same check, through `#stale_page_refusal`,
+which answers the way a stale autosave does: 409, `status: "stale"`, and
+under `STALE_SET_BANNER` the `banner:` from `#stale_set_banner`. Under
+`HELD_SET_LOOKUP` a paused user can have generated a newer set after opening
+an older one, and `#current_set` then carries the newer one forward; without
+this check the older page's plan would be sent to the provider and would use
+up the newer set's single critique.
 
 ## `#stored_thread_refusal`
 
@@ -84,7 +92,10 @@ truthy value and would let the action carry on.
 
 Round 1: one text-only critique of the engineer's plan. The claim, the write
 and the release are `DailyResponse`'s (`#claim_pseudocode_critique!`), and
-the action keeps only the token. A critique whose claim went stale and was
+the action keeps only the token. The posted scope is checked twice: before the
+response is created (`#stale_page_scope?`), and again under the locks where
+the claim is taken, since a regeneration or a start over can land between the
+two; a `:stale` refusal from the claim gets the same 409. A critique whose claim went stale and was
 taken over is still shown to the engineer, since it was paid for, but it is
 not stored: the newer call's result is the one the round keeps, so a reload
 can show a different critique from the one first shown. If the newer call
