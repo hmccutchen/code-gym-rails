@@ -78,6 +78,10 @@ The defaults describe corrected source code. A kind whose improvement is prose o
 
 The review prompt's `improved_code` field line reads this, in the graded prompt (`answered: true`) and in an unanswered section's walkthrough (`answered: false`). The default names the label, or asks for an empty string when the kind has no improved code. Pattern, plan review, pseudocode to code and a multi-file code review override it, and a grading note never repeats it, since the walkthrough leaves grading notes out (#642). Pseudocode to code words its walkthrough without "their plan", since nobody wrote one.
 
+## `.miss_reason`
+
+The review prompt reads this only in a graded section, and only while `REVIEW_MISS_REASON` is on. It names what a "missed" entry's reason is about for the kind, and `ReviewPrompt::MISS_REASON` wraps it. The default is nil, so a kind that hasn't opted in gets no line. Challenge, architecture and pattern override it. The walkthrough never reads it.
+
 ## `.titled_label?`
 
 This is false for kinds whose `problem_set` entry carries no title of its own.

@@ -221,7 +221,7 @@ RSpec.describe ReviewPrompt do
       end
     end
 
-    it "shows a planted key no more often with why on than with it off" do
+    it "shows a planted key no more often with why on than with it off, and never on a step 1 kind" do
       planted = "PLANTED_KEY_TEXT_7f3a"
       opted_in.each do |key|
         section = fake_section(key).merge("answer_key" => { "issue" => planted, "missable_requirements" => [ planted ] })
@@ -231,6 +231,7 @@ RSpec.describe ReviewPrompt do
         end
 
         expect(render.call(true)).to be <= render.call(false), key
+        expect(render.call(true)).to eq(0), key
       end
     end
 
