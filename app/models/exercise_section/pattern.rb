@@ -52,10 +52,11 @@ class ExerciseSection::Pattern < ExerciseSection
   end
 
   def self.review_context(section:, answer:, rating:)
-    <<~CONTEXT.chomp
-      Pattern question (#{section["title"]}): #{section["question"]}
-      #{answer_lines(answer, rating)}
-    CONTEXT
+    [
+      "Pattern question (#{section["title"]}): #{section["question"]}",
+      ("Scenario: #{section["scenario"]}" if section["scenario"].present?),
+      answer_lines(answer, rating)
+    ].compact.join("\n")
   end
 
   def self.grading_note(section:, answer:)

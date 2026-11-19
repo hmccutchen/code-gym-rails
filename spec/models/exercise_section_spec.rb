@@ -1379,6 +1379,22 @@ RSpec.describe ExerciseSection do
       expect(context).not_to include("Scenario:", "Starter code")
     end
 
+    it "carries the pattern's scenario, which the page shows beside the question" do
+      context = ExerciseSection::Pattern.review_context(
+        section: { "title" => "Observer", "question" => "How would you decouple it?",
+                   "scenario" => "checkout that charges a card and sends a receipt" },
+        answer: "a", rating: nil
+      )
+
+      expect(context).to include("Scenario: checkout that charges a card and sends a receipt")
+    end
+
+    it "omits the pattern's scenario line when the section carries none" do
+      context = ExerciseSection::Pattern.review_context(section: { "title" => "Observer", "question" => "How?" }, answer: "a", rating: nil)
+
+      expect(context).not_to include("Scenario:")
+    end
+
     it "carries the architecture options the grading note asks the reviewer to weigh" do
       context = ExerciseSection::Architecture.review_context(
         section: { "title" => "Queue", "question" => "Which?", "scenario" => "10k jobs/min",
