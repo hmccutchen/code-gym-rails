@@ -88,6 +88,13 @@ class DuckThread < ApplicationRecord
     stored_turns(section).map { |turn| { role: turn["role"], content: turn["content"] } }
   end
 
+  def turns_for_duck(section)
+    stored_turns(section).map do |turn|
+      content = turn["role"] == "assistant" ? DuckReply.with_point(turn["content"], turn["point"]) : turn["content"]
+      { role: turn["role"], content: content }
+    end
+  end
+
   def narrowing_due?(section)
     last_two = stored_turns(section).select { |turn| turn["role"] == "assistant" }.last(2)
     last_two.size == 2 && last_two.all? { |turn| DuckReply.question?(turn["content"]) } &&

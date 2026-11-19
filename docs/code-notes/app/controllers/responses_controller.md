@@ -44,29 +44,15 @@ A missing exercise still gets a JSON body, because the client calls
 The provider is called with the stored thread, and the exchange is stored
 only after the reply, under `DuckThread.append!`'s checks.
 
-## `#duck_answer`
+## `DuckAnswer` and the trial logs
 
-The one reader of `DuckNarrowing.enabled?` for the duck. With the switch off
-it makes today's `AiService#duck_response` call with today's arguments and
-stores no point, so nothing changes. With it on, it reads the gate from the
-stored thread (`DuckThread#narrowing_due?`), never from the new message or a
-posted `thread`, and calls `AiService#labelled_duck_response` with `narrow:`.
-The gate is read before the reply is stored, from the same thread the duck is
-sent, so it describes the history the duck saw. It hands back the log as a
-callable beside the answer and point, and `#duck_thread` calls it only when
-`DuckThread.append!` returns the new version, so a reply dropped as
-`:stale`, `:deleted` or `:submitted` writes no trial log line.
-
-## `#log_duck_reply`
-
-Writes the trial's two log lines, neither with any text. `[duck_point]` goes
-out for every reply while the switch is on: `question=` says whether the
-shown text ends in `?`, `labelled=` whether a point was parsed, and
-`matched=` whether it equals the last stored point. Logging every reply, and
-not only questions, lets a cut-off question, which ends in `…`, still count as
-a dropped label. `[duck_narrowing]` goes out only for a reply written with
-`narrow: true`, with the quote outcome from `DuckReply.quote_outcome` against
-the same `SectionContext.render` text the duck was shown.
+`#duck_thread` hands the call to `DuckAnswer.ask` with
+`DuckNarrowing.enabled?`, the one read of the switch for the duck, and stores
+`#text` and `#point` through `DuckThread.append!`. It calls `#log_stored`
+only when `append!` returns the new version, an Integer, so a reply dropped
+as `:stale`, `:deleted` or `:submitted` writes no trial log line. The gate,
+the history and the log lines are described in
+`docs/code-notes/app/services/duck_answer.md`.
 
 ## `#stale_page_scope?`
 

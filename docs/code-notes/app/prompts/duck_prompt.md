@@ -28,10 +28,13 @@ sit right after the two kinds.
 
 Both default to false, and with both false `.generate` returns today's
 prompt. `labelled: true` adds `POINT_LABEL` after `CONDUCT`, asking each
-guiding question to end on a `Point:` line. The duck never sees its earlier
-labels, because `DuckThread#turns_for` leaves them out, so the line asks for
-the same wording each time rather than telling it to copy a label.
-`narrow: true` adds `NARROWING`, the owner's wording, after `KINDS`. The
-controller passes `narrow:` only together with `labelled: true`. Either
+guiding question to end on a `Point:` line. With the switch on the duck's
+history comes from `DuckThread#turns_for_duck`, which puts each stored label
+back as the last line of its assistant turn, so the duck can keep a point's
+wording the same. The line still asks for the same wording each time rather
+than telling it to copy a label. `narrow: true` adds `NARROWING`, the owner's
+wording, after `KINDS`. It says "the exercise section" because the section
+follows it in the system prompt. `DuckAnswer` passes `narrow:` only together
+with `labelled: true`. Either
 line changes the system prompt, so a turn that flips one misses the
 provider's cached system prompt once.

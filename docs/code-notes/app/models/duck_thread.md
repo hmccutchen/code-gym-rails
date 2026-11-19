@@ -67,9 +67,20 @@ that has since been regenerated, and starts over empty.
 ## `#turns_for`
 
 Builds each turn from `role` and `content` only. The page's turns value, the
-duck's history and `ExtractLearnerItemsJob`'s turns all come from here, so
-anything else stored in an entry or a turn, such as `cleared` or an
+switch-off duck history and `ExtractLearnerItemsJob`'s turns all come from
+here, so anything else stored in an entry or a turn, such as `cleared` or an
 assistant turn's `point`, can't reach any of them.
+
+## `#turns_for_duck`
+
+The duck's own history under `DUCK_NARROWING`, and read only by `DuckAnswer`
+with the switch on. It is `#turns_for` with each assistant turn's stored
+`point` written back as a last `Point: <label>` line
+(`DuckReply.with_point`), so the duck sees the labels it gave and can keep a
+point's wording. Only assistant turns get one, and only the server's stored
+point, so a label in a user message or posted data never comes back. User
+turns are still wrapped by `UserText.tag_history` in `DuckPrompt.generate`.
+The owner accepted that the duck may lean on a label it has already given.
 
 ## `.append!`'s `point:`
 

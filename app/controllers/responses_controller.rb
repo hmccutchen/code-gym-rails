@@ -126,11 +126,11 @@ class ResponsesController < ApplicationController
     refusal = stored_thread_refusal(store, section)
     return render_section_error(refusal) if refusal
 
-    answer, point, log = duck_answer(exercise, section, message, store)
-    outcome = DuckThread.append!(exercise, section, message: message, answer: answer, point: point,
+    answer = DuckAnswer.ask(current_user, exercise, section: section, message: message, store: store, narrowing: DuckNarrowing.enabled?)
+    outcome = DuckThread.append!(exercise, section, message: message, answer: answer.text, point: answer.point,
                                  expected_version: store.version_for(section), expected_scope: params[:draft_scope].to_s)
-    log&.call if outcome.is_a?(Integer)
-    duck_outcome(outcome) { |version| { answer: answer, version: version } }
+    answer.log_stored if outcome.is_a?(Integer)
+    duck_outcome(outcome) { |version| { answer: answer.text, version: version } }
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :duck)
   end
@@ -298,27 +298,6 @@ class ResponsesController < ApplicationController
     elsif store.user_turn_count(section) >= MAX_DUCK_TURNS_PER_SECTION
       t("duck.turns_used", count: MAX_DUCK_TURNS_PER_SECTION)
     end
-  end
-
-  def duck_answer(exercise, section, message, store)
-    service = AiService.for(current_user)
-    thread  = store.turns_for(section)
-    return [ service.duck_response(current_user, exercise, section: section, message: message, thread: thread), nil ] unless DuckNarrowing.enabled?
-
-    narrow = store.narrowing_due?(section)
-    reply  = service.labelled_duck_response(current_user, exercise, section: section, message: message, thread: thread, narrow: narrow)
-    previous_point = store.last_point(section)
-    [ reply.text, reply.point, -> { log_duck_reply(exercise, section, reply, narrow: narrow, previous_point: previous_point) } ]
-  end
-
-  def log_duck_reply(exercise, section, reply, narrow:, previous_point:)
-    tag = "user=#{current_user.id} section=#{section}"
-    Rails.logger.info("[duck_point] #{tag} question=#{reply.question?} labelled=#{reply.point.present?} " \
-                      "matched=#{reply.point.present? && reply.point == previous_point}")
-    return unless narrow
-
-    quote = DuckReply.quote_outcome(reply.text, within: SectionContext.render(exercise.problem_set[section]), language: exercise.language)
-    Rails.logger.info("[duck_narrowing] #{tag} quote=#{quote}")
   end
 
   def capped_outcome(outcome, capped_message)

@@ -189,13 +189,14 @@ RSpec.describe "Duck narrowing", type: :request do
       expect(narrowed?).to be(false)
     end
 
-    it "keeps the label out of the history the duck is sent next" do
-      service.replies = [ "What runs first?\nPoint: the loop body" ]
+    it "hands the duck its own stored label back on that assistant turn, and the engineer's turn stays wrapped" do
+      service.replies = [ "What runs first?\nPoint: The loop body" ]
       ask("first")
 
       ask("second")
 
-      expect(service.requests.last.history.to_json).not_to include("Point", "loop body")
+      expect(service.requests.last.history).to eq(UserText.tag_history([ { role: "user", content: "first" },
+                                                                          { role: "assistant", content: "What runs first?\nPoint: the loop body" } ]))
     end
 
     it "counts narrowing replies toward the budget like any other" do
@@ -238,6 +239,26 @@ RSpec.describe "Duck narrowing", type: :request do
         ask("hmm")
 
         expect(Rails.logger).to have_received(:info).with("[duck_narrowing] user=#{user.id} section=code_review quote=none")
+      end
+
+      it "logs a gate-open reply that explains instead of asking as skipped, with no quote result" do
+        store_questions("the loop body", "the loop body")
+        service.replies = [ "The loop calls `sum` once for each customer." ]
+
+        ask("what does this loop do")
+
+        expect(Rails.logger).to have_received(:info).with("[duck_narrowing] user=#{user.id} section=code_review narrowing=skipped")
+        expect(Rails.logger).not_to have_received(:info).with(/quote=/)
+      end
+
+      it "logs a quote result only for a gate-open reply that ends in a question" do
+        store_questions("the loop body", "the loop body")
+        service.replies = [ "Look at `customer.invoices`. What runs there?\nPoint: the loop body" ]
+
+        ask("hmm")
+
+        expect(Rails.logger).to have_received(:info).with("[duck_narrowing] user=#{user.id} section=code_review quote=found")
+        expect(Rails.logger).not_to have_received(:info).with(/narrowing=skipped/)
       end
 
       it "logs no narrowing line when the gate is shut" do
@@ -291,6 +312,17 @@ RSpec.describe "Duck narrowing", type: :request do
       expect(response.parsed_body["answer"]).to eq("What runs first?\nPoint: the loop body")
       expect(stored.stored_turns("code_review").last).to eq("role" => "assistant", "content" => "What runs first?\nPoint: the loop body")
       expect(Rails.logger).not_to have_received(:info).with(/\[duck_(point|narrowing)\]/)
+    end
+
+    it "sends today's history, with no stored label, even after labelled turns" do
+      store_questions("the loop body", "the loop body")
+
+      ask("hmm")
+
+      expect(service.requests.last.history).to eq(UserText.tag_history([ { role: "user", content: "q0" },
+                                                                          { role: "assistant", content: "What does pass 0 ask for?" },
+                                                                          { role: "user", content: "q1" },
+                                                                          { role: "assistant", content: "What does pass 1 ask for?" } ]))
     end
   end
 end

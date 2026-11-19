@@ -97,9 +97,9 @@ RSpec.describe DuckPrompt do
     it "words the narrowing line as the owner decided" do
       expect(described_class::NARROWING).to eq(
         "The engineer has now been asked two questions about the same point. If this message asks for help solving it (kind 2), " \
-        "start by naming one thing in the exercise text above to look at, copied exactly inside backticks, such as a line of code, " \
+        "start by naming one thing in the exercise section to look at, copied exactly inside backticks, such as a line of code, " \
         "a stated requirement or a fact from the scenario. Then ask one guiding question about it. Never name the missing step, " \
-        "the fix or the answer, and never point at anything that isn't in the exercise text above."
+        "the fix or the answer, and never point at anything that isn't in the exercise section."
       )
     end
 

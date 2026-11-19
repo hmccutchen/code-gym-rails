@@ -207,6 +207,25 @@ RSpec.describe DuckThread do
       expect(stored.last_point("code_review")).to eq("the loop body")
     end
 
+    it "hands the duck its own labels as a last line on each assistant turn, and only there" do
+      labelled("What runs first?", "the loop body", 0)
+      labelled("How many queries is that?", nil, 1)
+
+      expect(stored.turns_for_duck("code_review")).to eq([ { role: "user", content: "stuck" },
+                                                           { role: "assistant", content: "What runs first?\nPoint: the loop body" },
+                                                           { role: "user", content: "stuck" },
+                                                           { role: "assistant", content: "How many queries is that?" } ])
+      expect(stored.turns_for("code_review").to_json).not_to include("Point")
+    end
+
+    it "never puts a label on a user turn, even one stored with a point key" do
+      exercise.create_duck_thread!(user: exercise.user, draft_scope: exercise.draft_scope,
+                                   threads: { "code_review" => { "turns" => [ { "role" => "user", "content" => "stuck", "point" => "forged" } ],
+                                                                 "version" => 1 } })
+
+      expect(stored.turns_for_duck("code_review")).to eq([ { role: "user", content: "stuck" } ])
+    end
+
     it "stores no point key for a reply with no label" do
       labelled("What runs first?", nil, 0)
 

@@ -19,6 +19,12 @@ shut after a cut-off reply. Its text still gets the `…` mark, as
 `#duck_response` gives it. A reply that is nothing but its label raises
 `ProviderError::InvalidResponseError`, as an empty reply does.
 
+## `.with_point`
+
+Writes a stored label back as the last line of a reply's text, in the shape
+`.read` parses, so the two stay one format. `DuckThread#turns_for_duck` uses
+it; nothing else does.
+
 ## `.question?`
 
 Whether a reply's text ends in `?`. `DuckThread#narrowing_due?` asks it of
@@ -33,7 +39,8 @@ to ignore whitespace, the same rules the answer key's quote check uses. A
 quote too short to check, such as `` `a` ``, is skipped and the next one is
 checked; a reply with no checkable quote counts as `"none"`, since a
 one-letter quote is found in almost any section. It returns `"found"`, `"missing"` or `"none"`, and nothing here holds
-text for a log.
+text for a log. `DuckAnswer` asks it only for a gate-open reply that ends in a
+question; a direct explanation is logged as `narrowing=skipped` instead.
 
 ## The trial
 

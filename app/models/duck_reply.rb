@@ -17,6 +17,8 @@ class DuckReply < Data.define(:text, :point)
   end
   private_class_method :point_from
 
+  def self.with_point(text, point) = point.present? ? "#{text}\nPoint: #{point}" : text
+
   def self.question?(text) = text.to_s.rstrip.end_with?("?")
 
   def self.quote_outcome(text, within:, language:)

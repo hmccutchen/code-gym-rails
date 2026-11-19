@@ -145,8 +145,8 @@ The duck call under `DUCK_NARROWING`. It shares `#duck_call` with
 switch-off path and its specs are untouched. This one asks `DuckPrompt` for
 the label line, passes `narrow:` through, and returns a `DuckReply` built
 from the reply and its `truncated` flag, so a cut-off reply carries no label.
-It reads no switch and no thread state: `ResponsesController#duck_answer`
-decides both.
+It reads no switch and no thread state: `DuckAnswer.ask` is handed the
+switch and decides the gate and the history.
 
 ## `#critique_pseudocode`
 

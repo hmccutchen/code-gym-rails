@@ -115,21 +115,28 @@ read it before changing that area.
   or one that is empty, one word, over five words or not last stores no
   point. `DuckThread#narrowing_due?` opens the gate only when the last two
   stored assistant turns share a point and both end in `?`; the new message
-  and a posted `thread` are never read. `ResponsesController` alone reads
-  the switch and the gate and passes `narrow:` through
-  `AiService#labelled_duck_response` to `DuckPrompt.generate`, which adds
-  `NARROWING` after the two kinds. With the switch off the call, the prompt
-  and the stored turns are today's, byte for byte. A narrowing reply's first
-  backticked quote is checked against `SectionContext.render`, ignoring
-  whitespace, and logged as `[duck_narrowing] quote=found|missing|none`;
-  every labelled-mode reply logs `[duck_point]`. Neither log holds text, and
-  the reply is shown either way. `#turns_for` returns only role and content,
-  so the point reaches neither the duck's history nor `ExtractLearnerItemsJob`.
+  and a posted `thread` are never read. `ResponsesController` reads the
+  switch and hands it to `DuckAnswer`, the one owner of the trial: it reads
+  the gate and passes `narrow:` through `AiService#labelled_duck_response`
+  to `DuckPrompt.generate`, which adds `NARROWING` after the two kinds. With
+  the switch off the call, the prompt, the history and the stored turns are
+  today's, byte for byte. With it on, the duck's history comes from
+  `DuckThread#turns_for_duck`, which writes each stored point back as a last
+  `Point:` line on its assistant turn; `#turns_for` still returns only role
+  and content, so the point never reaches `ExtractLearnerItemsJob`, the page
+  or any other reader. The log lines are written only once the reply is
+  stored. A gate-open reply that ends in a question has its first checkable
+  backticked quote (`PlantedKey.checkable?`) checked against
+  `SectionContext.render`, ignoring whitespace, and logged as
+  `[duck_narrowing] quote=found|missing|none`; one that explains directly
+  logs `narrowing=skipped`. Every labelled-mode reply logs `[duck_point]`.
+  Neither log holds text, and the reply is shown either way.
   The cap, Clear (which empties turns and points together), the section
   allowlist and `CallProfiles` are unchanged, and narrowing replies count
   toward the cap. A gate that ignores labels is never the fallback: when the
   labels prove unreliable, the switch goes off and the design returns to the
-  owner. Detail is in `docs/code-notes/app/models/duck_reply.md`.
+  owner. Detail is in `docs/code-notes/app/services/duck_answer.md` and
+  `docs/code-notes/app/models/duck_reply.md`.
 - **Per-user request limits** (`docs/decisions/per-user-request-limits.md`):
   Limits guard a trial's house key, so own-key accounts skip them
   (`ApplicationController#own_key?`). Every endpoint billing one provider call
