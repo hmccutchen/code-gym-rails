@@ -16,3 +16,10 @@ own element rather than interpolated.
 A successful round consumes the section's single critique, so the button goes
 and stays away. A failed one consumed nothing, so the button comes back and the
 engineer can try again.
+
+## The draft scope
+
+The critique posts the answer form's draft scope, read from the nearest
+`data-answer-form-draft-scope-value` as the duck does, so a not-current
+refusal can carry the banner sentence for the set the page shows
+(`CurrentSetLookup#posted_draft_scope`).

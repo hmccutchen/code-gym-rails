@@ -29,6 +29,16 @@ a status check.
 - Otherwise the caller's `fallback`: an HTML error page, an unreadable body or
   a dropped connection all show the page's own wording.
 
+## The not-current event
+
+A reply whose `status` is `not_current` (sent only under `STALE_SET_BANNER`,
+by `CurrentSetLookup#render_set_not_current`) makes `send` dispatch one
+`code-gym:set-not-current` event on `window`, with the reply's `banner`
+sentence as `detail.banner`. The return value is unchanged, so each caller
+still shows its own refusal. `fresh_day_controller` listens for it and shows
+the out-of-date banner, so no caller needs its own handling for a set that
+stopped being current.
+
 ## `csrf()`
 
 The lookup is optional-chained: with forgery protection off, as in the test

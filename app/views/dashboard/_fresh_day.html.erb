@@ -1,5 +1,5 @@
 <%# Required locals: shown, the draft scope of the set this page renders (nil when none), and banner, whether StaleSetBanner is on. Notes: docs/code-notes/app/javascript/controllers/fresh_day_controller.md %>
-<div hidden
+<div <%= "hidden" unless banner %>
      data-controller="fresh-day"
      data-fresh-day-url-value="<%= dashboard_freshness_path %>"
      data-fresh-day-shown-value="<%= shown %>"
@@ -12,4 +12,12 @@
      data-fresh-day-reload-label-value="<%= t("dashboard.stale_set.reload") %>"
      data-fresh-day-discard-label-value="<%= t("dashboard.stale_set.reload_and_discard") %>"
 <% end %>
-     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present"></div>
+     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present code-gym:set-not-current@window->fresh-day#notCurrent"><% if banner %>
+  <div id="stale-set-banner" class="section stale-set-banner" role="status" hidden data-fresh-day-target="banner">
+    <div class="stale-set-banner-text">
+      <p data-fresh-day-target="sentence"></p>
+      <p data-fresh-day-target="unsaved" hidden></p>
+    </div>
+    <button type="button" class="btn btn-primary" data-fresh-day-target="reload" data-action="fresh-day#reloadNow"><%= t("dashboard.stale_set.reload") %></button>
+  </div>
+<% end %></div>

@@ -13,6 +13,9 @@
     </div>
   </div>
 
+  <% unless @content_state == :generating %>
+    <%= render "dashboard/fresh_day", shown: @exercise&.draft_scope, banner: @stale_set_banner %>
+  <% end %>
   <% if @trial_status %>
     <%= render "dashboard/trial_banner", status: @trial_status %>
   <% end %>
@@ -41,8 +44,5 @@
     <div class="featured-compact">
       <%= render "shared/featured_concept", featured: featured_concept, day_response: @response %>
     </div>
-  <% end %>
-  <% unless @content_state == :generating %>
-    <%= render "dashboard/fresh_day", shown: @exercise&.draft_scope, banner: @stale_set_banner %>
   <% end %>
 </div>

@@ -111,6 +111,11 @@ read it before changing that area.
   Under `STALE_SET_BANNER` it adds the `out_of_date` answer, and every
   not-current reply carries `status: "not_current"` and `banner:`, the
   sentence `StaleSetNotice` picks; with it off every reply is today's.
+  `code_gym/request` turns that reply into one `code-gym:set-not-current`
+  event, and `fresh_day_controller` shows the banner, never reloading on
+  `out_of_date` and reloading on `stale` only while `saveStatus.unsaved()`
+  is false. Unsent duck or explanation text counts through `watchUnsent`,
+  never `watch`, so it never holds a reload gate.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and

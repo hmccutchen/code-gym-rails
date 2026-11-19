@@ -4,14 +4,21 @@ import request from "code_gym/request"
 import saveStatus from "code_gym/save_status"
 
 const REPLACED_NOTICE = "replaced"
+const BANNER_REFRESH_MS = 250
 
 export default class extends Controller {
+  static targets = ["banner", "sentence", "unsaved", "reload"]
+
   static values = {
     url: String,
     shown: String,
     minimumGap: Number,
     noticeShownFor: Number,
-    replacedText: String
+    replacedText: String,
+    banner: Boolean,
+    unsavedText: String,
+    reloadLabel: String,
+    discardLabel: String
   }
 
   connect() {
@@ -24,6 +31,7 @@ export default class extends Controller {
 
   disconnect() {
     this.stopped = true
+    clearInterval(this.bannerRefresh)
   }
 
   present() {
@@ -48,10 +56,47 @@ export default class extends Controller {
 
     const { data } = await request.get(`${this.urlValue}?${new URLSearchParams({ shown: this.shownValue })}`)
     this.checking = false
-    if (this.stopped || data?.stale !== true) return
+    if (this.stopped) return
+    if (this.bannerValue && this.answeredWithBanner(data)) return
+    if (data?.stale !== true) return
 
     this.stopped = true
     saveStatus.leaveWhenSaved(() => this.reload(data.replaced === true), () => {})
+  }
+
+  answeredWithBanner(data) {
+    const outOfDate = data?.out_of_date === true
+    if (!outOfDate && !(data?.stale === true && saveStatus.unsaved())) return false
+
+    this.showBanner(data.banner)
+    return true
+  }
+
+  notCurrent(event) {
+    if (this.bannerValue && this.hasBannerTarget) this.showBanner(event.detail?.banner)
+  }
+
+  showBanner(sentence) {
+    this.stopped = true
+    if (this.bannerTarget.hidden) {
+      this.unsavedTarget.textContent = this.unsavedTextValue
+      this.refreshBanner()
+      this.bannerTarget.hidden = false
+      this.bannerRefresh = setInterval(() => this.refreshBanner(), BANNER_REFRESH_MS)
+    }
+    if (typeof sentence === "string" && sentence !== "") this.sentenceTarget.textContent = sentence
+  }
+
+  refreshBanner() {
+    const unsaved = saveStatus.unsaved()
+    this.unsavedTarget.hidden = !unsaved
+    this.reloadTarget.textContent = unsaved ? this.discardLabelValue : this.reloadLabelValue
+  }
+
+  reloadNow() {
+    this.reloadTarget.disabled = true
+    clearInterval(this.bannerRefresh)
+    saveStatus.leaveDiscarding(() => window.location.reload())
   }
 
   reload(replaced) {

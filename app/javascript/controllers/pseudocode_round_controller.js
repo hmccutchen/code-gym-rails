@@ -21,7 +21,7 @@ export default class extends Controller {
     this.statusTarget.textContent = this.workingTextValue
 
     const result = await request.send("POST", this.urlValue,
-      { section: this.sectionValue, pseudocode: this.answerField()?.value },
+      { section: this.sectionValue, pseudocode: this.answerField()?.value, draft_scope: this.draftScope() },
       { fallback: this.failedTextValue })
     const data = result.data
 
@@ -52,6 +52,10 @@ export default class extends Controller {
       list.appendChild(item)
     })
     this.outputTarget.append(label, list)
+  }
+
+  draftScope() {
+    return this.element.closest("[data-answer-form-draft-scope-value]")?.dataset.answerFormDraftScopeValue ?? ""
   }
 
   answerField() {

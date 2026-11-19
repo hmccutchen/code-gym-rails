@@ -83,3 +83,11 @@ controls enabled, so the dropped reply does not have to.
 
 The input's action is `keydown.enter->duck-thread#send:prevent`. The
 `:prevent` option is what the handler's own `preventDefault` used to do.
+
+## Unsent text
+
+`initialize()` registers one `saveStatus.watchUnsent` probe: the box holds
+text that has not been sent. The out-of-date banner reads it through
+`saveStatus.unsaved()` to say that Reload discards changes. It is not a
+`watch` probe, because typed text never saves on its own and would hold
+every reload gate (`docs/code-notes/app/javascript/code_gym/save_status.md`).

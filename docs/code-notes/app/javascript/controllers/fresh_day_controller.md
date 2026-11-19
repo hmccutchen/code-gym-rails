@@ -115,3 +115,66 @@ one, because it tells the reader a change was lost:
 A failed request, or the login redirect an expired session gets, carries no
 `stale: true`, so the page stays as it is and the next signal after the gap
 asks again.
+
+## The out-of-date banner (`STALE_SET_BANNER`)
+
+`docs/decisions/a-held-set-stays-current.md` ("The out-of-date banner")
+holds the decision. The partial renders `banner: true` and the banner's
+fixed text as values only while `StaleSetBanner.enabled?`, and with
+`bannerValue` false every path above runs as it did before.
+
+With it on, the controller shows the banner in three cases:
+
+- an `out_of_date` freshness reply, which never reloads by itself;
+- a `stale` reply while `saveStatus.unsaved()` holds. With nothing
+  unsaved, a `stale` reply reloads as described above, replaced notice and
+  all;
+- the `code-gym:set-not-current` window event, which `code_gym/request`
+  raises for any reply whose `status` is `not_current`. The partial binds it
+  with `data-action`, so the duck, autosave, submit, the critique, the note
+  and the explanation need no handling of their own.
+
+The sentence always comes from the server, in the reply or the event's
+`detail.banner`, so the script holds no copy of `StaleSetNotice`. A later
+sentence replaces an earlier one. Once the banner shows, `stopped` is set and
+no further freshness check runs: the page has its answer, and the banner
+stays until the page reloads.
+
+### Where it sits
+
+`dashboard/show` renders the partial right under the page header, so the
+banner is near the top. The wrapper is `hidden` only while the switch is
+off; with it on, the wrapper is an empty `div` and the banner inside it
+carries `hidden` until it shows. It is a `.section` card with
+`role="status"`. The banner is unhidden before its sentence is written, so a
+screen reader sees the text change in a region already on the page.
+
+### The unsaved line and the button label
+
+"Unsaved" is `saveStatus.unsaved()`: `pending()`, any failure that was not
+carried from an earlier page, or a `watchUnsent` probe (the duck box holding
+unsent text, the explanation box holding text it was not rendered with).
+`docs/code-notes/app/javascript/code_gym/save_status.md` says why those
+probes are kept apart from `watch`.
+
+While the banner shows, the controller re-reads that state every 250 ms
+(`BANNER_REFRESH_MS`) on an interval and sets the second line's `hidden` and
+the button's label from it. Polling was chosen over listening for events
+because the inputs change in ways no event reports: a send that succeeds
+empties the duck box from script, and a save's state changes inside
+`save_status`. The interval starts only once the banner shows, reads only
+page state and sends nothing, so it does not break "no timer" above: a tab
+nobody is at still sends no request and stamps no set. It stops on
+disconnect and when Reload is pressed.
+
+A refused save keeps its failure in `failures`, so the line never drops
+because a later save was refused as not current.
+
+### Reload
+
+The button calls `saveStatus.leaveDiscarding`, which is `leaveWhenSaved`
+with every key that has failed ignored, and the same leave given as the
+stranded callback. A save already in flight lands first; a failed save, or
+one that fails while the button waits, never holds the reload, and after the
+ten-second wait limit it reloads whatever is still pending. The person asked
+for the reload, and a save refused as not current can never succeed.
