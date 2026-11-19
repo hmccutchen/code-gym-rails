@@ -222,23 +222,28 @@ RSpec.describe ReviewPrompt do
       end
     end
 
-    it "shows a planted answer key no more often with why on than with it off, and never on an opted-in kind" do
+    it "shows each kind's own key text exactly as often with why on as off, and none where the grader isn't shown it" do
       planted = "PLANTED_KEY_TEXT_7f3a"
       opted_in.each do |key|
-        section = fake_section(key).merge("answer_key" => { "issue" => planted, "missable_requirements" => [ planted ] })
+        kind = ExerciseSection.for(key)
+        keyed = kind.answer_key_fields.index_with { [ planted ] }
+        section = fake_section(key).merge("answer_key" => { "issue" => planted, "missable_requirements" => [ planted ] }, **keyed)
         render = lambda do |why|
           [ described_class.day_system(coach: "Rails", sections: [ { key: key, section: section, answer: long, rating: "right_level" } ]),
             graded(key, section: section, why: why) ].join("\n").scan(planted).size
         end
 
-        expect(render.call(true)).to be <= render.call(false), key
-        expect(render.call(true)).to eq(0), key
+        expect(render.call(true)).to eq(render.call(false)), key
+        expect(render.call(false)).to(key == "ambiguity_hunt" ? be >= 1 : eq(0), key)
       end
     end
 
     it "names no key field in the shared line or any kind's reason" do
-      ([ described_class::MISS_REASON ] + opted_in.map { |key| ExerciseSection.for(key).miss_reason }).each do |text|
-        expect(text).not_to match(/answer_key|planted_ambiguities|missable/i)
+      fields = Regexp.union(ExerciseSection.all_answer_key_fields + %w[answer_key missable planted])
+      texts = { "shared" => described_class::MISS_REASON }.merge(opted_in.index_with { |key| ExerciseSection.for(key).miss_reason })
+      texts.each do |name, text|
+        checked = name == "ambiguity_hunt" ? text.sub("planted ambiguity they missed", "") : text
+        expect(checked).not_to match(/#{fields}/i), name
       end
     end
 
