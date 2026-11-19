@@ -39,6 +39,11 @@ module CurrentSetLookup
     id && current_user.daily_exercises.find_by(id: id)
   end
 
+  def shown_set_at(scope)
+    shown = shown_set(scope)
+    shown if shown&.draft_scope == scope.to_s
+  end
+
   def posted_draft_scope
     nested = params[:response]
     params[:draft_scope].presence || (nested[:draft_scope] if nested.is_a?(ActionController::Parameters))

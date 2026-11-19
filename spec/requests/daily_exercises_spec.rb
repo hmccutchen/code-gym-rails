@@ -14,17 +14,52 @@ RSpec.describe "DailyExercises", type: :request do
                           generated_at: Time.current, regenerated_at: regenerated_at)
   end
 
+  def post_regenerate = post(regenerate_path, params: { draft_scope: user.daily_exercises.for_date.first&.draft_scope })
+
   describe "POST /regenerate" do
-    it "redirects with the not-current alert when no set is current" do
-      post regenerate_path
+    it "redirects with the not-current alert when the page's set is no longer current" do
+      shown = DailyExercise.create!(user: user, date: Date.yesterday, problem_set: { "code_review" => { "question" => "old" } },
+                                    generated_at: 1.day.ago)
+
+      post regenerate_path, params: { draft_scope: shown.draft_scope }
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("This set is no longer current, so it wasn't replaced.")
+    end
+
+    it "regenerates today's set when the page posts its scope" do
+      exercise = create_exercise
+
+      expect { post regenerate_path, params: { draft_scope: exercise.draft_scope } }.to have_enqueued_job(RegenerateExerciseJob)
+
+      expect(response).to redirect_to(root_path)
+      expect(exercise.reload.regenerating_since).to be_present
+    end
+
+    it "refuses a page left open on an earlier day once today has its own set" do
+      shown = DailyExercise.create!(user: user, date: Date.yesterday, problem_set: { "code_review" => { "question" => "old" } },
+                                    generated_at: 1.day.ago)
+      today = create_exercise
+
+      expect { post regenerate_path, params: { draft_scope: shown.draft_scope } }.not_to have_enqueued_job(RegenerateExerciseJob)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq("This page was out of date, so nothing was replaced.")
+      expect(today.reload.regenerating_since).to be_nil
+    end
+
+    it "refuses a request that posts no scope" do
+      exercise = create_exercise
+
+      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+
+      expect(flash[:alert]).to eq("This page was out of date, so nothing was replaced.")
+      expect(exercise.reload.regenerating_since).to be_nil
     end
 
     it "blocks a second regeneration the same day" do
       create_exercise(regenerated_at: Time.current)
 
-      post regenerate_path
+      post_regenerate
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("You've already generated a new set today.")
@@ -38,7 +73,7 @@ RSpec.describe "DailyExercises", type: :request do
                                        answers: { "code_review" => "a" * 20 },
                                        ai_review: { "code_review" => { "rating" => "developing" } })
 
-      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+      expect { post_regenerate }.not_to have_enqueued_job(RegenerateExerciseJob)
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to include("already been reviewed")
@@ -53,7 +88,7 @@ RSpec.describe "DailyExercises", type: :request do
                             submitted_at: Time.current, reviewing_since: 10.seconds.ago,
                             answers: { "code_review" => "a" * 20 })
 
-      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+      expect { post_regenerate }.not_to have_enqueued_job(RegenerateExerciseJob)
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("A review is being generated for today's set — try again in a moment.")
@@ -66,7 +101,7 @@ RSpec.describe "DailyExercises", type: :request do
                             submitted_at: Time.current, answers: { "code_review" => "a" * 20 },
                             reviewing_since: (DailyResponse::REVIEW_CLAIM_STALE_AFTER + 1.minute).ago)
 
-      expect { post regenerate_path }.to have_enqueued_job(RegenerateExerciseJob)
+      expect { post_regenerate }.to have_enqueued_job(RegenerateExerciseJob)
     end
 
     it "offers no regenerate button on a reviewed day" do
@@ -86,7 +121,7 @@ RSpec.describe "DailyExercises", type: :request do
       allow(AiService).to receive(:for)
 
       expect {
-        post regenerate_path
+        post_regenerate
       }.to have_enqueued_job(RegenerateExerciseJob).with(user_id: user.id)
 
       expect(AiService).not_to have_received(:for)
@@ -96,7 +131,7 @@ RSpec.describe "DailyExercises", type: :request do
     it "claims the row so the dashboard can show it as in flight" do
       exercise = create_exercise
 
-      post regenerate_path
+      post_regenerate
 
       expect(exercise.reload.regenerating_since).to be_present
     end
@@ -104,9 +139,9 @@ RSpec.describe "DailyExercises", type: :request do
     # An impatient second click must not enqueue a second billable generation.
     it "does not enqueue twice while a claim is already held" do
       create_exercise
-      post regenerate_path
+      post_regenerate
 
-      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+      expect { post_regenerate }.not_to have_enqueued_job(RegenerateExerciseJob)
     end
 
     it "lets a stale claim be reclaimed" do
@@ -114,7 +149,7 @@ RSpec.describe "DailyExercises", type: :request do
       exercise.update!(regenerating_since: DailyExercise::REGENERATION_STALE_AFTER.ago - 1.minute)
 
       expect {
-        post regenerate_path
+        post_regenerate
       }.to have_enqueued_job(RegenerateExerciseJob)
     end
 
@@ -122,7 +157,7 @@ RSpec.describe "DailyExercises", type: :request do
       exercise = create_exercise
       allow(RegenerateExerciseJob).to receive(:perform_later).and_raise(ActiveRecord::ConnectionNotEstablished)
 
-      post regenerate_path
+      post_regenerate
 
       expect(response).to redirect_to(root_path)
       expect(flash[:alert]).to eq("Couldn't start regeneration. Please try again.")
@@ -132,11 +167,11 @@ RSpec.describe "DailyExercises", type: :request do
     it "lets the user retry immediately after a failed enqueue" do
       create_exercise
       allow(RegenerateExerciseJob).to receive(:perform_later).and_raise(ActiveRecord::ConnectionNotEstablished)
-      post regenerate_path
+      post_regenerate
 
       allow(RegenerateExerciseJob).to receive(:perform_later).and_call_original
 
-      expect { post regenerate_path }.to have_enqueued_job(RegenerateExerciseJob)
+      expect { post_regenerate }.to have_enqueued_job(RegenerateExerciseJob)
       expect(flash[:generating]).to be true
     end
 
@@ -150,7 +185,7 @@ RSpec.describe "DailyExercises", type: :request do
           exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                                            problem_set: { "code_review" => { "question" => "PREVIOUS-SET-MARKER" } })
 
-          post regenerate_path
+          post_regenerate
 
           get root_path
           expect(response.body).to include("Generating your personalized exercise set")

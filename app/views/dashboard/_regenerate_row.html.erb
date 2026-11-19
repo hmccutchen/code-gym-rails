@@ -10,7 +10,7 @@
       <% confirm_msg = has_progress ?
            t("dashboard.exercise.regenerate_confirm_with_progress") :
            t("dashboard.exercise.regenerate_confirm") %>
-      <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post,
+      <%= button_to t("dashboard.exercise.regenerate"), regenerate_path, method: :post, params: { draft_scope: exercise.draft_scope },
             class: "btn btn-ghost btn-sm", disabled: true, data: { answer_form_target: "replaceButton" },
             form: { data: loading_form_data(label: t("dashboard.generating_label"),
                             confirm_message: confirm_msg) } %>

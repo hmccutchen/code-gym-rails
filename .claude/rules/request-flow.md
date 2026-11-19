@@ -158,7 +158,9 @@ User interacts:
   └→ DailyExercisesController#regenerate → replaces today's set in place (once/day),
        destroying today's response — so it is blocked once that response has been
        reviewed, the same invariant ResponsesController#start_over is blocked on
-       (see "One reviewed-response invariant" in `.claude/rules/answers.md`)
+       (see "One reviewed-response invariant" in `.claude/rules/answers.md`).
+       It posts the page's draft scope and redirects with `regenerate_stale`,
+       replacing nothing, when that scope is missing or names another set
   └→ HistoryController#index         → every submitted session, newest first,
        paginated 10 per page (pagy, offset) —
        the single destination for viewing any day's problems, answers, and

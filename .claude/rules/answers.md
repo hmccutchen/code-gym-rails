@@ -106,7 +106,10 @@ read it before changing that area.
   `CurrentSetLookup#current_set` (`User#current_exercise!`), which carries a
   paused user's held set forward only under `HELD_SET_LOOKUP`, with the move
   and locks unchanged. Start over finds its response by id, so it moves the
-  held set only when that is the response's own set. Finding none answers `errors.set_not_current` with a
+  held set only when that is the response's own set. Regenerate posts the
+  page's draft scope, refuses a missing or mismatched one before moving
+  anything (`CurrentSetLookup#shown_set_at`), and moves the held set only when
+  it is the shown one. Finding none answers `errors.set_not_current` with a
   404 through `#render_set_not_current`, switch or no switch.
   `DashboardController#freshness` only reads (`#todays_or_held_exercise`).
   Under `STALE_SET_BANNER` it adds the `out_of_date` answer, and every

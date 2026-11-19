@@ -160,16 +160,28 @@ RSpec.describe "Requests from a page left open on a paused user's held set", typ
       lookup(true)
       held.update_columns(regenerated_at: 1.day.ago)
 
-      expect { post regenerate_path }.to have_enqueued_job(RegenerateExerciseJob)
+      expect { post regenerate_path, params: { draft_scope: shown_scope } }.to have_enqueued_job(RegenerateExerciseJob)
 
       expect(response).to redirect_to(root_path)
       expect(held.reload).to have_attributes(date: Date.current, regenerating_since: be_present)
     end
 
+    it "neither moves nor regenerates the held set when the page's scope doesn't match, keeping its draft" do
+      lookup(true)
+      draft = user.daily_responses.create!(daily_exercise: held, date: yesterday, answers: { "code_review" => "Draft." })
+
+      expect { post regenerate_path, params: { draft_scope: "#{held.id}-1" } }.not_to have_enqueued_job(RegenerateExerciseJob)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq(I18n.t("flash.daily_exercises.regenerate_stale"))
+      expect(held.reload).to have_attributes(date: yesterday, regenerating_since: nil)
+      expect(draft.reload.answers).to eq("code_review" => "Draft.")
+    end
+
     it "redirects with the not-current flash and claims nothing with HELD_SET_LOOKUP off" do
       lookup(false)
 
-      expect { post regenerate_path }.not_to have_enqueued_job(RegenerateExerciseJob)
+      expect { post regenerate_path, params: { draft_scope: shown_scope } }.not_to have_enqueued_job(RegenerateExerciseJob)
 
       expect(flash[:alert]).to eq("This set is no longer current, so it wasn't replaced.")
       expect(held.reload).to have_attributes(date: yesterday, regenerating_since: nil)

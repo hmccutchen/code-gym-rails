@@ -547,6 +547,15 @@
     </div>
   </div>
 
+    <div hidden
+     data-controller="fresh-day"
+     data-fresh-day-url-value="/dashboard/freshness"
+     data-fresh-day-shown-value="900001-1790694000000000"
+     data-fresh-day-minimum-gap-value="60000"
+     data-fresh-day-notice-shown-for-value="10000"
+     data-fresh-day-replaced-text-value="This set was replaced, so the page now shows the current one."
+     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present code-gym:set-not-current@window->fresh-day#notCurrent"></div>
+
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
@@ -945,7 +954,7 @@ What would be easy to get wrong or worth testing:
       </div>
       <div class="regenerate-row">
   <div>
-      <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-label-value="Generating…" data-loading-form-confirm-message-value="Generate a new set for today?" class="button_to" method="post" action="/regenerate"><button class="btn btn-ghost btn-sm" disabled="disabled" data-answer-form-target="replaceButton" type="submit">Generate new set</button></form>
+      <form data-controller="loading-form" data-action="submit-&gt;loading-form#submit pageshow@window-&gt;loading-form#restore" data-loading-form-label-value="Generating…" data-loading-form-confirm-message-value="Generate a new set for today?" class="button_to" method="post" action="/regenerate"><button class="btn btn-ghost btn-sm" disabled="disabled" data-answer-form-target="replaceButton" type="submit">Generate new set</button><input type="hidden" name="draft_scope" value="900001-1790694000000000" autocomplete="off" /></form>
   </div>
 
 </div>
@@ -954,15 +963,6 @@ What would be easy to get wrong or worth testing:
   </div>
 
   </div>
-
-    <div hidden
-     data-controller="fresh-day"
-     data-fresh-day-url-value="/dashboard/freshness"
-     data-fresh-day-shown-value="900001-1790694000000000"
-     data-fresh-day-minimum-gap-value="60000"
-     data-fresh-day-notice-shown-for-value="10000"
-     data-fresh-day-replaced-text-value="This set was replaced, so the page now shows the current one."
-     data-action="visibilitychange@document->fresh-day#present focus@window->fresh-day#present pageshow@window->fresh-day#present pointermove@window->fresh-day#present keydown@window->fresh-day#present"></div>
 
 </div>
 

@@ -255,6 +255,7 @@ en:
       preferences_saved: "Preferences saved!"
     daily_exercises:
       nothing_to_regenerate: "This set is no longer current, so it wasn't replaced."
+      regenerate_stale: "This page was out of date, so nothing was replaced."
       generate_limited: "You've asked for a new set several times in the last hour. Try again later."
       already_reviewed: "Today's set has already been reviewed — that review is already part of your concept tracking, so it can't be replaced. Tomorrow's set will build on it."
       review_in_progress: "A review is being generated for today's set — try again in a moment."
