@@ -1,6 +1,7 @@
 class DashboardController < ApplicationController
   include LearnerNotesGate
   include LearnerNoteQuestions
+  include CurrentSetLookup
 
   FRESHNESS_CHECK_GAP = 60.seconds
   REPLACED_NOTICE_SHOWN_FOR = 10.seconds
@@ -8,7 +9,8 @@ class DashboardController < ApplicationController
   FRESHNESS_REPLIES = {
     current:  { stale: false, replaced: false },
     stale:    { stale: true, replaced: false },
-    replaced: { stale: true, replaced: true }
+    replaced: { stale: true, replaced: true },
+    out_of_date: { stale: false, replaced: false, out_of_date: true }
   }.freeze
 
   # no-store, or Back after submit → review replays the cached empty form with a Submit button that re-posts it.
@@ -18,6 +20,7 @@ class DashboardController < ApplicationController
     return redirect_to(welcome_path) if current_user.first_run?
 
     load_todays_set
+    @stale_set_banner = StaleSetBanner.enabled?
     @automatic_pause = current_user.generation_paused_automatically?
     load_submitted_day_notes
     @trial_status = TrialStatus.for(current_user) if current_user.on_trial?
@@ -48,22 +51,27 @@ class DashboardController < ApplicationController
 
   # GET /dashboard/freshness
   def freshness
-    outcome = todays_exercise&.freshness_against(params[:shown]) || :current
+    exercise = HeldSetLookup.enabled? ? current_user.todays_or_held_exercise : todays_exercise
+    outcome = exercise&.freshness_against(params[:shown]) || :current
+    outcome = :out_of_date if StaleSetBanner.enabled? && exercise.nil? && params[:shown].present?
 
-    render json: FRESHNESS_REPLIES.fetch(outcome)
+    render json: freshness_reply(outcome)
   end
 
   private
 
   def todays_exercise = current_user.daily_exercises.for_date.first
 
+  def freshness_reply(outcome)
+    reply = FRESHNESS_REPLIES.fetch(outcome)
+    return reply unless StaleSetBanner.enabled? && outcome != :current
+
+    banner = outcome == :out_of_date ? out_of_date_sentence(params[:shown]) : t(StaleSetNotice.newer_set(outcome))
+    reply.merge(banner: banner)
+  end
+
   def load_todays_set
-    # Re-read after the move: a second first-load of the day can lose the race and move nothing.
-    @exercise = todays_exercise
-    if @exercise.nil?
-      current_user.carry_held_set_forward!
-      @exercise = todays_exercise
-    end
+    @exercise = current_user.current_exercise!(carry: true)
     @response = @exercise&.daily_response&.tap { |stored| stored.user = current_user } ||
                 @exercise && DailyResponse.new(user: current_user, daily_exercise: @exercise, date: Date.current)
   end
@@ -86,11 +94,7 @@ class DashboardController < ApplicationController
   end
 
   def settle_missing_set
-    state = MissingSetState.for(
-      trial_ended: current_user.trial_ended?, provider_ready: current_user.provider_ready?,
-      manual_trigger: flash[:generating].present?, failed_today: current_user.generation_failed_today?,
-      weekend: Date.current.on_weekend?, paused: current_user.paused_generation_at?
-    )
+    state = missing_set_state(manual_trigger: flash[:generating].present?)
     return state unless state == :start_generation
 
     GenerateDailyExercisesJob.perform_later(user_id: current_user.id)

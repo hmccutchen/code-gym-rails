@@ -15,10 +15,10 @@ RSpec.describe "DailyExercises", type: :request do
   end
 
   describe "POST /regenerate" do
-    it "redirects with an alert when there's no exercise yet" do
+    it "redirects with the not-current alert when no set is current" do
       post regenerate_path
       expect(response).to redirect_to(root_path)
-      expect(flash[:alert]).to eq("No exercise set to regenerate yet.")
+      expect(flash[:alert]).to eq("This set is no longer current, so it wasn't replaced.")
     end
 
     it "blocks a second regeneration the same day" do

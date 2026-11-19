@@ -8,9 +8,12 @@ renders in every state the dashboard shows and each section's marker reads
 the same pick. `#status` does not read it, because picking the week's concept
 is not generation progress.
 
-`#todays_exercise` is the one read of today's set, and it is not memoized:
-`#load_todays_set` calls it again after `carry_held_set_forward!`, because a
-second first-load of the day can lose the race and move nothing.
+`#load_todays_set` finds the set through `User#current_exercise!` with
+`carry: true`, so a dashboard load carries a held set forward whatever
+`HELD_SET_LOOKUP` says, as it always has. That method re-reads today's set
+outside the query cache after the move: a load that lost the race to another
+tab's move used to re-read a cached nil and show the paused panel.
+`#todays_exercise` is the read `#status` and `#freshness` use.
 
 `#load_todays_set` gives the stored response `current_user` as its user, so the review's
 short version reads the exposure index the page already built for the
@@ -67,11 +70,15 @@ a presence signal may take it away. Both are read only by
 `dashboard/_fresh_day`, which renders them in milliseconds for the
 controller; nothing on the server limits requests by them.
 
+With `HELD_SET_LOOKUP` on, the set that answers is `User#todays_or_held_exercise`, so a held set whose scope matches the page answers `current`: the page's next real request moves it. With `STALE_SET_BANNER` on, a page that shows a set (a non-empty `shown`) when no set answers gets `FRESHNESS_REPLIES[:out_of_date]`, and every reply but `current` carries `banner:`, the sentence `StaleSetNotice` picks (`CurrentSetLookup#out_of_date_sentence`, shared with every not-current reply). With it off the replies are today's, byte for byte. `@stale_set_banner` tells `dashboard/_fresh_day` whether to render the banner's strings. `docs/decisions/a-held-set-stays-current.md` has the rules.
+
 Like `#status`, it only reads. It does not call `mark_opened!`, enqueue a
 job, or carry a paused user's held set forward; those belong to `#show`,
 which the reload runs.
 
 ## `#settle_missing_set`
+
+The plain values come from `CurrentSetLookup#missing_set_state`, which the out-of-date sentence also reads, so the banner and the reload ask `MissingSetState` the same question.
 
 `MissingSetState` decides what a day with no set shows, and its order is the
 rule: an ended trial first, then a missing provider, a fresh manual trigger

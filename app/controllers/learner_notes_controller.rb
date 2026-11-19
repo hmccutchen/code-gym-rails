@@ -1,13 +1,14 @@
 class LearnerNotesController < ApplicationController
   include LearnerNotesGate
   include LearnerNoteQuestions
+  include CurrentSetLookup
 
   # PATCH /learner_note
   def update
     return render_json_error(t("learner_notes.note.unavailable"), status: :not_found) unless learner_notes_on?
 
-    exercise = current_user.daily_exercises.for_date.first
-    return render_json_error(t("errors.no_exercise_today"), status: :not_found) unless exercise
+    exercise = current_set
+    return render_set_not_current unless exercise
 
     day = learner_day(exercise, exercise.daily_response)
     asked = LearnerDay.shown_note_question(day, posted: params[:question_key].to_s) || LearnerDay.note_question(day)

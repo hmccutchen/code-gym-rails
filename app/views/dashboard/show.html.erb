@@ -43,6 +43,6 @@
     </div>
   <% end %>
   <% unless @content_state == :generating %>
-    <%= render "dashboard/fresh_day", shown: @exercise&.draft_scope %>
+    <%= render "dashboard/fresh_day", shown: @exercise&.draft_scope, banner: @stale_set_banner %>
   <% end %>
 </div>

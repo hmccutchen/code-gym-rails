@@ -1,6 +1,7 @@
 class ResponsesController < ApplicationController
   include ProviderCallLimits
   include ProviderFailureRendering
+  include CurrentSetLookup
 
   limit_provider_calls only: [ :explain_differently, :follow_ups, :duck_thread, :pseudocode_critique ]
   before_action :set_response, only: [ :review, :review_status, :email_review, :explain_differently, :follow_ups, :start_over ]
@@ -16,8 +17,8 @@ class ResponsesController < ApplicationController
     (MAX_DUCK_MESSAGE_LENGTH * 4 + DUCK_ASSISTANT_REPLY_BYTE_ALLOWANCE)
 
   def create
-    exercise = current_user.daily_exercises.for_date.first
-    return head :not_found unless exercise
+    exercise = current_set
+    return reply_set_not_current unless exercise
 
     outcome = save_answers_under_lock(exercise)
     return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
@@ -54,6 +55,7 @@ class ResponsesController < ApplicationController
 
   # DELETE /responses/:id/start_over
   def start_over
+    current_set
     outcome = @response.daily_exercise.start_over!(response_id: @response.id)
     case outcome
     when :reviewed then redirect_to root_path, alert: t("flash.responses.start_over_after_review")
@@ -203,6 +205,13 @@ class ResponsesController < ApplicationController
     blocker
   end
 
+  def reply_set_not_current
+    respond_to do |format|
+      format.json { render_set_not_current }
+      format.html { redirect_to root_path, alert: t("errors.set_not_current") }
+    end
+  end
+
   def render_stale_answers(message = t("flash.responses.stale_answers"))
     respond_to do |format|
       format.json do
@@ -257,8 +266,8 @@ class ResponsesController < ApplicationController
   end
 
   def load_duck_section
-    exercise = current_user.daily_exercises.for_date.first
-    return duck_refusal(t("errors.no_exercise_today"), status: :not_found) unless exercise
+    exercise = current_set
+    return not_current_refusal unless exercise
 
     section = params[:section].to_s
     return duck_refusal(t("errors.section_not_in_exercise")) unless exercise.active_section_keys.include?(section)
@@ -317,17 +326,19 @@ class ResponsesController < ApplicationController
     end
   end
 
+  def not_current_refusal
+    render_set_not_current
+    nil
+  end
+
   def duck_refusal(message, status: :unprocessable_content)
     render_json_error(message, status: status)
     nil
   end
 
   def load_pseudocode_context
-    exercise = current_user.daily_exercises.for_date.first
-    unless exercise
-      render_json_error(t("errors.no_exercise_today"), status: :not_found)
-      return
-    end
+    exercise = current_set
+    return not_current_refusal unless exercise
 
     section = ExerciseSection::PseudocodeToCode.key
     return pseudocode_error(t("errors.responses.pseudocode.no_section")) unless exercise.active_section_keys.include?(section)

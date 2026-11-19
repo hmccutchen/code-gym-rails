@@ -217,6 +217,14 @@ class User < ApplicationRecord
     nil
   end
 
+  def current_exercise!(carry:)
+    today = daily_exercises.for_date.first
+    return today if today || !carry
+
+    carry_held_set_forward!
+    DailyExercise.uncached { daily_exercises.for_date.first }
+  end
+
   def anonymize!
     with_lock do
       return false if anonymized?

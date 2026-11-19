@@ -1,6 +1,8 @@
 ---
 paths:
   - "app/controllers/{responses,dashboard,daily_exercises}_controller.rb"
+  - "app/controllers/concerns/current_set_lookup.rb"
+  - "app/models/stale_set_notice.rb"
   - "app/models/{daily_response,daily_exercise,concept_exposure_index}.rb"
   - "app/models/exercise_section/**"
   - "app/helpers/{answer_scaffolds,section_status,self_rating}_helper.rb"
@@ -99,6 +101,16 @@ read it before changing that area.
   over and regenerate refuse on it, and `RegenerateExerciseJob` re-checks it
   under `DailyExercise#with_response_locked`. A review in flight
   (`#reviewing?`) blocks too; a claim past its stale window does not.
+- **A held set stays current** (`docs/decisions/a-held-set-stays-current.md`):
+  every action an open dashboard sends finds its set through
+  `CurrentSetLookup#current_set` (`User#current_exercise!`), which carries a
+  paused user's held set forward only under `HELD_SET_LOOKUP`, with the move
+  and locks unchanged. Finding none answers `errors.set_not_current` with a
+  404 through `#render_set_not_current`, switch or no switch.
+  `DashboardController#freshness` only reads (`#todays_or_held_exercise`).
+  Under `STALE_SET_BANNER` it adds the `out_of_date` answer, and every
+  not-current reply carries `status: "not_current"` and `banner:`, the
+  sentence `StaleSetNotice` picks; with it off every reply is today's.
 - **Parsons input**: drag (SortableJS, CDN) is the primary reorder mechanism;
   up/down arrow buttons are injected by script only if that import fails or
   stalls for 3s. Because dragging is pointer-only, every block is focusable and

@@ -1,4 +1,6 @@
 class DailyExercisesController < ApplicationController
+  include CurrentSetLookup
+
   REGENERATION_BLOCKED = {
     reviewed:  "flash.daily_exercises.already_reviewed",
     reviewing: "flash.daily_exercises.review_in_progress"
@@ -28,7 +30,7 @@ class DailyExercisesController < ApplicationController
   def regenerate
     return redirect_to root_path, alert: trial_ended_text(:regeneration) if current_user.trial_ended?
 
-    exercise = current_user.daily_exercises.for_date.first
+    exercise = current_set
     return redirect_to root_path, alert: t("flash.daily_exercises.nothing_to_regenerate") unless exercise
 
     blocker = exercise.daily_response&.replace_blocker
