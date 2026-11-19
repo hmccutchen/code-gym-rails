@@ -39,6 +39,11 @@ class ExerciseSection::Challenge < ExerciseSection
     "Essential pieces: each requirement and behavior the question states. Naming, style and idiom are not essential unless the question asks for them."
   end
 
+  def self.miss_reason
+    "an input or call that the code as written would likely handle wrongly, or the requirement the question states that it leaves unmet, " \
+      "traced from the question and their code"
+  end
+
   def self.schema_fragment(label:, **)
     <<~SCHEMA.chomp
       "challenge": {

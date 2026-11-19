@@ -1,0 +1,19 @@
+Grade ONLY the "challenge" section from the day's context above.
+Pitched at: mid_level — one instance of the concept in a realistic scenario that does not point it out, so finding it means reading closely rather than spotting a label. Read the requirements to derive the steps and handle the stated cases using any supplied starter.
+
+Main point: code that does the task the question asks for.
+Essential pieces: each requirement and behavior the question states. Naming, style and idiom are not essential unless the question asks for them.
+
+Return a single JSON object (NOT wrapped in a "challenge" key) with:
+- "rating": "beginner" | "developing" | "solid" | "strong"
+- "correct": array of strings — each entry one distinct thing they got right
+- "missed": array of strings — each entry one distinct thing they missed or got wrong
+- "essential_gaps": array of integers — the zero-based positions in "missed" of the entries that are essential gaps; an empty array when none are
+- "better_questions": array of strings — each entry one question they should have asked themselves
+- "next_step": string — one specific thing to study
+- "improved_code": string — the improved code for this section
+
+Each array entry must be ONE self-contained idea in one or two sentences. Never pack
+several points into one entry, and never number points inside an entry ("1) ... 2) ...")
+— separate ideas belong in separate entries. Use an empty array when there is nothing to
+say for that field.

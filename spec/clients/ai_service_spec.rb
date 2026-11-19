@@ -6476,4 +6476,31 @@ RSpec.describe AiService, "review prompt call sites" do
         .to include("how an experienced engineer would start on this kind of problem")
     end
   end
+
+  describe "the REVIEW_MISS_REASON switch" do
+    let(:opening) { %(In each "missed" entry, after naming the gap) }
+
+    around do |example|
+      original = ENV["REVIEW_MISS_REASON"]
+      example.run
+    ensure
+      ENV["REVIEW_MISS_REASON"] = original
+    end
+
+    it "builds today's section prompts when REVIEW_MISS_REASON is unset" do
+      ENV.delete("REVIEW_MISS_REASON")
+
+      exercise.active_section_keys.each do |key|
+        today = File.read(PromptSnapshotHelpers::PROMPT_SNAPSHOT_DIR.join("review__day_a__#{key}__prompt.txt"))
+        expect(service.send(:build_review_section_prompt, exercise, response, key)).to eq(today), key
+      end
+    end
+
+    it "asks an opted-in kind for the reason in each miss when REVIEW_MISS_REASON is 1, and leaves the others alone" do
+      ENV["REVIEW_MISS_REASON"] = "1"
+
+      expect(service.send(:build_review_section_prompt, exercise, response, "pattern")).to include(opening)
+      expect(service.send(:build_review_section_prompt, exercise, response, "code_review")).not_to include(opening)
+    end
+  end
 end

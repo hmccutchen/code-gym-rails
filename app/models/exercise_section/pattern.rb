@@ -63,6 +63,11 @@ class ExerciseSection::Pattern < ExerciseSection
     "Essential pieces: a structure and interface that would work for the stated problem. The answer scaffold names what to cover (#{scaffold_labels(section).map { |label| label.delete_suffix(':') }.join('; ')}), whether or not the answer kept the labels; a part it leaves out is an essential gap only when the design would not work without it."
   end
 
+  def self.miss_reason
+    "which caller, change or case the stated problem describes that the structure as written would break. " \
+      "Never give 'it isn't the named pattern' as the reason"
+  end
+
   def self.improved_code_instruction(section:, answered:)
     structure = answered ? "the refactored structure that addresses what they missed" : "the refactored structure the problem needs"
     "#{structure} — the classes, methods, and boundaries the pattern calls for — not a one-line tweak. A pattern fix is " \

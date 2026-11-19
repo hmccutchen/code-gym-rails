@@ -2,7 +2,7 @@
 paths:
   - "app/models/concept_mastery/**"
   - "app/services/{response_review,review_grading}.rb"
-  - "app/clients/{review_prose_judge,review_approach_paragraph,ai_service}.rb"
+  - "app/clients/{review_prose_judge,review_approach_paragraph,review_miss_reason,ai_service}.rb"
   - "app/prompts/{review_prose_judge_prompt,review_prompt,difficulty_prompt,prompt_standards}.rb"
   - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up,review_short_version}.rb"
   - "app/controllers/responses_controller.rb"
@@ -121,3 +121,17 @@ read it before changing that area.
   a recording run `git diff` must show no existing `review__*` file changed.
   `ReviewPrompt` takes the switch as `approach:` and never reads the
   environment, and the grader never draws on `SectionKindGuide`.
+- **The reason in each miss** (`docs/code-notes/app/prompts/review_prompt.md`):
+  a trial, only when `ReviewMissReason.enabled?` (`REVIEW_MISS_REASON`
+  exactly `"1"`). A graded section of a kind whose `.miss_reason` is present
+  gets `ReviewPrompt::MISS_REASON`, finished with that reason, on the line
+  right after its grading note; the walkthrough never gets it. Only
+  `challenge`, `architecture` and `pattern` opt in; `.miss_reason` is nil by
+  default, so shared code never branches on kind. The reason stays inside
+  the entry it explains, so `essential_gaps` positions hold. It adds no
+  field, key or label, and changes neither `RUBRIC_VERSION`, the prose
+  judge, the entry rules nor any grading note. No reason may ask for or
+  assume an answer key the grader isn't shown: `architecture`'s forbids
+  "didn't pick option X" and `pattern`'s forbids "isn't the named pattern".
+  With the switch off the prompt is byte for byte today's, pinned as for
+  the approach paragraph. `ReviewPrompt` takes it as `why:`.

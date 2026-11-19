@@ -288,6 +288,26 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".miss_reason" do
+    it "is nil for every kind that does not opt in, so shared code never branches on kind" do
+      (described_class.keys - %w[challenge architecture pattern]).each do |key|
+        expect(described_class.find(key).miss_reason).to be_nil, key
+      end
+    end
+
+    it "gives each opted-in kind's own reason" do
+      expect(described_class::Challenge.miss_reason).to eq(
+        "an input or call that the code as written would likely handle wrongly, or the requirement the question states that it leaves unmet, " \
+        "traced from the question and their code")
+      expect(described_class::Architecture.miss_reason).to eq(
+        "which constraint the scenario states that the decision or its reasoning leaves unaddressed, and what could happen to this system because of it. " \
+        "There is no single correct option, so never give 'it didn't pick option X' as the reason")
+      expect(described_class::Pattern.miss_reason).to eq(
+        "which caller, change or case the stated problem describes that the structure as written would break. " \
+        "Never give 'it isn't the named pattern' as the reason")
+    end
+  end
+
   describe ".improved_code_instruction" do
     def instruction(key, answered:, section: {}) = described_class.find(key).improved_code_instruction(section: section, answered: answered)
 
