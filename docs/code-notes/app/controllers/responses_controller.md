@@ -44,6 +44,16 @@ A missing exercise still gets a JSON body, because the client calls
 The provider is called with the stored thread, and the exchange is stored
 only after the reply, under `DuckThread.append!`'s checks.
 
+## `DuckAnswer` and the trial logs
+
+`#duck_thread` hands the call to `DuckAnswer.ask`, which reads the switch
+itself, and stores `#text` and `#point` through `DuckThread.append!`. It
+calls `#log_stored` only when `DuckThread.stored?` says the write landed, so
+a reply dropped
+as `:stale`, `:deleted` or `:submitted` writes no trial log line. The gate,
+the history and the log lines are described in
+`docs/code-notes/app/services/duck_answer.md`.
+
 ## `#stale_page_scope?`
 
 A page names the set it shows by its draft scope. A tab loaded before a

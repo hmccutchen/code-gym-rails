@@ -143,6 +143,22 @@ RSpec.describe ExtractLearnerItemsJob do
       expect(rendered[:prompt]).not_to include("too_hard")
     end
 
+    it "sends duck turns as role and content only, so a stored point label never reaches the extraction" do
+      exercise = submitted_set
+      DuckThread.create!(user: user, daily_exercise: exercise, draft_scope: exercise.draft_scope,
+                         threads: { "code_review" => { "turns" => [ { "role" => "user", "content" => "What does sum do here?" },
+                                                                    { "role" => "assistant", "content" => "What does each pass ask for?",
+                                                                      "point" => "POINT-LABEL-TEXT" } ],
+                                                       "version" => 1 } })
+
+      run(exercise, "fallback")
+
+      turns = calls.sole[:sections].first[:turns]
+      expect(turns).to eq([ { role: "user", content: "What does sum do here?" }, { role: "assistant", content: "What does each pass ask for?" } ])
+      rendered = LearnerItemsPrompt.generate(concepts: {}, **calls.sole.slice(:sections, :note, :explanation, :open_items, :earlier_items))
+      expect(rendered.values.join).not_to include("POINT-LABEL-TEXT")
+    end
+
     it "sends open items without ids and the earlier labels from the scope" do
       exercise = with_duck_turn(submitted_set)
       LearnerItem.create!(user: user, concept: "n_plus_one", bucket: "ruby_rails", kind: "concept", label: "Practise preloading.",

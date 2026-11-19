@@ -126,11 +126,11 @@ class ResponsesController < ApplicationController
     refusal = stored_thread_refusal(store, section)
     return render_section_error(refusal) if refusal
 
-    answer  = AiService.for(current_user).duck_response(current_user, exercise, section: section, message: message,
-                                                        thread: store.turns_for(section))
-    outcome = DuckThread.append!(exercise, section, message: message, answer: answer,
+    answer = DuckAnswer.ask(current_user, exercise, section: section, message: message, store: store)
+    outcome = DuckThread.append!(exercise, section, message: message, answer: answer.text, point: answer.point,
                                  expected_version: store.version_for(section), expected_scope: params[:draft_scope].to_s)
-    duck_outcome(outcome) { |version| { answer: answer, version: version } }
+    answer.log_stored if DuckThread.stored?(outcome)
+    duck_outcome(outcome) { |version| { answer: answer.text, version: version } }
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :duck)
   end
@@ -318,12 +318,11 @@ class ResponsesController < ApplicationController
 
   def stale_page_scope?(exercise) = params[:draft_scope].to_s != exercise.draft_scope
 
-  # An Integer is the new version; :stale covers a moved version, a regenerated set and a deleted account.
+  # Anything not stored or :submitted is :stale or :deleted: a moved version, a regenerated set or a deleted account.
   def duck_outcome(outcome)
-    case outcome
-    when Integer    then render json: { status: "ok", **yield(outcome) }
-    when :submitted then render_section_error(t("errors.responses.duck_after_submit"))
-    else                 render_json_error(t("flash.responses.stale_answers"), status: :conflict)
+    if DuckThread.stored?(outcome) then render json: { status: "ok", **yield(outcome) }
+    elsif outcome == :submitted then render_section_error(t("errors.responses.duck_after_submit"))
+    else render_json_error(t("flash.responses.stale_answers"), status: :conflict)
     end
   end
 

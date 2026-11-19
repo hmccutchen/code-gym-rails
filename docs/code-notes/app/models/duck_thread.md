@@ -29,6 +29,9 @@ always continues the history the duck actually saw.
 while they waited: `:deleted`, `:submitted` or `:stale`. `.under_locks` checks
 the account, the submitted state and the set; `.append!` adds the version.
 The controller maps them to messages, so the model never picks wording.
+`.stored?` is the one statement that an outcome means the write landed (the
+new version, an Integer). The controller asks it before writing the trial
+log lines and in `#duck_outcome`, so neither spells the rule out again.
 
 ## `.clear!`
 
@@ -66,6 +69,36 @@ that has since been regenerated, and starts over empty.
 
 ## `#turns_for`
 
-Builds each turn from `role` and `content` only. The page's turns value and
-the duck's history both come from here, so anything else stored in an entry,
-such as `cleared`, can't reach either.
+Builds each turn from `role` and `content` only. The page's turns value, the
+switch-off duck history and `ExtractLearnerItemsJob`'s turns all come from
+here, so anything else stored in an entry or a turn, such as `cleared` or an
+assistant turn's `point`, can't reach any of them.
+
+## `#turns_for_duck`
+
+The duck's own history under `DUCK_NARROWING`, and read only by `DuckAnswer`
+with the switch on. It is `#turns_for` with each assistant turn's stored
+`point` written back as a last `Point: <label>` line
+(`DuckReply.with_point`), so the duck sees the labels it gave and can keep a
+point's wording. Only assistant turns get one, and only the server's stored
+point, so a label in a user message or posted data never comes back. User
+turns are still wrapped by `UserText.tag_history` in `DuckPrompt.generate`.
+The owner accepted that the duck may lean on a label it has already given.
+
+## `.append!`'s `point:`
+
+Stored on the assistant turn only, and left out when nil, so a thread written
+with `DUCK_NARROWING` off is byte for byte what it was. A label typed in a
+user message is just content: nothing parses it.
+
+## `#narrowing_due?`
+
+The duck narrowing gate. It reads the last two stored assistant turns and
+opens only when both end in `?` and share a present point. It compares with
+`uniq.size == 1`, because `uniq.one?` counts truthy values and would read
+`["the loop", nil]` as one label. A dropped label on either turn shuts it,
+and Clear and Start over empty the turns, so they shut it too.
+
+## `#last_point`
+
+The newest assistant turn's point, for the `[duck_point]` log's `matched=`.

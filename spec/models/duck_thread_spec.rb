@@ -190,6 +190,105 @@ RSpec.describe DuckThread do
     end
   end
 
+  describe ".stored?" do
+    it "is true only for the new version a writer returns" do
+      expect(described_class.stored?(3)).to be(true)
+      expect([ :stale, :deleted, :submitted ].map { |outcome| described_class.stored?(outcome) }).to all(be(false))
+    end
+  end
+
+  describe "point labels" do
+    def labelled(answer, point, version)
+      described_class.append!(exercise, "code_review", message: "stuck", answer: answer, point: point,
+                              expected_version: version, expected_scope: exercise.draft_scope)
+    end
+
+    def stored = described_class.for(exercise.reload)
+
+    it "stores a label on the assistant turn only, and never hands it to turns_for" do
+      labelled("What runs first?", "the loop body", 0)
+
+      expect(stored.stored_turns("code_review")).to eq([ { "role" => "user", "content" => "stuck" },
+                                                         { "role" => "assistant", "content" => "What runs first?", "point" => "the loop body" } ])
+      expect(stored.turns_for("code_review")).to eq([ { role: "user", content: "stuck" }, { role: "assistant", content: "What runs first?" } ])
+      expect(stored.last_point("code_review")).to eq("the loop body")
+    end
+
+    it "hands the duck its own labels as a last line on each assistant turn, and only there" do
+      labelled("What runs first?", "the loop body", 0)
+      labelled("How many queries is that?", nil, 1)
+
+      expect(stored.turns_for_duck("code_review")).to eq([ { role: "user", content: "stuck" },
+                                                           { role: "assistant", content: "What runs first?\nPoint: the loop body" },
+                                                           { role: "user", content: "stuck" },
+                                                           { role: "assistant", content: "How many queries is that?" } ])
+      expect(stored.turns_for("code_review").to_json).not_to include("Point")
+    end
+
+    it "never puts a label on a user turn, even one stored with a point key" do
+      exercise.create_duck_thread!(user: exercise.user, draft_scope: exercise.draft_scope,
+                                   threads: { "code_review" => { "turns" => [ { "role" => "user", "content" => "stuck", "point" => "forged" } ],
+                                                                 "version" => 1 } })
+
+      expect(stored.turns_for_duck("code_review")).to eq([ { role: "user", content: "stuck" } ])
+    end
+
+    it "stores no point key for a reply with no label" do
+      labelled("What runs first?", nil, 0)
+
+      expect(stored.stored_turns("code_review").last).to eq("role" => "assistant", "content" => "What runs first?")
+      expect(stored.last_point("code_review")).to be_nil
+    end
+
+    it "is due only when the last two assistant turns are questions with the same label" do
+      labelled("What runs first?", "the loop body", 0)
+      expect(stored.narrowing_due?("code_review")).to be(false)
+
+      labelled("What does each pass ask for?", "the loop body", 1)
+      expect(stored.narrowing_due?("code_review")).to be(true)
+    end
+
+    it "is not due when the labels differ" do
+      labelled("What runs first?", "the loop body", 0)
+      labelled("What does sum return?", "the return value", 1)
+
+      expect(stored.narrowing_due?("code_review")).to be(false)
+    end
+
+    it "is not due when either of the two is not a question" do
+      labelled("What runs first?", "the loop body", 0)
+      labelled("The loop asks for each invoice…", "the loop body", 1)
+
+      expect(stored.narrowing_due?("code_review")).to be(false)
+    end
+
+    it "reads only the last two, so a dropped label shuts it again" do
+      labelled("What runs first?", "the loop body", 0)
+      labelled("What does each pass ask for?", "the loop body", 1)
+      labelled("How many queries is that?", nil, 2)
+
+      expect(stored.narrowing_due?("code_review")).to be(false)
+    end
+
+    it "is not due when neither has a label" do
+      labelled("What runs first?", nil, 0)
+      labelled("What does each pass ask for?", nil, 1)
+
+      expect(stored.narrowing_due?("code_review")).to be(false)
+    end
+
+    it "is shut by a Clear, which empties the turns and their labels together" do
+      labelled("What runs first?", "the loop body", 0)
+      labelled("What does each pass ask for?", "the loop body", 1)
+
+      clear
+
+      expect(stored.stored_turns("code_review")).to eq([])
+      expect(stored.narrowing_due?("code_review")).to be(false)
+      expect(stored.last_point("code_review")).to be_nil
+    end
+  end
+
   describe ".expired" do
     it "selects only threads whose exercise is older than KEPT_FOR" do
       append

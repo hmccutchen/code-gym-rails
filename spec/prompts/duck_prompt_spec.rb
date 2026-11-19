@@ -63,6 +63,50 @@ RSpec.describe DuckPrompt do
   end
 
   it "cannot see the response, the review or another section, because it takes only one section's data" do
-    expect(described_class.method(:generate).parameters).to eq([ [ :keyreq, :section_data ], [ :keyreq, :message ], [ :keyreq, :thread ] ])
+    expect(described_class.method(:generate).parameters).to eq([ [ :keyreq, :section_data ], [ :keyreq, :message ], [ :keyreq, :thread ],
+                                                                 [ :key, :labelled ], [ :key, :narrow ] ])
+  end
+
+  describe "point labels and narrowing" do
+    def system(**options) = described_class.generate(section_data: section, message: "hmm", thread: [], **options)[:system]
+
+    it "sends today's prompt byte for byte when neither is asked for" do
+      today = described_class.generate(section_data: section, message: "hmm", thread: [])
+
+      expect(described_class.generate(section_data: section, message: "hmm", thread: [], labelled: false, narrow: false)).to eq(today)
+      expect(today[:system]).to start_with(described_class::SYSTEM)
+      expect(today[:system]).not_to include(described_class::POINT_LABEL)
+      expect(today[:system]).not_to include(described_class::NARROWING)
+    end
+
+    it "asks for the label line, and only that, when labelled" do
+      labelled = system(labelled: true)
+
+      expect(labelled).to include(described_class::POINT_LABEL)
+      expect(labelled).not_to include(described_class::NARROWING)
+      expect(labelled.sub("\n\n#{described_class::POINT_LABEL}", "")).to eq(system)
+    end
+
+    it "adds the narrowing line right after the two kinds when narrowing" do
+      narrowed = system(labelled: true, narrow: true)
+
+      expect(narrowed).to start_with("#{described_class::KINDS}\n\n#{described_class::NARROWING}\n\n#{described_class::CONDUCT}")
+      expect(narrowed.sub("\n\n#{described_class::NARROWING}", "")).to eq(system(labelled: true))
+    end
+
+    it "words the narrowing line as the owner decided" do
+      expect(described_class::NARROWING).to eq(
+        "The engineer has now been asked two questions about the same point. If this message asks for help solving it (kind 2), " \
+        "start by naming one thing in the exercise section to look at, copied exactly inside backticks, such as a line of code, " \
+        "a stated requirement or a fact from the scenario. Then ask one guiding question about it. Never name the missing step, " \
+        "the fix or the answer, and never point at anything that isn't in the exercise section."
+      )
+    end
+
+    it "keeps the answer key out of a narrowed prompt" do
+      request = described_class.generate(section_data: section, message: "hmm", thread: [], labelled: true, narrow: true)
+
+      expect(request.values.flatten.to_json).not_to include("SENTINEL-KEY")
+    end
   end
 end

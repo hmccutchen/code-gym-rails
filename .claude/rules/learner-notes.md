@@ -187,3 +187,5 @@ this area.
   `stored.body`, only while `LEARNER_NOTES` is on.
 - **Duck turns in the extraction prompt** pass through `UserText.defanged`,
   so a duck reply carrying engineer tags never reads as the engineer's words.
+  They come from `DuckThread#turns_for`, role and content only, so a duck
+  turn's stored `point` label never reaches the extraction.
