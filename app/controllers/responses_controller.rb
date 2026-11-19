@@ -126,9 +126,10 @@ class ResponsesController < ApplicationController
     refusal = stored_thread_refusal(store, section)
     return render_section_error(refusal) if refusal
 
-    answer, point = duck_answer(exercise, section, message, store)
+    answer, point, log = duck_answer(exercise, section, message, store)
     outcome = DuckThread.append!(exercise, section, message: message, answer: answer, point: point,
                                  expected_version: store.version_for(section), expected_scope: params[:draft_scope].to_s)
+    log&.call if outcome.is_a?(Integer)
     duck_outcome(outcome) { |version| { answer: answer, version: version } }
   rescue ProviderError, SetupError => e
     render_provider_failure(e, :duck)
@@ -306,8 +307,8 @@ class ResponsesController < ApplicationController
 
     narrow = store.narrowing_due?(section)
     reply  = service.labelled_duck_response(current_user, exercise, section: section, message: message, thread: thread, narrow: narrow)
-    log_duck_reply(exercise, section, reply, narrow: narrow, previous_point: store.last_point(section))
-    [ reply.text, reply.point ]
+    previous_point = store.last_point(section)
+    [ reply.text, reply.point, -> { log_duck_reply(exercise, section, reply, narrow: narrow, previous_point: previous_point) } ]
   end
 
   def log_duck_reply(exercise, section, reply, narrow:, previous_point:)

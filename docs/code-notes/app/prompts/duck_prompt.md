@@ -18,8 +18,9 @@ It counts against the turn cap like any other message.
 
 ## `KINDS`, `CONDUCT` and `SYSTEM`
 
-`SYSTEM` is `KINDS` and `CONDUCT` joined the way the single heredoc used to
-be, so its bytes are unchanged and `duck_prompt_characterization_spec` and
+`SYSTEM` is `.system_for` with both switches off, so the switch-off prompt has
+one source. That joins `KINDS`, `CONDUCT` and the plain-language standard the
+way the single heredoc used to be, so its bytes are unchanged and `duck_prompt_characterization_spec` and
 the `duck__*` snapshots hold it. The split is only there so `NARROWING` can
 sit right after the two kinds.
 

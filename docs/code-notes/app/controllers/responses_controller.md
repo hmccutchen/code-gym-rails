@@ -52,7 +52,10 @@ stores no point, so nothing changes. With it on, it reads the gate from the
 stored thread (`DuckThread#narrowing_due?`), never from the new message or a
 posted `thread`, and calls `AiService#labelled_duck_response` with `narrow:`.
 The gate is read before the reply is stored, from the same thread the duck is
-sent, so it describes the history the duck saw.
+sent, so it describes the history the duck saw. It hands back the log as a
+callable beside the answer and point, and `#duck_thread` calls it only when
+`DuckThread.append!` returns the new version, so a reply dropped as
+`:stale`, `:deleted` or `:submitted` writes no trial log line.
 
 ## `#log_duck_reply`
 

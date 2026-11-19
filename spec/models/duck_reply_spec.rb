@@ -79,5 +79,10 @@ RSpec.describe DuckReply do
     it "checks the first quote" do
       expect(outcome("Compare `includes(:invoices)` with `Customer.all`.")).to eq("missing")
     end
+
+    it "skips a quote too short to check, the way the key's quote check does" do
+      expect(outcome("Look at `a`. What runs?")).to eq("none")
+      expect(outcome("Compare `do` with `customer.invoices`.")).to eq("found")
+    end
   end
 end

@@ -34,8 +34,6 @@ class DuckPrompt
     explanation. No preamble.
   PROMPT
 
-  SYSTEM = [ KINDS, CONDUCT, PromptStandards::PLAIN_LANGUAGE_STANDARD ].join("\n\n").freeze
-
   NARROWING = "The engineer has now been asked two questions about the same point. If this message asks for help " \
               "solving it (kind 2), start by naming one thing in the exercise text above to look at, copied exactly " \
               "inside backticks, such as a line of code, a stated requirement or a fact from the scenario. Then ask one " \
@@ -45,6 +43,13 @@ class DuckPrompt
   POINT_LABEL = "When your reply asks a guiding question, end it with one more line, on its own: \"Point:\" followed " \
                 "by two to five plain words naming the point that question is about, worded the same way every time " \
                 "you ask about that point. When your reply asks no guiding question, leave the line out.".freeze
+
+  def self.system_for(labelled:, narrow:)
+    [ KINDS, (NARROWING if narrow), CONDUCT, (POINT_LABEL if labelled), PromptStandards::PLAIN_LANGUAGE_STANDARD ].compact.join("\n\n")
+  end
+  private_class_method :system_for
+
+  SYSTEM = system_for(labelled: false, narrow: false).freeze
 
   def self.generate(section_data:, message:, thread:, labelled: false, narrow: false)
     { system: "#{system_for(labelled:, narrow:)}\n\n#{UserText::PROMPT_RULE}\n\nThe exercise section:\n#{SectionContext.render(section_data)}",
@@ -56,9 +61,4 @@ class DuckPrompt
         Respond as their Socratic thinking partner, following your system instructions exactly.
       PROMPT
   end
-
-  def self.system_for(labelled:, narrow:)
-    [ KINDS, (NARROWING if narrow), CONDUCT, (POINT_LABEL if labelled), PromptStandards::PLAIN_LANGUAGE_STANDARD ].compact.join("\n\n")
-  end
-  private_class_method :system_for
 end

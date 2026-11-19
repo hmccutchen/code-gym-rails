@@ -20,10 +20,10 @@ class DuckReply < Data.define(:text, :point)
   def self.question?(text) = text.to_s.rstrip.end_with?("?")
 
   def self.quote_outcome(text, within:, language:)
-    quote = text.scan(PlantedKey::QUOTE).flatten.map { |found| KeyQuote.normalize(found, language: language) }.find(&:present?)
+    quote = text.scan(PlantedKey::QUOTE).flatten.find { |found| PlantedKey.checkable?(found, language) }
     return "none" unless quote
 
-    KeyQuote.normalize(within, language: language).include?(quote) ? "found" : "missing"
+    KeyQuote.normalize(within, language: language).include?(KeyQuote.normalize(quote, language: language)) ? "found" : "missing"
   end
 
   def question? = self.class.question?(text)

@@ -246,6 +246,21 @@ RSpec.describe "Duck narrowing", type: :request do
         expect(Rails.logger).not_to have_received(:info).with(/\[duck_narrowing\]/)
       end
 
+      it "logs nothing for a reply that was never stored because the thread moved during the call" do
+        store_questions("the loop body", "the loop body")
+        posted_version = stored.version_for("code_review")
+        allow(service).to receive(:labelled_duck_response).and_wrap_original do |original, *args, **kwargs|
+          DuckThread.clear!(DailyExercise.find(exercise.id), "code_review", expected_scope: exercise.draft_scope)
+          original.call(*args, **kwargs)
+        end
+        service.replies = [ "Look at `customer.invoices`. What runs there?\nPoint: the loop body" ]
+
+        ask("hmm", version: posted_version)
+
+        expect(response).to have_http_status(:conflict)
+        expect(Rails.logger).not_to have_received(:info).with(/\[duck_(point|narrowing)\]/)
+      end
+
       it "logs each question's label state and whether it matched the previous label, with no text" do
         service.replies = [ "What runs first?\nPoint: the loop body", "What runs next?\nPoint: the loop body",
                             "What does it return?\nPoint: the return value", "What does it return?" ]

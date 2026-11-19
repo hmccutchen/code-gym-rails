@@ -26,11 +26,13 @@ stored turns, so the gate and the log use one rule.
 
 ## `.quote_outcome`
 
-Checks the first backticked quote in a narrowing reply against the section
-text the duck was shown. It uses `PlantedKey::QUOTE` for the quote's shape
-and `KeyQuote.normalize` to ignore whitespace, the same rules the answer
-key's quote check uses. A quote that normalizes to nothing counts as no
-quote. It returns `"found"`, `"missing"` or `"none"`, and nothing here holds
+Checks the first checkable backticked quote in a narrowing reply against the
+section text the duck was shown. It uses `PlantedKey::QUOTE` for the quote's
+shape, `PlantedKey.checkable?` for the minimum length and `KeyQuote.normalize`
+to ignore whitespace, the same rules the answer key's quote check uses. A
+quote too short to check, such as `` `a` ``, is skipped and the next one is
+checked; a reply with no checkable quote counts as `"none"`, since a
+one-letter quote is found in almost any section. It returns `"found"`, `"missing"` or `"none"`, and nothing here holds
 text for a log.
 
 ## The trial

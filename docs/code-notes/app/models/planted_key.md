@@ -41,7 +41,8 @@ never wrote (`{a: 1}` becomes `{ a: 1 }`, `x+1` becomes `x + 1`), and both
 formatters add a trailing comma to the last item of a wrapped list, so a
 quote of the provider's own snippet would otherwise miss against the code
 as shown. A quote whose normalized form is under `MIN_QUOTE_LENGTH`
-characters is left out, since a lone `.` matches anything. A backtick
+characters is left out, since a lone `.` matches anything. `.checkable?` holds that rule and is public, so
+`DuckReply.quote_outcome` skips the same short quotes. A backtick
 inside a quote, such as a JavaScript template literal, splits it into
 fragments; the check is a diagnostic, so that limit is accepted.
 

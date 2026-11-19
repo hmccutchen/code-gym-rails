@@ -84,5 +84,5 @@ module PlantedKey
     cleaned ? section[FIELD] = cleaned : section.delete(FIELD)
   end
 
-  private_class_method :checkable?, :quote_outcome
+  private_class_method :quote_outcome
 end
