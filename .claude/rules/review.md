@@ -126,12 +126,16 @@ read it before changing that area.
   exactly `"1"`). A graded section of a kind whose `.miss_reason` is present
   gets `ReviewPrompt::MISS_REASON`, finished with that reason, on the line
   right after its grading note; the walkthrough never gets it. Only
-  `challenge`, `architecture` and `pattern` opt in; `.miss_reason` is nil by
+  `challenge`, `architecture`, `pattern`, `ambiguity_hunt` and
+  `pseudocode_to_code` opt in; `.miss_reason` is nil by
   default, so shared code never branches on kind. The reason stays inside
   the entry it explains, so `essential_gaps` positions hold. It adds no
   field, key or label, and changes neither `RUBRIC_VERSION`, the prose
   judge, the entry rules nor any grading note. No reason may ask for or
   assume an answer key the grader isn't shown: `architecture`'s forbids
-  "didn't pick option X" and `pattern`'s forbids "isn't the named pattern".
+  "didn't pick option X", `pattern`'s forbids "isn't the named pattern",
+  `ambiguity_hunt`'s gives a reason only for a planted ambiguity they missed,
+  and `pseudocode_to_code`'s ties the reason to the plan, never the translated
+  code's syntax. No grader reads `answer_key.missable_requirements`.
   With the switch off the prompt is byte for byte today's, pinned as for
   the approach paragraph. `ReviewPrompt` takes it as `why:`.

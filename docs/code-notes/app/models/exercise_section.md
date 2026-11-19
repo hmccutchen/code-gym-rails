@@ -80,7 +80,7 @@ The review prompt's `improved_code` field line reads this, in the graded prompt 
 
 ## `.miss_reason`
 
-The review prompt reads this only in a graded section, and only while `REVIEW_MISS_REASON` is on. It names what a "missed" entry's reason is about for the kind, and `ReviewPrompt::MISS_REASON` wraps it. The default is nil, so a kind that hasn't opted in gets no line. Challenge, architecture and pattern override it. The walkthrough never reads it.
+The review prompt reads this only in a graded section, and only while `REVIEW_MISS_REASON` is on. It names what a "missed" entry's reason is about for the kind, and `ReviewPrompt::MISS_REASON` wraps it. The default is nil, so a kind that hasn't opted in gets no line. Challenge, architecture, pattern, ambiguity hunt and pseudocode to code override it. The walkthrough never reads it.
 
 ## `.titled_label?`
 

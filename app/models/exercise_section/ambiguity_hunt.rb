@@ -85,4 +85,9 @@ class ExerciseSection::AmbiguityHunt < ExerciseSection
     "Main point: at least one planted ambiguity identified.\n" \
     "Essential pieces: the planted ambiguities that would most likely get the feature built wrong if nobody asked. In \"missed\", name every planted ambiguity the engineer did not identify, but list only those as essential gaps, so the rating does not depend on how many were planted. In \"correct\", credit each one they did identify, AND credit (without penalty) any additional legitimate ambiguity they found that wasn't planted; an extra one like that is the kind of addition the rubric credits beyond solid."
   end
+
+  def self.miss_reason
+    "what a team would likely build wrong if nobody asked, described in this request's terms. " \
+      "Give this reason only for a planted ambiguity they missed"
+  end
 end

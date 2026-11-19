@@ -143,7 +143,7 @@ RSpec.describe ReviewPrompt do
   end
 
   describe "the miss reason" do
-    let(:opted_in) { %w[challenge architecture pattern] }
+    let(:opted_in) { %w[challenge architecture pattern ambiguity_hunt pseudocode_to_code] }
 
     def fake_section(key) = FakeService::EXERCISE_PROBLEM_SET.fetch(key).deep_dup.merge("rounds" => {})
 
@@ -155,8 +155,8 @@ RSpec.describe ReviewPrompt do
       described_class.section_prompt(key: key, section: section, answer: long, rung: "mid_level", **switches)
     end
 
-    it "records challenge's and architecture's graded prompt as it is today" do
-      %w[challenge architecture].each do |key|
+    it "records the graded prompt as it is today for each opted-in kind with no other recorded one" do
+      %w[challenge architecture ambiguity_hunt].each do |key|
         expect_prompt_snapshot("review__#{key}__prompt",
                                described_class.section_prompt(key: key, section: fake_section(key), answer: long, rung: "mid_level"))
       end
@@ -164,7 +164,8 @@ RSpec.describe ReviewPrompt do
 
     it "renders each opted-in kind's graded prompt byte for byte as recorded when why is off" do
       { "challenge" => "review__challenge__prompt", "architecture" => "review__architecture__prompt",
-        "pattern" => "review__pattern__improved_code__prompt" }.each do |key, name|
+        "pattern" => "review__pattern__improved_code__prompt", "ambiguity_hunt" => "review__ambiguity_hunt__prompt",
+        "pseudocode_to_code" => "review__pseudocode_to_code__improved_code__prompt" }.each do |key, name|
         expect(graded(key, why: false)).to eq(recorded(name)), key
         expect(graded(key)).to eq(recorded(name)), key
       end
@@ -179,7 +180,7 @@ RSpec.describe ReviewPrompt do
       end
     end
 
-    it "opts in only challenge, architecture and pattern" do
+    it "opts in only challenge, architecture, pattern, ambiguity_hunt and pseudocode_to_code" do
       expect(ExerciseSection.all.select(&:miss_reason).map(&:key)).to match_array(opted_in)
     end
 
@@ -221,7 +222,7 @@ RSpec.describe ReviewPrompt do
       end
     end
 
-    it "shows a planted key no more often with why on than with it off, and never on a step 1 kind" do
+    it "shows a planted answer key no more often with why on than with it off, and never on an opted-in kind" do
       planted = "PLANTED_KEY_TEXT_7f3a"
       opted_in.each do |key|
         section = fake_section(key).merge("answer_key" => { "issue" => planted, "missable_requirements" => [ planted ] })
@@ -237,7 +238,7 @@ RSpec.describe ReviewPrompt do
 
     it "names no key field in the shared line or any kind's reason" do
       ([ described_class::MISS_REASON ] + opted_in.map { |key| ExerciseSection.for(key).miss_reason }).each do |text|
-        expect(text).not_to match(/answer_key|planted|missable/i)
+        expect(text).not_to match(/answer_key|planted_ambiguities|missable/i)
       end
     end
 
@@ -248,6 +249,14 @@ RSpec.describe ReviewPrompt do
 
     it "forbids pattern's reason from naming a pattern" do
       expect(ExerciseSection::Pattern.miss_reason).to include("Never give 'it isn't the named pattern' as the reason")
+    end
+
+    it "limits ambiguity_hunt's reason to a planted ambiguity they missed" do
+      expect(ExerciseSection::AmbiguityHunt.miss_reason).to include("Give this reason only for a planted ambiguity they missed")
+    end
+
+    it "ties pseudocode_to_code's reason to the plan, never to the translated code's syntax" do
+      expect(ExerciseSection::PseudocodeToCode.miss_reason).to include("Attribute it to the plan, never to the translated code's syntax")
     end
 
     it "never reads the environment, so the switch is a value it is handed" do

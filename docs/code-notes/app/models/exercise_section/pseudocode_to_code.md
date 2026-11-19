@@ -35,3 +35,7 @@ The critique is provider text going into the page, so it is bounded the same way
 ## `.translation_lines`
 
 The second branch covers rows translated from an earlier draft than the final pseudocode. The code stays fenced in both branches, because it carries the plan's text intact.
+
+## `.miss_reason`
+
+The reason in each miss points at the problem statement and the plan, never at `answer_key.missable_requirements`, though that key holds exactly this reason: no grader reads the stored key. It ties the reason to the plan, so the grading note's rule that the translated code's syntax is never a fault still holds.
