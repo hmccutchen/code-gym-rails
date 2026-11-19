@@ -134,7 +134,7 @@ With it on, the controller shows the banner in four cases:
   with `data-action`, so the duck, autosave, submit, the critique, the note
   and the explanation need no handling of their own;
 - the cancelable `code-gym:stale-save` window event the answer form raises
-  before an autosave's or submit's `409 stale` would reload, while
+  before an autosave's, submit's or note flush's `409 stale` would reload, while
   `saveStatus.unsaved()` holds (leaving out the keys the event names) or the
   banner already shows. The controller cancels it, and the form stays. With
   nothing unsaved the event is left alone and the form reloads as before

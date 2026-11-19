@@ -124,8 +124,8 @@ read it before changing that area.
   `code_gym/request` turns that reply into one `code-gym:set-not-current`
   event, and `fresh_day_controller` shows the banner. The page reloads by
   itself on `stale`, from freshness or an answer save's 409, only while
-  `saveStatus.unsaved()` is false; the 409 carries the freshness reply's
-  sentence. Reload and discard changes clears the tab's draft copy first.
+  `saveStatus.unsaved()` is false. A 409 from an answer save, or from the
+  note save Submit sends first, carries the freshness reply's sentence. Reload and discard changes clears the tab's draft copy first.
   Unsent duck or explanation text counts through `watchUnsent`, never
   `watch`, so it never holds a reload gate. Yesterday's unsubmitted set stays lost from
   view after a reload without a pause, by the owner's decision of

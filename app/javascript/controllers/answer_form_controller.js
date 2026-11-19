@@ -291,6 +291,7 @@ export default class extends Controller {
     }
     const note = await this.flushPendingNote()
     if (note.status === 409) {
+      if (this.bannerTookStale(note.data, "submit", "learner_note")) return this.showStaleSubmitBehindBanner(note)
       return this.leaveWhenOtherSavesLand(() => this.reloadAfterSubmit(note, true), "submit", "learner_note")
     }
     if (!note.ok) return this.unlock()

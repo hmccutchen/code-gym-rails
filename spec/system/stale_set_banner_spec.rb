@@ -229,6 +229,26 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
       end
     end
 
+    it "shows the banner and keeps unsent duck text when Submit's note save is refused as stale" do
+      stub_env("LEARNER_NOTES" => "1")
+      user.update!(learner_notes_enabled: true)
+
+      travel_to(a_weekday) do
+        open_dashboard
+        duck = open_duck
+        duck.find(".duck-input").fill_in(with: "Not sent yet")
+        replace_todays_set
+        find("#learner-note textarea").fill_in(with: "A note for the replaced set")
+
+        find("#submit-answers").click
+
+        expect_banner(:replaced, unsaved: true)
+        expect(duck.find(".duck-input").value).to eq("Not sent yet")
+        expect(same_load?).to be(true)
+        expect(user.daily_responses.where.not(submitted_at: nil)).to be_empty
+      end
+    end
+
     it "reloads by itself when an autosave is refused as stale and nothing else is unsaved" do
       travel_to(a_weekday) do
         open_dashboard

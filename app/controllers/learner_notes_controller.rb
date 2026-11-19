@@ -15,16 +15,17 @@ class LearnerNotesController < ApplicationController
     outcome = LearnerNote.save_body!(exercise, params[:learner_note], question_key: asked.key,
                                                                        expected_scope: params[:draft_scope].to_s,
                                                                        expected_response_id: params[:response_id].to_s)
-    render_note_outcome(outcome, day, asked)
+    render_note_outcome(outcome, exercise, day, asked)
   end
 
   private
 
-  def render_note_outcome(outcome, day, asked)
+  def render_note_outcome(outcome, exercise, day, asked)
     case outcome
     when LearnerNote        then render_question(LearnerDay.note_question(day, stored: outcome.question_key || asked.key))
     when :submitted         then render_json_error(t("learner_notes.note.after_submit"), status: :unprocessable_content, submitted: true)
-    when :stale, :deleted   then render_json_error(t("flash.responses.stale_answers"), status: :conflict)
+    when :stale             then render_json_error(t("flash.responses.stale_answers"), status: :conflict, **stale_set_banner(exercise))
+    when :deleted           then render_json_error(t("flash.responses.stale_answers"), status: :conflict)
     else raise ArgumentError, "Unhandled learner note outcome: #{outcome.inspect}"
     end
   end
