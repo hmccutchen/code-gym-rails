@@ -31,6 +31,24 @@ RSpec.describe "History", type: :request do
     )
   end
 
+  it "keeps the outer History folds while adding a separate closed full review to each eligible section" do
+    stub_env("REVIEW_TAKEAWAY" => "1")
+    [ 1.day.ago.to_date, 2.days.ago.to_date ].each do |date|
+      day = create_session_for(user, date: date, reviewed: true)
+      day.update!(ai_review: { "code_review" => {
+        "rating" => "developing", "rubric" => ReviewedSectionResults::RUBRIC_VERSION,
+        "missed" => [ "The query returns a stale value." ], "essential_gaps" => [ 0 ]
+      } })
+    end
+    login_as(user)
+
+    get history_path
+
+    folds = Nokogiri::HTML5(response.body).css(".history-entry > details.review")
+    expect(folds.map { |fold| fold.key?("open") }).to eq([ true, false ])
+    expect(folds.map { |fold| fold.at_css("details.review-full").key?("open") }).to eq([ false, false ])
+  end
+
   it "underlines glossary terms in the review's prose and its saved explanations, and escapes markup in them" do
     reviewed = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
     reviewed.update!(

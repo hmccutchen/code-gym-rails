@@ -16,6 +16,15 @@
     <% if response.answered?(section) && response.self_rating_favorable?(section) && response.ai_rating_unfavorable?(section) %>
       <p class="calibration-note"><%= t("review.calibration_note", rating: self_rating_label(response, section)) %></p>
     <% end %>
+    <% if (takeaway = review_takeaway(response, section)) %>
+      <% component_stylesheet "review_takeaway" %>
+      <div class="review-takeaway">
+        <strong><%= t("review.main_takeaway") %></strong>
+        <p><%= glossary_wrap_prose(takeaway) %></p>
+      </div>
+      <details class="review review-full">
+        <summary aria-label="<%= t("review.full_review_for", section: section.humanize) %>"><%= t("review.full_review") %></summary>
+    <% end %>
     <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| %>
       <% if field[:list] %>
         <% points = DailyResponse.review_points(fb[key]) %>
@@ -65,6 +74,9 @@
       <% end %>
       <span class="alternate-status" aria-live="polite" data-review-alternates-target="status"></span>
     </div>
+    <% if takeaway %>
+      </details>
+    <% end %>
     <% turns = response.follow_up_turns(section) %>
     <div class="follow-ups" data-section="<%= section %>" data-controller="follow-ups"
          data-follow-ups-section-value="<%= section %>"

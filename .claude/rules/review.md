@@ -2,9 +2,9 @@
 paths:
   - "app/models/concept_mastery/**"
   - "app/services/{response_review,review_grading}.rb"
-  - "app/clients/{review_prose_judge,review_approach_paragraph,review_miss_reason,ai_service}.rb"
+  - "app/clients/{review_prose_judge,review_approach_paragraph,review_miss_reason,review_takeaway_presentation,ai_service}.rb"
   - "app/prompts/{review_prose_judge_prompt,review_prompt,difficulty_prompt,prompt_standards}.rb"
-  - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up,review_short_version}.rb"
+  - "app/models/{review_prose_verdict,rubric_check,daily_response,review_follow_up,review_short_version,review_takeaway}.rb"
   - "app/controllers/responses_controller.rb"
   - "app/views/shared/{_ai_review,_review_short_version}.html.erb"
   - "app/views/responses/{_submission,_review_in_progress,_answered_sections}.html.erb"
@@ -139,3 +139,9 @@ read it before changing that area.
   code's syntax. No grader reads `answer_key.missable_requirements`.
   With the switch off the prompt is byte for byte today's, pinned as for
   the approach paragraph. `ReviewPrompt` takes it as `why:`.
+
+- **Review takeaway** ([decision and trial checklist](../../docs/decisions/review-takeaway.md)):
+  `REVIEW_TAKEAWAY=1` lets the shared web review show one intact essential
+  miss from a submitted, current-rubric section when its original gap
+  position and displayed prose agree. The takeaway and follow-up stay
+  visible while Full review is folded. The switch affects rendering only.
