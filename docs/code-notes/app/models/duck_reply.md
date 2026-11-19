@@ -9,6 +9,10 @@ and the controller stores both.
 Only the last line can be a label, and only when it starts with `Point:` (after
 optional spaces) on a line of its own. That line is removed from the shown
 text whether or not it parses, so a malformed label never reaches the page.
+Any other line of its own that starts with `Point:` is removed too
+(`STANDALONE_POINT_LINE`) but never becomes the point, so a label the duck
+wrote too early is neither shown, stored nor passed to learner-items
+extraction.
 It counts as a point only when the label is two to five words. The point is
 kept squished, lower-cased and without a closing full stop, so the same label
 written with different spacing or case still matches.

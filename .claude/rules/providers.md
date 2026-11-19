@@ -111,7 +111,8 @@ read it before changing that area.
   2026-11-18. The duck stays Socratic. With the switch on, the prompt asks
   each guiding question to end with a `Point: <two to five words>` line,
   which `DuckReply.read` strips from the shown text and `DuckThread.append!`
-  stores on that assistant turn as `point`. A cut-off reply, a missing line,
+  stores on that assistant turn as `point`; any other standalone `Point:`
+  line is stripped too and never becomes the point. A cut-off reply, a missing line,
   or one that is empty, one word, over five words or not last stores no
   point. `DuckThread#narrowing_due?` opens the gate only when the last two
   stored assistant turns share a point and both end in `?`; the new message

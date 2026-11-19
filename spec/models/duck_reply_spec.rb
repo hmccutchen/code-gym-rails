@@ -29,10 +29,16 @@ RSpec.describe DuckReply do
       end
     end
 
-    it "gives no point when the label is not on the last line" do
+    it "gives no point when the label is not on the last line, and still hides the line" do
       reply = read("Point: the loop body\nWhat runs first?")
 
-      expect(reply).to have_attributes(text: "Point: the loop body\nWhat runs first?", point: nil)
+      expect(reply).to have_attributes(text: "What runs first?", point: nil)
+    end
+
+    it "hides every standalone label line, keeping the point only from the last line" do
+      reply = read("Look at the loop.\n  Point: an early label\nWhat runs first?\nPoint: the loop body")
+
+      expect(reply).to have_attributes(text: "Look at the loop.\nWhat runs first?", point: "the loop body")
     end
 
     it "gives no point when the label shares a line with the question" do
