@@ -63,6 +63,18 @@ paths:
   until L5 runs on web and worker, as step 6 states. Its `down` restores
   the schema but not the deleted rows, so after it runs the rollback floor
   is L5's code.
+- `AddSlotToDailySets` adds `slot` (default 1) to `daily_exercises` and
+  `daily_responses` and moves both unique indexes to `(user_id, date, slot)`,
+  a release before any code reads `slot`. Code from before it still writes
+  slot 1 and still refuses a second set on a date in its own validation.
+  Its `down` waits at most 5 seconds for a lock, as `up` does, and refuses
+  once any slot 2 set exists, so the first release that writes slot 2 is
+  the rollback floor: code from before it would read either set of a
+  two-set day. An old process that prepared a `daily_exercises.*` or
+  `daily_responses.*` read before the column was added can fail one
+  request inside a transaction ("cached plan must not change result
+  type") until it prepares the read again. This is the same caveat every
+  added column has, accepted for one deploy.
 - `CreateLearnerNotes` adds `learner_notes`, `learner_items` and
   `users.learner_notes_enabled` a release before any code reads them, with
   their `AccountData::FATES` entries. Once a later release writes rows,
