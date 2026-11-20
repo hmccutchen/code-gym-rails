@@ -45,6 +45,19 @@ RSpec.describe "The concept's short version in a review", type: :request do
     expect(block.at_css("a")["href"]).to eq(learn_concept_path("ruby_rails", "n_plus_one"))
   end
 
+  it "keeps Short version as its own closed disclosure inside Full review" do
+    stub_env("REVIEW_TAKEAWAY" => "1")
+    ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
+    day = reviewed_day(date: Date.current)
+    day.update!(ai_review: day.ai_review.deep_merge("code_review" => { "rubric" => ReviewedSectionResults::RUBRIC_VERSION }))
+
+    block = short_version(root_path)
+
+    expect(block.ancestors("details.review-full").size).to eq(1)
+    expect(block["open"]).to be_nil
+    expect(block.text).to include(guide[:guide_pitfalls])
+  end
+
   it "builds the exposure index once for the submitted dashboard" do
     ConceptReference.create!(user: user, concept: "n_plus_one", language: "ruby_rails", **guide)
     reviewed_day(date: Date.current)

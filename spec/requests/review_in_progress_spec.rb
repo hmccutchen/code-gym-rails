@@ -89,6 +89,24 @@ RSpec.describe "A review still running when the dashboard loads", type: :request
       expect(page.at_css(".review-in-progress")).to be_present
     end
 
+    it "shows a completed section's takeaway without hiding the pending retry" do
+      stub_env("REVIEW_TAKEAWAY" => "1")
+      submitted_response(
+        reviewing_since: 1.minute.ago,
+        ai_review: { "code_review" => {
+          "rating" => "developing", "rubric" => ReviewedSectionResults::RUBRIC_VERSION,
+          "missed" => [ "The query returns a stale value." ], "essential_gaps" => [ 0 ]
+        } },
+        review_errors: { "pattern" => { "kind" => "short_rate_limit", "provider" => "claude", "at" => 1.hour.ago.iso8601 } }
+      )
+
+      page = page_html
+
+      expect(page.at_css("#ai-review .review-takeaway").text).to include("The query returns a stale value.")
+      expect(page.at_css(".review-in-progress")).to be_present
+      expect(page.css(".review-failure")).to be_empty
+    end
+
     it "offers the review button again once the claim has gone stale" do
       submitted_response(reviewing_since: stale_claim)
 

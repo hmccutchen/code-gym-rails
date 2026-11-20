@@ -1,0 +1,4 @@
+.review-takeaway { margin-block-start: .75rem; font-size: .9rem; line-height: 1.7; }
+.review-takeaway p { margin-block-start: .25rem; }
+.review-block > .review-full > summary { cursor: pointer; display: flex; align-items: center; min-height: 48px; list-style: none; font-size: .85rem; color: var(--accent-text); }
+.review-block > .review-full > summary::-webkit-details-marker { display: none; }

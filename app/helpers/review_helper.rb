@@ -5,6 +5,10 @@ module ReviewHelper
 
   ShortVersion = Data.define(:reference, :bucket, :show_pitfalls, :learn_link)
 
+  def review_takeaway(response, section)
+    ReviewTakeaway.call(response, section) if ReviewTakeawayPresentation.enabled?
+  end
+
   def review_short_version(response, section)
     short_version = short_version_for(response)
     return unless short_version.offered?(section)

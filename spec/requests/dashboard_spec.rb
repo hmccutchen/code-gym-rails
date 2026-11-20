@@ -46,6 +46,70 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
   before { login_as(user) }
 
+  describe "review takeaway presentation" do
+    let(:excerpt) { "A race condition can overwrite a newer value in `save.record`." }
+    let(:reviewed) do
+      create_response(create_exercise, ai_review: sample_review.deep_merge("code_review" => {
+        "rating" => "developing", "rubric" => ReviewedSectionResults::RUBRIC_VERSION,
+        "missed" => [ excerpt ], "essential_gaps" => [ 0 ]
+      })).tap do |day|
+        day.update!(answers: day.answers.except("challenge"))
+      end
+    end
+
+    it "shows the same takeaway on Today and History without changing the stored response or asking a provider" do
+      stub_env("REVIEW_TAKEAWAY" => "1")
+      original = reviewed.attributes
+      masteries = user.concept_masteries.order(:id).map(&:attributes)
+      expect(AiService).not_to receive(:for)
+
+      [ root_path, history_path ].each do |path|
+        get path
+
+        page = Nokogiri::HTML5(response.body)
+        expect(page.css('link[href*="components/review_takeaway"]').size).to eq(1)
+        blocks = page.css(".review-block")
+        block = blocks.find { |item| item.at_css("h3").text.start_with?("Code review") }
+        expect(block.at_css("h3 .review-rating").text).to eq("developing")
+        expect(block.at_css(".review-takeaway")).to be_present
+        expect(block.at_css(".review-takeaway strong").text).to eq("Main takeaway")
+        expect(block.at_css(".review-takeaway p").text).to eq(excerpt.delete("`"))
+        expect(block.at_css(".review-takeaway .gloss-term").text).to eq("race condition")
+        expect(block.at_css(".review-takeaway code").text).to eq("save.record")
+        expect(block.css("details.review-full").size).to eq(1)
+        full = block.at_css("details.review-full")
+        expect(full["open"]).to be_nil
+        expect(full.at_css("summary").text.strip).to eq("Full review")
+        expect(full.at_css("summary")["aria-label"]).to eq("Full review for Code review")
+        expect(full.css(".review-points li").map(&:text)).to include(excerpt)
+        expect(full.css("pre.snippet").text).to include("improved_code_marker")
+        expect(full.at_css("[data-controller='review-alternates']")).to be_present
+        expect(full.at_css(".follow-ups")).to be_nil
+        expect(block.at_css(".follow-ups").parent).to eq(block)
+        expect(blocks.reject { |item| item == block }).to all(satisfy { |other| other.css(".review-takeaway, details.review-full").empty? })
+        expect(page.css(".review-ungraded").text).to include("Skipped")
+      end
+
+      expect(reviewed.reload.attributes).to eq(original)
+      expect(reviewed.review_follow_ups).to be_empty
+      expect(user.concept_masteries.reload.order(:id).map(&:attributes)).to eq(masteries)
+    end
+
+    it "retains the flat review for eligible data while the switch is off" do
+      stub_env("REVIEW_TAKEAWAY" => nil)
+      reviewed
+      expect(ReviewTakeaway).not_to receive(:call)
+      expect(AiService).not_to receive(:for)
+
+      get root_path
+
+      block = Nokogiri::HTML5(response.body).css("#ai-review .review-block").find { |item| item.at_css("h3").text.start_with?("Code review") }
+      expect(block.css(".review-takeaway, details.review-full")).to be_empty
+      expect(block.css(".review-points li").map(&:text)).to include(excerpt)
+      expect(response.body).not_to include("components/review_takeaway")
+    end
+  end
+
   it "says when a section was left out today" do
     DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current,
                           dropped_sections: [ "challenge" ],
