@@ -4,17 +4,41 @@ class DuckAnswer
 
   def self.ask(user, exercise, section:, message:, store:, narrowing: DuckNarrowing.enabled?)
     service = AiService.for(user)
+    examples = concept_examples_allowed?(exercise, section) ? { concept_examples: true } : {}
     unless narrowing
       return new(user, exercise, section, text: service.duck_response(user, exercise, section: section, message: message,
-                                                                                         thread: store.turns_for(section)))
+                                                                                         thread: store.turns_for(section), **examples))
     end
 
     narrow = store.narrowing_due?(section)
     reply = service.labelled_duck_response(user, exercise, section: section, message: message,
-                                                           thread: store.turns_for_duck(section), narrow: narrow)
+                                                           thread: store.turns_for_duck(section), narrow: narrow, **examples)
     new(user, exercise, section, text: reply.text, reply: reply, narrow: narrow, previous_point: store.last_point(section))
   end
   private_class_method :new
+
+  def self.concept_examples_allowed?(exercise, section)
+    return false unless DuckConceptExamples.enabled?
+
+    kind = ExerciseSection.find(section)
+    return false unless kind&.duck_concept_examples?
+    return false unless exercise.problem_set.is_a?(Hash) && exercise.plan_notes.is_a?(Hash)
+
+    key = section.to_s
+    data = exercise.problem_set[key]
+    return false unless data.is_a?(Hash) && exercise.active_section_keys.include?(key)
+
+    question = data["question"]
+    return false unless question.is_a?(String) && question.present?
+
+    concept = data["concept"]
+    return false unless concept.nil? || concept.is_a?(String)
+
+    return false unless kind.concept_shown_before_submission?(data) && exercise.concepts_withheld_before_submission.exclude?(concept)
+
+    SectionContext.render(data) == SectionContext.render(data.slice(*kind.prose_fields))
+  end
+  private_class_method :concept_examples_allowed?
 
   def initialize(user, exercise, section, text:, reply: nil, narrow: false, previous_point: nil)
     @user           = user

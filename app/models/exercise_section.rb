@@ -152,6 +152,8 @@ class ExerciseSection
 
     def glossary_shown_before_submission? = true
 
+    def duck_concept_examples? = false
+
     def mastery_evidence?(_section) = true
 
     def adaptation_evidence?(_section) = true

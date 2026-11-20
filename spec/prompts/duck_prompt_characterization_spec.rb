@@ -11,6 +11,13 @@ RSpec.describe "duck prompt characterization" do
         "scenario" => "A nightly job emails each customer their open invoices.",
         "question" => "What would you change before this ships?",
         "snippet"  => "Customer.all.each do |customer|\n  customer.invoices.open.sum(:total)\nend"
+      },
+      "pattern" => {
+        "title" => "Notification delivery",
+        "scenario" => "An application sends notifications through email today. Next month it needs another delivery channel.",
+        "question" => "How can it add a channel without editing existing delivery code?",
+        "snippet" => "return unless enabled? && channel_available?\ndeliver(message)",
+        "answer_key" => "SENTINEL-PATTERN-KEY"
       }
     })
   end
@@ -35,9 +42,13 @@ RSpec.describe "duck prompt characterization" do
     end
   end
 
-  def recorded_request(message:, thread:)
+  def recorded_request(message:, thread:, section: "code_review", labelled: false, narrow: false, **options)
     service = recording_class.new
-    service.duck_response(user, exercise, section: "code_review", message: message, thread: thread)
+    if labelled
+      service.labelled_duck_response(user, exercise, section:, message:, thread:, narrow:, **options)
+    else
+      service.duck_response(user, exercise, section:, message:, thread:, **options)
+    end
     service.requests.sole
   end
 
@@ -90,5 +101,47 @@ RSpec.describe "duck prompt characterization" do
 
   it "keeps the duck's instructions as the system prompt's opening bytes" do
     expect(recorded_request(message: "hm", thread: []).system).to start_with(DuckPrompt::SYSTEM)
+  end
+
+  {
+    "concept_example_first_turn" => {
+      message: "Can you show me a small example of when && skips evaluating the right side?",
+      thread: []
+    },
+    "concept_example_prior_explanation" => {
+      message: "I still don't understand your explanation of short-circuiting.",
+      thread: [
+        { role: "user", content: "What does && do in this line?" },
+        { role: "assistant", content: "The right check runs only if the left check succeeds. That is called short-circuiting." }
+      ],
+      labelled: true
+    },
+    "concept_example_narrowed" => {
+      message: "Could I see a tiny example of when && skips the right check?",
+      thread: [
+        { role: "user", content: "Where should I start?" },
+        { role: "assistant", content: "What does the question say must stay the same?\nPoint: existing delivery code" },
+        { role: "user", content: "I am still stuck." },
+        { role: "assistant", content: "Which code does adding a channel currently require editing?\nPoint: existing delivery code" }
+      ],
+      labelled: true,
+      narrow: true
+    }
+  }.each do |name, turn|
+    it "sends the #{name.tr('_', ' ')} request with only the optional instruction added" do
+      args = turn.merge(section: "pattern")
+      enabled = recorded_request(**args, concept_examples: true)
+      off = recorded_request(**args, concept_examples: false)
+
+      expect(off.to_h).to eq(recorded_request(**args).to_h)
+      expect(enabled.system).to include(DuckPrompt::CONCEPT_EXAMPLES)
+      expect(enabled.to_h.merge(system: enabled.system.sub("\n\n#{DuckPrompt::CONCEPT_EXAMPLES}", ""))).to eq(off.to_h)
+      expect(rendered(enabled)).not_to include("SENTINEL-PATTERN-KEY")
+
+      path = snapshot_path(name)
+      File.write(path, rendered(enabled)) if ENV["UPDATE_PROMPT_SNAPSHOTS"]
+      expect(path).to exist
+      expect(rendered(enabled)).to eq(File.read(path))
+    end
   end
 end

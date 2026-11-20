@@ -94,6 +94,17 @@ RSpec.describe ExerciseSection do
     end
   end
 
+  describe ".duck_concept_examples?" do
+    it "defaults to false for the base kind and new subclasses" do
+      expect(described_class.duck_concept_examples?).to be(false)
+      expect(Class.new(described_class).duck_concept_examples?).to be(false)
+    end
+
+    it "opts in only the Pattern kind" do
+      expect(described_class.all.select(&:duck_concept_examples?)).to eq([ ExerciseSection::Pattern ])
+    end
+  end
+
   describe ".keys" do
     it "lists every section kind in the order the app has always enumerated them" do
       expect(described_class.keys).to eq(%w[

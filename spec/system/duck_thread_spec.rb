@@ -147,6 +147,51 @@ RSpec.describe "Duck thread", type: :system, with_csrf: true do
     end
   end
 
+  it "shows an enabled Pattern example as plain assistant text and restores it on reload" do
+    user = create_fake_provider_user
+    scenario = "The shipping screen asks the carrier for availability only if the package is ready."
+    example = "A weather board checks whether the forecast says <current> before checking permission. " \
+              "When it says <stale>, the board skips that second check."
+    requests = []
+    stub_env("DUCK_CONCEPT_EXAMPLES" => "1", "DUCK_NARROWING" => "1")
+    allow_any_instance_of(FakeService).to receive(:call).and_wrap_original do |original, request|
+      result = original.call(request)
+      next result unless request.purpose == "duck_thread"
+
+      requests << request
+      result.merge(text: example)
+    end
+
+    travel_to(a_weekday) do
+      DailyExercise.create!(
+        user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+        problem_set: { "pattern" => {
+          "title" => "Shipping labels", "question" => "How would you support new label formats?", "scenario" => scenario
+        } }
+      )
+      visit_as(user)
+      wait_for_js
+      expect(page).to have_content(scenario)
+      message = "Can you give an example of how short-circuiting works?"
+      selector = ".duck-thread[data-duck-thread-section-value='pattern']"
+      duck = find(selector)
+      duck.find(".duck-toggle").click
+      ask(duck, message)
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: example)
+      expect(requests.sole.system).to include(DuckPrompt::CONCEPT_EXAMPLES)
+      expect(duck).to have_no_css(".duck-turn :is(current, stale)")
+
+      visit root_path
+      wait_for_js
+      duck = find(selector)
+      duck.find(".duck-toggle").click
+      expect(duck).to have_css(".duck-turn.duck-user", text: message)
+      expect(duck).to have_css(".duck-turn.duck-assistant", text: example)
+      expect(duck).to have_no_css(".duck-turn :is(current, stale)")
+      expect(requests.size).to eq(1)
+    end
+  end
+
   it "keeps the cap across a reload, and Clear still gives it back" do
     user = create_fake_provider_user
 

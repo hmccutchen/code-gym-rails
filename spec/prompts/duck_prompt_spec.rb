@@ -64,7 +64,24 @@ RSpec.describe DuckPrompt do
 
   it "cannot see the response, the review or another section, because it takes only one section's data" do
     expect(described_class.method(:generate).parameters).to eq([ [ :keyreq, :section_data ], [ :keyreq, :message ], [ :keyreq, :thread ],
-                                                                 [ :key, :labelled ], [ :key, :narrow ] ])
+                                                                 [ :key, :labelled ], [ :key, :narrow ], [ :key, :concept_examples ] ])
+  end
+
+  [ {}, { labelled: true }, { labelled: true, narrow: true } ].each do |options|
+    it "adds only the concept-example instruction when enabled with #{options.inspect}" do
+      turn = { section_data: section, message: "Can you show a small example of memoization?", thread: [] }
+      default = described_class.generate(**turn, **options)
+      off = described_class.generate(**turn, **options, concept_examples: false)
+      enabled = described_class.generate(**turn, **options, concept_examples: true)
+      instruction = described_class::CONCEPT_EXAMPLES
+
+      expect(off).to eq(default)
+      expect(enabled[:system]).to start_with("#{described_class::KINDS}\n\n#{instruction}\n\n")
+      expect(enabled.merge(system: enabled[:system].delete_prefix("#{described_class::KINDS}\n\n#{instruction}"))).to eq(
+        off.merge(system: off[:system].delete_prefix(described_class::KINDS))
+      )
+      expect(enabled.values.flatten.to_json).not_to include("SENTINEL-KEY")
+    end
   end
 
   describe "point labels and narrowing" do

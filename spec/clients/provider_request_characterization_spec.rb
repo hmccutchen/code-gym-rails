@@ -69,6 +69,35 @@ RSpec.describe "provider request characterization" do
   REQUEST_SNAPSHOT_PROVIDERS.each do |service_class|
     provider = service_class.name.sub("Service", "").downcase
 
+    it "keeps the #{provider} duck wire shape when conceptual examples are enabled" do
+      service, bodies = recording(service_class)
+      user = User.create!(email: "duck-wire@example.com")
+      exercise = DailyExercise.new(problem_set: {
+        "pattern" => { "question" => "The sample checks a second condition only if the first passes.",
+                       "answer_key" => "HIDDEN ANSWER SENTINEL" }
+      })
+      turn = { section: "pattern", message: "Can you give an example of short-circuiting?",
+               thread: [
+                 { role: "user", content: "You: I already explained a different concept." },
+                 { role: "assistant", content: "Skipping the second check is called short-circuiting." }
+               ] }
+
+      service.duck_response(user, exercise, **turn)
+      service.duck_response(user, exercise, **turn, concept_examples: true)
+
+      expect(bodies.size).to eq(2)
+      baseline, enabled = bodies.map { |body| JSON.parse(body) }
+      system = case service_class.provider_key
+      when "anthropic" then baseline.fetch("system").first
+      else baseline
+      end
+      field = { "anthropic" => "text", "gemini" => "system_instruction", "openai" => "instructions" }.fetch(service_class.provider_key)
+      system[field] = system.fetch(field).sub(DuckPrompt::KINDS, "#{DuckPrompt::KINDS}\n\n#{DuckPrompt::CONCEPT_EXAMPLES}")
+
+      expect(enabled).to eq(baseline)
+      expect(bodies.last).not_to include("HIDDEN ANSWER SENTINEL")
+    end
+
     REQUEST_SNAPSHOT_SHAPES.each do |shape|
       context "#{provider} / #{shape}" do
         let(:body) do
