@@ -250,15 +250,16 @@ class AiService
     text_or_raise(result, subject: "follow-up answer")
   end
 
-  def duck_response(user, exercise, section:, message:, thread: [])
-    result = duck_call(user, exercise, section, message: message, thread: thread)
+  def duck_response(user, exercise, section:, message:, thread: [], concept_examples: false)
+    result = duck_call(user, exercise, section, message: message, thread: thread, concept_examples: concept_examples)
 
     text = text_or_raise(result, subject: "duck response")
     result[:truncated] ? "#{text}…" : text
   end
 
-  def labelled_duck_response(user, exercise, section:, message:, thread:, narrow:)
-    result = duck_call(user, exercise, section, message: message, thread: thread, labelled: true, narrow: narrow)
+  def labelled_duck_response(user, exercise, section:, message:, thread:, narrow:, concept_examples: false)
+    result = duck_call(user, exercise, section, message: message, thread: thread,
+                       labelled: true, narrow: narrow, concept_examples: concept_examples)
 
     DuckReply.read(text_or_raise(result, subject: "duck response"), truncated: result[:truncated])
   end

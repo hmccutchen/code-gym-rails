@@ -22,6 +22,8 @@ class ExerciseSection::Pattern < ExerciseSection
     true
   end
 
+  def self.duck_concept_examples? = true
+
   def self.judge_task
     "Design an approach to the stated problem, explaining the tradeoffs the scaffold names; naming the pattern is the point."
   end

@@ -1,6 +1,6 @@
 ---
 paths:
-  - "app/clients/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store,duck_narrowing}.rb"
+  - "app/clients/{ai_service,claude_service,gemini_service,openai_service,fake_service,lazy_cache_store,duck_narrowing,duck_concept_examples}.rb"
   - "app/prompts/{duck_prompt,follow_up_prompt}.rb"
   - "app/models/{ai_provider,call_profiles,api_usage,monthly_spend,provider_credential,provider_error,provider_failure,provider_failure_text,reset_clock,concept_reference_failures,user,duck_reply,duck_thread}.rb"
   - "app/controllers/concerns/{provider_call_limits,provider_failure_rendering,json_errors}.rb"
@@ -106,6 +106,12 @@ read it before changing that area.
   cap is six user turns a thread, counted on the server, and a posted `thread`
   is ignored. Threads are kept 365 days (`SweepDuckThreadsJob`), emptied on
   start over, deleted on account deletion, and never rendered after submit.
+- **Duck concept examples** ([decision and trial](../../docs/decisions/duck-concept-examples.md)):
+  `DUCK_CONCEPT_EXAMPLES` is off unless exactly `"1"`. `DuckAnswer` grants
+  permission only to an active section whose kind opts in and whose
+  concept is not withheld on that day. Only Pattern opts in. The
+  allowance is a conditional instruction in the existing call, with
+  the same answer-key boundary, turn cap, storage, and narrowing rules.
 - **Duck narrowing when stuck**: a trial behind `DUCK_NARROWING`, on only
   when exactly `"1"` (`DuckNarrowing.enabled?`), decided by the owner on
   2026-11-18. The duck stays Socratic. With the switch on, the prompt asks
