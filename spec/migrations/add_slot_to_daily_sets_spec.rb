@@ -36,11 +36,38 @@ RSpec.describe AddSlotToDailySets do
     expect(unique_columns(:daily_exercises)).to include(%w[user_id date])
     expect(unique_columns(:daily_responses)).to include(%w[user_id date])
     expect(connection.check_constraints(:daily_exercises).map(&:name)).not_to include("daily_exercises_slot_range")
+    expect(connection.check_constraints(:daily_responses).map(&:name)).not_to include("daily_responses_slot_range")
+  end
+
+  it "refuses to roll back once a day holds a second set, and changes nothing" do
+    insert = lambda do |slot|
+      connection.select_value(<<~SQL)
+        INSERT INTO daily_exercises (user_id, date, slot, problem_set, generated_at, language, created_at, updated_at)
+        VALUES (#{user.id}, CURRENT_DATE, #{slot}, '{}', now(), 'ruby_rails', now(), now()) RETURNING id
+      SQL
+    end
+    insert.call(1)
+    insert.call(2)
+
+    expect { described_class.new.migrate(:down) }
+      .to raise_error(ActiveRecord::IrreversibleMigration, /second set/)
+    expect(connection.column_exists?(:daily_exercises, :slot)).to be(true)
+    expect(unique_columns(:daily_exercises)).to include(%w[user_id date slot])
+  end
+
+  it "waits at most #{AddSlotToDailySets::LOCK_TIMEOUT} for its table locks in each direction" do
+    allow(connection).to receive(:execute).and_call_original
+
+    described_class.new.migrate(:down)
+    described_class.new.migrate(:up)
+
+    expect(connection).to have_received(:execute).with("SET LOCAL lock_timeout = '#{AddSlotToDailySets::LOCK_TIMEOUT}'").twice
   end
 
   it "makes the user, date and slot unique on both tables" do
     expect(unique_columns(:daily_exercises)).to include(%w[user_id date slot])
     expect(unique_columns(:daily_responses)).to include(%w[user_id date slot])
     expect(unique_columns(:daily_exercises)).not_to include(%w[user_id date])
+    expect(unique_columns(:daily_responses)).not_to include(%w[user_id date])
   end
 end
