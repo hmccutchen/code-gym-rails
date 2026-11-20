@@ -63,6 +63,10 @@ paths:
   until L5 runs on web and worker, as step 6 states. Its `down` restores
   the schema but not the deleted rows, so after it runs the rollback floor
   is L5's code.
+- `AddSlotToDailySets` adds `slot` (default 1) to `daily_exercises` and
+  `daily_responses` and moves both unique indexes to `(user_id, date, slot)`,
+  a release before any code reads `slot`. Code from before it still writes
+  slot 1 and still refuses a second set on a date in its own validation.
 - `CreateLearnerNotes` adds `learner_notes`, `learner_items` and
   `users.learner_notes_enabled` a release before any code reads them, with
   their `AccountData::FATES` entries. Once a later release writes rows,
