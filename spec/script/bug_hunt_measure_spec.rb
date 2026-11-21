@@ -235,7 +235,7 @@ RSpec.describe BugHuntMeasure::Report do
 
   after { FileUtils.rm_rf(dir) }
 
-  def results(lines, build: manifest["build_id"], runtime: { "ruby" => "3.3.6", "node" => "22.11.0" })
+  def results(lines, build: manifest["build_id"], runtime: { "ruby" => "3.3.14", "node" => "22.11.0" })
     path = File.join(dir, "results-#{SecureRandom.hex(3)}.jsonl")
     File.write(path, ([ { "build" => build, "network" => "off", "runtime" => runtime }.to_json ] + lines.map(&:to_json)).join("\n") + "\n")
     path
@@ -287,7 +287,7 @@ RSpec.describe BugHuntMeasure::Report do
 
   it "takes one results file per runtime" do
     lines = all_pass
-    ruby  = results(lines.select { |line| line["harness"].start_with?("rb") }, runtime: { "ruby" => "3.3.6" })
+    ruby  = results(lines.select { |line| line["harness"].start_with?("rb") }, runtime: { "ruby" => "3.3.14" })
     node  = results(lines.select { |line| line["harness"].start_with?("js") }, runtime: { "node" => "22.1.0" })
 
     expect(report(ruby, node)).to include("drafts: 3")
@@ -296,13 +296,13 @@ RSpec.describe BugHuntMeasure::Report do
   {
     "another build"         => -> { [ results(all_pass, build: "000000000000") ] },
     "another Ruby"          => -> { [ results(all_pass, runtime: { "ruby" => "3.4.1", "node" => "22.1.0" }) ] },
-    "another Node major"    => -> { [ results(all_pass, runtime: { "ruby" => "3.3.6", "node" => "20.1.0" }) ] },
+    "another Node major"    => -> { [ results(all_pass, runtime: { "ruby" => "3.3.14", "node" => "20.1.0" }) ] },
     "a missing harness"     => -> { [ results(all_pass.drop(1)) ] },
     "a repeated harness"    => -> { [ results(all_pass + all_pass.first(1)) ] },
     "an unknown harness"    => -> { [ results(all_pass + [ { "harness" => "rb99-bug_real", "outcome" => "pass", "reason" => "matched" } ]) ] },
     "a reason off the list" => -> { [ results(all_pass(except: { "rb01-bug_real" => { "outcome" => "pass", "reason" => "maybe" } })) ] },
     "an extra key"          => -> { [ results(all_pass(except: { "rb01-bug_real" => { "outcome" => "pass", "reason" => "matched", "note" => "x" } })) ] },
-    "a runtime not run"     => -> { [ results(all_pass, runtime: { "ruby" => "3.3.6" }) ] }
+    "a runtime not run"     => -> { [ results(all_pass, runtime: { "ruby" => "3.3.14" }) ] }
   }.each do |problem, paths|
     it "refuses, writing nothing, on #{problem}" do
       given = instance_exec(&paths)
