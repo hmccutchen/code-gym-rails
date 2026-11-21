@@ -84,6 +84,21 @@ RSpec.describe DuckPrompt do
     end
   end
 
+  it "gives the enabled teaching reply explicit limits on analogies, solving questions, and length" do
+    turn = { section_data: section, message: "What does this term mean?", thread: [] }
+    system = described_class.generate(**turn, concept_examples: true).fetch(:system).squish
+
+    expect(system).to include(
+      "This rule overrides the general analogy permission",
+      "only when their current message asks for both",
+      "The exercise question and surrounding context alone do not make a request mixed",
+      "answer the concept and stop",
+      "If an example or analogy is eligible and safe, give one compact example",
+      "For a concept-only reply, stop after the example or optional principle",
+      "four explanation sentences"
+    )
+  end
+
   describe "point labels and narrowing" do
     def system(**options) = described_class.generate(section_data: section, message: "hmm", thread: [], **options)[:system]
 

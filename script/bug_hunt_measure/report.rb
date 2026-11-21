@@ -16,7 +16,7 @@ module BugHuntMeasure
                 "not_runnable" => %w[key_unparsable syntax not_core timeout no_result] }.freeze
     LINE_KEYS = %w[harness outcome reason error].freeze
     ERROR_NAME = /\A[A-Za-z_][\w:]*\z/
-    RUBY_VERSION_WANTED = "3.3.6"
+    RUBY_VERSION_WANTED = "3.3.14"
     NODE_MAJOR_WANTED = "22"
     CHECK_GROUPS = { 1 => %w[bug_real], 2 => %w[returns_match], 3 => %w[looks_right], 4 => %w[fix_witness fix_looks_right] }.freeze
     THRESHOLD_CHECKS = [ 1, 3, 4 ].freeze

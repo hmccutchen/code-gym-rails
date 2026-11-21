@@ -107,7 +107,7 @@ an error and equal to it: Ruby `==`, JavaScript `isDeepStrictEqual`.
 
 - **It refuses, writing nothing, when:**
   - a results file is from another build
-  - Ruby isn't 3.3.6 or Node isn't 22.x
+  - Ruby isn't 3.3.14 or Node isn't 22.x
   - a runtime the harnesses need ran in no file
   - a harness has no line, more than one, or none in the manifest
   - a line has a key or value outside the format
@@ -141,7 +141,7 @@ call count and the cap in the measurement session's chat.
    bin/rails db:prepare
    npm --prefix vendor/prettier ci
    dockerd   (in the background)
-   docker pull ruby:3.3.6-slim
+   docker pull ruby:3.3.14-slim
    docker pull node:22-slim
    ```
 
@@ -159,7 +159,7 @@ call count and the cap in the measurement session's chat.
    docker run --rm --network none --read-only --tmpfs /tmp --memory 256m --cpus 1 \
      --pids-limit 64 --user 65534 --env-file /dev/null -e BUGHUNT_NETWORK_OFF=external \
      -v "$HARNESS_DIR":/in:ro -v "$RESULTS_DIR":/out \
-     ruby:3.3.6-slim bash /in/run.sh ruby /out/results-ruby.jsonl
+     ruby:3.3.14-slim bash /in/run.sh ruby /out/results-ruby.jsonl
    ```
 
    The same runs with `node:22-slim`, `node` and `results-node.jsonl`. If

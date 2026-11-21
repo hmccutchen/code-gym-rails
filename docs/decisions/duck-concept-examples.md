@@ -6,6 +6,15 @@ existing duck reply. It describes a different setting and reasoning
 structure. The reply stays within the four-sentence explanation budget.
 A reusable principle is optional. There is no automatic quiz or follow-up.
 
+The first owner-controlled trial surfaced an unsolicited analogy, a
+solving question after a concept-only answer, and six explanations that
+exceeded four sentences. With examples enabled, the teaching trigger
+governs analogies too. Only the learner's current message can make a
+request mixed by asking for both understanding and solving help.
+A safe concept-only reply explains the concept, includes one compact
+event or state change when eligible, and stops. Keep any contrast
+inside the example and add a principle only when it adds a new idea.
+
 Pattern is the only kind that opts in. The active section and existing
 day-wide concept withholding further restrict eligibility. Code Review
 metadata can identify some modes. It cannot reliably tell whether an
