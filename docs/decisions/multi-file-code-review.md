@@ -222,3 +222,18 @@ mastery handoff. A normal section sharing the concept and date still
 contributes exposure. Normal Code Review and bug-hunt behavior are unchanged.
 Mixed delivery requires a separate decision and history safeguards before it
 can be enabled.
+
+### Graduation and cleanup
+
+Authentic PR Review's standalone trial requires a dedicated cleanup PR
+after the owner decides to graduate or abandon it. Retire
+`CODE_REVIEW_PR_REVIEW`, synthetic-only admission and delivery, and obsolete
+trial configuration, tooling, and switch documentation. Close pending jobs
+and retries before removing their entry points. Any regular successor ships
+separately under its own version and progression eligibility decision.
+
+Preserve retained `pr_review_v1` records as formative, with their original
+feedback, History rendering, and answer-key isolation. Preserve their
+exclusion from mastery, retention, exposure, workload, and level progression.
+Cleanup must verify ordinary Code Review behavior, historical replay, and
+that stale trial jobs, retries, and History reads make no provider calls.
