@@ -142,7 +142,7 @@ GEM
     herb (0.11.2-x86_64-darwin)
     herb (0.11.2-x86_64-linux-gnu)
     herb (0.11.2-x86_64-linux-musl)
-    httparty (0.24.3)
+    httparty (0.25.1)
       csv
       mini_mime (>= 1.0.0)
       multi_xml (>= 0.5.2)
@@ -316,7 +316,7 @@ GEM
     regexp_parser (2.13.4)
     reline (0.7.0)
       io-console (~> 0.5)
-    resend (1.19.0)
+    resend (1.20.0)
       base64
       httparty (>= 0.22.0)
     rotp (6.4.0)
