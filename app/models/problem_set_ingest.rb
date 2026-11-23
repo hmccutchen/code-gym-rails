@@ -14,10 +14,10 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
   def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1, code_review_mode: nil,
-                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {}, pr_review_enabled: false)
+                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
     new(problem_set, language: language, expected_keys: expected_keys, daily: daily, code_review_source: code_review_source,
         code_review_files: code_review_files, code_review_mode: code_review_mode, pitched_at: pitched_at, eased_for: eased_for,
-        fixed_concepts: fixed_concepts, assignments: assignments, pr_review_enabled: pr_review_enabled).call
+        fixed_concepts: fixed_concepts, assignments: assignments).call
   end
 
   def self.prune_to_expected_keys(problem_set, expected_keys:)
@@ -25,7 +25,7 @@ class ProblemSetIngest
   end
 
   def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1,
-                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {}, pr_review_enabled: false)
+                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
@@ -38,19 +38,18 @@ class ProblemSetIngest
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
     @assignments        = assignments
-    @pr_review_enabled  = pr_review_enabled
     @suggested_concepts = []
     @unusable_sections  = []
     @dropped_keys       = {}
   end
 
   def call
-    validate_pr_review_scope! if pr_review?
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
     enforce_fixed_concepts!
     prune_unplanned_slots!
+    validate_pr_review_scope! if pr_review?
     format_code!
     reject_unusable_sections!
     clean_planted_keys!
@@ -63,7 +62,7 @@ class ProblemSetIngest
     strip_server_stamps!
     ground_code_review!
     stamp_pitched_rungs!
-    @problem_set.fetch("code_review")[PR_REVIEW::FIELD] = PR_REVIEW::VALUE if pr_review?
+    @problem_set.fetch("code_review")[PR_REVIEW::FIELD] = PR_REVIEW::VALUE if pr_review? && @problem_set.key?("code_review")
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections,
                key_notes: key_notes)
@@ -71,16 +70,17 @@ class ProblemSetIngest
 
   private
 
-  def pr_review? = @code_review_mode == PR_REVIEW::MODE
+  def pr_review? = @code_review_mode == PR_REVIEW::MODE && @expected_keys.include?("code_review")
 
   def validate_pr_review_scope!
-    valid = @pr_review_enabled.equal?(true) && @language == "ruby_rails" &&
-      @expected_keys == [ "code_review" ] && @problem_set.keys == @expected_keys &&
-      @pitched_at == { "code_review" => "mid_level" } && @code_review_files == PR_REVIEW::FILE_RANGE &&
-      @code_review_source.nil? && @assignments.empty? && @eased_for.empty?
-    return if valid
+    unless resolved_keys.include?("code_review")
+      raise ProviderError::InvalidResponseError, "PR Review requires an active slot"
+    end
 
-    raise ProviderError::InvalidResponseError, "PR Review requires an enabled standalone mid-level Ruby/Rails trial"
+    return if @language == "ruby_rails" && @pitched_at&.dig("code_review") == "mid_level" &&
+      @code_review_files == PR_REVIEW::FILE_RANGE && @code_review_source.nil?
+
+    raise ProviderError::InvalidResponseError, "PR Review requires two mid-level Ruby/Rails application files"
   end
 
   def clean_planted_keys!
@@ -148,7 +148,8 @@ class ProblemSetIngest
   end
 
   def prune_retry_extras!
-    return if @fixed_concepts.empty? && @assignments.empty?
+    sibling_retry = @code_review_mode == PR_REVIEW::MODE && !pr_review?
+    return if @fixed_concepts.empty? && @assignments.empty? && !sibling_retry
 
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
@@ -296,11 +297,11 @@ class ProblemSetIngest
 
   # Every section, since an unrequested one can win its slot; runs before ground_code_review! restamps `source`.
   def strip_server_stamps!
-    @problem_set.each_value do |section|
+    @problem_set.each do |key, section|
       next unless section.is_a?(Hash)
 
       SERVER_STAMPS.each { |stamp| section.delete(stamp) }
-      section.delete(PR_REVIEW::REQUIREMENTS) unless pr_review?
+      section.delete(PR_REVIEW::REQUIREMENTS) unless key == "code_review" && pr_review?
     end
   end
 

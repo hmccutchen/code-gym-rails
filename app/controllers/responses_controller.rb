@@ -431,7 +431,6 @@ class ResponsesController < ApplicationController
 
   def exercise_concept_tags(exercise)
     exercise.active_section_keys
-      .reject { |section| ExerciseSection.for(section).formative_review?(exercise.problem_set[section]) }
       .index_with { |section| exercise.problem_set.dig(section, "concept") }
       .compact
   end

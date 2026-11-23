@@ -1,15 +1,13 @@
 module ExerciseSection::CodeReview::PrReview
   MODE = :pr_review
   FIELD = "review_variant".freeze
-  VALUE = "pr_review_v1".freeze
+  VALUE = "pr_review".freeze
   REQUIREMENTS = "requirements".freeze
   FILE_RANGE = (2..2).freeze
   MAX_SCENARIO_LENGTH = 400
   MAX_QUESTION_LENGTH = 300
   MAX_REQUIREMENT_LENGTH = 240
   PUBLIC_FIELDS = %w[scenario question concept requirements].freeze
-
-  def self.section?(section) = section.is_a?(Hash) && section[FIELD] == VALUE
 
   def self.valid_context?(section, file_parts:)
     file_fields = FILE_RANGE.end.times.flat_map { |index| file_parts.map { |part| "file_#{index + 1}_#{part}" } }

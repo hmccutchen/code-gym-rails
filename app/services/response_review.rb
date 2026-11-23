@@ -70,18 +70,9 @@ class ResponseReview
     unassessed = @response.assessed_adaptation_sections.empty?
     @response.ai_review = (@response.ai_review || {}).merge(successes.transform_values { |result| result[:review] })
     @response.review_provider = @user.provider
-
-    mastery_sections = without_formative_reviews(successes.keys)
-    return if mastery_sections.empty?
-
     first_assessment = unassessed && @response.assessed_adaptation_sections.any?
-    ConceptMastery.record_review!(@response, sections: mastery_sections, apply_session_countdown: first_assessment,
-      previous_review_keys: without_formative_reviews(previous_keys))
-  end
-
-  def without_formative_reviews(sections)
-    data = @response.daily_exercise.problem_set
-    sections.reject { |key| ExerciseSection.for(key).formative_review?(data[key]) }
+    ConceptMastery.record_review!(@response, sections: successes.keys, apply_session_countdown: first_assessment,
+      previous_review_keys: previous_keys)
   end
 
   def status_for(successes, failures)

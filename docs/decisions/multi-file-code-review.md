@@ -199,41 +199,22 @@ With one account that comparison is a direction, not a verdict.
 
 ## Authentic PR Review foundation
 
-The standalone experimental shape reuses two numbered Code Review excerpts and
-the existing changed-line matcher. It requires a bounded scenario and one to
-three short requirements. Each supplied changed-line quote must resolve. Both files must be parseable
-Ruby under relative application paths. The
-structural check verifies format and grounding. Later blind judgment will
-verify that the requirements are checkable and that the files are related.
+PR Review is a regular Code Review variation. It reuses two numbered
+excerpts and the existing changed-line matcher for mid-level Ruby/Rails
+exercises. It requires a bounded scenario, one to three short requirements,
+and two parseable Ruby files at relative application paths. At least one
+changed line must be marked, and each supplied changed-line quote must
+resolve. The existing trusted `code_review_mode` selects validation, and
+ingest stamps `review_variant: "pr_review"` after the artifact passes.
+Other Code Review modes strip provider-supplied variant fields. A PR Review
+can share a day with other sections.
 
-`CODE_REVIEW_PR_REVIEW` defaults off and enables only on the exact value `1`.
-The trusted caller resolves the switch and passes explicit admission to ingest.
-Ingest accepts the trial shape only on an explicit internal request for a
-standalone mid-level Ruby/Rails Code Review with no practice assignment or
-curated source. It validates the artifact before stamping
-`review_variant: "pr_review_v1"`. Ordinary ingest strips experimental fields.
-No planner selects the variant in this foundation. A future entry point must
-separately enforce the isolated environment and dedicated synthetic account.
+The foundation does not select or deliver PR Review. Planner selection,
+generation and blind judgment, rendering, and post-submission grading
+remain follow-up work. The earlier `pr_review_v1` trial shape never shipped
+or had a delivery path.
 
-The stored marker remains authoritative when the switch is off. Marked
-sections supply no mastery, adaptation, or submitted concept tag. Review
-persistence keeps their feedback while omitting their results from the
-mastery handoff. A normal section sharing the concept and date still
-contributes exposure. Normal Code Review and bug-hunt behavior are unchanged.
-Mixed delivery requires a separate decision and history safeguards before it
-can be enabled.
-
-### Graduation and cleanup
-
-Authentic PR Review's standalone trial requires a dedicated cleanup PR
-after the owner decides to graduate or abandon it. Retire
-`CODE_REVIEW_PR_REVIEW`, synthetic-only admission and delivery, and obsolete
-trial configuration, tooling, and switch documentation. Close pending jobs
-and retries before removing their entry points. Any regular successor ships
-separately under its own version and progression eligibility decision.
-
-Preserve retained `pr_review_v1` records as formative, with their original
-feedback, History rendering, and answer-key isolation. Preserve their
-exclusion from mastery, retention, exposure, workload, and level progression.
-Cleanup must verify ordinary Code Review behavior, historical replay, and
-that stale trial jobs, retries, and History reads make no provider calls.
+Once delivered, valid PR Review results enter ordinary Code Review
+progression from day one. Existing mastery, exposure, retention, workload,
+and level rules apply. Review the grading after real use via
+[#851](https://github.com/hmccutchen/code-gym-rails/issues/851).

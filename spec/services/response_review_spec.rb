@@ -23,45 +23,26 @@ RSpec.describe ResponseReview do
     described_class.new(subject_response, user: user, reviewer: reviewer).call
   end
 
-  describe "formative PR review progression" do
-    before do
-      exercise.update!(problem_set: exercise.problem_set.deep_merge(
-        "code_review" => { "review_variant" => "pr_review_v1" }
-      ))
-      response.update!(concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
-    end
+  it "uses the ordinary evidence and mastery handoff for a PR Review in a mixed set" do
+    exercise.update!(problem_set: exercise.problem_set.deep_merge(
+      "code_review" => { "review_variant" => "pr_review", "pitched_at" => "mid_level" },
+      "pattern" => { "pitched_at" => "mid_level" }
+    ))
+    response.update!(concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
+    allow(reviewer).to receive(:review_sections).and_return(
+      { "code_review" => review_result("strong"), "pattern" => failed_result },
+      { "pattern" => review_result("solid") }
+    )
+    allow(ConceptMastery).to receive(:record_review!).and_call_original
 
-    it "stores a standalone trial success without entering mastery reconciliation" do
-      exercise.update!(problem_set: exercise.problem_set.slice("code_review"))
-      paused = user.concept_masteries.create!(concept: "caching", language: "ruby_rails", tier: :paused, cooldown_remaining: 2)
-      allow(reviewer).to receive(:review_sections).and_return("code_review" => review_result("strong"))
-
-      baseline = CompetencyGate.for(user, before: response.date.next_day)
-      expect(ConceptMastery).not_to receive(:record_review!)
-
-      expect(review.status).to eq(:ready)
-      expect(response.reload).to have_attributes(ai_review: { "code_review" => { "rating" => "strong" } }, mastery_application: {})
-      expect(user.concept_masteries.pluck(:concept)).to eq([ "caching" ])
-      expect(paused.reload.cooldown_remaining).to eq(2)
-      expect(ReviewedSectionResults.for(response)).to be_empty
-      expect(user.recent_performance).to be_empty
-      expect(CompetencyGate.for(user, before: response.date.next_day)).to eq(baseline)
-    end
-
-    it "keeps a prior formative success out of the normal mastery handoff on retry" do
-      allow(reviewer).to receive(:review_sections).and_return(
-        { "code_review" => review_result("strong"), "pattern" => failed_result },
-        { "pattern" => review_result("solid") }
-      )
-      allow(ConceptMastery).to receive(:record_review!).and_call_original
-
-      expect(review.status).to eq(:partial)
-      expect(review.status).to eq(:ready)
-      expect(response.reload.ai_review.keys).to contain_exactly("code_review", "pattern")
-      expect(ConceptMastery).to have_received(:record_review!).with(response, sections: [ "pattern" ],
-        apply_session_countdown: true, previous_review_keys: []).once
-      expect(ConceptMastery).to have_received(:record_review!).once
-    end
+    expect(review.status).to eq(:partial)
+    expect(review.status).to eq(:ready)
+    expect(response.reload.ai_review.keys).to contain_exactly("code_review", "pattern")
+    expect(ConceptMastery).to have_received(:record_review!).with(response, sections: [ "code_review" ],
+      apply_session_countdown: true, previous_review_keys: []).once
+    expect(ConceptMastery).to have_received(:record_review!).with(response, sections: [ "pattern" ],
+      apply_session_countdown: false, previous_review_keys: [ "code_review" ]).once
+    expect(ReviewedSectionResults.for(response).map(&:kind)).to contain_exactly("code_review", "pattern")
   end
 
   describe "daily mastery reconciliation" do

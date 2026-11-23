@@ -67,14 +67,6 @@ class ExerciseSection::CodeReview < ExerciseSection
     MultiFile.unusable_key_reason(shown, key, language: language) if shown.any?
   end
 
-  def self.formative_review?(section) = PrReview.section?(section)
-
-  def self.planning_host?(mode:) = mode != PrReview::MODE && super
-
-  def self.mastery_evidence?(section) = !formative_review?(section) && super
-
-  def self.adaptation_evidence?(section) = !formative_review?(section) && super
-
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
                               changed_lines_unresolved pr_review_artifact_invalid pr_review_changed_lines_unresolved] + BugHunt::REFUSAL_CODES
 
@@ -106,8 +98,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, **)
     return reject_bug_hunt!(section) if BugHunt.mode?(mode)
 
-    trial = mode == PrReview::MODE
-    if trial && !PrReview.valid_context?(section, file_parts: FILE_PARTS)
+    pr_review = mode == PrReview::MODE
+    if pr_review && !PrReview.valid_context?(section, file_parts: FILE_PARTS)
       refuse!("pr_review_artifact_invalid", "PR Review returned invalid public context or unsupported fields")
     end
     section.delete(BugHunt::PURPOSE_FIELD)
@@ -123,10 +115,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     reject_wrong_file_count!(section, shown.size, file_range)
     reject_long_files!(shown)
     reject_invalid_paths!(shown)
-    if trial && !PrReview.valid_files?(shown)
+    if pr_review && !PrReview.valid_files?(shown)
       refuse!("pr_review_artifact_invalid", "PR Review requires valid Ruby code in relative application paths")
     end
-    resolve_changed_lines!(section, language, strict: trial)
+    resolve_changed_lines!(section, language, strict: pr_review)
     drop_absent_files!(section)
   end
 
