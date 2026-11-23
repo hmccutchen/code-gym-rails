@@ -15,6 +15,7 @@ module GenerationPrompt::RetryReasons
                                   "held a line break or another control character, or two of its files had the same path.",
     "code_review.changed_lines_unresolved" => "none of its quoted changed lines matched exactly one line of its file.",
     "code_review.pr_review_artifact_invalid" => "its public context was invalid or its files were not valid Ruby application excerpts.",
+    "code_review.pr_review_changed_lines_unresolved" => "at least one quoted changed line did not match exactly one line of its file.",
     "code_review.purpose_missing" => "it had no purpose line, or its purpose ran over more than one line.",
     "code_review.purpose_too_long" => "its purpose line ran past #{ExerciseSection::CodeReview::BugHunt::MAX_PURPOSE_LENGTH} characters.",
     "code_review.bug_hunt_too_long" => "its code snippet ran past #{ExerciseSection::CodeReview::BugHunt::MAX_LINES} lines.",

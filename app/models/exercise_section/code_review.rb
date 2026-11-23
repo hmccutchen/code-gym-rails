@@ -76,7 +76,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.adaptation_evidence?(section) = !formative_review?(section) && super
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
-                              changed_lines_unresolved pr_review_artifact_invalid] + BugHunt::REFUSAL_CODES
+                              changed_lines_unresolved pr_review_artifact_invalid pr_review_changed_lines_unresolved] + BugHunt::REFUSAL_CODES
 
   def self.files(section)
     FILE_SLOTS.filter_map do |number|
@@ -179,7 +179,7 @@ class ExerciseSection::CodeReview < ExerciseSection
       _, code, changed = file_parts(section, number)
       lines = usable_text?(code) ? Array(changed).filter_map { |quote| KeyQuote.line(code, quote, language: language) } : []
       if strict && lines.size != Array(changed).size
-        refuse!("changed_lines_unresolved", "A PR Review changed-line quote did not resolve uniquely")
+        refuse!("pr_review_changed_lines_unresolved", "A PR Review changed-line quote did not resolve uniquely")
       end
       [ number, lines.flat_map(&:to_a).uniq.sort ]
     end

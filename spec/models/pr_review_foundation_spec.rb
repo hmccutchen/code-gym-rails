@@ -54,6 +54,16 @@ RSpec.describe ProblemSetIngest, "standalone PR Review foundation" do
       .to raise_error(ProviderError::UnusableSectionError) { |error| expect(error.code).to eq("code_review.pr_review_artifact_invalid") }
   end
 
+  it "reports a partially unresolved changed-line list with a trial-specific refusal" do
+    stub_env("CODE_REVIEW_PR_REVIEW" => "1")
+    data = { "code_review" => section.merge("file_1_changed" => [ "slots.any?", "not actually shown" ]) }
+
+    expect { ingest_trial(data) }.to raise_error(ProviderError::UnusableSectionError) { |error|
+      expect(error.code).to eq("code_review.pr_review_changed_lines_unresolved")
+    }
+    expect(ingest_trial(data, code_review_mode: :application_code).fetch("file_1_changed_lines")).to eq([ 2 ])
+  end
+
   it "rejects file paths and code outside the Ruby application scope" do
     stub_env("CODE_REVIEW_PR_REVIEW" => "1")
     [
@@ -103,7 +113,6 @@ RSpec.describe ProblemSetIngest, "standalone PR Review foundation" do
       marker, { "requirements" => [] }, { "requirements" => [ " " ] },
       { "requirements" => Array.new(4, "A requirement") }, { "scenario" => " " }, { "concept" => [] },
       { "file_2_path" => section.fetch("file_1_path") }, { "file_2_code" => nil },
-      { "file_1_changed" => [ "slots.any?", "not actually shown" ] },
       { "file_1_changed" => [], "file_1_changed_lines" => [ 2 ] },
       { "file_3_path" => "extra.rb" }, { "purpose" => "a bug hunt" }
     ].each do |changes|
