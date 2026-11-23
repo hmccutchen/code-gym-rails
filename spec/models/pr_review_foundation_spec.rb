@@ -48,6 +48,12 @@ RSpec.describe ProblemSetIngest, "standalone PR Review foundation" do
     expect { ingest_trial(pr_review_enabled: false) }.to raise_error(ProviderError::InvalidResponseError, /standalone/)
   end
 
+  it "reports invalid public context with a registered trial refusal code" do
+    stub_env("CODE_REVIEW_PR_REVIEW" => "1")
+    expect { ingest_trial({ "code_review" => section.merge("requirements" => []) }) }
+      .to raise_error(ProviderError::UnusableSectionError) { |error| expect(error.code).to eq("code_review.pr_review_artifact_invalid") }
+  end
+
   it "rejects file paths and code outside the Ruby application scope" do
     stub_env("CODE_REVIEW_PR_REVIEW" => "1")
     [

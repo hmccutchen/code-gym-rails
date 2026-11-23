@@ -1,0 +1,1 @@
+- This section replaces one that was turned down. Its concept must be exactly `service_objects`, which the day's plan already placed here. It was turned down because its public context was invalid or its files were not valid Ruby application excerpts. Write a new section for the same concept.

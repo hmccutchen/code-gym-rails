@@ -11,24 +11,19 @@ module ExerciseSection::CodeReview::PrReview
 
   def self.section?(section) = section.is_a?(Hash) && section[FIELD] == VALUE
 
-  def self.validate!(section, file_parts:)
+  def self.valid_context?(section, file_parts:)
     file_fields = FILE_RANGE.end.times.flat_map { |index| file_parts.map { |part| "file_#{index + 1}_#{part}" } }
     requirements = section[REQUIREMENTS]
-    valid = (section.keys - PUBLIC_FIELDS - file_fields).empty? &&
+    (section.keys - PUBLIC_FIELDS - file_fields).empty? &&
       short_line?(section["scenario"], MAX_SCENARIO_LENGTH) &&
       short_line?(section["question"], MAX_QUESTION_LENGTH) &&
       (!section.key?("concept") || short_line?(section["concept"], MAX_REQUIREMENT_LENGTH)) &&
       requirements.is_a?(Array) && (1..3).cover?(requirements.size) &&
       requirements.all? { |requirement| short_line?(requirement, MAX_REQUIREMENT_LENGTH) }
-    return if valid
-
-    raise ProviderError::InvalidResponseError, "PR Review returned invalid public context or unsupported fields"
   end
 
-  def self.validate_files!(files)
-    return if files.all? { |file| file.path.match?(%r{\Aapp/(?:[\w-]+/)+[\w-]+\.rb\z}) && Prism.parse(file.code).success? }
-
-    raise ProviderError::InvalidResponseError, "PR Review requires valid Ruby code in relative application paths"
+  def self.valid_files?(files)
+    files.all? { |file| file.path.match?(%r{\Aapp/(?:[\w-]+/)+[\w-]+\.rb\z}) && Prism.parse(file.code).success? }
   end
 
   def self.short_line?(value, max)
