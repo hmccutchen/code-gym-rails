@@ -1,5 +1,6 @@
 class ProblemSetIngest
-  SERVER_STAMPS = %w[pitched_at eased source practice_adjustment].freeze
+  PR_REVIEW = ExerciseSection::CodeReview::PrReview
+  SERVER_STAMPS = (%w[pitched_at eased source practice_adjustment] + [ PR_REVIEW::FIELD ]).freeze
   REFERENCE_PROSE_FIELDS = %w[tagline explanation senior_lens].freeze
 
   Suggestion = Data.define(:bucket, :name)
@@ -13,10 +14,10 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
   def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1, code_review_mode: nil,
-                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
+                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {}, pr_review_enabled: false)
     new(problem_set, language: language, expected_keys: expected_keys, daily: daily, code_review_source: code_review_source,
         code_review_files: code_review_files, code_review_mode: code_review_mode, pitched_at: pitched_at, eased_for: eased_for,
-        fixed_concepts: fixed_concepts, assignments: assignments).call
+        fixed_concepts: fixed_concepts, assignments: assignments, pr_review_enabled: pr_review_enabled).call
   end
 
   def self.prune_to_expected_keys(problem_set, expected_keys:)
@@ -24,7 +25,7 @@ class ProblemSetIngest
   end
 
   def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1,
-                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
+                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {}, pr_review_enabled: false)
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
@@ -37,12 +38,14 @@ class ProblemSetIngest
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
     @assignments        = assignments
+    @pr_review_enabled  = pr_review_enabled
     @suggested_concepts = []
     @unusable_sections  = []
     @dropped_keys       = {}
   end
 
   def call
+    validate_pr_review_scope! if pr_review?
     reject_missing_sections!
     warn_unrequested_sections!
     prune_retry_extras!
@@ -60,12 +63,25 @@ class ProblemSetIngest
     strip_server_stamps!
     ground_code_review!
     stamp_pitched_rungs!
+    @problem_set.fetch("code_review")[PR_REVIEW::FIELD] = PR_REVIEW::VALUE if pr_review?
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections,
                key_notes: key_notes)
   end
 
   private
+
+  def pr_review? = @code_review_mode == PR_REVIEW::MODE
+
+  def validate_pr_review_scope!
+    valid = @pr_review_enabled.equal?(true) && @language == "ruby_rails" &&
+      @expected_keys == [ "code_review" ] && @problem_set.keys == @expected_keys &&
+      @pitched_at == { "code_review" => "mid_level" } && @code_review_files == PR_REVIEW::FILE_RANGE &&
+      @code_review_source.nil? && @assignments.empty? && @eased_for.empty?
+    return if valid
+
+    raise ProviderError::InvalidResponseError, "PR Review requires an enabled standalone mid-level Ruby/Rails trial"
+  end
 
   def clean_planted_keys!
     @problem_set.each do |key, section|
@@ -284,6 +300,7 @@ class ProblemSetIngest
       next unless section.is_a?(Hash)
 
       SERVER_STAMPS.each { |stamp| section.delete(stamp) }
+      section.delete(PR_REVIEW::REQUIREMENTS) unless pr_review?
     end
   end
 

@@ -154,6 +154,8 @@ class ExerciseSection
 
     def duck_concept_examples? = false
 
+    def formative_review?(_section) = false
+
     def mastery_evidence?(_section) = true
 
     def adaptation_evidence?(_section) = true

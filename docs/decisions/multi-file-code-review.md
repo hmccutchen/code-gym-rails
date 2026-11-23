@@ -196,3 +196,29 @@ Results don't record the shape; a section's file fields do. If multi-file
 sections at a rung rate well below single-file ones at the same rung, the
 owner lowers the weight or narrows the rungs before anything else changes.
 With one account that comparison is a direction, not a verdict.
+
+## Authentic PR Review foundation
+
+The standalone experimental shape reuses two numbered Code Review excerpts and
+the existing changed-line matcher. It requires a bounded scenario and one to
+three short requirements. Each supplied changed-line quote must resolve. Both files must be parseable
+Ruby under relative application paths. The
+structural check verifies format and grounding. Later blind judgment will
+verify that the requirements are checkable and that the files are related.
+
+`CODE_REVIEW_PR_REVIEW` defaults off and enables only on the exact value `1`.
+The trusted caller resolves the switch and passes explicit admission to ingest.
+Ingest accepts the trial shape only on an explicit internal request for a
+standalone mid-level Ruby/Rails Code Review with no practice assignment or
+curated source. It validates the artifact before stamping
+`review_variant: "pr_review_v1"`. Ordinary ingest strips experimental fields.
+No planner selects the variant in this foundation. A future entry point must
+separately enforce the isolated environment and dedicated synthetic account.
+
+The stored marker remains authoritative when the switch is off. Marked
+sections supply no mastery, adaptation, or submitted concept tag. Review
+persistence keeps their feedback while omitting their results from the
+mastery handoff. A normal section sharing the concept and date still
+contributes exposure. Normal Code Review and bug-hunt behavior are unchanged.
+Mixed delivery requires a separate decision and history safeguards before it
+can be enabled.
