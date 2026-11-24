@@ -67,8 +67,16 @@ class ExerciseSection::CodeReview < ExerciseSection
     MultiFile.unusable_key_reason(shown, key, language: language) if shown.any?
   end
 
+  def self.ingest_variant?(mode:) = mode == PrReview::MODE
+
+  def self.ingest_variant_fields = PrReview::FIELDS
+
+  def self.valid_ingest_variant_scope?(**options) = PrReview.valid_scope?(**options)
+
+  def self.stamp_ingest_variant!(section) = section[PrReview::FIELD] = PrReview::VALUE
+
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
-                              changed_lines_unresolved] + BugHunt::REFUSAL_CODES
+                              changed_lines_unresolved pr_review_artifact_invalid pr_review_changed_lines_unresolved] + BugHunt::REFUSAL_CODES
 
   def self.files(section)
     FILE_SLOTS.filter_map do |number|
@@ -98,6 +106,10 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, **)
     return reject_bug_hunt!(section) if BugHunt.mode?(mode)
 
+    pr_review = ingest_variant?(mode: mode)
+    if pr_review && !PrReview.valid_context?(section, file_parts: FILE_PARTS)
+      refuse!("pr_review_artifact_invalid", "PR Review returned invalid public context or unsupported fields")
+    end
     section.delete(BugHunt::PURPOSE_FIELD)
     unless multi_file_range?(file_range)
       reject_unusable_snippet!(section)
@@ -111,7 +123,10 @@ class ExerciseSection::CodeReview < ExerciseSection
     reject_wrong_file_count!(section, shown.size, file_range)
     reject_long_files!(shown)
     reject_invalid_paths!(shown)
-    resolve_changed_lines!(section, language)
+    if pr_review && !PrReview.valid_files?(shown)
+      refuse!("pr_review_artifact_invalid", "PR Review requires valid Ruby code in relative application paths")
+    end
+    resolve_changed_lines!(section, language, strict: pr_review)
     drop_absent_files!(section)
   end
 
@@ -159,10 +174,13 @@ class ExerciseSection::CodeReview < ExerciseSection
     refuse!("path_invalid", "Two code review files share a path")
   end
 
-  def self.resolve_changed_lines!(section, language)
+  def self.resolve_changed_lines!(section, language, strict: false)
     resolved = FILE_SLOTS.to_h do |number|
       _, code, changed = file_parts(section, number)
       lines = usable_text?(code) ? Array(changed).filter_map { |quote| KeyQuote.line(code, quote, language: language) } : []
+      if strict && lines.size != Array(changed).size
+        refuse!("pr_review_changed_lines_unresolved", "A PR Review changed-line quote did not resolve uniquely")
+      end
       [ number, lines.flat_map(&:to_a).uniq.sort ]
     end
     refuse!("changed_lines_unresolved", "No code review file has a changed line its quotes resolve to") if resolved.values.all?(&:empty?)

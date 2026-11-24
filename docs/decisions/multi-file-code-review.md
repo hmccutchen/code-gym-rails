@@ -196,3 +196,27 @@ Results don't record the shape; a section's file fields do. If multi-file
 sections at a rung rate well below single-file ones at the same rung, the
 owner lowers the weight or narrows the rungs before anything else changes.
 With one account that comparison is a direction, not a verdict.
+
+## Authentic PR Review foundation
+
+PR Review is a regular Code Review variation. It reuses two numbered
+excerpts and the existing changed-line matcher for mid-level Ruby/Rails
+exercises. It requires a bounded scenario, one to three short requirements,
+and two parseable Ruby files at relative application paths. At least one
+changed line must be marked, and each supplied changed-line quote must
+resolve. The existing trusted `code_review_mode` selects the variant. Code
+Review owns its eligibility, reserved fields, and `review_variant: "pr_review"`
+stamp. Ingest checks that the review has an active slot before validation and
+applies the stamp only to a surviving review.
+Other Code Review modes strip provider-supplied variant fields. A PR Review
+can share a day with other sections.
+
+The foundation does not select or deliver PR Review. Planner selection,
+generation and blind judgment, rendering, and post-submission grading
+remain follow-up work. The earlier `pr_review_v1` trial shape never shipped
+or had a delivery path.
+
+Once delivered, valid PR Review results enter ordinary Code Review
+progression from day one. Existing mastery, exposure, retention, workload,
+and level rules apply. Review the grading after real use via
+[#851](https://github.com/hmccutchen/code-gym-rails/issues/851).

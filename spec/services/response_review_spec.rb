@@ -23,6 +23,28 @@ RSpec.describe ResponseReview do
     described_class.new(subject_response, user: user, reviewer: reviewer).call
   end
 
+  it "uses the ordinary evidence and mastery handoff for a PR Review in a mixed set" do
+    exercise.update!(problem_set: exercise.problem_set.deep_merge(
+      "code_review" => { "review_variant" => "pr_review", "pitched_at" => "mid_level" },
+      "pattern" => { "pitched_at" => "mid_level" }
+    ))
+    response.update!(concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
+    allow(reviewer).to receive(:review_sections).and_return(
+      { "code_review" => review_result("strong"), "pattern" => failed_result },
+      { "pattern" => review_result("solid") }
+    )
+    allow(ConceptMastery).to receive(:record_review!).and_call_original
+
+    expect(review.status).to eq(:partial)
+    expect(review.status).to eq(:ready)
+    expect(response.reload.ai_review.keys).to contain_exactly("code_review", "pattern")
+    expect(ConceptMastery).to have_received(:record_review!).with(response, sections: [ "code_review" ],
+      apply_session_countdown: true, previous_review_keys: []).once
+    expect(ConceptMastery).to have_received(:record_review!).with(response, sections: [ "pattern" ],
+      apply_session_countdown: false, previous_review_keys: [ "code_review" ]).once
+    expect(ReviewedSectionResults.for(response).map(&:kind)).to contain_exactly("code_review", "pattern")
+  end
+
   describe "daily mastery reconciliation" do
     around do |example|
       Time.use_zone("America/New_York") do

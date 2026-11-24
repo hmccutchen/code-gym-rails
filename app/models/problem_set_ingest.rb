@@ -33,6 +33,7 @@ class ProblemSetIngest
     @code_review_source = code_review_source
     @code_review_files  = code_review_files
     @code_review_mode   = code_review_mode
+    @variant_kind       = ExerciseSection.all.find { |kind| kind.ingest_variant?(mode: code_review_mode) }
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
@@ -48,6 +49,7 @@ class ProblemSetIngest
     prune_retry_extras!
     enforce_fixed_concepts!
     prune_unplanned_slots!
+    validate_variant_scope! if intended_variant?
     format_code!
     reject_unusable_sections!
     clean_planted_keys!
@@ -57,7 +59,7 @@ class ProblemSetIngest
     normalize_reference_prose!
     arrange_sections!
     strip_current_schemas!
-    strip_server_stamps!
+    normalize_server_fields!
     ground_code_review!
     stamp_pitched_rungs!
 
@@ -66,6 +68,20 @@ class ProblemSetIngest
   end
 
   private
+
+  def intended_variant? = @variant_kind && @expected_keys.include?(@variant_kind.key)
+
+  def validate_variant_scope!
+    key = @variant_kind.key
+    unless resolved_keys.include?(key)
+      raise ProviderError::InvalidResponseError, "#{key} variant requires an active slot"
+    end
+
+    return if @variant_kind.valid_ingest_variant_scope?(language: @language, rung: @pitched_at&.dig(key),
+                                                        file_range: @code_review_files, source: @code_review_source)
+
+    raise ProviderError::InvalidResponseError, "#{key} variant does not match the planned scope"
+  end
 
   def clean_planted_keys!
     @problem_set.each do |key, section|
@@ -132,7 +148,8 @@ class ProblemSetIngest
   end
 
   def prune_retry_extras!
-    return if @fixed_concepts.empty? && @assignments.empty?
+    sibling_retry = @variant_kind && !intended_variant?
+    return if @fixed_concepts.empty? && @assignments.empty? && !sibling_retry
 
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
   end
@@ -279,11 +296,18 @@ class ProblemSetIngest
   end
 
   # Every section, since an unrequested one can win its slot; runs before ground_code_review! restamps `source`.
-  def strip_server_stamps!
-    @problem_set.each_value do |section|
+  def normalize_server_fields!
+    variant_fields = ExerciseSection.all.flat_map(&:ingest_variant_fields)
+    @problem_set.each do |key, section|
       next unless section.is_a?(Hash)
 
-      SERVER_STAMPS.each { |stamp| section.delete(stamp) }
+      section.except!(*SERVER_STAMPS)
+      if intended_variant? && key == @variant_kind.key
+        section.except!(*(variant_fields - @variant_kind.ingest_variant_fields))
+        @variant_kind.stamp_ingest_variant!(section)
+      else
+        section.except!(*variant_fields)
+      end
     end
   end
 

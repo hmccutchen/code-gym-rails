@@ -449,6 +449,33 @@ RSpec.describe "Responses", type: :request do
       )
     end
 
+    it "records ordinary exposure for a PR Review on mixed and later review-only days" do
+      pr_review = { "question" => "Review the change.", "concept" => "n_plus_one", "review_variant" => "pr_review" }
+      create_exercise("code_review" => pr_review, "pattern" => { "question" => "q", "concept" => "n_plus_one" })
+      post responses_path, params: { response: {
+        answers: { code_review: "a" * 20, pattern: "b" * 20 },
+        section_ratings: { code_review: "right_level", pattern: "right_level" }, submit: "1"
+      } }, as: :json
+
+      saved = user.daily_responses.sole
+      expect(saved).to be_submitted
+      expect(saved.concept_tags).to eq("code_review" => "n_plus_one", "pattern" => "n_plus_one")
+
+      travel_to(1.day.from_now) do
+        create_exercise("code_review" => pr_review)
+        post responses_path, params: { response: {
+          answers: { code_review: "c" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1"
+        } }, as: :json
+
+        expect(user.daily_responses.find_by!(date: Date.current)).to have_attributes(
+          concept_tags: { "code_review" => "n_plus_one" }, submitted_at: be_present
+        )
+        exposures = ConceptExposureIndex.for(user)
+        expect(exposures.count("n_plus_one", "ruby_rails", on_or_before: Date.current)).to eq(2)
+        expect(exposures.last_seen("n_plus_one", "ruby_rails")).to eq(Date.current)
+      end
+    end
+
     it "tags and saves an architecture third section's concept and answer" do
       create_exercise(
         "code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" },
