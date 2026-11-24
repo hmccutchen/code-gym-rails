@@ -3,11 +3,16 @@ module ExerciseSection::CodeReview::PrReview
   FIELD = "review_variant".freeze
   VALUE = "pr_review".freeze
   REQUIREMENTS = "requirements".freeze
+  FIELDS = [ FIELD, REQUIREMENTS ].freeze
   FILE_RANGE = (2..2).freeze
   MAX_SCENARIO_LENGTH = 400
   MAX_QUESTION_LENGTH = 300
   MAX_REQUIREMENT_LENGTH = 240
   PUBLIC_FIELDS = %w[scenario question concept requirements].freeze
+
+  def self.valid_scope?(language:, rung:, file_range:, source:)
+    language == "ruby_rails" && rung == "mid_level" && file_range == FILE_RANGE && source.nil?
+  end
 
   def self.valid_context?(section, file_parts:)
     file_fields = FILE_RANGE.end.times.flat_map { |index| file_parts.map { |part| "file_#{index + 1}_#{part}" } }

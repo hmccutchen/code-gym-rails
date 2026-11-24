@@ -68,8 +68,7 @@ RSpec.describe ProblemSetIngest, "PR Review foundation" do
   it "ignores variant data on a retry for another section" do
     data = { "pattern" => { "question" => "Explain the pattern.", "concept" => "memoization" }, "code_review" => section }
 
-    result = ingest(data, expected_keys: [ "pattern" ], pitched_at: { "pattern" => "junior" },
-      fixed_concepts: { "pattern" => "memoization" })
+    result = ingest(data, expected_keys: [ "pattern" ], pitched_at: { "pattern" => "junior" })
 
     expect(result.problem_set.keys).to eq([ "pattern" ])
   end
@@ -77,6 +76,31 @@ RSpec.describe ProblemSetIngest, "PR Review foundation" do
   it "reports invalid public context with a registered PR Review refusal code" do
     expect { ingest_review({ "code_review" => section.merge("requirements" => []) }) }
       .to raise_error(ProviderError::UnusableSectionError) { |error| expect(error.code).to eq("code_review.pr_review_artifact_invalid") }
+  end
+
+  { "scenario" => 400, "question" => 300, "requirements" => 240 }.each do |field, limit|
+    describe field do
+      def review_with(field, value)
+        ingest_review({ "code_review" => section.merge(field => (field == "requirements" ? [ value ] : value)) })
+      end
+
+      it "keeps text at the length limit" do
+        text = "a" * limit
+        expect(Array(review_with(field, text).fetch(field))).to eq([ text ])
+      end
+
+      it "refuses text one character over the limit" do
+        expect { review_with(field, "a" * (limit + 1)) }
+          .to raise_error(ProviderError::UnusableSectionError, /invalid public context/)
+      end
+
+      it "refuses embedded newlines and other control characters" do
+        [ "\n", "\u0001" ].each do |character|
+          expect { review_with(field, "before#{character}after") }
+            .to raise_error(ProviderError::UnusableSectionError, /invalid public context/)
+        end
+      end
+    end
   end
 
   it "reports a partially unresolved changed-line list with a PR Review refusal" do

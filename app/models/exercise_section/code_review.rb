@@ -67,6 +67,14 @@ class ExerciseSection::CodeReview < ExerciseSection
     MultiFile.unusable_key_reason(shown, key, language: language) if shown.any?
   end
 
+  def self.ingest_variant?(mode:) = mode == PrReview::MODE
+
+  def self.ingest_variant_fields = PrReview::FIELDS
+
+  def self.valid_ingest_variant_scope?(**options) = PrReview.valid_scope?(**options)
+
+  def self.stamp_ingest_variant!(section) = section[PrReview::FIELD] = PrReview::VALUE
+
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
                               changed_lines_unresolved pr_review_artifact_invalid pr_review_changed_lines_unresolved] + BugHunt::REFUSAL_CODES
 
@@ -98,7 +106,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, **)
     return reject_bug_hunt!(section) if BugHunt.mode?(mode)
 
-    pr_review = mode == PrReview::MODE
+    pr_review = ingest_variant?(mode: mode)
     if pr_review && !PrReview.valid_context?(section, file_parts: FILE_PARTS)
       refuse!("pr_review_artifact_invalid", "PR Review returned invalid public context or unsupported fields")
     end

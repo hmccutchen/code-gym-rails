@@ -1,6 +1,5 @@
 class ProblemSetIngest
-  PR_REVIEW = ExerciseSection::CodeReview::PrReview
-  SERVER_STAMPS = (%w[pitched_at eased source practice_adjustment] + [ PR_REVIEW::FIELD ]).freeze
+  SERVER_STAMPS = %w[pitched_at eased source practice_adjustment].freeze
   REFERENCE_PROSE_FIELDS = %w[tagline explanation senior_lens].freeze
 
   Suggestion = Data.define(:bucket, :name)
@@ -34,6 +33,7 @@ class ProblemSetIngest
     @code_review_source = code_review_source
     @code_review_files  = code_review_files
     @code_review_mode   = code_review_mode
+    @variant_kind       = ExerciseSection.all.find { |kind| kind.ingest_variant?(mode: code_review_mode) }
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
@@ -49,7 +49,7 @@ class ProblemSetIngest
     prune_retry_extras!
     enforce_fixed_concepts!
     prune_unplanned_slots!
-    validate_pr_review_scope! if pr_review?
+    validate_variant_scope! if intended_variant?
     format_code!
     reject_unusable_sections!
     clean_planted_keys!
@@ -59,10 +59,9 @@ class ProblemSetIngest
     normalize_reference_prose!
     arrange_sections!
     strip_current_schemas!
-    strip_server_stamps!
+    normalize_server_fields!
     ground_code_review!
     stamp_pitched_rungs!
-    @problem_set.fetch("code_review")[PR_REVIEW::FIELD] = PR_REVIEW::VALUE if pr_review? && @problem_set.key?("code_review")
 
     Result.new(problem_set: @problem_set, suggested_concepts: @suggested_concepts, unusable_sections: @unusable_sections,
                key_notes: key_notes)
@@ -70,17 +69,18 @@ class ProblemSetIngest
 
   private
 
-  def pr_review? = @code_review_mode == PR_REVIEW::MODE && @expected_keys.include?("code_review")
+  def intended_variant? = @variant_kind && @expected_keys.include?(@variant_kind.key)
 
-  def validate_pr_review_scope!
-    unless resolved_keys.include?("code_review")
-      raise ProviderError::InvalidResponseError, "PR Review requires an active slot"
+  def validate_variant_scope!
+    key = @variant_kind.key
+    unless resolved_keys.include?(key)
+      raise ProviderError::InvalidResponseError, "#{key} variant requires an active slot"
     end
 
-    return if @language == "ruby_rails" && @pitched_at&.dig("code_review") == "mid_level" &&
-      @code_review_files == PR_REVIEW::FILE_RANGE && @code_review_source.nil?
+    return if @variant_kind.valid_ingest_variant_scope?(language: @language, rung: @pitched_at&.dig(key),
+                                                        file_range: @code_review_files, source: @code_review_source)
 
-    raise ProviderError::InvalidResponseError, "PR Review requires two mid-level Ruby/Rails application files"
+    raise ProviderError::InvalidResponseError, "#{key} variant does not match the planned scope"
   end
 
   def clean_planted_keys!
@@ -148,7 +148,7 @@ class ProblemSetIngest
   end
 
   def prune_retry_extras!
-    sibling_retry = @code_review_mode == PR_REVIEW::MODE && !pr_review?
+    sibling_retry = @variant_kind && !intended_variant?
     return if @fixed_concepts.empty? && @assignments.empty? && !sibling_retry
 
     @problem_set = self.class.prune_to_expected_keys(@problem_set, expected_keys: @expected_keys)
@@ -296,12 +296,18 @@ class ProblemSetIngest
   end
 
   # Every section, since an unrequested one can win its slot; runs before ground_code_review! restamps `source`.
-  def strip_server_stamps!
+  def normalize_server_fields!
+    variant_fields = ExerciseSection.all.flat_map(&:ingest_variant_fields)
     @problem_set.each do |key, section|
       next unless section.is_a?(Hash)
 
-      SERVER_STAMPS.each { |stamp| section.delete(stamp) }
-      section.delete(PR_REVIEW::REQUIREMENTS) unless key == "code_review" && pr_review?
+      section.except!(*SERVER_STAMPS)
+      if intended_variant? && key == @variant_kind.key
+        section.except!(*(variant_fields - @variant_kind.ingest_variant_fields))
+        @variant_kind.stamp_ingest_variant!(section)
+      else
+        section.except!(*variant_fields)
+      end
     end
   end
 

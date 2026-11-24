@@ -204,8 +204,10 @@ excerpts and the existing changed-line matcher for mid-level Ruby/Rails
 exercises. It requires a bounded scenario, one to three short requirements,
 and two parseable Ruby files at relative application paths. At least one
 changed line must be marked, and each supplied changed-line quote must
-resolve. The existing trusted `code_review_mode` selects validation, and
-ingest stamps `review_variant: "pr_review"` after the artifact passes.
+resolve. The existing trusted `code_review_mode` selects the variant. Code
+Review owns its eligibility, reserved fields, and `review_variant: "pr_review"`
+stamp. Ingest checks that the review has an active slot before validation and
+applies the stamp only to a surviving review.
 Other Code Review modes strip provider-supplied variant fields. A PR Review
 can share a day with other sections.
 
