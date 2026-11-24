@@ -45,6 +45,12 @@ class SectionJudgePrompt
   end
 
   def self.generate(kind:, section:, rung:, locked:)
+    variant = kind.judge_variant(section)
+    if variant
+      return variant.request(section: section, attachment: attachment_block(kind, section),
+                             plain_language: PromptStandards::PLAIN_LANGUAGE_STANDARD)
+    end
+
     shown = visible(kind, section)
 
     { response_schema: JudgeVerdict.schema_for(kind), system: SYSTEM, prompt: <<~PROMPT }

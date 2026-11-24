@@ -13,10 +13,10 @@ class ProblemSetIngest
   Result = Data.define(:problem_set, :suggested_concepts, :unusable_sections, :key_notes)
 
   def self.call(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1, code_review_mode: nil,
-                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
+                pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {}, pr_review_target: nil)
     new(problem_set, language: language, expected_keys: expected_keys, daily: daily, code_review_source: code_review_source,
         code_review_files: code_review_files, code_review_mode: code_review_mode, pitched_at: pitched_at, eased_for: eased_for,
-        fixed_concepts: fixed_concepts, assignments: assignments).call
+        fixed_concepts: fixed_concepts, assignments: assignments, pr_review_target: pr_review_target).call
   end
 
   def self.prune_to_expected_keys(problem_set, expected_keys:)
@@ -24,7 +24,7 @@ class ProblemSetIngest
   end
 
   def initialize(problem_set, language:, expected_keys:, daily:, code_review_source: nil, code_review_files: 1..1,
-                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {})
+                 code_review_mode: nil, pitched_at: nil, eased_for: {}, fixed_concepts: {}, assignments: {}, pr_review_target: nil)
     @problem_set        = problem_set
     @language           = language
     @expected_keys      = expected_keys
@@ -33,7 +33,8 @@ class ProblemSetIngest
     @code_review_source = code_review_source
     @code_review_files  = code_review_files
     @code_review_mode   = code_review_mode
-    @variant_kind       = ExerciseSection.all.find { |kind| kind.ingest_variant?(mode: code_review_mode) }
+    @variant_kind       = ExerciseSection.ingest_variant_kind(mode: code_review_mode)
+    @variant_target     = pr_review_target
     @pitched_at         = pitched_at
     @eased_for          = eased_for
     @fixed_concepts     = fixed_concepts
@@ -52,6 +53,7 @@ class ProblemSetIngest
     validate_variant_scope! if intended_variant?
     format_code!
     reject_unusable_sections!
+    normalize_variant_fields!
     clean_planted_keys!
     normalize_concepts!
     normalize_answer_scaffolds!
@@ -59,7 +61,7 @@ class ProblemSetIngest
     normalize_reference_prose!
     arrange_sections!
     strip_current_schemas!
-    normalize_server_fields!
+    strip_server_stamps!
     ground_code_review!
     stamp_pitched_rungs!
 
@@ -78,7 +80,8 @@ class ProblemSetIngest
     end
 
     return if @variant_kind.valid_ingest_variant_scope?(language: @language, rung: @pitched_at&.dig(key),
-                                                        file_range: @code_review_files, source: @code_review_source)
+                                                        file_range: @code_review_files, source: @code_review_source,
+                                                        target: @variant_target)
 
     raise ProviderError::InvalidResponseError, "#{key} variant does not match the planned scope"
   end
@@ -180,8 +183,10 @@ class ProblemSetIngest
   end
 
   def reject_if_unusable(key)
-    ExerciseSection.for(key).reject_unusable!(@problem_set[key], language: @language, file_range: @code_review_files,
-                                                                 mode: @code_review_mode)
+    kind = ExerciseSection.for(key)
+    options = { language: @language, file_range: @code_review_files, mode: @code_review_mode }
+    options[:variant_target] = @variant_target if kind == @variant_kind
+    kind.reject_unusable!(@problem_set[key], **options)
     nil
   rescue ProviderError::UnusableSectionError => e
     leave_out(key, e.message, e.code)
@@ -296,12 +301,15 @@ class ProblemSetIngest
   end
 
   # Every section, since an unrequested one can win its slot; runs before ground_code_review! restamps `source`.
-  def normalize_server_fields!
+  def strip_server_stamps!
+    @problem_set.each_value { |section| section.except!(*SERVER_STAMPS) if section.is_a?(Hash) }
+  end
+
+  def normalize_variant_fields!
     variant_fields = ExerciseSection.all.flat_map(&:ingest_variant_fields)
     @problem_set.each do |key, section|
       next unless section.is_a?(Hash)
 
-      section.except!(*SERVER_STAMPS)
       if intended_variant? && key == @variant_kind.key
         section.except!(*(variant_fields - @variant_kind.ingest_variant_fields))
         @variant_kind.stamp_ingest_variant!(section)

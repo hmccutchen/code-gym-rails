@@ -2,10 +2,10 @@
 class DailyPlan
   Result = Data.define(:daily_kinds, :rotation, :reinforcement, :due_checks, :established,
                         :fourth_reinforcement, :fourth_due_checks, :fourth_established,
-                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :featured_concept, :scenario_flavor,
+                        :code_review_mode, :code_review_source, :code_review_files, :code_review_gotcha, :pr_review_target, :featured_concept, :scenario_flavor,
                         :shared_concept, :coverage, :waiting_checks, :size, :selected_kinds, :practice_schedule, :assignments) do
-    def initialize(**attributes)
-      super(**{ selected_kinds: nil, practice_schedule: nil, assignments: {} }.merge(attributes))
+    def initialize(pr_review_target: nil, **attributes)
+      super(pr_review_target: pr_review_target&.dup&.freeze, **{ selected_kinds: nil, practice_schedule: nil, assignments: {} }.merge(attributes))
     end
 
     def notes(kind_rungs: nil)

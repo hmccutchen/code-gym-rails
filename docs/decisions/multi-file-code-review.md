@@ -208,15 +208,36 @@ resolve. The existing trusted `code_review_mode` selects the variant. Code
 Review owns its eligibility, reserved fields, and `review_variant: "pr_review"`
 stamp. Ingest checks that the review has an active slot before validation and
 applies the stamp only to a surviving review.
+
 Other Code Review modes strip provider-supplied variant fields. A PR Review
 can share a day with other sections.
 
-The foundation does not select or deliver PR Review. Planner selection,
-generation and blind judgment, rendering, and post-submission grading
-remain follow-up work. The earlier `pr_review_v1` trial shape never shipped
-or had a delivery path.
+The planner does not select PR Review. Learner rendering, post-submission
+grading, and ordinary selection remain follow-up work. The earlier
+`pr_review_v1` trial shape never shipped or had a delivery path.
 
 Once delivered, valid PR Review results enter ordinary Code Review
 progression from day one. Existing mastery, exposure, retention, workload,
 and level rules apply. Review the grading after real use via
 [#851](https://github.com/hmccutchen/code-gym-rails/issues/851).
+
+### Generation and blind judgment
+
+A trusted plan carries one private case target for generation and retries.
+The target never enters plan notes or the section's public fields. Both case
+classes get the same question and artifact shape. Ingest requires a matching
+private `answer_key` with a bounded reason, one or two exact code lines
+from the formatted excerpts, and the expected and observed outcomes for
+a particular requirement. Other sections keep their existing key rules.
+
+The blind judge receives only the public intent, requirements, question,
+and numbered excerpts. It can reject insufficient context or a material
+ambiguity. A keep requires a supported classification that agrees with the
+key on the requirement and its expected and observed outcomes. For a blocker,
+at least one evidence line must also agree. This
+conservative check can reject two descriptions of the same blocker if
+they cite different lines. Semantic accuracy still requires human evaluation. A prose edit requires a fresh blind keep before it can ship. Sets with PR
+Review share one edit confirmation across sections, including retries.
+Disagreement uses the existing retry budget, and an unavailable judge
+cannot let the artifact through. Judge explanations and the private key
+stay out of generation diagnostics.

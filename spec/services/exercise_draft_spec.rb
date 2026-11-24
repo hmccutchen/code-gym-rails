@@ -190,6 +190,40 @@ RSpec.describe ExerciseDraft do
     expect(draft.problem_set.keys).to match_array(draft.kinds.map(&:key))
   end
 
+  it "keeps a trusted PR Review target private and stable between draft and retry" do
+    user.update!(skill_level: "mid_level")
+    plan = plan_for(code_review_mode: :pr_review, code_review_files: :multi, pr_review_target: "acceptable", size: DaySize.for(setting: 4))
+    allow(DailyPlan).to receive(:for).and_return(plan)
+    allow(ProblemSetIngest).to receive(:call).and_call_original
+    reply["code_review"] = {
+      "concept" => "service_objects", "scenario" => "Inventory availability", "question" => "Assess this change.",
+      "file_1_path" => "app/services/availability.rb", "file_1_code" => "class Availability\n  def available? = true\nend",
+      "file_1_changed" => [ "def available? = true" ],
+      "file_2_path" => "app/models/product.rb", "file_2_code" => "class Product\n  def visible? = Availability.new.available?\nend",
+      "requirements" => [ "Expose availability to products." ],
+      "answer_key" => { "case" => "acceptable", "reason" => "The product uses the availability result.",
+        "behavior" => { "requirement" => 1, "expected" => "true", "observed" => "true" },
+        "evidence" => [ { "path" => "app/models/product.rb", "quote" => "def visible? = Availability.new.available?" } ] }
+    }
+
+    fresh_provider = provider.with(generate: ->(*args, **options) { provider.generate.call(*args, **options).deep_dup })
+    draft = described_class.call(user, language: "ruby_rails", provider: fresh_provider)
+    described_class.retry_section(draft, ExerciseSection::CodeReview, "service_objects", provider: fresh_provider)
+
+    expect(ProblemSetIngest).to have_received(:call).with(anything, hash_including(pr_review_target: "acceptable")).twice
+    expect(draft.plan.notes).not_to have_key("pr_review_target")
+  end
+
+  it "refuses invalid trusted PR Review scope or targets before a provider call" do
+    plan = plan_for(code_review_mode: :pr_review, code_review_files: :multi, pr_review_target: "acceptable", size: DaySize.for(setting: 4))
+    allow(DailyPlan).to receive(:for).and_return(plan)
+    expect { described_class.call(user, language: "ruby_rails", provider: provider) }.to raise_error(ArgumentError, /planned scope/)
+    draft = draft_for(mode: :application_code).with(plan: plan.with(pr_review_target: "mixed"))
+    expect { described_class.retry_section(draft, ExerciseSection::CodeReview, "service_objects", provider: provider) }
+      .to raise_error(ArgumentError, /planned scope/)
+    expect(generated).to be_empty
+  end
+
   it "captures both histories once and reuses the same projections on retry" do
     inputs = []
     capturing = provider.with(prompt: ->(*, **options) { inputs << options; prompt })

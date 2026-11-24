@@ -11,6 +11,9 @@ RSpec.describe ProblemSetIngest, "PR Review foundation" do
       "file_1_path" => "app/services/availability.rb",
       "file_1_code" => "def available?\n  slots.any?\nend",
       "file_1_changed" => [ "slots.any?" ],
+      "answer_key" => { "case" => "acceptable", "reason" => "The caller preserves both outcomes.",
+        "behavior" => { "requirement" => 1, "expected" => ":unavailable", "observed" => ":unavailable" },
+        "evidence" => [ { "path" => "app/services/booking.rb", "quote" => "availability.available? ? :available : :unavailable" } ] },
       "file_2_path" => "app/services/booking.rb",
       "file_2_code" => "def status\n  availability.available? ? :available : :unavailable\nend"
     }
@@ -18,7 +21,7 @@ RSpec.describe ProblemSetIngest, "PR Review foundation" do
 
   def ingest(data = { "code_review" => section }, **options)
     defaults = { expected_keys: [ "code_review" ], daily: DailyKinds::DEFAULT, language: "ruby_rails",
-      code_review_mode: :pr_review, code_review_files: 2..2, pitched_at: { "code_review" => "mid_level" } }
+      code_review_mode: :pr_review, code_review_files: 2..2, pitched_at: { "code_review" => "mid_level" }, pr_review_target: "acceptable" }
     described_class.call(data.deep_dup, **defaults.merge(options))
   end
 
@@ -129,6 +132,39 @@ RSpec.describe ProblemSetIngest, "PR Review foundation" do
     expect(kind.mastery_evidence?(row)).to be(true)
     expect(kind.adaptation_evidence?(row)).to be(true)
     expect(kind.planning_host?(mode: :application_code)).to be(true)
+  end
+
+  it "stores the grounded key without copying the private target to the section" do
+    stored = ingest_review
+
+    expect(stored.fetch("answer_key")).to eq(section.fetch("answer_key"))
+    expect(stored).not_to have_key("pr_review_target")
+    expect(ExerciseSection.without_answer_keys("code_review" => stored).fetch("code_review")).not_to have_key("answer_key")
+  end
+
+  it "gives pre-submission context the requirements and files without the hidden key" do
+    stored = ingest_review
+    context = SectionContext.render(stored)
+
+    expect(context).to include(section.fetch("scenario"), *section.fetch("requirements"), section.fetch("file_2_path"))
+    expect(context).not_to include("answer_key", "acceptable", section.dig("answer_key", "reason"))
+  end
+
+  it "rejects a missing, ungrounded, mismatched, or forged key" do
+    key = section.fetch("answer_key")
+    candidates = [ nil, key.except("behavior"), key.merge("behavior" => key.fetch("behavior").merge("observed" => ":available")), key.merge("case" => "flawed"), key.merge("private_target" => "acceptable"),
+      key.merge("evidence" => [ { "path" => "app/services/availability.rb", "quote" => "slots" } ]),
+      key.merge("evidence" => [ { "path" => "app/services/missing.rb", "quote" => "slots.any?" } ]) ]
+    candidates.each do |bad_key|
+      expect { ingest_review({ "code_review" => section.merge("answer_key" => bad_key) }) }
+        .to raise_error(ProviderError::UnusableSectionError) { |error| expect(error.code).to eq("code_review.pr_review_key_invalid") }
+    end
+  end
+
+  it "requires a trusted case target when Code Review is selected" do
+    [ nil, "unknown" ].each do |target|
+      expect { ingest_review(pr_review_target: target) }.to raise_error(ProviderError::InvalidResponseError)
+    end
   end
 
   it "leaves weekday and weekend selection unchanged" do

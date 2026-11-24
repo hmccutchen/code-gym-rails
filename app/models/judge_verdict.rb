@@ -8,9 +8,12 @@ class JudgeVerdict
   SOLVE_FIELD = "better".freeze
   SOLVE_MISMATCH_TOLERATED_AT = "principal_engineer".freeze
 
-  attr_reader :status, :issues, :fields, :principle, :evidence, :reason, :solve
+  attr_reader :status, :issues, :fields, :principle, :evidence, :reason, :solve, :review_case, :behavior
 
-  def self.parse(raw, kind:)
+  def self.parse(raw, kind:, section: nil)
+    variant = kind.judge_variant(section) if section
+    return variant.parse(raw, section: section) if variant
+
     raise Invalid, "judge returned #{raw.class}, not an object" unless raw.is_a?(Hash)
     status = raw["status"].to_s
     raise Invalid, "unknown status #{status.inspect}" unless STATUSES.include?(status)
@@ -91,7 +94,7 @@ class JudgeVerdict
   end
   private_class_method :required_text
 
-  def initialize(status:, issues: [], fields: {}, principle: nil, evidence: nil, reason: nil, solve: nil)
+  def initialize(status:, issues: [], fields: {}, principle: nil, evidence: nil, reason: nil, solve: nil, review_case: nil, behavior: nil)
     @status = status
     @issues = issues
     @fields = fields
@@ -99,6 +102,8 @@ class JudgeVerdict
     @evidence = evidence
     @reason = reason
     @solve = solve
+    @review_case = review_case
+    @behavior = behavior
   end
 
   def reject? = status == :reject

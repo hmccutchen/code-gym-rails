@@ -17,6 +17,10 @@ class ExerciseSection
       PlanReview, AmbiguityHunt, PseudocodeToCode ]
   end
 
+  def self.ingest_variant_kind(mode:)
+    all.find { |kind| kind.ingest_variant?(mode: mode) }
+  end
+
   def self.keys
     all.map(&:key)
   end
@@ -252,6 +256,8 @@ class ExerciseSection
     def judge_task_for(_section) = judge_task
 
     def judge_guidance_for(_section) = judge_guidance
+
+    def judge_variant(_section) = nil
 
     def judge_hidden_fields = []
 

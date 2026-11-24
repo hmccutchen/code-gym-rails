@@ -298,8 +298,9 @@ class AiService
   def judge_section(user, kind, section, rung:, locked:, deadline: GenerationDeadline::NONE)
     request = AiService.request_for("judge_section", **SectionJudgePrompt.generate(kind: kind, section: section, rung: rung, locked: locked))
     result = call_and_log(user, request, deadline: deadline)
-    raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: kind.judge_solve_options.nil?)
-    JudgeVerdict.parse(raw, kind: kind)
+    log_raw = kind.judge_solve_options.nil? && kind.judge_variant(section).nil?
+    raw = parse_json_object(result[:text], subject: "#{kind.key} verdict", log_raw: log_raw)
+    JudgeVerdict.parse(raw, kind: kind, section: section)
   end
 
   def judge_review_prose(user, kind, review, coach:)

@@ -76,6 +76,26 @@ RSpec.describe GenerationPrompt do
     prompt.render(only: ExerciseSection::Challenge, fixed_concept: "memoization")
   end
 
+  it "builds a neutral PR Review for either private target and leaves sibling retries unmarked" do
+    user.skill_level = "mid_level"
+    targets = %w[acceptable flawed]
+    rendered = targets.map do |target|
+      pr_plan = plan.with(code_review_mode: :pr_review, code_review_source: nil, code_review_files: :multi, pr_review_target: target)
+      prompt = GenerationPrompt.new(user, "ruby_rails", plan: pr_plan, history: [], delivered_history: [], difficulty: KindDifficulty.none,
+                                   ladders: {}, retention_annotation: generation_retention_annotation)
+      text = prompt.render
+
+      expect(text).to include("Private PR Review target: #{target}", "exactly two", "Keep the public question neutral")
+      expect(text).to include(target == "acceptable" ? "Do not manufacture criticism" : "exactly one meaningful blocker")
+      expect(text).not_to include("review_variant", '"file_3_path"')
+      expect(retry_render(prompt)).not_to include("Private PR Review target:", '"requirements"')
+      prompt.schema(only: ExerciseSection::CodeReview)
+    end
+
+    expect(rendered.uniq.size).to eq(1)
+    expect(rendered.first).to include('"requirements"', '"file_1_code"', '"file_2_code"', '"answer_key"', '"evidence"')
+  end
+
   it "keeps level-dependent file counts compatible with the shared reasoning instruction" do
     user.skill_level = "principal_engineer"
     text = render_generation_prompt(user, code_review_files: :multi, only: ExerciseSection::CodeReview)

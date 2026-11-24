@@ -14,6 +14,7 @@ module GenerationPrompt::RetryReasons
     "code_review.path_invalid" => "one of its file paths ran past #{ExerciseSection::CodeReview::MAX_PATH_LENGTH} characters or " \
                                   "held a line break or another control character, or two of its files had the same path.",
     "code_review.changed_lines_unresolved" => "none of its quoted changed lines matched exactly one line of its file.",
+    "code_review.pr_review_key_invalid" => "its private key did not match the requested case or lacked valid evidence.",
     "code_review.pr_review_artifact_invalid" => "its public context was invalid or its files were not valid Ruby application excerpts.",
     "code_review.pr_review_changed_lines_unresolved" => "at least one quoted changed line did not match exactly one line of its file.",
     "code_review.purpose_missing" => "it had no purpose line, or its purpose ran over more than one line.",
