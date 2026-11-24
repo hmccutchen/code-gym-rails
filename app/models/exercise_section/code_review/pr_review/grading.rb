@@ -74,15 +74,15 @@ module ExerciseSection::CodeReview::PrReview::Grading
     ungradable = raw["ungradable"]
     key = section.fetch(PlantedKey::FIELD)
     valid_feedback = FEEDBACK_FIELDS.all? { |field| PrReview.short_line?(feedback[field], PrReview::MAX_REASON_LENGTH) }
-    raise ProviderError::InvalidResponseError, "Invalid PR Review feedback" unless valid_feedback
+    raise ExerciseSection::InvalidGrade, "Invalid PR Review feedback" unless valid_feedback
 
     return feedback.merge("ungradable" => true) if ungradable.equal?(true)
-    raise ProviderError::InvalidResponseError, "Missing PR Review grade status" unless ungradable.equal?(false)
+    raise ExerciseSection::InvalidGrade, "Missing PR Review grade status" unless ungradable.equal?(false)
 
     case_name, assessment, rating = raw.values_at("artifact_case", "assessment", "rating")
     ranks = ConceptMastery::AI_RATING_RANK
     unless PrReview::CASES.include?(case_name) && RATING_CAPS.key?(assessment) && ranks.key?(rating)
-      raise ProviderError::InvalidResponseError, "Invalid PR Review grade"
+      raise ExerciseSection::InvalidGrade, "Invalid PR Review grade"
     end
 
     return unavailable unless case_name == key.fetch("case")

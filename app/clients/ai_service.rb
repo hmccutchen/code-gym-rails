@@ -48,9 +48,8 @@ class AiService
     def sensitive? = true
   end
 
-  def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil, sensitive: false)
-    request = sensitive ? SensitiveRequest : Request
-    request.build(purpose: purpose, system: system, prompt: prompt, history: history, response_schema: response_schema,
+  def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil)
+    Request.build(purpose: purpose, system: system, prompt: prompt, history: history, response_schema: response_schema,
                   **CallProfiles.fetch(purpose))
   end
 
@@ -578,9 +577,11 @@ class AiService
     return variant.skipped unless response.answered?(section)
 
     request = AiService.request_for("review_response", system: context,
-      prompt: ReviewPrompt.for_variant(variant, key: section, section: data), sensitive: true)
-    result = call_and_log(user, request)
+      prompt: ReviewPrompt.for_variant(variant, key: section, section: data))
+    result = call_and_log(user, SensitiveRequest.new(**request.to_h))
     variant.parse(parse_json_object(result[:text], subject: "#{section} review", log_raw: false), section: data)
+  rescue ExerciseSection::InvalidGrade => error
+    raise ProviderError::InvalidResponseError, error.message
   end
 
   def authorized_variant_grade?(user, exercise, response, section)

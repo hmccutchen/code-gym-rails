@@ -68,6 +68,8 @@ RSpec.describe "Submitted PR Review grading" do
     expect(grade("pattern")[:ok]).to be(true)
     target, sibling = received
     expect(target.purpose).to eq("review_response")
+    expect(target).to be_sensitive
+    expect(sibling).not_to be_sensitive
     expect(target.system).not_to include("PRIVATE GRADE KEY")
     expect(target.prompt).to include("Private cross-check for this submitted section only:", "comprehension", "material blocker")
     expect(target.prompt).not_to include("PRIVATE GRADE KEY")
