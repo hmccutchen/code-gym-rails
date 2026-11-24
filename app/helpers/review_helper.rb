@@ -26,10 +26,30 @@ module ReviewHelper
   end
 
   def review_badge(response, section)
-    if (rating = response.ai_rating_for(section)).present?
+    if response.ungradable_review?(section)
+      ReviewBadge.new(text: t("review.ungradable_label"), graded: false)
+    elsif (rating = response.ai_rating_for(section)).present?
       ReviewBadge.new(text: rating, graded: true)
     elsif !response.answered?(section)
       ReviewBadge.new(text: t("review.skipped_label"), graded: false)
+    end
+  end
+
+  def review_section_name(response, section)
+    presentation = ExerciseSection.find(section)&.presentation_key(response.section_data(section))
+    presentation ? t("sections.#{presentation}.name") : section.humanize
+  end
+
+  def review_qualitative_feedback(response, section, feedback)
+    kind = ExerciseSection.find(section)
+    data = response.section_data(section)
+    variant = kind&.grading_variant(data)
+    return [] unless variant
+
+    presentation = kind.presentation_key(data)
+    variant.feedback_fields.filter_map do |field|
+      text = feedback[field]
+      [ t("sections.#{presentation}.feedback.#{field}"), text ] if text.is_a?(String) && text.present?
     end
   end
 

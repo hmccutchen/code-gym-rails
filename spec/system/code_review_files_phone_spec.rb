@@ -14,17 +14,46 @@ RSpec.describe "A multi-file code review on a phone", type: :system do
       "file_2_path" => "app/models/line_item.rb", "file_2_code" => "def price\n  0\nend", "file_2_changed_lines" => [] }
   end
 
-  def open_dashboard(user)
+  def open_dashboard(user, review_details: {})
     resize(320)
     visit_with_todays_set(user)
     exercise = DailyExercise.find_by!(user: user, date: Date.current)
-    code_review = exercise.problem_set["code_review"].except("snippet", "diagram").merge(files)
+    code_review = exercise.problem_set["code_review"].except("snippet", "diagram").merge(files, review_details)
     exercise.update!(problem_set: exercise.problem_set.merge("code_review" => code_review))
     visit root_path
     wait_for_js
   end
 
   def first_file = find("details.comparison-piece", match: :first)
+
+  it "shows the proposed change and accepts one review draft on a narrow screen" do
+    travel_to(a_weekday) do
+      user = create_fake_provider_user
+      open_dashboard(user, review_details: {
+        "review_variant" => "pr_review",
+        "scenario" => "Return the total for an order.",
+        "requirements" => [ "Include every line item.", "Return zero for an empty order." ],
+        "answer_key" => { "case" => "acceptable", "reason" => "private answer-key sentinel" }
+      })
+
+      expect(page.html).not_to include("private answer-key sentinel")
+      within('[data-section-fold="code_review"]') do
+        expect(page).to have_css("h2", text: /PR Review/i)
+        expect(page).to have_text("Return the total for an order.")
+        expect(page).to have_css("ol li", text: "Include every line item.")
+        expect(page).to have_text("Approve, Comment, or Request changes")
+        expect(page).to have_css("details.comparison-piece", count: 2)
+        expect(page).to have_css("textarea", count: 1)
+        find('textarea[data-field="code_review"]').fill_in(with: "Approve. Order totals use the line item prices.")
+      end
+      wait_for do
+        user.daily_responses.reload.first&.answers&.fetch("code_review", nil) == "Approve. Order totals use the line item prices."
+      end
+      visit root_path
+      expect(find('textarea[data-field="code_review"]').value).to eq("Approve. Order totals use the line item prices.")
+      expect(sideways_overflow).to eq(0)
+    end
+  end
 
   def align_extra_font_size
     page.evaluate_script(<<~JS)

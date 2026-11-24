@@ -12,6 +12,7 @@ module ExerciseSection::CodeReview::PrReview
   MAX_QUOTE_LENGTH = 240
   MAX_OUTCOME_LENGTH = 80
   CASES = %w[acceptable flawed].freeze
+  SELECTION_WEIGHTS = CASES.index_with { 0.20 }.merge("ordinary" => 0.60).freeze
   INPUT_FIELDS = [ "scenario", "question", "concept", REQUIREMENTS, PlantedKey::FIELD ].freeze
   KEY_FIELDS = %w[case evidence reason behavior].freeze
   BEHAVIOR_FIELDS = %w[requirement expected observed].freeze
@@ -22,18 +23,37 @@ module ExerciseSection::CodeReview::PrReview
   def self.section?(section) = section.is_a?(Hash) && section[FIELD] == VALUE
 
   def self.valid_scope?(language:, rung:, file_range:, source:, target:)
-    language == "ruby_rails" && rung == "mid_level" && file_range == FILE_RANGE && source.nil? && CASES.include?(target)
+    eligible_context?(language: language, rung: rung, source: source) && file_range == FILE_RANGE && CASES.include?(target)
   end
+
+  def self.select_target(mode:, language:, rung:, source:)
+    return unless mode == :application_code && eligible_context?(language: language, rung: rung, source: source)
+
+    target = WeightedRoll.pick(SELECTION_WEIGHTS)
+    target if CASES.include?(target)
+  end
+
+  def self.eligible_context?(language:, rung:, source:)
+    language == "ruby_rails" && rung == "mid_level" && source.nil?
+  end
+
+  private_class_method :eligible_context?
 
   def self.valid_context?(section, file_parts:)
     file_fields = FILE_RANGE.end.times.flat_map { |index| file_parts.map { |part| "file_#{index + 1}_#{part}" } }
-    requirements = section[REQUIREMENTS]
     (section.keys - INPUT_FIELDS - file_fields).empty? &&
       short_line?(section["scenario"], MAX_SCENARIO_LENGTH) &&
       short_line?(section["question"], MAX_QUESTION_LENGTH) &&
       (!section.key?("concept") || short_line?(section["concept"], MAX_REQUIREMENT_LENGTH)) &&
-      requirements.is_a?(Array) && (1..3).cover?(requirements.size) &&
-      requirements.all? { |requirement| short_line?(requirement, MAX_REQUIREMENT_LENGTH) }
+      public_requirements(section).any?
+  end
+
+  def self.public_requirements(section)
+    requirements = section[REQUIREMENTS]
+    return [] unless requirements.is_a?(Array) && (1..3).cover?(requirements.size)
+    return [] unless requirements.all? { |requirement| short_line?(requirement, MAX_REQUIREMENT_LENGTH) }
+
+    requirements
   end
 
   def self.valid_files?(files)

@@ -36,6 +36,8 @@ class ReviewGrading
   def grade_section(section, context)
     provider = @providers.call
     review   = provider.grade.call(@user, @exercise, @response, section, context)
+    return [ section, { ok: true, review: review } ] if grading_variant(section)
+
     review   = unanswered?(section) ? ungraded(review) : rated(section, review)
     review   = gaps_beside_their_prose(judged_review(provider, section, review))
     [ section, { ok: true, review: review } ]
@@ -52,7 +54,10 @@ class ReviewGrading
   end
 
   def safe_difficulty_assessment
-    @providers.call.assess_difficulty.call(@user, @exercise, sections: @sections)
+    sections = @sections.reject { |section| unavailable_variant?(section) }
+    return {} if sections.empty?
+
+    @providers.call.assess_difficulty.call(@user, @exercise, sections: sections)
   rescue StandardError => e
     Rails.logger.warn("[difficulty] assessment failed: #{e.message}")
     {}
@@ -86,9 +91,17 @@ class ReviewGrading
   def merge_difficulty!(results, difficulty)
     results.each do |section, result|
       next unless result[:ok] && difficulty[section]
+      next if grading_variant(section) && !result[:review].key?("rating")
 
       result[:review]["difficulty"] = difficulty[section]
     end
+  end
+
+  def grading_variant(section) = ExerciseSection.for(section).grading_variant(@exercise.problem_set[section])
+
+  def unavailable_variant?(section)
+    variant = grading_variant(section)
+    variant && (unanswered?(section) || !variant.gradable?(@exercise.problem_set[section], language: @exercise.language))
   end
 
   def unanswered?(section)

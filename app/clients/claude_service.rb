@@ -81,7 +81,7 @@ class ClaudeService < AiService
 
   RATE_LIMIT_FAMILIES = %w[requests input-tokens output-tokens tokens].freeze
 
-  def raise_for_status(resp)
+  def raise_for_status(resp, sensitive: false)
     raise_if_key_rejected("Anthropic", resp.status)
     error = error_envelope(resp.body)
     raise_if_out_of_credit(error, resp.status)
@@ -89,14 +89,12 @@ class ClaudeService < AiService
     case resp.status
     when 429
       raise ProviderError::RateLimitError.new("Claude API error 429", http_status: 429,
-                                              quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+                                              quota_id: safe_quota_id(quota_id_from(resp, error), sensitive: sensitive), retry_after: retry_after_seconds(resp))
     when 529
       raise ProviderError::RateLimitError.new("Claude API error 529", http_status: 529, quota_id: "overloaded_error")
     end
 
-    log_raw_snippet("Claude API error #{resp.status} body", resp.body)
-    message = extract_provider_message(error, fallback: "Claude API error #{resp.status}")
-    raise ProviderError.new(message, http_status: resp.status)
+    raise provider_http_error(resp, error, sensitive: sensitive)
   end
 
   def raise_if_out_of_credit(error, status)

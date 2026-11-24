@@ -1,8 +1,9 @@
 <%# Locals: kind, key, data, slot, exercise, response, submitted, picker (nil on a card with no swap control), folded (renders closed). %>
 <% bucket = ConceptBucket.for(key, exercise.language) %>
 <% concept_shown = submitted || exercise.concepts_withheld_before_submission.exclude?(data["concept"]) %>
+<% name = t("sections.#{kind.presentation_key(data) || key}.name") %>
 <% label = capture do %>
-  <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: t("sections.#{key}.name"), title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: t("sections.#{key}.name")) %><% end %>
+  <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: name, title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: name) %><% end %>
 <% end %>
 <details class="section"<%= " open".html_safe unless local_assigns[:folded] %> data-slot="<%= slot %>" data-section-fold="<%= key %>">
   <%# No glossary terms in the summary (a control nested in a control), and never role="button": it erases the <h2>. %>
@@ -37,7 +38,7 @@
 
   <% unless submitted %>
     <div class="rating-row" data-rating-for="<%= key %>" role="group"
-         aria-label="<%= t("dashboard.rating_group", section: t("sections.#{key}.name")) %>">
+         aria-label="<%= t("dashboard.rating_group", section: name) %>">
       <% self_rating_labels.each do |value, label| %>
         <% selected = response.self_rating_for(key) == value %>
         <button type="button" class="rating-btn<%= " active" if selected %>" aria-pressed="<%= selected %>"

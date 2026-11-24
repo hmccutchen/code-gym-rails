@@ -257,6 +257,10 @@ class ExerciseSection
 
     def judge_guidance_for(_section) = judge_guidance
 
+    def presentation_key(_section) = nil
+
+    def grading_variant(_section) = nil
+
     def judge_variant(_section) = nil
 
     def judge_hidden_fields = []

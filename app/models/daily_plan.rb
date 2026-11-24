@@ -19,6 +19,17 @@ class DailyPlan
 
     def fourth = kinds.find(&:fourth?)&.key&.to_sym
 
+    def select_delivery_variant(language:, kind_rungs:)
+      review = ExerciseSection::CodeReview
+      return self unless kinds.include?(review)
+
+      target = review::PrReview.select_target(mode: code_review_mode, language: language,
+        rung: kind_rungs[review.key], source: code_review_source)
+      return self unless target
+
+      with(code_review_mode: review::PrReview::MODE, code_review_files: :multi, pr_review_target: target)
+    end
+
     def judge_retries(kind) = daily_kinds.include?(kind) ? DAILY_JUDGE_RETRIES : ROTATED_JUDGE_RETRIES
   end
 

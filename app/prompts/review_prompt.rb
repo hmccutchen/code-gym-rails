@@ -39,7 +39,14 @@ class ReviewPrompt
       else "the other #{others} sections are"
       end
     contexts = sections.map do |entry|
-      ExerciseSection.for(entry[:key]).review_context(section: entry[:section], answer: entry[:answer], rating: entry[:rating])
+      kind = ExerciseSection.for(entry[:key])
+      variant = kind.grading_variant(entry[:section])
+      if variant
+        section = entry[:section].except(*ExerciseSection.all_answer_key_fields)
+        variant.public_context(section: section, answer: entry[:answer], rating: entry[:rating])
+      else
+        kind.review_context(section: entry[:section], answer: entry[:answer], rating: entry[:rating])
+      end
     end
 
     <<~CONTEXT
@@ -53,6 +60,10 @@ class ReviewPrompt
 
       #{contexts.join("\n\n")}
     CONTEXT
+  end
+
+  def self.for_variant(variant, key:, section:)
+    variant.request_prompt(key: key, section: section, plain_language: PromptStandards::PLAIN_LANGUAGE_STANDARD)
   end
 
   def self.for_section(key:, section:, answer:, answered:, rung:, approach: false, why: false)

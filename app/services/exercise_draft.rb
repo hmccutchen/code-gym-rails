@@ -18,6 +18,7 @@ class ExerciseDraft
     difficulty = schedule_context ? schedule_context.fetch(:difficulty) : KindDifficulty.for(user)
     skill_level = (schedule_context ? schedule_context.fetch(:skill_level) : user.skill_level)&.dup&.freeze
     kind_rungs = (schedule_context ? schedule_context.fetch(:kind_rungs) : difficulty.rungs(skill_level: skill_level)).transform_values { |rung| rung.dup.freeze }.freeze
+    plan       = plan.select_delivery_variant(language: language, kind_rungs: kind_rungs)
     kinds      = plan.kinds
     adjustments = if plan.practice_schedule
       PracticeAdjustment.resolve(assignments: plan.assignments, difficulty: difficulty,

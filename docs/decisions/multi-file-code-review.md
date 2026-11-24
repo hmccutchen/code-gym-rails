@@ -212,10 +212,6 @@ applies the stamp only to a surviving review.
 Other Code Review modes strip provider-supplied variant fields. A PR Review
 can share a day with other sections.
 
-The planner does not select PR Review. Learner rendering, post-submission
-grading, and ordinary selection remain follow-up work. The earlier
-`pr_review_v1` trial shape never shipped or had a delivery path.
-
 Once delivered, valid PR Review results enter ordinary Code Review
 progression from day one. Existing mastery, exposure, retention, workload,
 and level rules apply. Review the grading after real use via
@@ -241,3 +237,25 @@ Review share one edit confirmation across sections, including retries.
 Disagreement uses the existing retry budget, and an unavailable judge
 cannot let the artifact through. Judge explanations and the private key
 stay out of generation diagnostics.
+
+### Daily delivery and grading
+
+After the ordinary plan and its difficulty are captured, eligible generated
+Ruby/Rails application-code slots at mid-level draw ordinary Code Review
+60% of the time and PR Review 40% of the time. The PR Review draw splits
+acceptable and flawed targets equally. Curated excerpts and other modes
+retain their existing selection. The variant uses the same slot, assignments,
+and progression rules.
+
+Today and History present the intent, requirements, and two existing code
+panels. The learner uses one autosaved field to explain the behavior and file
+interaction, state a disposition, and support it with evidence. The overall
+rubric accepts concise answers. Feedback covers comprehension, evidence, and
+disposition qualitatively in Today, History, and review email.
+
+Only the grading request for the submitted PR Review receives the case
+and grounded code citations from its validated private key. Generated
+rationale and recorded outcomes stay out of the request. Ungradable
+feedback carries no rating, retention skip, or workload completion result. Malformed provider replies
+use the existing retry path. Grade relevance and fairness after real use
+are tracked in [#851](https://github.com/hmccutchen/code-gym-rails/issues/851).

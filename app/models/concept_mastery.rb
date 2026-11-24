@@ -77,6 +77,7 @@ class ConceptMastery < ApplicationRecord
     answered = response.answered_concept_tags.select { |section, _| response.mastery_evidence?(section) }.values
     response.concept_tags.slice(*(sections & response.section_keys)).filter_map do |section, concept|
       next unless response.section_reviewed?(section) && !answered.include?(concept)
+      next if response.ungradable_review?(section)
 
       response.mastery_tag(section)
     end.uniq

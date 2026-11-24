@@ -766,6 +766,15 @@ en:
         one: "changed line %{lines}"
         other: "changed lines %{lines}"
       changed_range: "%{first}–%{last}"
+    pr_review:
+      name: "PR Review"
+      placeholder: "Describe the change, give your decision, and support it with evidence."
+      requirements: "Requirements"
+      instructions: "Briefly explain what changes and how the files work together. Choose Approve, Comment, or Request changes and support your decision with evidence from the change. Aim for about five minutes."
+      feedback:
+        comprehension: "Comprehension"
+        evidence: "Evidence"
+        disposition: "Disposition"
     design_comparison:
       name: "Design Comparison"
       placeholder: "Name the fact from the scenario or question, and the principle it settles…"
@@ -840,6 +849,7 @@ en:
     walkthrough_fields:
       missed: "What a good answer covers"
     skipped_label: "Skipped"
+    ungradable_label: "Ungradable"
     finish_button: "Finish review"
     generating_label: "Generating review…"
     in_progress:

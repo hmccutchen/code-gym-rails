@@ -361,6 +361,8 @@ class FakeService < AiService
     "What would happen to that method if it ran a hundred times in one request — where would the slowdown show up?"
 
   def self.review_section(prompt)
+    return PrReview.grade(prompt).to_json if prompt.start_with?('Grade ONLY the "code_review" PR Review section')
+
     section = prompt[/(?:Grade ONLY|Walk through) the "(\w+)" section/, 1]
     raise "FakeService could not extract the section key from the review prompt" if section.blank?
 
@@ -368,6 +370,8 @@ class FakeService < AiService
   end
 
   def self.judge_verdict(prompt)
+    return PrReview.judgment(prompt) if prompt.start_with?("The public PR Review artifact:\n")
+
     kind = ExerciseSection.find(prompt[/^Section kind: (\w+)$/, 1])
     solve = kind&.judge_solve_options&.last
     { "status" => "keep", "better" => solve }.compact
@@ -385,6 +389,9 @@ class FakeService < AiService
   end
 
   def self.exercise_problem_set(prompt)
+    target = prompt[/^- Private PR Review target: (\w+)\./, 1]
+    return EXERCISE_PROBLEM_SET.merge("code_review" => PrReview.section(target)) if target
+
     asks_for_files = prompt.include?(%("file_1_path"))
     asks_for_files ? EXERCISE_PROBLEM_SET.merge("code_review" => MULTI_FILE_CODE_REVIEW) : EXERCISE_PROBLEM_SET
   end

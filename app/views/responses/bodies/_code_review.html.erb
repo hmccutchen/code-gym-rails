@@ -1,5 +1,19 @@
 <%# Locals: kind, data, exercise, response, submitted. %>
 <% files = ExerciseSection::CodeReview.files(data) %>
+<% if ExerciseSection::CodeReview::PrReview.section?(data) %>
+  <div class="section-scenario">
+    <% requirements = ExerciseSection::CodeReview::PrReview.public_requirements(data) %>
+    <% if requirements.any? %>
+      <strong><%= t("sections.pr_review.requirements") %></strong>
+      <ol>
+        <% requirements.each do |requirement| %>
+          <li><%= section_glossary_wrap(requirement, kind: kind, submitted: submitted) %></li>
+        <% end %>
+      </ol>
+    <% end %>
+    <% unless submitted %><p><%= t("sections.pr_review.instructions") %></p><% end %>
+  </div>
+<% end %>
 <% if ExerciseSection::CodeReview.bug_hunt?(data) %>
 <div class="section-scenario bug-hunt-goal"><strong><%= t("sections.code_review.goal") %></strong> <%= data["purpose"] %></div>
 <% snippet = ExerciseSection::CodeReview::File.new(path: nil, code: data["snippet"].to_s, changed: []) %>

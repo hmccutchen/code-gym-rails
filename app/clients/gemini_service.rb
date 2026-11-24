@@ -42,7 +42,7 @@ class GeminiService < AiService
   def read_result(parsed, request)
     usage  = read_usage(parsed, request.purpose)
     status = parsed["status"]
-    return unfinished_reply(usage, status) if status && FINISHED_STATUSES.exclude?(status)
+    return unfinished_reply(usage, status, sensitive: request.sensitive?) if status && FINISHED_STATUSES.exclude?(status)
 
     text_parts = model_output_parts(parsed).select { |c| c["type"] == "text" }
     usage.merge(text: joined_text(text_parts), truncated: parsed["status"] == "incomplete")
@@ -68,19 +68,17 @@ class GeminiService < AiService
   end
 
   # An invalid key arrives as a 400 with API_KEY_INVALID; never log these bodies, since they can echo the key.
-  def raise_for_status(resp)
+  def raise_for_status(resp, sensitive: false)
     raise_if_key_rejected("Google", resp.status)
     error = error_envelope(resp.body)
     raise_if_key_invalid(error, resp.status)
 
     if resp.status == 429
       raise ProviderError::RateLimitError.new("Gemini API error 429", http_status: 429,
-                                              quota_id: quota_id_from(error), retry_after: retry_delay_from(resp, error))
+                                              quota_id: safe_quota_id(quota_id_from(error), sensitive: sensitive), retry_after: retry_delay_from(resp, error))
     end
 
-    log_raw_snippet("Gemini API error #{resp.status} body", resp.body)
-    message = extract_provider_message(error, fallback: "Gemini API error #{resp.status}")
-    raise ProviderError.new(message, http_status: resp.status)
+    raise provider_http_error(resp, error, sensitive: sensitive)
   end
 
   def raise_if_key_invalid(error, status)
