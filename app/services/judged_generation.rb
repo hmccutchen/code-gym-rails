@@ -20,6 +20,7 @@ class JudgedGeneration
     @draft     = draft
     @providers = providers
     @finish    = finish
+    @edit_check_lock = Mutex.new if ExerciseSection.ingest_variant_kind(mode: draft.plan.code_review_mode)
     @chains    = draft.kinds.to_h do |kind|
       [ kind.key, SolveChain.new(kind, rung: rung_for(kind), locked: draft.difficulty.locked?(kind)) ]
     end
@@ -90,15 +91,42 @@ class JudgedGeneration
 
   def judge_outcome(kind, section)
     verdict, latency, pass = judge_with_fallback(kind, section)
+    verdict, extra_latency = admit_variant(kind, section, verdict)
     outcome = { status: :keep, issues: [], principle: nil, retries: 0,
-                dropped: false, fallback: nil, latency_ms: latency }
+                dropped: false, fallback: nil, latency_ms: latency + extra_latency }
     matched = record_pass(kind, section, verdict, pass, attempt: 0)
     return unjudged_draft(kind, section, outcome.merge(fallback: verdict)) if verdict.is_a?(String)
 
     verdict = settled(kind, verdict, matched)
     chain(kind).settle(0) unless verdict.reject?
-    shipped, outcome = confirmed_edit(kind, section, verdict, with_solve(outcome, matched).merge(judgment(kind, verdict)))
+    shipped, outcome = confirmed_edit(kind, section, verdict, with_solve(outcome, matched).merge(judgment(kind, section, verdict)))
     [ kind.key, outcome, shipped ]
+  end
+
+  def admit_variant(kind, section, verdict)
+    variant = kind.judge_variant(section)
+    return [ verdict, 0 ] if variant.nil? || verdict.is_a?(String) || verdict.reject?
+
+    return [ variant_disagreement, 0 ] unless variant.matches_key?(section, verdict)
+    return [ verdict, 0 ] unless verdict.edit?
+    return [ variant_disagreement, 0 ] unless variant.valid_edit?(verdict.fields) && reserve_edit_check
+
+    edited = apply_verdict(verdict, section)
+    check, latency, = judge_with_fallback(kind, edited)
+    accepted = !check.is_a?(String) && check.status == :keep && variant.matches_key?(edited, check)
+    [ accepted ? verdict : variant_disagreement, latency ]
+  end
+
+  def variant_disagreement = JudgeVerdict.new(status: :reject, principle: "underdetermined")
+
+  def reserve_edit_check
+    return true unless @edit_check_lock
+
+    @edit_check_lock.synchronize do
+      return false if @edit_checked
+
+      @edit_checked = true
+    end
   end
 
   def unjudged_draft(kind, section, outcome)
@@ -111,6 +139,7 @@ class JudgedGeneration
   def confirmed_edit(kind, section, verdict, outcome)
     edited = apply_verdict(verdict, section)
     return [ edited, outcome ] unless verdict.edit? && kind.rejudge_edits?
+    return [ section, outcome.merge(edit_reverted: true) ] unless reserve_edit_check
 
     check, latency, pass = judge_with_fallback(kind, edited)
     matched = check.is_a?(String) ? nil : solve_matched(kind, edited, check)
@@ -135,9 +164,9 @@ class JudgedGeneration
     edited.merge("scenario" => section["scenario"])
   end
 
-  def judgment(kind, verdict)
+  def judgment(kind, section, verdict)
     summary = { status: verdict.status, issues: issue_types(verdict), principle: verdict.principle }
-    return summary if kind.judge_solve_options
+    return summary if kind.judge_solve_options || kind.judge_variant(section)
 
     summary.merge(evidence: verdict.evidence, reason: verdict.reason)
   end
@@ -180,12 +209,13 @@ class JudgedGeneration
 
   def rejudge(kind, retried, outcome)
     verdict, latency, pass = judge_with_fallback(kind, retried)
-    outcome = outcome.merge(retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency)
+    verdict, extra_latency = admit_variant(kind, retried, verdict)
+    outcome = outcome.merge(retries: outcome[:retries] + 1, latency_ms: outcome[:latency_ms] + latency + extra_latency)
     matched = record_pass(kind, retried, verdict, pass, attempt: outcome[:retries])
     return unjudged_retry(kind, retried, record_attempt(outcome).merge(fallback: verdict)) if verdict.is_a?(String)
 
     verdict = settled(kind, verdict, matched)
-    outcome = record_attempt(with_solve(outcome, matched), verdict)
+    outcome = record_attempt(with_solve(outcome, matched), verdict, private_judgment: kind.judge_variant(retried).present?)
     return [ retried, outcome, false ] if verdict.reject?
 
     chain(kind).settle(outcome[:retries])
@@ -206,9 +236,9 @@ class JudgedGeneration
     outcome[:fallback] != ProviderError::DeadlineError.judge_fallback_reason && kind.ships_unjudged?(retried)
   end
 
-  def record_attempt(outcome, verdict = nil)
+  def record_attempt(outcome, verdict = nil, private_judgment: false)
     attempt = { retry_principle: verdict&.principle, retry_issues: verdict ? issue_types(verdict) : [],
-                retry_evidence: verdict&.evidence, retry_reason: verdict&.reason }
+                retry_evidence: (verdict&.evidence unless private_judgment), retry_reason: (verdict&.reason unless private_judgment) }
     outcome.merge(attempt.slice(*outcome.keys).to_h { |field, value| [ field, outcome[field] + [ value ] ] })
   end
 

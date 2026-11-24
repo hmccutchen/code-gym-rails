@@ -24,6 +24,8 @@ class ExerciseDraft
         rungs: kind_rungs.slice(*kinds.map(&:key)), reduced: eased_concepts_for(plan, difficulty))
     end
     plan = adjusted_plan(plan, adjustments) if adjustments
+    files = code_review_files(plan, kind_rungs)
+    validate_variant_plan!(plan, kinds, language, kind_rungs, files)
     ladders    = ladders_for(user, plan, kinds, kind_rungs, language)
     prompt     = provider.prompt.call(user, language, plan: plan, history: history, delivered_history: delivered_history,
                                      difficulty: difficulty, kind_rungs: kind_rungs, skill_level: skill_level, ladders: ladders,
@@ -31,10 +33,10 @@ class ExerciseDraft
 
     reply = provider.generate.call(user, "generate_exercise", language, prompt.render,
                                    subject: "problem set", deadline: deadline)
-    files = code_review_files(plan, kind_rungs)
     ingested = ProblemSetIngest.call(
       reply, language: language, expected_keys: kinds.map(&:key), daily: plan.daily_kinds, code_review_source: plan.code_review_source,
-      code_review_files: files, code_review_mode: plan.code_review_mode, pitched_at: kind_rungs, eased_for: eased_concepts_for(plan, difficulty),
+      code_review_files: files, code_review_mode: plan.code_review_mode, pr_review_target: plan.pr_review_target,
+      pitched_at: kind_rungs, eased_for: eased_concepts_for(plan, difficulty),
       assignments: adjustments || {}, fixed_concepts: plan.assignments.transform_values { |entry| entry.fetch(:concept) }
     )
 
@@ -56,6 +58,8 @@ class ExerciseDraft
 
   def self.retry_section(draft, kind, concept, cause: nil, provider:, deadline: GenerationDeadline::NONE)
     user, language = draft.user, draft.language
+    files = code_review_files(draft.plan, draft.kind_rungs)
+    validate_variant_plan!(draft.plan, draft.kinds, language, draft.kind_rungs, files)
     prompt = provider.prompt.call(user, language, plan: draft.plan, history: draft.history, delivered_history: draft.delivered_history, difficulty: draft.difficulty,
                                   kind_rungs: draft.kind_rungs, skill_level: draft.skill_level,
                                   ladders: ladders_for(user, draft.plan, [ kind ], draft.kind_rungs, language), adjustments: draft.adjustments)
@@ -63,12 +67,11 @@ class ExerciseDraft
                                    subject: "#{kind.key} retry",
                                    deadline: deadline.leaving(CallProfiles.worst_case_seconds_for("judge_section")))
 
-    files = code_review_files(draft.plan, draft.kind_rungs)
     ingested = ProblemSetIngest.call(
       reply, language: language,
       expected_keys: [ kind.key ], daily: draft.plan.daily_kinds, fixed_concepts: { kind.key => concept },
       code_review_source: draft.plan.code_review_source, code_review_files: files,
-      code_review_mode: draft.plan.code_review_mode,
+      code_review_mode: draft.plan.code_review_mode, pr_review_target: draft.plan.pr_review_target,
       pitched_at: draft.kind_rungs.slice(kind.key),
       eased_for: eased_concepts_for(draft.plan, draft.difficulty).slice(kind.key),
       assignments: (draft.adjustments || {}).slice(kind.key)
@@ -96,6 +99,16 @@ class ExerciseDraft
     ExerciseSection::CodeReview.file_range(files: plan.code_review_files, rung: kind_rungs.fetch(ExerciseSection::CodeReview.key))
   end
   private_class_method :code_review_files
+
+  def self.validate_variant_plan!(plan, kinds, language, kind_rungs, files)
+    kind = ExerciseSection.ingest_variant_kind(mode: plan.code_review_mode)
+    return unless kind
+    return if kinds.include?(kind) && kind.valid_ingest_variant_scope?(language: language, rung: kind_rungs[kind.key],
+      file_range: files, source: plan.code_review_source, target: plan.pr_review_target)
+
+    raise ArgumentError, "#{kind.key} variant does not match the planned scope"
+  end
+  private_class_method :validate_variant_plan!
 
   def self.ladders_for(user, plan, kinds, kind_rungs, language)
     GenerationLadders.for(user, kinds.index_with { |kind| kind_rungs.fetch(kind.key) }, language,

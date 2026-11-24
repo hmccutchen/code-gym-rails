@@ -212,6 +212,22 @@ RSpec.describe "section rendering", type: :request do
     end
   end
 
+  it "keeps the PR Review case and key off Today and History" do
+    exercise = DailyExercise.create!(user: user, date: Date.current, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => {
+        "review_variant" => "pr_review", "scenario" => "Public booking scenario", "question" => "Review the change.",
+        "answer_key" => { "case" => "acceptable", "reason" => "PRIVATE-PR-REVIEW-REASON" }
+      } })
+    get root_path
+    expect(response.body).to include("Public booking scenario")
+    expect(response.body).not_to include("PRIVATE-PR-REVIEW-REASON", "answer_key")
+
+    submit!(exercise)
+    get history_path
+    expect(response.body).to include("Review the change.")
+    expect(response.body).not_to include("PRIVATE-PR-REVIEW-REASON", "answer_key")
+  end
+
   describe "a multi-file code review" do
     let(:files) do
       { "file_1_path" => "app/models/cr_order.rb", "file_1_code" => "cr_order_a = 1\ncr_order_b = 2\ncr_order_c = 3",

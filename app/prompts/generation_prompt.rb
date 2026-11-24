@@ -303,7 +303,8 @@ class GenerationPrompt
       alongside:      alongside,
       file_range:     code_review_file_range,
       code_style:     language_config[:code_style],
-      gotcha:         @plan.code_review_gotcha
+      gotcha:         @plan.code_review_gotcha,
+      pr_review_target: @plan.pr_review_target
     )
   end
 end

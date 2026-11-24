@@ -37,7 +37,7 @@ RSpec.describe JudgedGeneration do
           reply = verdicts[kind.key].length > 1 ? verdicts[kind.key].shift : verdicts[kind.key].first
           raise reply if reply.is_a?(Exception)
 
-          JudgeVerdict.parse(reply, kind: kind)
+          JudgeVerdict.parse(reply, kind: kind, section: section)
         },
         retry_section: lambda { |retry_draft, kind, concept, cause|
           retry_calls << [ retry_draft, kind.key, concept ]
@@ -58,6 +58,159 @@ RSpec.describe JudgedGeneration do
   end
 
   def run = described_class.call(user: user, draft: draft, providers: providers, finish: finish)
+
+  describe "bounded PR Review admission" do
+    let(:plan) { super().with(code_review_mode: :pr_review, pr_review_target: case_class) }
+    let(:kinds) { [ ExerciseSection::CodeReview, ExerciseSection::Pattern ] }
+    let(:witness) { { "path" => "app/services/booking.rb", "quote" => booking_result } }
+    let(:booking_result) { "availability.available? ? :available : :unavailable" }
+    let(:case_class) { "acceptable" }
+    let(:observed) { ":unavailable" }
+    let(:behavior) { { "requirement" => 1, "expected" => ":unavailable", "observed" => observed } }
+    let(:drafted) do
+      {
+        "code_review" => { "review_variant" => "pr_review", "concept" => "service_objects", "scenario" => "Report availability.",
+          "question" => "Trace the behavior and support a disposition.", "requirements" => [ "Report unavailability when no slot remains." ],
+          "file_1_path" => "app/services/availability.rb", "file_1_code" => "def available?\n  slots.any?\nend",
+          "file_2_path" => "app/services/booking.rb", "file_2_code" => "def status\n  #{booking_result}\nend",
+          "answer_key" => { "case" => case_class, "reason" => "PRIVATE_KEY_SENTINEL", "evidence" => [ witness ], "behavior" => behavior } },
+        "pattern" => { "concept" => "service_objects", "question" => "Which pattern?" }
+      }
+    end
+
+    def blind_review(case_name = case_class, **extras)
+      { "status" => "keep", "case" => case_name, "reason" => "PRIVATE_JUDGMENT_SENTINEL",
+        "evidence" => [ witness ], "behavior" => behavior.merge(
+          "observed" => (case_name == "acceptable" ? ":unavailable" : ":available")) }.merge(extras.stringify_keys)
+    end
+
+    it "admits a supported clean change without storing its private judgment in diagnostics" do
+      verdicts["code_review"] = [ blind_review ]
+
+      result = run
+
+      expect(result.problem_set["code_review"]).to eq(drafted["code_review"])
+      expect(result.outcomes["code_review"].to_json).not_to include("PRIVATE_", "acceptable", booking_result)
+      expect(retry_calls).to be_empty
+    end
+
+    context "when the proposed change has a demonstrated blocker" do
+      let(:case_class) { "flawed" }
+      let(:observed) { ":available" }
+      let(:booking_result) { "availability.available? ? :unavailable : :available" }
+
+      it "admits a matching independently supported blocker" do
+        verdicts["code_review"] = [ blind_review ]
+
+        expect(run.problem_set["code_review"]).to eq(drafted["code_review"])
+      end
+
+      it "requires agreement on the consequence even when the citations match" do
+        verdicts["code_review"] = [ blind_review(behavior: behavior.merge("observed" => ":sold_out")) ]
+
+        result = run
+
+        expect(result.dropped_sections).to eq([ "code_review" ])
+        expect(result.outcomes["code_review"].to_json).not_to include(":sold_out")
+      end
+
+      it "rejects a claimed blocker whose evidence disagrees with the key" do
+        unrelated = { "path" => "app/services/availability.rb", "quote" => "slots.any?" }
+        verdicts["code_review"] = [ blind_review(evidence: [ unrelated ]) ]
+
+        result = run
+
+        expect(result.dropped_sections).to eq([ "code_review" ])
+        expect(retry_calls.size).to eq(2)
+      end
+    end
+
+    it "uses bounded retries for material disagreement and retains unrelated sections" do
+      verdicts["code_review"] = [ blind_review("flawed") ]
+
+      result = run
+
+      expect(result.problem_set.keys).to eq([ "pattern" ])
+      expect(result.dropped_sections).to eq([ "code_review" ])
+      expect(retry_calls.size).to eq(2)
+      expect(result.outcomes["code_review"].to_json).not_to include("PRIVATE_", "flawed", booking_result)
+    end
+
+    it "does not share an ambiguous judge verdict's private explanation with retries or diagnostics" do
+      ambiguous = reject("underdetermined").merge("reason" => "PRIVATE_JUDGMENT_SENTINEL", "evidence" => "PRIVATE_EVIDENCE_SENTINEL")
+      verdicts["code_review"] = [ ambiguous, blind_review ]
+
+      result = run
+
+      expect(result.problem_set).to have_key("code_review")
+      expect(retry_causes).to eq([ "underdetermined" ])
+      expect(result.outcomes["code_review"].to_json).not_to include("PRIVATE_")
+    end
+
+    it "does not ship when the judge is unavailable" do
+      verdicts["code_review"] = [ ProviderError::InvalidResponseError.new("Unavailable") ]
+
+      expect(run.problem_set.keys).to eq([ "pattern" ])
+    end
+
+    it "rejudges an edit before accepting revised prose" do
+      revised = "Show the outcome of the service call."
+      edit = blind_review(status: "edit", issues: [ { "type" => "padding", "evidence" => "padded text" } ],
+        fields: { "scenario" => revised })
+      verdicts["code_review"] = [ edit, blind_review ]
+
+      expect(run.problem_set.dig("code_review", "scenario")).to eq(revised)
+      expect(judged_calls.count { |call| call[1] == "code_review" }).to eq(2)
+    end
+
+    it "uses only one extra edit confirmation across the original review and its retries" do
+      edit = blind_review(status: "edit", issues: [ { "type" => "padding", "evidence" => "padded text" } ],
+        fields: { "scenario" => "Rewritten." })
+      verdicts["code_review"] = [ edit, reject("underdetermined"), edit, blind_review ]
+
+      result = run
+
+      expect(result.problem_set.dig("code_review", "question")).to eq("Retried")
+      expect(result.outcomes.fetch("code_review")).to include(status: :keep, retries: 2)
+      expect(judged_calls.count { |call| call[1] == "code_review" }).to eq(4)
+    end
+
+    context "when another section uses the extra edit confirmation" do
+      let(:kinds) { super() + [ ExerciseSection::DesignComparison ] }
+      let(:drafted) do
+        super().merge("design_comparison" => { "scenario" => "Comparison.",
+          "answer_key" => { "better" => "a" } })
+      end
+
+      it "shares the one confirmation across the initial phase and PR Review retries" do
+        verdicts["design_comparison"] = [
+          { "status" => "edit", "better" => "a", "issues" => [ { "type" => "padding", "evidence" => "padded prose" } ],
+            "fields" => { "scenario" => "Shorter comparison." } },
+          { "status" => "keep", "better" => "a" }
+        ]
+        edit = blind_review(status: "edit", issues: [ { "type" => "padding", "evidence" => "padded text" } ],
+          fields: { "scenario" => "Rewritten." })
+        verdicts["code_review"] = [ reject("underdetermined"), edit, blind_review ]
+
+        result = run
+
+        expect(result.problem_set.dig("design_comparison", "scenario")).to eq("Shorter comparison.")
+        expect(result.problem_set.dig("code_review", "scenario")).to eq(drafted.dig("code_review", "scenario"))
+        expect(result.outcomes.fetch("code_review")).to include(status: :keep, retries: 2)
+      end
+    end
+
+    it "drops a materially disputed edit without delivering the unapproved original" do
+      edit = blind_review(status: "edit", issues: [ { "type" => "leakage", "evidence" => "PRIVATE_JUDGMENT_SENTINEL" } ],
+        fields: { "scenario" => "Rewritten." })
+      verdicts["code_review"] = [ edit, reject("underdetermined") ]
+
+      result = run
+
+      expect(result.dropped_sections).to eq([ "code_review" ])
+      expect(result.outcomes["code_review"].to_json).not_to include("PRIVATE_")
+    end
+  end
 
   it "preserves the draft's opaque captured context on the judged result" do
     context = Object.new.freeze

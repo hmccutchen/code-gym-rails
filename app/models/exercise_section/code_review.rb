@@ -55,6 +55,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.quoted_key_texts(key) = [ key&.dig("issue") ]
 
   def self.normalize_planted_key(section)
+    return section[PlantedKey::FIELD] if PrReview.section?(section)
+
     key = PlantedKey.fields(section[PlantedKey::FIELD], KEY_FIELDS)
     return key.merge(BugHunt.optional_key_fields(section[PlantedKey::FIELD])) if key && bug_hunt?(section)
     return key unless key && files(section).any?
@@ -63,8 +65,21 @@ class ExerciseSection::CodeReview < ExerciseSection
   end
 
   def self.unusable_key_reason(section, key, language:)
+    return if PrReview.section?(section)
+
     shown = files(section)
     MultiFile.unusable_key_reason(shown, key, language: language) if shown.any?
+  end
+
+  def self.quote_tally(section, language:)
+    return super unless PrReview.section?(section)
+
+    count = section.fetch(PlantedKey::FIELD).fetch("evidence").size
+    PlantedKey::QuoteTally.new(verbatim: count, reference: 0, scenario: 0, unresolved: [])
+  end
+
+  def self.judge_variant(section)
+    PrReview::Judgment if PrReview.section?(section)
   end
 
   def self.ingest_variant?(mode:) = mode == PrReview::MODE
@@ -76,7 +91,7 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.stamp_ingest_variant!(section) = section[PrReview::FIELD] = PrReview::VALUE
 
   def self.refusal_codes = %w[snippet_missing snippet_too_long file_count_wrong file_incomplete file_too_long path_invalid
-                              changed_lines_unresolved pr_review_artifact_invalid pr_review_changed_lines_unresolved] + BugHunt::REFUSAL_CODES
+                              changed_lines_unresolved pr_review_artifact_invalid pr_review_changed_lines_unresolved pr_review_key_invalid] + BugHunt::REFUSAL_CODES
 
   def self.files(section)
     FILE_SLOTS.filter_map do |number|
@@ -91,6 +106,15 @@ class ExerciseSection::CodeReview < ExerciseSection
   NUMBERED_FILES_NOTE = "The page numbers each file's lines the way they are numbered here. " \
                         "The \"N | \" before each line is not part of the code, so never copy it into code you write."
 
+  def self.requirements_context(section)
+    return unless PrReview.section?(section)
+
+    requirements = section[PrReview::REQUIREMENTS]
+    return unless requirements.is_a?(Array) && requirements.any?
+
+    "Requirements:\n" + requirements.map.with_index(1) { |requirement, number| "#{number}. #{requirement}" }.join("\n")
+  end
+
   def self.files_context(section) = numbered_files(section)&.then { |files| "#{NUMBERED_FILES_NOTE}\n#{files}" }
 
   def self.numbered_files(section) = files(section).map(&:prompt_text).join("\n").presence
@@ -103,7 +127,7 @@ class ExerciseSection::CodeReview < ExerciseSection
     "The section's files, every line numbered, with \"Changed lines\" naming the lines the page marks as the change:\n#{files}" if files
   end
 
-  def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, **)
+  def self.reject_unusable!(section, language: nil, file_range: 1..1, mode: nil, variant_target: nil, **)
     return reject_bug_hunt!(section) if BugHunt.mode?(mode)
 
     pr_review = ingest_variant?(mode: mode)
@@ -127,6 +151,9 @@ class ExerciseSection::CodeReview < ExerciseSection
       refuse!("pr_review_artifact_invalid", "PR Review requires valid Ruby code in relative application paths")
     end
     resolve_changed_lines!(section, language, strict: pr_review)
+    if pr_review && !PrReview.valid_key?(section, target: variant_target)
+      refuse!("pr_review_key_invalid", "PR Review requires a grounded key matching the requested case")
+    end
     drop_absent_files!(section)
   end
 
@@ -231,7 +258,7 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   def self.judge_guidance_for(section) = files(section).any? ? MultiFile::JUDGE_GUIDANCE : super
 
-  def self.ships_unjudged?(section) = files(section).none? && super
+  def self.ships_unjudged?(section) = !PrReview.section?(section) && files(section).none? && super
 
   def self.discovery?
     true
@@ -245,9 +272,17 @@ class ExerciseSection::CodeReview < ExerciseSection
     %w[scenario question teaching_note]
   end
 
+  def self.difficulty_definition(rung:, mode: nil, section: nil)
+    return super unless ingest_variant?(mode: mode) || PrReview.section?(section)
+
+    ExerciseSection::DifficultyDefinition.new(rung: rung,
+      expectation: "Trace the behavior across both files, evaluate it against the requirements, and support a review disposition.")
+  end
+
   # A RealSource excerpt's own instruction replaces the mode's toy line.
   def self.generation_guidance(vocabulary:, label:, mode: nil, artifact: nil, test_framework: nil, source: nil, rung: nil,
-                               file_range: 1..1, code_style: nil, gotcha: nil, **)
+                               file_range: 1..1, code_style: nil, gotcha: nil, pr_review_target: nil, **)
+    return PrReview::Generation.guidance(vocabulary: vocabulary, target: pr_review_target) if ingest_variant?(mode: mode)
     return BugHunt::Prompt.guidance(gotcha: gotcha, rung: rung, vocabulary: vocabulary) if BugHunt.mode?(mode)
 
     vocabulary_line = "- Choose the code_review concept from this vocabulary, exactly one: #{vocabulary.join(", ")}"
@@ -274,6 +309,7 @@ class ExerciseSection::CodeReview < ExerciseSection
 
   # Keep the snippet's language out of here: the instruction line above is its one authoritative statement.
   def self.schema_fragment(label:, file_range: 1..1, mode: nil, **)
+    return PrReview::Generation.schema_fragment if ingest_variant?(mode: mode)
     return BugHunt::Prompt.schema_fragment if BugHunt.mode?(mode)
     return MultiFile.schema_fragment(file_range: file_range, answer_key: MultiFile::ANSWER_KEY_SCHEMA) if multi_file_range?(file_range)
 
