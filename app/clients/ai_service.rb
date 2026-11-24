@@ -239,18 +239,20 @@ class AiService
       **ExplainDifferentlyPrompt.generate(
         coach: LanguagePrompts.for(exercise.language)[:coach], question: exercise.problem_set.dig(section, "question"),
         answer: daily_response.answer_for(section), missed: DailyResponse.review_points(review["missed"]),
-        prior_alternates: prior_alternates
+        prior_alternates: prior_alternates, qualitative_feedback: qualitative_feedback_lines(daily_response, section, review)
       )))
 
     text_or_raise(result, subject: "alternate explanation")
   end
 
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
+    review = daily_response.ai_review&.dig(section) || {}
+
     result = call_and_log(user, AiService.request_for("review_follow_up",
       **FollowUpPrompt.generate(
         coach: LanguagePrompts.for(exercise.language)[:coach], exercise_question: exercise.problem_set.dig(section, "question"),
-        review: daily_response.ai_review&.dig(section) || {}, answer: daily_response.answer_for(section),
-        question: question, thread: thread
+        review: review, answer: daily_response.answer_for(section), question: question, thread: thread,
+        qualitative_feedback: qualitative_feedback_lines(daily_response, section, review)
       )))
 
     text_or_raise(result, subject: "follow-up answer")
@@ -531,6 +533,11 @@ class AiService
     end
 
     ReviewPrompt.day_system(coach: coach, sections: sections)
+  end
+
+  def qualitative_feedback_lines(response, section, review)
+    variant = ExerciseSection.find(section)&.grading_variant(response.section_data(section))
+    variant&.public_feedback(review, locale: :en)&.map { |label, text| "#{label}: #{text}" }
   end
 
   def build_review_section_prompt(exercise, daily_response, section)

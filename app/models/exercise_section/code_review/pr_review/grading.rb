@@ -4,7 +4,14 @@ module ExerciseSection::CodeReview::PrReview::Grading
   FEEDBACK_FIELDS = %w[comprehension evidence disposition].freeze
   RATING_CAPS = { "sound" => "strong", "essential_gap" => "developing", "main_point_missed" => "beginner" }.freeze
 
-  def self.feedback_fields = FEEDBACK_FIELDS
+  def self.public_feedback(review, locale: I18n.locale)
+    FEEDBACK_FIELDS.filter_map do |field|
+      text = review[field]
+      next unless PrReview.short_line?(text, PrReview::MAX_REASON_LENGTH)
+
+      [ I18n.t("sections.#{PrReview::VALUE}.feedback.#{field}", locale: locale), text ]
+    end
+  end
 
   def self.public_context(section:, answer:, rating:)
     [

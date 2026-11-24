@@ -44,13 +44,7 @@ module ReviewHelper
     kind = ExerciseSection.find(section)
     data = response.section_data(section)
     variant = kind&.grading_variant(data)
-    return [] unless variant
-
-    presentation = kind.presentation_key(data)
-    variant.feedback_fields.filter_map do |field|
-      text = feedback[field]
-      [ t("sections.#{presentation}.feedback.#{field}"), text ] if text.is_a?(String) && text.present?
-    end
+    variant&.public_feedback(feedback) || []
   end
 
   def review_field_label(response, section, field)

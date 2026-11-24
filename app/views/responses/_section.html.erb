@@ -1,7 +1,8 @@
 <%# Locals: kind, key, data, slot, exercise, response, submitted, picker (nil on a card with no swap control), folded (renders closed). %>
 <% bucket = ConceptBucket.for(key, exercise.language) %>
 <% concept_shown = submitted || exercise.concepts_withheld_before_submission.exclude?(data["concept"]) %>
-<% name = t("sections.#{kind.presentation_key(data) || key}.name") %>
+<% presentation = kind.presentation_key(data) %>
+<% name = t("sections.#{presentation || key}.name") %>
 <% label = capture do %>
   <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: name, title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: name) %><% end %>
 <% end %>
@@ -15,7 +16,7 @@
   <% if local_assigns[:picker] %>
     <%= render "daily_kinds/swap", picker: picker %>
   <% end %>
-  <% if !submitted && kind_about_on_form?(key) %>
+  <% if !submitted && presentation.nil? && kind_about_on_form?(key) %>
     <%= render "responses/kind_about", key: key %>
   <% end %>
   <% if data["scenario"].present? %><div class="section-scenario"><%= section_glossary_wrap(data["scenario"], kind: kind, submitted: submitted) %></div><% end %>

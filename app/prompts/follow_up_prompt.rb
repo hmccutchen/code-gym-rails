@@ -1,5 +1,7 @@
 class FollowUpPrompt
-  def self.generate(coach:, exercise_question:, review:, answer:, question:, thread:)
+  def self.generate(coach:, exercise_question:, review:, answer:, question:, thread:, qualitative_feedback: nil)
+    summary = qualitative_feedback ? qualitative_feedback.join("\n") : review_summary(review)
+
     { system: <<~SYSTEM,
         You are a senior #{coach} engineer answering a follow-up question about feedback you already gave. Return plain prose — no JSON, no markdown fences.
 
@@ -10,7 +12,7 @@ class FollowUpPrompt
         The original exercise asked: #{exercise_question}
 
         The review you gave:
-        #{review_summary(review).presence || "(no detail recorded)"}
+        #{summary.presence || "(no detail recorded)"}
       SYSTEM
       history: UserText.tag_history(thread, limit: UserText::MAX_QUESTION_LENGTH),
       prompt: <<~PROMPT }
