@@ -78,6 +78,13 @@ class ExerciseSection::CodeReview < ExerciseSection
     PlantedKey::QuoteTally.new(verbatim: count, reference: 0, scenario: 0, unresolved: [])
   end
 
+  def self.select_delivery_variant(plan:, language:, rung:)
+    target = PrReview.select_target(mode: plan.code_review_mode, language: language, rung: rung, source: plan.code_review_source)
+    return plan unless target
+
+    plan.with(code_review_mode: PrReview::MODE, code_review_files: :multi, pr_review_target: target)
+  end
+
   def self.presentation_key(section)
     :pr_review if PrReview.section?(section)
   end

@@ -30,13 +30,13 @@ module ExerciseSection::CodeReview::PrReview::Grading
 
       Describe what the engineer understood about the changed behavior and the interaction between files. Credit accurate comprehension even if a material blocker was missed. Assess whether claims follow from the code and requirements and distinguish observed behavior from uncertainty.
       A material blocker calls for requesting changes. An evidence-based approval or grounded nonblocking comment can earn full credit for an acceptable change. Never invent a defect or treat a preference as a blocker. Credit independently supported alternative findings. Grade the reasoning and severity, not the presence of a disposition word.
-      A missed blocker, an unsupported rejection, an incorrect approval, or a correct conclusion without essential evidence prevents a favorable grade. A credible trace with an essential gap can earn developing at most. Use beginner when the central behavior and judgment are missed. Use solid when all essentials are supported and strong only for an additional grounded consequence or tradeoff. Optional polish does not lower the grade.
+      Use the shared rating rubric from the day context. Treat a missed blocker, an unsupported rejection, an incorrect approval, or a conclusion without essential evidence as an essential gap in the review. Record essential gaps in "evidence" or "disposition". Use those points in place of the rubric's "missed" list and use only the JSON fields shown below.
       If a material requirement is ambiguous or missing, the shown artifact cannot support judgment, or the private cross-check materially contradicts your own trace, return ungradable. Explain the uncertainty without repeating any key text. Lesser uncertainties can be mentioned without penalty. Never claim you ran or tested the code.
 
       #{plain_language}
 
       Return only JSON. Write a short statement for each qualitative dimension. For a valid grade use:
-      {"ungradable":false,"artifact_case":"acceptable or flawed","assessment":"sound, essential_gap, or main_point_missed","rating":"beginner, developing, solid, or strong","comprehension":"...","evidence":"...","disposition":"..."}
+      {"ungradable":false,"artifact_case":"acceptable or flawed","assessment":"sound, essential_gap, or main_point_missed","rating":"#{ConceptMastery::AI_RATING_RANK.keys.to_sentence(locale: :en)}","comprehension":"...","evidence":"...","disposition":"..."}
       "artifact_case" classifies the public artifact independently of the learner's disposition. Use "essential_gap" when the central behavior is understood but an essential point is missing or wrong. Use "main_point_missed" when the central task is missed. Use "sound" only when all essentials are supported.
       When assessment is unavailable use, with no rating:
       {"ungradable":true,"comprehension":"...","evidence":"...","disposition":"..."}

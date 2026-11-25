@@ -76,6 +76,18 @@ RSpec.describe "Submitted PR Review grading" do
     expect(sibling.prompt).not_to include("Private cross-check for this submitted section only:", "PRIVATE GRADE KEY")
   end
 
+  it "uses the shared rubric and defines only the essential review gaps in the section prompt" do
+    allow(service).to receive(:call_and_log) do |_actor, request|
+      expect(request.system).to include(ReviewPrompt::RATING_RUBRIC)
+      expect(request.prompt).to include("Use the shared rating rubric", "Treat a missed blocker",
+        'Record essential gaps in "evidence" or "disposition".', ConceptMastery::AI_RATING_RANK.keys.to_sentence)
+      expect(request.prompt).not_to include("developing at most", "Use beginner", "Use solid", "strong only")
+      { text: rated_reply.to_json }
+    end
+
+    expect(grade[:ok]).to be(true)
+  end
+
   it "sends only the case and public evidence needed for grading" do
     original = section.fetch("answer_key")
     privacy_probe = "SYNTHETIC PRIVATE OBSERVATION"

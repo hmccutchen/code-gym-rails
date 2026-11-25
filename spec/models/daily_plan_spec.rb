@@ -679,6 +679,16 @@ RSpec.describe DailyPlan do
       candidate.select_delivery_variant(language: language, kind_rungs: kind_rungs)
     end
 
+    it "delegates delivery selection to the kinds included in the plan" do
+      pattern = ExerciseSection::Pattern
+      candidate = plan.with(selected_kinds: [ pattern ])
+      selected = candidate.with(scenario_flavor: :everyday)
+      expect(pattern).to receive(:select_delivery_variant).with(plan: candidate, language: "ruby_rails", rung: "junior")
+        .and_return(selected)
+
+      expect(choose_variant(candidate, kind_rungs: { "pattern" => "junior" })).to equal(selected)
+    end
+
     it "can select either hidden case for an eligible generated day without changing its sections or notes" do
       weights = { "ordinary" => 0.60, "acceptable" => 0.20, "flawed" => 0.20 }
       %w[acceptable flawed].each do |target|

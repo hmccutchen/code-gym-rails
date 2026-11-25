@@ -150,6 +150,8 @@ class ExerciseSection
       vocabulary
     end
 
+    def select_delivery_variant(plan:, language:, rung:) = plan
+
     def planning_host?(mode:) = true
 
     def concept_shown_before_submission?(_section) = true
