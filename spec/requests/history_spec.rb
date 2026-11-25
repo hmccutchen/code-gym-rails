@@ -31,6 +31,58 @@ RSpec.describe "History", type: :request do
     )
   end
 
+  it "replays the proposed change and only public qualitative feedback for PR Review" do
+    day = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+    exercise = day.daily_exercise
+    section = {
+      "review_variant" => "pr_review", "scenario" => "Calculate each order total.",
+      "question" => "Review the proposed change.", "requirements" => [ "Include every line item." ],
+      "file_1_path" => "app/models/order.rb", "file_1_code" => "def total; 0; end", "file_1_changed_lines" => [ 1 ],
+      "file_2_path" => "app/models/line_item.rb", "file_2_code" => "def price; 0; end", "file_2_changed_lines" => [],
+      "answer_key" => { "case" => "flawed", "reason" => "private answer-key sentinel" }
+    }
+    exercise.update!(problem_set: exercise.problem_set.merge("code_review" => section))
+    day.update!(ai_review: { "code_review" => {
+      "rating" => "developing", "comprehension" => "You understood the caller.",
+      "evidence" => "Use the returned total.", "disposition" => "A blocker remains.",
+      "case" => "private classification sentinel"
+    } })
+    login_as(user)
+
+    get history_path
+
+    page = Nokogiri::HTML5(response.body)
+    expect(page.at_css(".review-block h3").text).to include("PR Review")
+    expect(page.at_css(".review-block").text).to include("Comprehension", "You understood the caller.",
+      "Evidence", "Use the returned total.", "Disposition", "A blocker remains.")
+    expect(page.text).to include("Calculate each order total.", "Include every line item.", "app/models/order.rb", "app/models/line_item.rb")
+    expect(response.body).not_to include("private answer-key sentinel", "private classification sentinel")
+
+    day.update!(ai_review: { "code_review" => { "ungradable" => true, "disposition" => "The requirement is ambiguous." } })
+    get history_path
+
+    review = Nokogiri::HTML5(response.body).at_css(".review-block")
+    expect(review.at_css(".review-ungraded").text).to eq("Ungradable")
+    expect(review.text).to include("The requirement is ambiguous.")
+    expect(review.css(".review-rating")).to be_empty
+  end
+
+  it "replays ungradable feedback when the stored PR Review requirements are malformed" do
+    day = create_session_for(user, date: 1.day.ago.to_date, reviewed: true)
+    exercise = day.daily_exercise
+    section = exercise.problem_set.fetch("code_review").merge("review_variant" => "pr_review")
+    day.update!(ai_review: { "code_review" => { "ungradable" => true, "evidence" => "The artifact could not support a grade." } })
+    login_as(user)
+
+    [ nil, "invalid requirements", { "not" => "an ordered list" } ].each do |requirements|
+      exercise.update!(problem_set: exercise.problem_set.merge("code_review" => section.merge("requirements" => requirements)))
+      get history_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("The artifact could not support a grade.")
+      expect(response.body).not_to include("invalid requirements", "an ordered list")
+    end
+  end
+
   it "keeps the outer History folds while adding a separate closed full review to each eligible section" do
     stub_env("REVIEW_TAKEAWAY" => "1")
     [ 1.day.ago.to_date, 2.days.ago.to_date ].each do |date|

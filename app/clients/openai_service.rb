@@ -55,25 +55,24 @@ class OpenaiService < AiService
   INSUFFICIENT_QUOTA = "insufficient_quota".freeze
   RATE_LIMIT_FAMILIES = %w[requests tokens].freeze
 
-  def raise_for_status(resp)
+  def raise_for_status(resp, sensitive: false)
     raise_if_key_rejected("OpenAI", resp.status)
     error = error_envelope(resp.body)
-    raise_if_out_of_credit(error, resp.status)
+    raise_if_out_of_credit(error, resp.status, sensitive: sensitive)
 
     if resp.status == 429
       raise ProviderError::RateLimitError.new("OpenAI API error 429", http_status: 429,
-                                              quota_id: quota_id_from(resp, error), retry_after: retry_after_seconds(resp))
+                                              quota_id: safe_quota_id(quota_id_from(resp, error), sensitive: sensitive), retry_after: retry_after_seconds(resp))
     end
 
-    log_raw_snippet("OpenAI API error #{resp.status} body", resp.body)
-    message = extract_provider_message(error, fallback: "OpenAI API error #{resp.status}")
-    raise ProviderError.new(message, http_status: resp.status)
+    raise provider_http_error(resp, error, sensitive: sensitive)
   end
 
-  def raise_if_out_of_credit(error, status)
+  def raise_if_out_of_credit(error, status, sensitive: false)
     return unless status == 402 || (status == 429 && error["code"] == INSUFFICIENT_QUOTA)
 
-    Rails.logger.warn("OpenAI reports the account is out of credit (HTTP #{status}, #{error['code']})")
+    code = ", #{error['code']}" unless sensitive
+    Rails.logger.warn("OpenAI reports the account is out of credit (HTTP #{status}#{code})")
     raise ProviderError::BillingError.new("OpenAI reports the account is out of credit", http_status: status)
   end
 
@@ -86,7 +85,7 @@ class OpenaiService < AiService
 
   def read_result(parsed, request)
     usage = read_usage(parsed, route_for(request.purpose))
-    return unfinished_reply(usage, parsed["status"]) unless FINISHED_STATUSES.include?(parsed["status"])
+    return unfinished_reply(usage, parsed["status"], sensitive: request.sensitive?) unless FINISHED_STATUSES.include?(parsed["status"])
 
     content = object_list(parsed, "output").select { |item| item["type"] == "message" }.flat_map { |item| object_list(item, "content") }
     usage.merge(

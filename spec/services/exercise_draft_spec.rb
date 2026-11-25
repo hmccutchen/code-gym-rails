@@ -214,6 +214,20 @@ RSpec.describe ExerciseDraft do
     expect(draft.plan.notes).not_to have_key("pr_review_target")
   end
 
+  it "selects the variant in the ordinary drafting path after capturing difficulty" do
+    user.update!(skill_level: "mid_level")
+    plan = plan_for(code_review_mode: :application_code, size: DaySize.for(setting: 4))
+    allow(DailyPlan).to receive(:for).and_return(plan)
+    allow(WeightedRoll).to receive(:pick).with({ "ordinary" => 0.60, "acceptable" => 0.20, "flawed" => 0.20 }).and_return("flawed")
+    allow(ProblemSetIngest).to receive(:call).and_call_original
+
+    draft = described_class.call(user, language: "ruby_rails", provider: provider)
+
+    expect(draft.plan).to have_attributes(code_review_mode: :pr_review, code_review_files: :multi, pr_review_target: "flawed")
+    expect(ProblemSetIngest).to have_received(:call).with(anything, hash_including(pr_review_target: "flawed"))
+    expect(draft.unusable_sections.map(&:key)).to include("code_review")
+  end
+
   it "refuses invalid trusted PR Review scope or targets before a provider call" do
     plan = plan_for(code_review_mode: :pr_review, code_review_files: :multi, pr_review_target: "acceptable", size: DaySize.for(setting: 4))
     allow(DailyPlan).to receive(:for).and_return(plan)

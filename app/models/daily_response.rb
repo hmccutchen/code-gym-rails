@@ -232,6 +232,12 @@ class DailyResponse < ApplicationRecord
     ai_review&.dig(section.to_s, AI_RATING_FIELD)
   end
 
+  def ungradable_review?(section)
+    review = ai_review[section.to_s] if ai_review.is_a?(Hash)
+    review.is_a?(Hash) && review["ungradable"] == true &&
+      ExerciseSection.find(section)&.grading_variant(section_data(section)).present?
+  end
+
   def ai_rating_favorable?(section)   = AI_RATING_FAVORABLE.include?(ai_rating_for(section))
   def ai_rating_unfavorable?(section) = AI_RATING_UNFAVORABLE.include?(ai_rating_for(section))
 
@@ -325,6 +331,8 @@ class DailyResponse < ApplicationRecord
     return false if assessed.empty?
 
     selected = sections.nil? ? section_keys : section_keys & sections
+    return false if selected.any? { |section| ungradable_review?(section) }
+
     (assessed & selected).any? && ((answered_sections & selected) - assessed).empty?
   end
 

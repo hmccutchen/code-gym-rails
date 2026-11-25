@@ -412,6 +412,27 @@ RSpec.describe ResponseReview do
       expect(mastery.reload).to have_attributes(tier: "standard", retention_interval_days: 14, next_retention_check_on: Date.current + 14)
     end
 
+    it "does not count an ungradable PR Review as a skipped retention check" do
+      exercise.update!(problem_set: exercise.problem_set.deep_merge(
+        "code_review" => { "review_variant" => "pr_review" }
+      ))
+      response.update!(answers: response.answers.merge("code_review" => ""),
+        concept_tags: { "code_review" => "n_plus_one", "pattern" => "memoization" })
+      before = domain(mastery)
+      allow(reviewer).to receive(:review_sections).and_return(
+        "code_review" => { ok: true, review: { "ungradable" => true } },
+        "pattern" => review_result("solid")
+      )
+
+      expect(review.status).to eq(:ready)
+      expect(response.reload.assessed_sections).to eq([ "pattern" ])
+      expect(response).not_to be_completion_evidence
+      expect(user.recent_performance.sole[:completion]).to be_nil
+      expect(response.ai_review.fetch("code_review")).to eq("ungradable" => true)
+      expect(response.mastery_application["skip_attempts"]).to eq([])
+      expect(domain(mastery)).to eq(before)
+    end
+
     it "retains one skipped attempt even if another batch and correction later make it relevant" do
       batch(response, "pattern" => "strong")
       skipped = another_day(20, concept: "n_plus_one", answer: "", keys: %w[code_review pattern])

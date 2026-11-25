@@ -67,6 +67,22 @@ RSpec.describe ReviewMailer, type: :mailer do
       expect(body).to include("User.includes(:posts)")
     end
 
+    it "includes the marked PR Review feedback without private metadata" do
+      exercise.update!(problem_set: exercise.problem_set.deep_merge("code_review" => {
+        "review_variant" => "pr_review", "answer_key" => { "reason" => "PRIVATE KEY SENTINEL" }
+      }))
+      daily_response.update!(ai_review: { "code_review" => {
+        "rating" => "solid", "comprehension" => "You traced both files.",
+        "evidence" => "The return value supports your claim.", "disposition" => "Approval is supported.",
+        "artifact_case" => "PRIVATE CASE SENTINEL"
+      } })
+
+      body = mail.body.decoded
+      expect(body).to include("== PR Review ==", "Comprehension: You traced both files.",
+        "Evidence: The return value supports your claim.", "Disposition: Approval is supported.")
+      expect(body).not_to include("PRIVATE KEY SENTINEL", "PRIVATE CASE SENTINEL")
+    end
+
     it "carries the difficulty note alongside the grade" do
       daily_response.update!(ai_review: daily_response.ai_review.deep_merge(
         "code_review" => { "difficulty" => { "level" => "demanding",

@@ -2,7 +2,7 @@
 
 <% @response.ai_review.each do |section, fb| -%>
 <% next unless fb.is_a?(Hash) -%>
-== <%= section.humanize %> ==
+== <%= review_section_name(@response, section) %> ==
 
 <% if (badge = review_badge(@response, section)) -%>
 <%= badge.graded? ? t("review_mailer.send_review.rating", rating: badge.text) : badge.text %>
@@ -10,6 +10,10 @@
 <% end -%>
 <% if (difficulty = @response.difficulty_for(section)) -%>
 <%= t("review.difficulty_note", level: difficulty["level"]) %> <%= difficulty["reason"] %>
+
+<% end -%>
+<% review_qualitative_feedback(@response, section, fb).each do |label, text| -%>
+<%= label %>: <%= text %>
 
 <% end -%>
 <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| -%>

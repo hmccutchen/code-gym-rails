@@ -19,6 +19,12 @@ class DailyPlan
 
     def fourth = kinds.find(&:fourth?)&.key&.to_sym
 
+    def select_delivery_variant(language:, kind_rungs:)
+      kinds.reduce(self) do |plan, kind|
+        kind.select_delivery_variant(plan: plan, language: language, rung: kind_rungs[kind.key])
+      end
+    end
+
     def judge_retries(kind) = daily_kinds.include?(kind) ? DAILY_JUDGE_RETRIES : ROTATED_JUDGE_RETRIES
   end
 

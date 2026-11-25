@@ -40,6 +40,12 @@ class AiService
     end
 
     def worst_case_seconds = CallProfiles.call_worst_case_seconds(read_timeout: read_timeout, single_attempt: single_attempt)
+
+    def sensitive? = false
+  end
+
+  class SensitiveRequest < Request
+    def sensitive? = true
   end
 
   def self.request_for(purpose, system:, prompt:, history: [], response_schema: nil)
@@ -233,18 +239,20 @@ class AiService
       **ExplainDifferentlyPrompt.generate(
         coach: LanguagePrompts.for(exercise.language)[:coach], question: exercise.problem_set.dig(section, "question"),
         answer: daily_response.answer_for(section), missed: DailyResponse.review_points(review["missed"]),
-        prior_alternates: prior_alternates
+        prior_alternates: prior_alternates, qualitative_feedback: qualitative_feedback_lines(daily_response, section, review)
       )))
 
     text_or_raise(result, subject: "alternate explanation")
   end
 
   def answer_follow_up(user, exercise, daily_response, section:, question:, thread: [])
+    review = daily_response.ai_review&.dig(section) || {}
+
     result = call_and_log(user, AiService.request_for("review_follow_up",
       **FollowUpPrompt.generate(
         coach: LanguagePrompts.for(exercise.language)[:coach], exercise_question: exercise.problem_set.dig(section, "question"),
-        review: daily_response.ai_review&.dig(section) || {}, answer: daily_response.answer_for(section),
-        question: question, thread: thread
+        review: review, answer: daily_response.answer_for(section), question: question, thread: thread,
+        qualitative_feedback: qualitative_feedback_lines(daily_response, section, review)
       )))
 
     text_or_raise(result, subject: "follow-up answer")
@@ -432,10 +440,15 @@ class AiService
 
   def call(request)
     resp = post(request_body(request), request)
-    raise_for_status(resp) unless resp.success?
-    read_result(parse_provider_envelope(resp.body, provider: provider_name), request).merge(http_status: resp.status)
+    raise_for_status(resp, sensitive: request.sensitive?) unless resp.success?
+    parsed = parse_provider_envelope(resp.body, provider: provider_name, sensitive: request.sensitive?)
+    result = read_result(parsed, request)
+    result[:refusal] = "unspecified" if request.sensitive? && result[:refusal]
+    result.merge(http_status: resp.status)
   rescue Faraday::Error => e
-    raise (e.is_a?(Faraday::TimeoutError) ? ProviderError::TimeoutError : ProviderError::NetworkError), "Network error calling #{provider_name}: #{e.message}"
+    detail = ": #{e.message}" unless request.sensitive?
+    error = e.is_a?(Faraday::TimeoutError) ? ProviderError::TimeoutError : ProviderError::NetworkError
+    raise error, "Network error calling #{provider_name}#{detail}", cause: (e unless request.sensitive?)
   end
 
   def post(body, request)
@@ -460,7 +473,7 @@ class AiService
     raise NotImplementedError, "#{self.class} must implement #provider_name"
   end
 
-  def raise_for_status(_resp)
+  def raise_for_status(_resp, sensitive: false)
     raise NotImplementedError, "#{self.class} must implement #raise_for_status"
   end
 
@@ -522,6 +535,11 @@ class AiService
     ReviewPrompt.day_system(coach: coach, sections: sections)
   end
 
+  def qualitative_feedback_lines(response, section, review)
+    variant = ExerciseSection.find(section)&.grading_variant(response.section_data(section))
+    variant&.public_feedback(review, locale: :en)&.map { |label, text| "#{label}: #{text}" }
+  end
+
   def build_review_section_prompt(exercise, daily_response, section)
     ReviewPrompt.for_section(key: section, section: exercise.problem_set[section] || {}, answer: daily_response.answer_for(section),
                              answered: daily_response.answered?(section), rung: review_rung(exercise, daily_response, section),
@@ -545,11 +563,38 @@ class AiService
   ].freeze
 
   def grade_review(user, exercise, daily_response, section, context)
+    data = exercise.problem_set[section]
+    variant = ExerciseSection.for(section).grading_variant(data)
+    return grade_variant(variant, user, exercise, daily_response, section, context) if variant
+
     result = call_and_log(user, AiService.request_for("review_response",
       system: context, prompt: build_review_section_prompt(exercise, daily_response, section)
     ))
     parse_json_object(result[:text], subject: "#{section} review", log_raw: false)
       .except(ReviewProseVerdict::ORIGINAL_KEY, "rubric").merge("rubric" => ReviewedSectionResults::RUBRIC_VERSION)
+  end
+
+  def grade_variant(variant, user, exercise, response, section, context)
+    unless authorized_variant_grade?(user, exercise, response, section)
+      raise ProviderError::InvalidResponseError, "PR Review grading requires a current submitted review claim"
+    end
+
+    data = exercise.problem_set.fetch(section)
+    return variant.unavailable unless variant.gradable?(data, language: exercise.language)
+    return variant.skipped unless response.answered?(section)
+
+    request = AiService.request_for("review_response", system: context,
+      prompt: ReviewPrompt.for_variant(variant, key: section, section: data))
+    result = call_and_log(user, SensitiveRequest.new(**request.to_h))
+    variant.parse(parse_json_object(result[:text], subject: "#{section} review", log_raw: false), section: data)
+  rescue ExerciseSection::InvalidGrade => error
+    raise ProviderError::InvalidResponseError, error.message
+  end
+
+  def authorized_variant_grade?(user, exercise, response, section)
+    exercise.user_id == user.id && response.user_id == user.id && response.daily_exercise_id == exercise.id &&
+      response.submitted? && response.reviewing? && !response.section_reviewed?(section) && exercise.active_section_keys.include?(section) &&
+      DailyResponse.submitted.exists?(id: response.id, user_id: user.id, daily_exercise_id: exercise.id, reviewing_since: response.reviewing_since)
   end
 
   def assess_difficulty(user, exercise, sections:)
@@ -577,29 +622,42 @@ class AiService
     clean = text.to_s.gsub(/\A```(?:json)?\n?/, "").gsub(/\n?```\z/, "").strip
     JSON.parse(clean)
   rescue JSON::ParserError => e
-    raise ProviderError::InvalidResponseError, "Provider returned invalid JSON for the #{subject}" unless log_raw
+    raise ProviderError::InvalidResponseError, "Provider returned invalid JSON for the #{subject}", cause: nil unless log_raw
 
     log_raw_snippet("Invalid JSON from provider", text)
     raise ProviderError::InvalidResponseError, "Provider returned invalid JSON: #{e.message}"
   end
 
-  def parse_provider_envelope(body, provider:)
+  def parse_provider_envelope(body, provider:, sensitive: false)
     parsed = JSON.parse(body.to_s)
     return parsed if parsed.is_a?(Hash)
 
-    unreadable_envelope!(body, provider)
+    unreadable_envelope!(body, provider, sensitive: sensitive)
   rescue JSON::ParserError
-    unreadable_envelope!(body, provider)
+    unreadable_envelope!(body, provider, sensitive: sensitive)
   end
 
-  def unreadable_envelope!(body, provider)
+  def unreadable_envelope!(body, provider, sensitive: false)
     text = body.to_s
-    if text.lstrip.start_with?("{", "[", '"')
+    if sensitive || text.lstrip.start_with?("{", "[", '"')
       Rails.logger.error("Unreadable #{provider} response body: #{text.bytesize} bytes of cut-off JSON, withheld")
     else
       log_raw_snippet("Unreadable #{provider} response body", text)
     end
-    raise ProviderError::InvalidResponseError, "#{provider} returned an unreadable response"
+    raise ProviderError::InvalidResponseError, "#{provider} returned an unreadable response", cause: ($! unless sensitive)
+  end
+
+  def provider_http_error(response, error, sensitive:)
+    fallback = "#{provider_name} API error #{response.status}"
+    log_raw_snippet("#{fallback} body", response.body) unless sensitive
+    message = sensitive ? fallback : extract_provider_message(error, fallback: fallback)
+    ProviderError.new(message, http_status: response.status)
+  end
+
+  def safe_quota_id(quota_id, sensitive:)
+    return quota_id unless sensitive
+
+    "PerDay" if quota_id.to_s.match?(ProviderFailure::DAILY_QUOTA_PATTERN)
   end
 
   def extract_provider_message(error, fallback:)
@@ -688,8 +746,9 @@ class AiService
 
   def tagged(error) = error.tap { |e| e.provider = self.class.provider_key }
 
-  def unfinished_reply(usage, status)
-    Rails.logger.warn("#{provider_name} reply did not finish (status=#{status.inspect})")
+  def unfinished_reply(usage, status, sensitive: false)
+    shown_status = sensitive ? "withheld" : status.inspect
+    Rails.logger.warn("#{provider_name} reply did not finish (status=#{shown_status})")
     usage.merge(error: "#{provider_name} did not complete its response. Try again.")
   end
 

@@ -671,6 +671,57 @@ RSpec.describe DailyPlan do
     end
   end
 
+  describe "delivery of Authentic PR Review" do
+    let(:plan) { plan_for(code_review_mode: :application_code, code_review_files: :single) }
+    let(:rungs) { { "code_review" => "mid_level" } }
+
+    def choose_variant(candidate = plan, language: "ruby_rails", kind_rungs: rungs)
+      candidate.select_delivery_variant(language: language, kind_rungs: kind_rungs)
+    end
+
+    it "delegates delivery selection to the kinds included in the plan" do
+      pattern = ExerciseSection::Pattern
+      candidate = plan.with(selected_kinds: [ pattern ])
+      selected = candidate.with(scenario_flavor: :everyday)
+      expect(pattern).to receive(:select_delivery_variant).with(plan: candidate, language: "ruby_rails", rung: "junior")
+        .and_return(selected)
+
+      expect(choose_variant(candidate, kind_rungs: { "pattern" => "junior" })).to equal(selected)
+    end
+
+    it "can select either hidden case for an eligible generated day without changing its sections or notes" do
+      weights = { "ordinary" => 0.60, "acceptable" => 0.20, "flawed" => 0.20 }
+      %w[acceptable flawed].each do |target|
+        allow(WeightedRoll).to receive(:pick).with(weights).and_return(target)
+
+        variant = choose_variant
+        expect(variant).to have_attributes(code_review_mode: :pr_review, code_review_files: :multi, pr_review_target: target)
+        expect(variant.kinds).to eq(plan.kinds)
+        expect(variant.notes).to eq(plan.notes)
+        expect(choose_variant(variant)).to equal(variant)
+      end
+    end
+
+    it "leaves the original plan in place when the ordinary outcome is drawn" do
+      allow(WeightedRoll).to receive(:pick).with({ "ordinary" => 0.60, "acceptable" => 0.20, "flawed" => 0.20 }).and_return("ordinary")
+
+      expect(choose_variant).to equal(plan)
+    end
+
+    it "skips other languages, rungs, existing modes, curated sources and sets without Code Review" do
+      expect(WeightedRoll).not_to receive(:pick)
+
+      expect(choose_variant(language: "javascript")).to equal(plan)
+      %w[junior senior principal_engineer].each do |rung|
+        expect(choose_variant(kind_rungs: { "code_review" => rung })).to equal(plan)
+      end
+      [
+        plan.with(code_review_mode: :schema_review), plan.with(code_review_mode: :test_file), plan.with(code_review_mode: :bug_hunt),
+        plan.with(code_review_source: RealSource::APPLICATION_CODE.first), plan.with(selected_kinds: [ ExerciseSection::Pattern ])
+      ].each { |other| expect(choose_variant(other)).to equal(other) }
+    end
+  end
+
   describe "#code_review_source on the plan" do
     let(:user) { User.create!(email: "source@example.com") }
 

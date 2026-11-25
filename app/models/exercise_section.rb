@@ -1,5 +1,7 @@
 # Design notes: docs/code-notes/app/models/exercise_section.md
 class ExerciseSection
+  InvalidGrade = Class.new(StandardError)
+
   MAX_SCAFFOLD_LABELS       = 4
   MAX_SCAFFOLD_LABEL_LENGTH = 80
 
@@ -148,6 +150,8 @@ class ExerciseSection
       vocabulary
     end
 
+    def select_delivery_variant(plan:, language:, rung:) = plan
+
     def planning_host?(mode:) = true
 
     def concept_shown_before_submission?(_section) = true
@@ -256,6 +260,10 @@ class ExerciseSection
     def judge_task_for(_section) = judge_task
 
     def judge_guidance_for(_section) = judge_guidance
+
+    def presentation_key(_section) = nil
+
+    def grading_variant(_section) = nil
 
     def judge_variant(_section) = nil
 

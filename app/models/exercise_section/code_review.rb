@@ -78,6 +78,21 @@ class ExerciseSection::CodeReview < ExerciseSection
     PlantedKey::QuoteTally.new(verbatim: count, reference: 0, scenario: 0, unresolved: [])
   end
 
+  def self.select_delivery_variant(plan:, language:, rung:)
+    target = PrReview.select_target(mode: plan.code_review_mode, language: language, rung: rung, source: plan.code_review_source)
+    return plan unless target
+
+    plan.with(code_review_mode: PrReview::MODE, code_review_files: :multi, pr_review_target: target)
+  end
+
+  def self.presentation_key(section)
+    :pr_review if PrReview.section?(section)
+  end
+
+  def self.grading_variant(section)
+    PrReview::Grading if PrReview.section?(section)
+  end
+
   def self.judge_variant(section)
     PrReview::Judgment if PrReview.section?(section)
   end
@@ -109,8 +124,8 @@ class ExerciseSection::CodeReview < ExerciseSection
   def self.requirements_context(section)
     return unless PrReview.section?(section)
 
-    requirements = section[PrReview::REQUIREMENTS]
-    return unless requirements.is_a?(Array) && requirements.any?
+    requirements = PrReview.public_requirements(section)
+    return if requirements.empty?
 
     "Requirements:\n" + requirements.map.with_index(1) { |requirement, number| "#{number}. #{requirement}" }.join("\n")
   end
@@ -183,8 +198,10 @@ class ExerciseSection::CodeReview < ExerciseSection
                                 "where #{file_range.min} to #{file_range.max} files were asked for")
   end
 
+  def self.file_line_counts(files) = files.map { |file| shown_lines(file.code) }
+
   def self.reject_long_files!(shown)
-    counts = shown.map { |file| shown_lines(file.code) }
+    counts = file_line_counts(shown)
     longest = counts.max.to_i
     refuse!("file_too_long", "A code review file runs #{longest} lines, past #{MAX_FILE_LINES}") if longest > MAX_FILE_LINES
     return if counts.sum <= MAX_SNIPPET_LINES

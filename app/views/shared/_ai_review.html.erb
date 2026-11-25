@@ -4,8 +4,9 @@
 <% response.ai_review.each do |section, fb| %>
   <% next unless fb.is_a?(Hash) %>
   <% slot = section_keys.index(section)&.succ %>
+  <% section_name = review_section_name(response, section) %>
   <div class="review-block"<% if slot %> data-slot="<%= slot %>"<% end %>>
-    <h3><%= section.humanize %><% if (badge = review_badge(response, section)) %><span class="<%= badge.graded? ? "review-rating" : "review-ungraded" %>"><%= badge.text %></span><% end %></h3>
+    <h3><%= section_name %><% if (badge = review_badge(response, section)) %><span class="<%= badge.graded? ? "review-rating" : "review-ungraded" %>"><%= badge.text %></span><% end %></h3>
     <%# Context under the grade badge, never a badge of its own: a second pill would read as a second score. %>
     <% if (difficulty = response.difficulty_for(section)) %>
       <p class="difficulty-note">
@@ -23,7 +24,10 @@
         <p><%= glossary_wrap_prose(takeaway) %></p>
       </div>
       <details class="review review-full">
-        <summary aria-label="<%= t("review.full_review_for", section: section.humanize) %>"><%= t("review.full_review") %></summary>
+        <summary aria-label="<%= t("review.full_review_for", section: section_name) %>"><%= t("review.full_review") %></summary>
+    <% end %>
+    <% review_qualitative_feedback(response, section, fb).each do |label, text| %>
+      <p class="review-item"><strong><%= label %></strong> <%= glossary_wrap(text) %></p>
     <% end %>
     <% DailyResponse::AI_REVIEW_FIELDS.each do |key, field| %>
       <% if field[:list] %>
