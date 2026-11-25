@@ -43,11 +43,13 @@ reviews and every round of GitHub review.
   could lose or corrupt data, is a security problem, breaks a rule under
   "Rules that block review", or defeats the Purpose. Every other finding is
   answered from the PR description, or handled as an out-of-scope finding.
-- **Stop and ask the person who asked for the work** when a theme holds three
-  or more findings, when a fix would touch a file outside the Scope, when a
-  condition would gain a third branch added in review, or when a finding
-  depends on stored data that may never occur. For that last case, propose
-  a read-only production query instead of new handling.
+- **Stop and ask the owner,** the repository's one developer, who directs
+  the agents doing the work. Ask before anything changes when a finding would
+  change the design, when a theme holds three or more findings, when a fix
+  would touch a file outside the Scope, when a condition would gain a third
+  branch added in review, or when a finding depends on stored data that may
+  never occur. For that last case, propose a read-only production query
+  instead of new handling.
 - **Three rounds at most.** Stop requesting reviews after the third round,
   or sooner when no open finding is in the fix-now class. The rest become
   GitHub issues, which counts as resolving them.
@@ -59,9 +61,8 @@ Hand a finding to another fresh agent only when the session disputes it, or
 when the change is high-risk: it touches concurrency, security, a migration
 or data integrity. That agent checks the finding against the code and reports
 it as confirmed, with the file and line or a failing spec that shows it, or
-as rejected, with the reason. Fix only confirmed findings, test-first. When a
-finding would change the design, the person who asked for the work decides
-before anything changes. Out-of-scope findings become GitHub issues. Post a
+as rejected, with the reason. Fix only confirmed findings, test-first.
+Out-of-scope findings become GitHub issues. Post a
 PR comment listing what was fixed, what was rejected and why, and which
 issues were opened. Reviewers can run specs, and two runs sharing the test
 database fail falsely, so don't run the suite while a review agent is
@@ -86,7 +87,7 @@ Copilot alike.
   high-risk changes Git Workflow names.
 - **Required behavior and regressions come first.** Record an optional
   refactor or an unrelated discovery separately, as a GitHub issue. It joins
-  the batch in progress only when the person who asked for the work says so.
+  the batch in progress only when the owner says so.
 - **Batch related corrections before pushing.** One push carries the whole
   batch, so CI runs the full suites once, on the final commit. Never skip a
   hook or a merge gate.
