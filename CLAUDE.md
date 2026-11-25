@@ -28,6 +28,30 @@ already decided it is right, so it doesn't review its own work.
   follows the repository's copy of the plugin's review workflow, pinned at
   3.1.0 under `.claude/skills/layered-review/`.
 
+**Review feedback is triaged before it is fixed.** This covers both agent
+reviews and every round of GitHub review.
+
+- **The PR states what it is for.** Before the first review, the PR
+  description has a Purpose of one or two sentences, a Scope naming the
+  files and behaviors it changes, and Non-goals. A choice a reviewer is
+  likely to question is recorded there with its reason.
+- **Triage comes first.** When findings arrive, run the `review-triage`
+  agent (`.claude/agents/review-triage.md`) before changing code. It groups
+  every open finding into themes, names the one rule that would settle each
+  theme, and gives each finding a disposition.
+- **What gets fixed in this PR.** A confirmed finding inside the Scope that
+  could lose or corrupt data, is a security problem, breaks a rule under
+  "Rules that block review", or defeats the Purpose. Every other finding is
+  answered from the PR description, or handled as an out-of-scope finding.
+- **Stop and ask the person who asked for the work** when a theme holds three
+  or more findings, when a fix would touch a file outside the Scope, when a
+  condition would gain a third branch added in review, or when a finding
+  depends on stored data that may never occur. For that last case, propose
+  a read-only production query instead of new handling.
+- **Three rounds at most.** Stop requesting reviews after the third round,
+  or sooner when no open finding is in the fix-now class. The rest become
+  GitHub issues, which counts as resolving them.
+
 **Findings are checked before any code changes.** A finding counts as
 confirmed once a focused failing spec reproduces it, or, for a finding about
 documentation or configuration, once the file and line it cites show it.
