@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_20_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -93,8 +93,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
     t.bigint "user_id", null: false
     t.jsonb "plan_notes", default: {}, null: false
     t.datetime "opened_at"
-    t.index ["user_id", "date"], name: "index_daily_exercises_on_user_id_and_date", unique: true
+    t.integer "slot", default: 1, null: false
+    t.index ["user_id", "date", "slot"], name: "index_daily_exercises_on_user_id_and_date_and_slot", unique: true
     t.index ["user_id"], name: "index_daily_exercises_on_user_id"
+    t.check_constraint "slot >= 1 AND slot <= 2", name: "daily_exercises_slot_range"
   end
 
   create_table "daily_kind_swaps", force: :cascade do |t|
@@ -126,9 +128,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
     t.bigint "user_id", null: false
     t.string "review_provider"
     t.jsonb "mastery_application", default: {}, null: false
+    t.integer "slot", default: 1, null: false
     t.index ["daily_exercise_id"], name: "index_daily_responses_on_daily_exercise_id", unique: true
-    t.index ["user_id", "date"], name: "index_daily_responses_on_user_id_and_date", unique: true
+    t.index ["user_id", "date", "slot"], name: "index_daily_responses_on_user_id_and_date_and_slot", unique: true
     t.index ["user_id"], name: "index_daily_responses_on_user_id"
+    t.check_constraint "slot >= 1 AND slot <= 2", name: "daily_responses_slot_range"
   end
 
   create_table "duck_threads", force: :cascade do |t|
