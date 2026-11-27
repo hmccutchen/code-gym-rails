@@ -1,6 +1,14 @@
 class PracticeSchedule
   Selection = Data.define(:kinds, :rotation, :assignments, :notes, :continuation)
 
+  def self.single_turn(**options) = SingleSlot.plan(**options)
+
+  def self.single_plan(context:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false, turn: nil)
+    options = { context: context, daily: daily, preferences: preferences, evidence: evidence, hosts: hosts,
+      rotation_history: rotation_history, due: due, drills: drills, replacing: replacing }
+    plan(**options, count: 1, setting: nil, turn: turn || single_turn(**options))
+  end
+
   def self.plan(context:, count:, setting:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false,
                 regular: daily.first(DailyKinds::COUNT), turn: nil)
     turn ||= select_turn(context: context, count: count, setting: setting, daily: daily, regular: regular, preferences: preferences,

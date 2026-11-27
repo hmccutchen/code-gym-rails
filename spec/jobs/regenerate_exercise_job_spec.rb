@@ -529,17 +529,17 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     expect(fake_service).to have_received(:generate_judged_exercise).with(user, hash_including(language: "javascript"))
   end
 
-  it "records a section the provider returned unusable as dropped" do
+  it "records no unrequested dropped section on a successful single-exercise replacement" do
     exercise = claimed_exercise
     stub_provider({ "code_review" => { "question" => "new" } })
     allow(AiService.for(user)).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
-      with_practice_context(judged_set({ "code_review" => { "question" => "new" } }, dropped: [ "design_comparison" ]),
+      with_practice_context(judged_set({ "code_review" => { "question" => "new" } }),
         user: caller, language: language, schedule_context: schedule_context)
     end
 
     described_class.new.perform(user_id: user.id)
 
-    expect(exercise.reload.dropped_sections).to eq([ "design_comparison" ])
+    expect(exercise.reload.dropped_sections).to eq([])
   end
 
   it "preserves the existing set and the daily allowance when the provider fails" do
@@ -643,7 +643,11 @@ RSpec.describe RegenerateExerciseJob, type: :job do
     exercise = claimed_exercise
     daily_response = DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                                            answers: { "code_review" => "important work" })
-    stub_provider(nil)
+    stub_provider({ "code_review" => { "question" => "new" } })
+    allow_any_instance_of(DailyExercise).to receive(:update!).and_wrap_original do |method, **attributes|
+      attributes[:problem_set] = nil if attributes.key?(:problem_set)
+      method.call(**attributes)
+    end
 
     described_class.new.perform(user_id: user.id)
 

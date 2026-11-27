@@ -36,7 +36,7 @@ class KindPreferences
   def all_excluded?(kinds) = kinds.all? { |kind| excluded?(kind) }
 
   def offered(daily:, rotates: true)
-    rotating = rotates ? ExerciseSection.optional_slots(daily: daily).values.flat_map { |kinds| eligible(kinds) } : []
+    rotating = rotates ? ExerciseSection.optional_slots(daily: daily).values.flatten.reject { |kind| excluded?(kind) } : []
 
     ExerciseSection.pickable(daily: daily) & (daily + rotating)
   end

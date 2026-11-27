@@ -15,7 +15,7 @@ RSpec.describe "Answers through a lost connection", type: :system do
   end
 
   def open_dashboard
-    visit_with_todays_set(user)
+    visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
     expect(page).to have_content(/Code Review/i)
   end
 

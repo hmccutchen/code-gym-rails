@@ -20,10 +20,10 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
 
   def await(queue) = Timeout.timeout(10) { queue.pop }
 
-  def judged(context)
-    selected = PracticeSchedule.plan(context: context[:note], count: DailyKinds::COUNT, setting: nil,
-      daily: DailyKinds::DEFAULT, preferences: KindPreferences.none, evidence: context[:evidence],
-      hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [])
+  def judged(context, single: false)
+    options = { context: context[:note], daily: DailyKinds::DEFAULT, preferences: KindPreferences.none, evidence: context[:evidence],
+      hosts: DayHosts.new("ruby_rails", mode: :application_code), rotation_history: [], due: [], drills: [] }
+    selected = single ? PracticeSchedule.single_plan(**options) : PracticeSchedule.plan(**options, count: DailyKinds::COUNT, setting: nil)
     AiService::JudgedSet.new(problem_set: selected.kinds.to_h { |kind| [ kind.key, { "question" => "q" } ] },
       dropped_sections: [], outcomes: {}, schedule_context: context,
       plan_notes: { "daily_kinds" => DailyKinds::DEFAULT.map(&:key), "practice_schedule" => selected.notes })
@@ -132,14 +132,14 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
     worker&.join
   end
 
-  [ 0, 1 ].each do |offset|
-    it "commits one successor when concurrent captures target dates #{offset} day apart" do
+  [ [ 0, false ], [ 1, false ], [ 0, true ], [ 1, true ] ].each do |offset, single|
+    it "commits one successor for single=#{single} when concurrent captures target dates #{offset} day apart" do
       ready, release = Queue.new, Queue.new
       threads = [ 0, offset ].map do |day|
         connected do
           caller = User.find(user.id)
           context = PracticeGeneration.capture(caller, date: Date.current + day)
-          draft = judged(context)
+          draft = judged(context, single: single)
           ready << true
           await(release)
           PracticeGeneration.commit_new(caller, context: context, judged: draft, language: "ruby_rails", drafted_by: FakeService.new("fake-key"))
@@ -149,7 +149,14 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
       threads.size.times { release << true }
       expect(threads.map { |thread| thread.value.status }).to match_array([ :saved, offset.zero? ? :duplicate : :superseded ])
       expect(user.daily_exercises.count).to eq(1)
-      expect(user.daily_exercises.sole.practice_schedule["sequence"]).to eq(1)
+      exercise = user.daily_exercises.sole
+      expect(exercise.practice_schedule["sequence"]).to eq(1)
+      if single
+        expect(exercise.practice_schedule["version"]).to eq(2)
+        expect(exercise.section_order.size).to eq(1)
+        expect(exercise.problem_set.keys).to eq(exercise.section_order)
+        expect(exercise.practice_schedule.dig("continuation", "kind_service")).to eq(exercise.section_order.sole => 1)
+      end
     ensure
       threads&.size&.times { release << true }
       threads&.each(&:join)

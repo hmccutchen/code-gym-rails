@@ -61,7 +61,7 @@ class DailyKindSwap
 
   def held_places = current.first([ DailyKinds.for(@user).size, DailyKinds::COUNT ].max)
 
-  # A hidden extra that would clash with the swapped-in kind is dropped; the setting asks for a new one when raised.
+  # A stored historical extra that would clash with the swapped-in kind is dropped.
   def proposed
     kept = held_places.dup.tap { |kinds| kinds[@place] = @kind }
     kept + current.drop(kept.size).reject { |kind| DailyKinds.conflict(kind, kept) }

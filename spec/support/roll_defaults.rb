@@ -9,4 +9,9 @@ RSpec.configure do |config|
       original.call(DailyPlan::CODE_REVIEW_MODE_WEIGHTS)
     end
   end
+  # Browser lifecycle specs keep the ordinary initial tie stable; every other candidate group still uses the planner's roll.
+  config.before(:each, type: :system) do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(DailyKinds::DEFAULT.first)
+  end
 end

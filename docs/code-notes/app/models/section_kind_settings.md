@@ -59,3 +59,11 @@ kind's stored entries drop out on the next save that posts that field.
 `#weight_problems` and `#exclusion_problems` check only the entries a save
 adds or changes against the pair's rotatable kinds; a kept entry was valid when it
 was stored and must not refuse an unrelated save.
+
+## Historical counts
+
+The current form and its validation use the normalized regular pair regardless
+of the retained `daily_section_count`. Former third and fourth fixed choices
+now have the ordinary optional controls. Their weights and exclusions can be
+changed or cleared; `keep_unrendered` retains only controls the current pair
+actually hides. Historical values remain stored for interpreting old sets.

@@ -81,21 +81,17 @@ says what a deviation from one requires.
   key in the profiles that use it.
 - **Registry for section kinds** — `ExerciseSection` and its subclasses answer
   every per-kind question (which are thirds, which scaffold, what the prompt
-  says). Adding a kind is adding a class. Which kinds are daily is a per-user
-  value (`DailyKinds`), so slot questions go through
+  says). Adding a kind is adding a class. `DailyKinds` provides per-user kind
+  preferences and recorded kinds for historical layouts. Layout queries use
   `ExerciseSection.layout(daily:)`.
-- **Pure decision objects** — `DailyPlan` decides the day's shape before any
-  provider is contacted; `ProblemSetIngest` normalizes provider output and
-  writes nothing, returning a `Result` instead. `ProblemSetIngest` is pure, so
-  its specs need no database; `DailyPlan` composes two pure collaborators of
-  its own — `CompetencyGate` (Automatic count, completion and recovery) and `SectionRotation` (which
-  kind fills each) — whose specs need none, even though `DailyPlan` itself
-  reads concept-mastery history to decide reinforcement and retention. The
-  same holds for `DaySize` (the fixed setting or gate count),
-  `CoverageException` (whether a two-section day gains a
-  section), `SharedConcept` (which concept both daily sections take) and
-  `DayHosts` (which kinds can tag a concept today). Keep the collaborators
-  that way.
+- **Pure decision objects** — `DailyPlan` reads history and decides the day's
+  shape before any provider call. It passes value inputs to
+  `PracticeSchedule::SingleSlot`, `PracticeSchedule::Assignments` and
+  `DayHosts` for selection, assignment and concept eligibility.
+  `ProblemSetIngest` normalizes provider output and returns a `Result`.
+  These collaborators run without a database or persistence side effects.
+  The same holds for the historical `CompetencyGate`, `SectionRotation`
+  and `CoverageException` calculations.
 - **Single authority per fact** — `DailyExercise#active_section_keys` for how
   many sections a day has, `ConceptVocabulary` for the concept lists and which
   of them a kind may be asked for, `ConceptBucket` for which vocabulary a

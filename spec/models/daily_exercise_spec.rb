@@ -190,11 +190,10 @@ RSpec.describe DailyExercise, type: :model do
     end
 
     it "keeps the planned pair and its rotated third, in order, after a reload and after the user's pair changes" do
-      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: nil, design_comparison: nil)
-      plan = DailyPlan.for(pair_user, language: "ruby_rails")
-      set  = plan.kinds.to_h { |kind| [ kind.key, { "question" => "?" } ] }
+      set = %w[architecture code_review challenge].index_with { { "question" => "?" } }
       exercise = DailyExercise.create!(user: pair_user, date: Date.current, generated_at: Time.current,
-                                       problem_set: set, plan_notes: plan.notes)
+        problem_set: set, section_order: nil,
+        plan_notes: { "daily_kinds" => %w[architecture code_review], "size" => 3, "size_reason" => "gate" })
 
       expect(exercise.reload.active_section_keys).to eq(%w[architecture code_review challenge])
 

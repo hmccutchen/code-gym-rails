@@ -23,7 +23,7 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
     travel_to(a_weekday) do
       user = create_fake_provider_user
       resize(390)
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
 
       expect(page.evaluate_script("document.documentElement.scrollWidth")).to eq(390)
       heights = page.evaluate_script(<<~JS)
@@ -66,8 +66,7 @@ RSpec.describe "Answering a design comparison on a phone", type: :system do
   it "keeps a reason saved without a pick through a reload and another section's autosave" do
     travel_to(a_weekday) do
       user = create_fake_provider_user
-      perform_enqueued_jobs { GenerateDailyExercisesJob.perform_now(user_id: user.id) }
-      exercise = DailyExercise.find_by!(user: user, date: Date.current)
+      exercise = create_existing_set(user)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: { "design_comparison" => "\n#{reason}" })
       visit_as(user)

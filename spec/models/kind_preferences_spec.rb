@@ -93,14 +93,20 @@ RSpec.describe KindPreferences do
   end
 
   describe "#offered" do
-    it "offers a slot whose every kind is excluded, as rotation still fills it" do
+    it "keeps explicitly excluded optional kinds out even when their old slot would be empty" do
       preferences = described_class.new(weights: {}, excluded: %w[architecture security_review parsons_problem])
       daily = [ ExerciseSection::Challenge, ExerciseSection::CodeReview ]
 
       expect(preferences.offered(daily: daily))
-        .to include(ExerciseSection::Architecture, ExerciseSection::SecurityReview, ExerciseSection::ParsonsProblem)
+        .not_to include(ExerciseSection::Architecture, ExerciseSection::SecurityReview, ExerciseSection::ParsonsProblem)
     end
 
+
+    it "does not revive an excluded singleton optional kind" do
+      preferences = described_class.new(weights: {}, excluded: %w[pattern])
+
+      expect(preferences.offered(daily: DailyKinds::DEFAULT)).not_to include(ExerciseSection::Pattern)
+    end
 
     it "keeps a daily kind the user excluded and drops an excluded optional kind" do
       preferences = described_class.new(weights: {}, excluded: %w[architecture challenge])
@@ -115,10 +121,10 @@ RSpec.describe KindPreferences do
         .to eq([ ExerciseSection::CodeReview ])
     end
 
-    it "reads the user's daily kinds and whether their setting rotates" do
+    it "uses regular preferences regardless of the historical daily count" do
       user = User.new(daily_section_kinds: [], daily_section_count: 1, section_kind_weights: {}, excluded_section_kinds: [])
 
-      expect(described_class.offered_to(user)).to eq([ ExerciseSection::CodeReview ])
+      expect(described_class.offered_to(user)).to eq(ExerciseSection.all)
       expect(described_class.offered_to(User.new(daily_section_kinds: [], section_kind_weights: {}, excluded_section_kinds: [])))
         .to eq(ExerciseSection.all)
     end

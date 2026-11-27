@@ -1,5 +1,12 @@
 # Daily sections setting
 
+## Historical behavior
+
+Single-exercise practice retires this control from Setup. New sessions always
+start with one exercise. Stored counts and the validated profile boundary
+remain for compatibility; they no longer size new sessions. The following
+records the earlier behavior for historical data and clients.
+
 `User#daily_section_count` is Automatic (nil)
 or a fixed count in `User::DAILY_SECTION_COUNTS`, which runs from
 `DailyKinds::FEWEST` (1) to `ExerciseSection::MAX_SECTIONS`. Setup shows it as a

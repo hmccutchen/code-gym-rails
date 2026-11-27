@@ -7,14 +7,13 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     weekday = a_weekday
 
     travel_to(weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       # Regex: `.section-label` is uppercased by CSS and Playwright matches the rendered text.
       expect(page).to have_content(/Code Review/i)
 
       expect(page).to have_button("Submit answers", disabled: false)
       expect_blocked("Answer at least one section to finish up.")
 
-      # Answer every section the page holds, since the count varies with the plan.
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
 
@@ -41,7 +40,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       fill_in_answer("code_review", "An answer long enough to count, so the day has a response to start over.")
       wait_for_answers_settled
       visit root_path
@@ -75,7 +74,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "A substantive answer that will stay.")
       rate_section("code_review")
@@ -101,7 +100,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     weekday = a_weekday
 
     travel_to(weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
 
       expect_blocked("Answer at least one section to finish up.")
@@ -131,7 +130,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       user = create_fake_provider_user
 
       travel_to(a_weekday) do
-        visit_with_todays_set(user)
+        visit_with_existing_set(user)
         expect(page).to have_content(/Code Review/i)
         original = "The earlier autosaved answer."
         final = "The final edit typed immediately before submission."
@@ -185,7 +184,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "The answer that survives the lost submission acknowledgement.")
       rate_section("code_review")
@@ -219,7 +218,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "The answer that will be submitted before navigation fails.")
       rate_section("code_review")
@@ -246,7 +245,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_content(/Code Review/i)
       rate_section("code_review")
       expect_blocked("Answer at least one section to finish up.")
@@ -264,7 +263,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       page.execute_script(<<~JS)
         const originalSetTimeout = window.setTimeout;
@@ -291,7 +290,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       page.execute_script(<<~JS)
         const originalFetch = window.fetch;
@@ -322,7 +321,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "An answer long enough for the server to count it.")
       leave_field
@@ -343,7 +342,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       hold_response_requests
       fill_in_answer("code_review", "The substantive answer to keep.")
@@ -373,7 +372,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_content(/Code Review/i)
       fill_in_answer("code_review", "The substantive answer that gets submitted.")
       rate_section("code_review")

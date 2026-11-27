@@ -28,19 +28,19 @@ RSpec.describe DailyKinds do
         .to eq(kinds("code_review", "design_comparison"))
     end
 
-    it "holds the first place alone under a setting of 1" do
+    it "keeps both recommendation preferences under a historical setting of 1" do
       user = User.new(daily_section_kinds: %w[design_comparison code_review], daily_section_count: 1)
 
-      expect(described_class.for(user)).to eq(kinds("design_comparison"))
+      expect(described_class.for(user)).to eq(kinds("design_comparison", "code_review"))
     end
 
-    it "holds a chosen extra section for each place a larger setting adds" do
+    it "does not turn historical chosen extras into mandatory daily kinds" do
       stored = %w[code_review design_comparison pattern challenge]
 
       expect(described_class.for(User.new(daily_section_kinds: stored, daily_section_count: 3)))
-        .to eq(kinds("code_review", "design_comparison", "pattern"))
+        .to eq(kinds("code_review", "design_comparison"))
       expect(described_class.for(User.new(daily_section_kinds: stored, daily_section_count: 4)))
-        .to eq(kinds(*stored))
+        .to eq(kinds("code_review", "design_comparison"))
     end
 
     it "holds only the places stored when a larger setting has no extra sections chosen, so rotation fills the rest" do
@@ -54,11 +54,20 @@ RSpec.describe DailyKinds do
       expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 3))).to be(true)
     end
 
-    it "is false under a fixed count whose every place holds a daily kind" do
-      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 1))).to be(false)
-      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 2))).to be(false)
+    it "allows variety despite historical fixed counts" do
+      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 1))).to be(true)
+      expect(described_class.rotates?(User.new(daily_section_kinds: [], daily_section_count: 2))).to be(true)
       expect(described_class.rotates?(User.new(daily_section_kinds: %w[code_review design_comparison pattern],
-                                               daily_section_count: 3))).to be(false)
+                                               daily_section_count: 3))).to be(true)
+    end
+  end
+
+  describe ".held" do
+    it "retains historical fixed-layout decoding" do
+      stored = %w[code_review design_comparison pattern challenge]
+      expect(described_class.held(stored, 1)).to eq(kinds("code_review"))
+      expect(described_class.held(stored, 4)).to eq(kinds(*stored))
+      expect(described_class.held(stored, nil)).to eq(described_class::DEFAULT)
     end
   end
 

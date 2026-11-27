@@ -8,7 +8,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
   # Reduced motion: a click on a sliding sheet can press one row and release on another.
   before do
     page.driver.with_playwright_page { |pw| pw.emulate_media(reducedMotion: "reduce") }
-    visit_with_todays_set(user)
+    visit_with_existing_set(user)
   end
 
   def panel(place) = find("#daily-kind-swap-panel-#{place}")
@@ -57,7 +57,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(find("#daily-kind-0-code_review")).to be_checked
     expect(page).to have_css("label[data-kind='code_review'] .daily-kind-badge-now", text: "Now")
     expect(find("#daily-kind-0-design_comparison")).to be_disabled
-    expect(page).to have_css("label[data-kind='design_comparison'] .daily-kind-badge", text: "Already daily")
+    expect(page).to have_css("label[data-kind='design_comparison'] .daily-kind-badge", text: "Already regular")
     expect(page).to have_css("#daily-kind-0-design_comparison-short", text: SectionKindGuide.for("design_comparison")[:short])
     expect(page).to have_css(sheet(0), text: I18n.t("daily_kinds.picker.next_set"))
     expect(page).to have_css("#daily-kind-0-title", text: I18n.t("daily_kinds.picker.title"))
@@ -112,7 +112,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
 
     finish_saved(0)
     expect(trigger_focused?).to be(true)
-    expect(panel(0)).to have_css(".daily-kind-next", text: "Your next set uses Coding Challenge here.")
+    expect(panel(0)).to have_css(".daily-kind-next", text: "Coding Challenge is now one of your regular preferences.")
     open_sheet(1)
     expect(find("#daily-kind-1-challenge")).to be_disabled
   end
@@ -837,7 +837,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     confirm_swap(1, "pattern")
     finish_saved(1)
     expect(panel(0)).to have_no_css(".daily-kind-hint")
-    expect(panel(1)).to have_css(".daily-kind-next", text: "Your next set uses Pattern of the Month here.")
+    expect(panel(1)).to have_css(".daily-kind-next", text: "Pattern of the Month is now one of your regular preferences.")
   end
 
   def card_reply(place) = ".daily-kind-swap:has(#daily-kind-swap-panel-#{place}) .daily-kind-reply"
@@ -961,7 +961,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     names = ->(name) { page.driver.with_playwright_page { |pw| pw.get_by_role("radio", name: name, exact: true).count } }
 
     expect(names.("Code Review Now")).to eq(1)
-    expect(names.("Design Comparison Already daily")).to eq(1)
+    expect(names.("Design Comparison Already regular")).to eq(1)
     expect(names.("Coding Challenge")).to eq(1)
     expect(find("#daily-kind-0-challenge")["aria-describedby"].split).to include("daily-kind-0-challenge-short")
 

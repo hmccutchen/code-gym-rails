@@ -1,7 +1,7 @@
 # app/models/daily_kind_swap/picker.rb
 
 What one daily card's swap control shows: the current kind, one option per
-kind with its state, note and consequences, the "next set" line, the
+kind with its state, note and consequences, the future-preferences line, the
 first-time hint, and the version a save must post.
 
 ## Cards are matched by membership
@@ -11,28 +11,27 @@ first-time hint, and the version a save must post.
 by position would move a control onto a rotating card when the judge drops a
 daily section, so a dropped daily section simply has no control. The place's
 kind is then read from the user's current pair, since a swap made after the
-set was planned changes the next set and not this one.
+set was planned changes future recommendations and not this set.
 
 ## The card's kind and the stored kind
 
-A swap changes the next set, so after one the card on screen (the row's
+A swap changes future preferences, so after one the card on screen (the row's
 recorded kind) and the place's stored kind differ. The trigger's label names
 the card ("Swap Code Review for another kind"), and a line under the title
-row says what the next set uses there (`next_kind_line`, shown unless
+row says which regular preference is now stored (`next_kind_line`, shown unless
 `card_shows_current?`).
 
 ## Badges
 
 `marks_for(kind, refusal)` gives each option its badges, in order:
 
-- the place's stored kind gets "Now" when the card shows it, and "In your
-  next set" when a swap has already changed this place;
+- the place's stored kind gets "Now" when the card shows it, and "Regular preference" when a swap has already changed this place;
 - the card's own kind gets "In today's set" when it is not the stored kind;
-- the other daily kind gets "Already daily", from its `already_daily`
+- the other daily kind gets "Already regular", from its `already_daily`
   refusal.
 
 An option can carry two badges: after swaps that move the card's kind to the
-other place, that kind is both in today's set here and already daily there.
+other place, that kind is both in today's set here and already a regular preference there.
 Section 7 of the spec lists both badges, and #421 showed both facts, so
 neither is dropped. `accent_mark?` is true only for the "Now" badge, the one
 the view draws in the accent colour.
@@ -51,7 +50,7 @@ refusal reason shows up here with its message and no code change.
 When asking about the place's own kind is refused for anything but
 `unchanged`, the refusal is about the account rather than a choice. Today
 that is `trial_ended`. The picker then offers no options, shows the reason in
-place of the "next set" line, and drops the hint, since the hint invites a
+place of the future-preferences line, and drops the hint, since the hint invites a
 swap the account can't make.
 
 ## The hint

@@ -4,15 +4,13 @@ class SectionKindSettings
 
   def self.for(user)
     new(**FIELDS.index_with { |field| user.public_send(field) },
-        stored: FIELDS.index_with { |field| user.attribute_in_database(field.to_s) }, section_count: user.daily_section_count)
+        stored: FIELDS.index_with { |field| user.attribute_in_database(field.to_s) })
   end
 
-  # section_count is the Daily sections setting, which decides how many daily places Setup renders; it is not a field here.
-  def initialize(stored: {}, section_count: nil, **values)
+  def initialize(stored: {}, **values)
     values.assert_valid_keys(*FIELDS)
     @values = values
     @stored = stored
-    @section_count = section_count
   end
 
   def changed?(*fields) = (fields.presence || FIELDS).any? { |field| @values[field] != @stored[field] }
@@ -45,7 +43,7 @@ class SectionKindSettings
     attrs
   end
 
-  def daily = DailyKinds.held(@values[:daily_section_kinds], @section_count)
+  def daily = pair
 
   def pair = DailyKinds.pair_of(@values[:daily_section_kinds])
 

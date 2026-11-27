@@ -11,12 +11,11 @@ RSpec.describe "Dashboard on-demand generation", type: :system do
         visit_as(user)
       end
 
-      # Waits on the page's own poll to reload; regex since CSS uppercases `.section-label` in the rendered text.
-      expect(page).to have_content(/Code Review/i)
+      expect(page).to have_css("details[data-section-fold]", count: 1)
 
-      # The judged path keeps only the kinds the plan chose, so which third and fourth render depends on the plan.
       exercise = DailyExercise.find_by!(user: user, date: Date.current)
-      expect(exercise.active_section_keys.size).to be >= 2
+      expect(exercise.active_section_keys.size).to eq(1)
+      expect(exercise.section_order).to eq(exercise.active_section_keys)
       exercise.active_section_keys.each do |key|
         expect(page).to have_content(/#{Regexp.escape(I18n.t("sections.#{key}.name"))}/i)
       end

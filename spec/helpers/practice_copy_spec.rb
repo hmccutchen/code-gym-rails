@@ -20,9 +20,9 @@ RSpec.describe ApplicationHelper, type: :helper do
   it "shows active copy for an untouched user under the source-controlled default" do
     expect(helper.practice_copy("exercise_mix.intro")).to eq(I18n.t("protected_practice.exercise_mix.intro"))
     expect(helper.practice_copy("learn.drill.offer")).to eq(I18n.t("protected_practice.learn.drill.offer"))
-    expect(helper.practice_copy("exercise_mix.exclude_body_weak")).to include("equal shares", "initial order", "do not change those shares")
+    expect(helper.practice_copy("exercise_mix.exclude_body_weak")).to include("similar practice needs and recent use", "does not guarantee")
     expect(helper.practice_copy("exercise_mix.exclude_body_frequency")).to include(
-      "three- or four-section", "places that still rotate", "not seen for a long time", "Fixed chosen sections stay chosen")
+      "Skipping removes an optional kind", "regular sections remain eligible")
   end
 
   it "shows explicit unavailable copy and safely logs a persisted invalid historical receipt" do
@@ -44,7 +44,7 @@ RSpec.describe ApplicationHelper, type: :helper do
     user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", practice_requests: {
       "pattern" => { "mode" => "normal_retry", "source_response_id" => 1, "requested_at" => Time.current.utc.iso8601(6) }
     })
-    expect(helper.practice_copy("exercise_mix.intro")).to include("two-section", "pause")
+    expect(helper.practice_copy("exercise_mix.intro")).to include("one exercise", "regular sections guide recommendations")
     expect(helper.practice_copy("learn.drill.offer")).to include("does not add a section or promise")
   end
 end

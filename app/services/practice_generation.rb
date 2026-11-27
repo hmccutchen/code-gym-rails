@@ -13,7 +13,7 @@ class PracticeGeneration
         predecessor: predecessor, note: note, replacing_id: replacing&.id,
         settings: fresh.attributes.slice(*SETTINGS), difficulty: KindDifficulty.for(fresh),
         kind_rungs: fresh.kind_rungs, skill_level: fresh.skill_level,
-        evidence: active ? PracticeEvidence.for(fresh, before: date, kinds: DailyKinds.pair(fresh).map(&:key),
+        evidence: active ? PracticeEvidence.for(fresh, before: date, kinds: KindPreferences.offered_to(fresh).map(&:key),
           initial_ready: predecessor.fetch("initial_ready", false)) : nil }
       freeze_context(context)
     end
@@ -67,7 +67,6 @@ class PracticeGeneration
 
         response&.destroy!
         exercise.forget_learner_note!
-        exercise.section_order = nil if DailyExercise.section_order_available?
         exercise.update!(**content, plan_notes: replacement_notes(exercise), generated_at: Time.current,
           regenerated_at: Time.current, regenerating_since: nil)
         record_judge_solves(exercise)
@@ -91,8 +90,18 @@ class PracticeGeneration
   end
 
   def content
-    PracticeSchedule::Note.decode(@judged.plan_notes.fetch("practice_schedule")) if @context.fetch(:active)
-    { problem_set: @judged.problem_set, dropped_sections: @judged.dropped_sections, plan_notes: @judged.plan_notes }
+    note = PracticeSchedule::Note.decode(@judged.plan_notes.fetch("practice_schedule")) if @context.fetch(:active)
+    { problem_set: @judged.problem_set, dropped_sections: @judged.dropped_sections,
+      plan_notes: @judged.plan_notes, section_order: section_order(note) }
+  end
+
+  def section_order(note)
+    return ExerciseSection.resolved_keys(@judged.problem_set, daily: DailyKinds.recorded(@judged.plan_notes)) unless note&.fetch("version") == 2
+
+    selected = note.fetch("selected_kinds")
+    raise ArgumentError, "Generated sections do not match the selected exercise" unless selected.one? && @judged.problem_set.keys.sort == selected.sort
+
+    selected
   end
 
   def record_judge_solves(exercise)
@@ -110,6 +119,8 @@ class PracticeGeneration
     return notes.except("practice_schedule") if original.empty?
 
     changed = notes.fetch("practice_schedule")
+    return notes if changed.fetch("version") == 2
+
     notes["practice_schedule"] = PracticeSchedule::Note.decode(changed.merge(
       original.slice("sequence", "phase", "regular_kinds", "initial_ready", "continuation")))
     notes

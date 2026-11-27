@@ -49,7 +49,7 @@ RSpec.describe "Answer form reconnecting on the same controller", type: :system 
 
   it "clears the confirmed copy when a save sent before the reconnect succeeds" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       send_a_held_save
 
       force_reconnect
@@ -66,7 +66,7 @@ RSpec.describe "Answer form reconnecting on the same controller", type: :system 
 
   it "still says the answers are kept when an inert form's earlier save gets no reply" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       send_a_held_save
       page.execute_script("#{controller_js}.formTarget.inert = true")
 
@@ -79,7 +79,7 @@ RSpec.describe "Answer form reconnecting on the same controller", type: :system 
 
   it "rebinds the rendered token and scope and drops proofs and the restored copy, keeping the last send" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       wait_for_answers_settled
       page.execute_script(<<~JS)
         const draft = #{controller_js}.draft

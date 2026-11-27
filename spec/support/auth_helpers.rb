@@ -21,7 +21,7 @@ module AuthHelpers
     user
   end
 
-  # Every system spec logs in as this fake-provider user; a new account starts at the gate's two-section floor.
+  # Every system spec logs in as this fake-provider user; a new account receives one initial exercise.
   def create_fake_provider_user(email: nil, time_zone: "UTC", track_chosen: true,
                                 daily_section_count: nil)
     User.create!(

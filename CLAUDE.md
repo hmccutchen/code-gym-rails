@@ -373,10 +373,11 @@ above; inspect actual final-commit CI results rather than assuming checks ran.
   which enqueues one `GenerateDailyExercisesJob` per due user; each builds
   that user's set from their recent performance. A dashboard
   opened with no set generates one on demand and polls `GET /dashboard/status`.
-- A day holds 2-4 sections: `code_review` and `design_comparison` always planned, and
-  `DaySize` and `SectionRotation` fill the rest. A fixed Daily sections
-  setting holds 1-4: one of the pair, the pair, or the pair plus extra
-  sections the user chose, which then appear in every set.
+- New sets start with one exercise. `DailyPlan` uses `PracticeSchedule` to
+  choose a kind from eligible practice, using prior service, learning needs
+  and kind preferences. The committed manifest lists the active section.
+  Older sets without a manifest use the layout recorded on their own row.
+  See [Single initial exercise](docs/decisions/single-initial-exercise.md).
 - `ResponsesController#create` autosaves answers and ratings; a successful
   submit chains into `#review` (`ResponseReview`), which lands back on the
   submitted dashboard with the review in place.

@@ -1,6 +1,15 @@
 require "rails_helper"
 
 RSpec.describe DaySize do
+  it "starts a new session with one exercise and no setting or gate" do
+    decision = described_class.initial
+    expect(decision).to have_attributes(count: 1, reason: :single, setting: nil, gate: nil)
+    expect(decision.automatic?).to be(false)
+    expect(decision.brake?).to be(false)
+    expect(decision.reduction?).to be(false)
+    expect(decision.diagnostics).to include(setting: nil, gate: nil)
+  end
+
   it "keeps coverage held even when the latest transition reason is held" do
     gate = CompetencyGate::Plan.new(count: 2, reason: :held, safety_hold: true, evidence: {})
     decision = described_class.for(setting: nil, gate: gate)

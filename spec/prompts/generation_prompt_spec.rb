@@ -240,7 +240,11 @@ RSpec.describe GenerationPrompt do
       user.update_columns(section_kind_levels: { "challenge" => "senior" }, locked_section_kinds: [ "challenge" ])
       user.reload
       pin_code_review_mode(:application_code)
-      allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :plan_review)
+      allow(PracticeSchedule).to receive(:single_turn).and_wrap_original do |original, **options|
+        preferences = options.fetch(:preferences).dup
+        allow(preferences).to receive(:offered).and_return([ ExerciseSection::Challenge ])
+        original.call(**options.merge(preferences: preferences))
+      end
     end
 
     it "is one renderer shared by the prompt and the diagnostics log, which reports its exact length" do
@@ -254,9 +258,10 @@ RSpec.describe GenerationPrompt do
         logged = message if message.is_a?(String) && message.start_with?("[difficulty_diagnostics]")
       end
 
-      FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
+      problem_set = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails").problem_set
 
-      kinds = ExerciseSection.for_plan(daily: DailyKinds::DEFAULT, rotation: { pattern: nil, third: :challenge, fourth: :plan_review })
+      expect(problem_set.keys).to eq([ "challenge" ])
+      kinds = problem_set.keys.map { |key| ExerciseSection.for(key) }
       expect(rendered.size).to eq(2)
       expect(rendered.uniq.size).to eq(1)
       expect(rendered.last[:rungs]).to eq(KindDifficulty.for(user).rungs_for(kinds, skill_level: user.skill_level))

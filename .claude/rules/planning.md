@@ -37,12 +37,19 @@ paths:
 
 # Day planning, sizing and mastery
 
-Protected-practice P-A enables initiation after the P-C deployment gate. Its mode, mixed
-policies, within-capacity schedule, fair assignments and persistence contract
-are in `docs/decisions/protected-practice-opportunities.md`. Durable v2 state
-always wins over the switch. Capture under the user lock; validate again at
-commit. Never add coverage for an enrolled user or spend another turn on
-regeneration, movement, failure or a superseded result.
+New sessions start with one selected kind. `DaySize.initial` supplies the
+size without replaying the competency gate. `PracticeSchedule::SingleSlot`
+chooses a host from eligible kinds using delivered history, outstanding
+needs and kind preferences. Coverage never creates an extra slot.
+[Single initial exercise](../../docs/decisions/single-initial-exercise.md)
+records the policy and rollout order.
+
+Protected-practice enrollment follows its existing rollout gate.
+Inactive accounts use delivered history and keep their existing concept
+guidance without writing a schedule note. Enrolled accounts keep durable
+continuation, with the format-1 cadence available for historical rows
+([Protected practice opportunities](../../docs/decisions/protected-practice-opportunities.md)).
+Capture under the user lock and validate again at commit.
 
 The default-on mastery writer and all compatible drill commands follow
 `docs/decisions/daily-mastery-reconciliation.md`. Receipt/suffix enrollment
@@ -58,26 +65,19 @@ Each entry states what a change must not break. An entry that names a
 read it before changing that area.
 
 - **Track and exercise mix** (`docs/decisions/tracks.md`): Track sets baseline
-  difficulty, never an initial mix preset or ongoing kind-frequency bias.
-  Track changes leave weights and exclusions alone. Preserve the separation
-  between kind selection, per-kind difficulty, future overall graduation and
-  Automatic workload size; #715's workload rule is not a graduation threshold.
-  #714 owns the protected-practice and variety direction, and #718 owns
-  kind-specific difficulty definitions.
-- **Section kind weight preferences**
-  (`docs/decisions/section-kind-weight-preferences.md`): A per-kind multiplier
-  (`KindPreferences::MULTIPLIERS`) leans only `SectionRotation#pick_kind`'s
-  roll, after the starvation guarantee, and never touches `slot_staleness`.
-  Exclusion removes a kind from the pool everywhere, `slot_staleness`
-  included; validation refuses one that empties a slot. Storage is sparse, so
-  an untouched user stays byte-identical to pre-feature behavior.
-- **Pattern's rotating role** (`docs/decisions/daily-kinds.md`): Pattern is
-  ordinary slot-staleness rotation unless chosen as a daily kind, not a
-  member of `ExerciseSection.rotatable` with How often or Skip controls.
-  Its place in every day before adaptive rotation justifies no special
-  priority. The inherited tie order is unchanged and its separate group
-  promises no higher or equal frequency. The decision records the available
-  settings; enrolled users follow #714's stable protected-practice order.
+  difficulty. Track changes preserve weights and exclusions. Keep kind
+  selection, per-kind difficulty and future overall graduation separate.
+  The historical workload rule in #715 gives no graduation threshold.
+  #714 owns protected practice and variety. #718 owns kind-specific
+  difficulty definitions.
+- **Section kind preferences**
+  (`docs/decisions/section-kind-weight-preferences.md`): Exclusions filter the
+  optional pool. Optional weights settle otherwise equal optional hosts.
+  The stored regular pair supplies a separate tie preference and uses
+  the default weight.
+- **Pattern** (`docs/decisions/daily-kinds.md`): Pattern remains eligible for
+  variety. It is outside `ExerciseSection.rotatable`, the pool with How
+  often and Skip controls.
 - **Difficulty targets and locks**
   (`docs/decisions/difficulty-targets-and-locks.md`): Per-kind level targets
   (`KindDifficulty::LEVELS`) and locks; an unset kind follows `skill_level`
@@ -113,76 +113,42 @@ read it before changing that area.
   featured `plan_review` or `ambiguity_hunt` concept waits until the week turns
   over (`docs/decisions/the-weekly-featured-concept.md`).
   `DailyPlan` still reads no `KindDifficulty`.
-- **Drills** (`docs/decisions/drills.md`): A drill (`ConceptDrills`) only
-  moves a concept to the front of `User#concepts_needing_reinforcement`; it
-  never touches rotation, weights or `KindDifficulty`. It clears on the same
+- **Drills** (`docs/decisions/drills.md`): A drill (`ConceptDrills`)
+  moves a concept to the front of `User#concepts_needing_reinforcement`
+  and makes it a learning need for eligible hosts. It clears on the same
   co-favourable rating that sets mastery to standard.
   `ConceptDrills::MAX_CONCURRENT` caps drills, a group counting as one, with
   `#can_start?`/`#can_start_group?` as the one statement of it. Drills, like
   every reinforcement entry, are offered only where `DayHosts` says today can
   tag them (`concepts_needing_reinforcement(hostable:)`).
-- **Daily kinds** (`docs/decisions/daily-kinds.md`): `DailyKinds` is the one
-  authority for which kinds every set holds. `users.daily_section_kinds` is
-  sparse (empty means `DailyKinds::DEFAULT`) and normalized on read; each day
-  records its pair in `plan_notes["daily_kinds"]`, and a row without it reads
-  as the default. That fallback covers only rows from before the feature:
-  `DailyPlan::Result#notes` always writes the pair, `AiService::JudgedSet`
-  requires `plan_notes`, and `daily_exercise_plan_notes_spec` lists every
-  writer and fails on a new one. Every slot reader takes the pair through
-  `ExerciseSection.layout(daily:)` or `.optional_slots(daily:)`; never
-  re-introduce a global slot list. A default account must stay byte-identical,
-  which the prompt, page and request snapshots hold. A daily fourth takes the
-  fourth slot out of rotation. Workload reads active core work from each row, independent of daily membership. The card's swap control (`DailyKindSwap::Picker`,
-  `DailyKindSwap::Consequences`) restates no pair rule: option states come
-  from `DailyKindSwap.refusal`, sharing from `DayHosts`, the weeks figure
-  from `CoverageException.expected_gap_weekdays` (pinned to the real planner
-  by `coverage_exception_cadence_spec`), and whether coverage runs from
-  `CoverageException.applies_to_day?` with the row's `brake` note.
-  `DailyKinds.for` holds as many stored places as the Daily sections
-  setting asks for (the pair under Automatic); places past the pair are
-  chosen extra sections in every set. The swap control, the shared concept
-  (`DailyKinds.shared_pair`) and the emptied-slot check read the pair alone;
-  a swap ignores, and drops on a clash, an extra the setting hides. When a
-  fixed count leaves nothing to rotate (`DailyKinds.rotates?`),
-  `KindPreferences.offered_to` offers only the held kinds.
-  `DailyKindSwap` (`PATCH /daily_kinds/:place`) writes a pair place, and
-  `ProfileUpdate` writes the whole list with a Daily sections choice. A swap
-  refuses a stale version, a repeat, a second fourth or a pair that empties
-  an optional slot, saves under the user-row lock and writes one
-  `DailyKindSwapEvent`. An Exercise mix save keeps every stored setting
-  Setup does not render under the current pair: weights and exclusions
-  outside `ExerciseSection.rotatable`, targets and locks outside `.pickable`
-  (`SectionKindSettings#keep_unrendered`). A 409 tells a page rendered for
-  another pair to reload (`layout_changed`).
+- **Daily kinds** (`docs/decisions/daily-kinds.md`): `DailyKinds.pair`
+  normalizes the stored regular pair (empty means `DailyKinds::DEFAULT`).
+  `DailyKinds.recorded` resolves a historical row from its plan notes.
+  Slot readers use `ExerciseSection.layout(daily:)` or
+  `.optional_slots(daily:)`. A new set's active kind comes from its
+  manifest. `DailyKindSwap` (`PATCH /daily_kinds/:place`) changes a pair
+  place under the user-row lock and writes a `DailyKindSwapEvent`. It
+  refuses stale versions, repeats, a second fourth kind and a pair that
+  empties an optional slot. `SectionKindSettings#keep_unrendered` preserves
+  settings Setup does not show. A save from a page rendered for another
+  pair returns 409 (`layout_changed`).
 - **Daily sections setting** (`docs/decisions/daily-sections-setting.md`):
-  `User#daily_section_count` is Automatic (nil) or a count in
-  `User::DAILY_SECTION_COUNTS` (1 to 4; Automatic's floors stay at the pair).
-  `DailyPlan.size_for` returns a fixed count before querying the gate, and a
-  fixed count never gains a coverage section. Setup asks which daily section
-  a count of 1 keeps and which kinds a larger count adds, and saves the count
-  and the place list in one `PATCH /profile` (`DailySectionsChoice`); a count
-  of 3 or 4 without a kind for every place is a 422.
-  `ProfileUpdate` accepts only `"automatic"` or a whole number, since Active
-  Record's integer cast would misread anything else, and `User` 422s a count
-  outside the range. It is not part of the Exercise mix version.
+  Setup no longer offers a count. Stored counts and profile validation
+  remain for compatibility. A count of 1 to 4 or Automatic has no effect
+  on the size of a newly generated set.
 - **What the plan did, on the row**
   (`docs/decisions/what-the-plan-did-on-the-row.md`):
   `daily_exercises.plan_notes` records the planned size and reason on every
-  plan and the day's daily kinds (`daily_kinds`), plus captured server
-  `kind_rungs`, coverage, shared
-  concept and `brake` when they applied (`DailyPlan::Result#notes`). It is server-owned, written with the row from
-  the plan that produced it and never recomputed while rendering; the size
-  excludes any coverage addition, and `RegenerateExerciseJob` rewrites it from
-  the new plan.
+  plan and the regular pair (`daily_kinds`), plus captured server
+  `kind_rungs` (`DailyPlan::Result#notes`). Historical notes may contain
+  coverage, shared concept and `brake` fields. The server writes notes with
+  the producing plan and reads them as stored. Regeneration writes notes
+  from the replacement plan.
 - **Shared concept on a real struggle**
-  (`docs/decisions/shared-concept-on-a-real-struggle.md`):
-  `SharedConcept.pick` puts a reduced-tier reinforcement concept that every
-  daily kind can tag (via `DayHosts`) into both daily sections, only on a host
-  nothing else needed (`SharedConcept.placeable?`), so it never evicts a drill
-  or reinforcement entry. It is advisory prompt text, never enforced through
-  `fixed_concepts:`. The dashboard line shows only when both delivered
-  sections carry it, and it gives no reason, since saying why would expose the
-  mastery tier.
+  (`docs/decisions/shared-concept-on-a-real-struggle.md`): Historical
+  multi-section notes may record a shared concept. The dashboard shows the
+  line only when both delivered sections carry it and keeps mastery tier
+  private.
 - **Waiting retention checks** (`docs/decisions/waiting-retention-checks.md`):
   `DailyPlan` reads due checks for every bucket in the user's slice plus the
   generated language's bucket in one query
@@ -192,25 +158,13 @@ read it before changing that area.
   (`DayHosts`); the rest land on `Result#waiting_checks` as `no_slot` or
   `no_host` and are logged.
 - **Coverage exception** (`docs/decisions/coverage-exception.md`):
-  `CoverageException` (pure) adds one optional section, from the pair's
-  optional slots, to a two-section Automatic day when the workload safety hold is off and
-  no exercise on the previous `CAP_WEEKDAYS` weekdays has `plan_notes["coverage"]`, picking a kind for an
-  overdue check or one unseen for `GAP_WEEKDAYS`. It respects exclusions with
-  no fallback, unlike rotation, on purpose: an all-excluded pool adds nothing.
-  It reads hosting through `DayHosts`, and gives up the addition when the check
-  would not land in it.
-- **Competency gate** (`docs/decisions/competency-gate.md`): `CompetencyGate`
-  owns Automatic size and replays all eligible history without a cap.
-  Growth needs independent five-attempt normal-grade proof per kind plus
-  two full core sets at the current workload. Kind effort tracks known
-  nominal-rung observations separately; eased hard counts, eased comfort
-  does not. Actual skips and broad overload reduce one, retaining kind
-  windows; two comfortable full sets reopen growth. Grade/effort/overload
-  retain current-rubric/rung requirements; basic completion/recovery do
-  not. Server as-planned rung snapshots reset only changed-kind windows,
-  with observed-rung fallback for legacy rows. Supplementary bug hunts
-  affect none of these paths. Coverage remains, blocked by persistent
-  safety hold; protected practice and #264 checkpointing remain separate.
+  Historical two-section Automatic days could add a coverage section.
+  Preserve that evidence when reading old rows.
+- **Competency gate** (`docs/decisions/competency-gate.md`):
+  The gate still interprets historical completion, effort, and recovery.
+  Grade, effort and overload require current rubric and rung evidence.
+  Basic completion and recovery use active core work. Supplementary bug
+  hunts stay outside both paths.
 - **Pausing generation** (`docs/decisions/pausing-generation.md`):
   `User#paused_generation_at` stops only generation the user didn't ask for
   (cron and the dashboard auto-trigger), never submit or review. A pause has

@@ -86,7 +86,7 @@ RSpec.describe DailyKindSwap::Picker do
       picker = pickers["code_review"]
 
       expect(option(picker, "code_review")).to have_attributes(state: :now, consequences: nil)
-      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, note: nil, marks: [ "Already daily" ])
+      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, note: nil, marks: [ "Already regular" ])
       expect(picker.accent_mark?(option(picker, "code_review"))).to be(true)
       expect(picker.accent_mark?(option(picker, "design_comparison"))).to be(false)
       expect(option(picker, "challenge").state).to eq(:available)
@@ -111,19 +111,20 @@ RSpec.describe DailyKindSwap::Picker do
       expect(option(picker, "architecture").note).to include("Coding Challenge").and include("Security Review")
     end
 
-    it "reads today's planned size for the outgoing warning" do
+    it "describes future recommendation eligibility even on a historical two-section set" do
       stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise(size: 2)
 
-      expect(option(pickers["code_review"], "challenge").consequences.warning.first).to include("about once every")
+      expect(option(pickers["code_review"], "challenge").consequences.warning)
+        .to eq([ I18n.t("protected_practice.daily_kinds.outgoing", outgoing: "Code Review") ])
     end
 
-    it "explains growth through reviewed answers and finished sections on an available swap" do
+    it "does not promise automatic workload growth on an available swap" do
       stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
       exercise(size: 2)
       candidate = option(pickers["code_review"], "pattern")
       expect(candidate).to be_available
-      expect(candidate.consequences.warning).to include("Your sets grow based on your reviewed answers and the sections you finish.")
+      expect(candidate.consequences.warning.join).not_to include("sets grow", "every day", "weeks")
       expect(candidate.consequences.warning.join).not_to include("Your two daily sections are also what decides")
     end
 
@@ -148,10 +149,10 @@ RSpec.describe DailyKindSwap::Picker do
       picker = pickers["code_review"]
 
       expect(picker.card_kind).to eq(ExerciseSection::CodeReview)
-      expect(picker.next_kind_line).to eq("Your next set uses Coding Challenge here.")
-      expect(option(picker, "challenge")).to have_attributes(state: :now, marks: [ "In your next set" ])
+      expect(picker.next_kind_line).to eq("Coding Challenge is now one of your regular preferences.")
+      expect(option(picker, "challenge")).to have_attributes(state: :now, marks: [ "Regular preference" ])
       expect(option(picker, "code_review")).to have_attributes(state: :available, marks: [ "In today's set" ])
-      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, marks: [ "Already daily" ])
+      expect(option(picker, "design_comparison")).to have_attributes(state: :disabled, marks: [ "Already regular" ])
       expect(picker.options.select { |option| picker.accent_mark?(option) }).to eq([])
     end
 
@@ -160,7 +161,7 @@ RSpec.describe DailyKindSwap::Picker do
       picker = pickers["code_review"]
 
       expect(option(picker, "code_review")).to have_attributes(state: :disabled, note: nil,
-                                                               marks: [ "In today's set", "Already daily" ])
+                                                               marks: [ "In today's set", "Already regular" ])
     end
 
     it "marks only Now and the other daily kind, and adds no line, when the card and the stored pair agree" do
@@ -168,24 +169,20 @@ RSpec.describe DailyKindSwap::Picker do
 
       expect(picker.next_kind_line).to be_nil
       expect(option(picker, "design_comparison").marks).to eq([ "Now" ])
-      expect(picker.options.flat_map(&:marks)).to eq([ "Now", "Already daily" ])
+      expect(picker.options.flat_map(&:marks)).to eq([ "Now", "Already regular" ])
       expect(picker.options.select { |option| picker.accent_mark?(option) }.map { |option| option.kind.key }).to eq([ "design_comparison" ])
     end
   end
 
-  it "asks whether the stored pair can share a concept once per picker, not once per option" do
-    allow(DailyKindSwap::Consequences).to receive(:shares_a_concept?).and_call_original
-    expect(DailyKindSwap::Consequences).to receive(:shares_a_concept?).with(DailyKinds::DEFAULT, anything).twice.and_call_original
+  [ nil, *User::DAILY_SECTION_COUNTS ].each do |count|
+    it "ignores historical count #{count.inspect} in future recommendation warnings" do
+      user.update!(daily_section_count: count)
+      exercise(size: 2)
+      @exercise.update!(plan_notes: @exercise.plan_notes.merge("brake" => true))
 
-    pickers
-  end
-
-  it "reads the brake from the row, so a braked two-section day gets no weeks figure" do
-    stub_const("PracticePolicyMode::INITIATE_PRACTICE_POLICY", false)
-    exercise(size: 2)
-    @exercise.update!(plan_notes: @exercise.plan_notes.merge("brake" => true))
-
-    expect(option(pickers["code_review"], "challenge").consequences.warning.join).not_to include("weeks")
+      expect(option(pickers["code_review"], "challenge").consequences.warning)
+        .to eq([ I18n.t("protected_practice.daily_kinds.outgoing", outgoing: "Code Review") ])
+    end
   end
 
   it "offers no options to an ended trial, only the reason, and drops the first-time hint" do

@@ -7,7 +7,7 @@ RSpec.describe "Today's desktop layout", type: :system do
     resize(width, height: height)
     @user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
     @user.update!(display_preferences: prefs)
-    visit_with_todays_set(@user)
+    visit_with_existing_set(@user, keys: %w[code_review design_comparison pattern challenge])
   end
 
   def submit_the_day

@@ -191,11 +191,16 @@ RSpec.describe DailyKindSwap do
       expect_refused(:already_daily, place: 0, kind: "design_comparison")
     end
 
-    it "refuses a kind already chosen as an extra section, or a second fourth beside one" do
+    it "ignores former fixed extras when changing regular preferences" do
       user.update!(daily_section_count: 4, daily_section_kinds: %w[code_review design_comparison pattern plan_review])
 
-      expect_refused(:already_daily, place: 0, kind: "pattern")
-      expect_refused(:second_fourth, place: 0, kind: "ambiguity_hunt")
+      expect(swap(place: 0, kind: "pattern").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[pattern design_comparison plan_review])
+      expect(user.daily_section_count).to eq(4)
+
+      expect(swap(place: 0, kind: "ambiguity_hunt").status).to eq(:saved)
+      expect(user.reload.daily_section_kinds).to eq(%w[ambiguity_hunt design_comparison])
+      expect(user.daily_section_count).to eq(4)
     end
 
     it "refuses a second fourth kind, naming the three" do
