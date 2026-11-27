@@ -5,9 +5,37 @@ class PracticeSchedule::Note
 
   def self.decode(value)
     return {} if value == {}
+    return decode_single(value) if value.is_a?(Hash) && value["version"].eql?(2)
 
     keys!(value, FIELDS + (value.is_a?(Hash) && value.key?("omitted_kind") ? %w[omitted_kind] : []))
     invalid! unless value["version"].eql?(1) && value["policy"].eql?(2)
+    contents!(value)
+    invalid! unless value["phase"].nil? || phase?(value["phase"])
+    invalid! if value.key?("omitted_kind") && (!value["regular_kinds"].include?(value["omitted_kind"]) ||
+      value["selected_kinds"].include?(value["omitted_kind"]))
+    continuation!(value["continuation"], value["sequence"])
+    eligible = ExerciseSection.optional_slots(daily: value["regular_kinds"].map { |key| ExerciseSection.for(key) }).values.flatten.map(&:key)
+    invalid! unless (value["continuation"]["kind_order"] - eligible).empty?
+    value.deep_dup
+  end
+
+  def self.decode_single(value)
+    keys!(value, FIELDS - %w[phase])
+    invalid! unless value["policy"].eql?(2)
+    contents!(value)
+    continuation = value["continuation"]
+    keys!(continuation, %w[kind_service service])
+    kinds!(continuation["kind_service"].keys) if continuation["kind_service"].is_a?(Hash)
+    invalid! unless continuation["kind_service"].is_a?(Hash)
+    continuation["kind_service"].each_value do |sequence|
+      integer!(sequence)
+      invalid! if sequence > value["sequence"]
+    end
+    service!(continuation["service"], value["sequence"])
+    value.deep_dup
+  end
+
+  def self.contents!(value)
     integer!(value["sequence"], minimum: 1)
     invalid! unless [ true, false ].include?(value["initial_ready"])
     kinds!(value["regular_kinds"])
@@ -17,14 +45,7 @@ class PracticeSchedule::Note
       invalid! if keys.count { |key| ExerciseSection.for(key).fourth? } > DailyPlan::FOURTH_SLOT_CAPACITY
     end
     invalid! unless (1..ExerciseSection::MAX_SECTIONS).cover?(value["selected_kinds"].size)
-    invalid! unless value["phase"].nil? || phase?(value["phase"])
-    invalid! if value.key?("omitted_kind") && (!value["regular_kinds"].include?(value["omitted_kind"]) ||
-      value["selected_kinds"].include?(value["omitted_kind"]))
     assignments!(value["assignments"], value["selected_kinds"])
-    continuation!(value["continuation"], value["sequence"])
-    eligible = ExerciseSection.optional_slots(daily: value["regular_kinds"].map { |key| ExerciseSection.for(key) }).values.flatten.map(&:key)
-    invalid! unless (value["continuation"]["kind_order"] - eligible).empty?
-    value.deep_dup
   end
 
   def self.assignments!(value, selected)
@@ -84,5 +105,5 @@ class PracticeSchedule::Note
   def self.phase?(value) = value.is_a?(Integer) && (0...PracticeSchedule::Turns::CYCLE).cover?(value)
 
   def self.invalid! = raise ArgumentError, "Invalid practice schedule format"
-  private_class_method :assignments!, :continuation!, :service!, :identity!, :kinds!, :keys!, :integer!, :phase?, :invalid!
+  private_class_method :decode_single, :contents!, :assignments!, :continuation!, :service!, :identity!, :kinds!, :keys!, :integer!, :phase?, :invalid!
 end
