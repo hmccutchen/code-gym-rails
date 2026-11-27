@@ -202,10 +202,27 @@ RSpec.describe PracticeGeneration do
     expect(legacy.reload.practice_schedule).to eq({})
   end
 
+  %w[pattern code_review].each do |old_key|
+    it "clears the previous manifest when it listed #{old_key}" do
+      exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+        problem_set: { old_key => {} }, section_order: [ old_key ])
+      claim = exercise.claim_regenerating!
+      context = described_class.capture(user, date: exercise.date, replacing: exercise)
+
+      result = described_class.commit_replacement(user, exercise: exercise, claim: claim, context: context,
+        judged: active_judged(context), drafted_by: service)
+
+      expect(result.status).to eq(:saved)
+      expect(exercise.reload.section_order).to be_nil
+      expect(exercise.active_section_keys).to eq(%w[code_review design_comparison])
+    end
+  end
+
   it "rolls back destruction of an active draft and its full continuation when replacement persistence fails" do
     first = described_class.capture(user, date: Date.current)
     exercise = described_class.commit_new(user, context: first, judged: active_judged(first),
       language: "ruby_rails", drafted_by: service).exercise
+    exercise.update!(section_order: %w[code_review])
     draft = user.daily_responses.create!(date: exercise.date, daily_exercise: exercise, answers: { "code_review" => "Keep this draft" })
     JudgeSolve.record!(exercise, [ live_solve ])
     before_solves = JudgeSolve.where(daily_exercise_id: exercise.id).map(&:attributes)

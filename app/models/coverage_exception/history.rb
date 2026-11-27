@@ -10,7 +10,7 @@ class CoverageException
     # One query, newest first, so the first date seen for a key is its last.
     def self.for(user, coverage_dates:)
       columns = %i[id date problem_set plan_notes]
-      columns << :section_order if DailyExercise.column_names.include?("section_order")
+      columns << :section_order if DailyExercise.section_order_available?
       rows = user.daily_exercises.where(date: ...Date.current).order(date: :desc).limit(HISTORY_LIMIT)
                  .select(*columns).to_a
 

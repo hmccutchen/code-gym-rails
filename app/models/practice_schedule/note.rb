@@ -6,7 +6,8 @@ class PracticeSchedule::Note
   def self.decode(value)
     return {} if value == {}
 
-    envelope!(value)
+    keys!(value, FIELDS + (value.is_a?(Hash) && value.key?("omitted_kind") ? %w[omitted_kind] : []))
+    invalid! unless value["version"].eql?(1) && value["policy"].eql?(2)
     integer!(value["sequence"], minimum: 1)
     invalid! unless [ true, false ].include?(value["initial_ready"])
     kinds!(value["regular_kinds"])
@@ -22,24 +23,8 @@ class PracticeSchedule::Note
     assignments!(value["assignments"], value["selected_kinds"])
     continuation!(value["continuation"], value["sequence"])
     eligible = ExerciseSection.optional_slots(daily: value["regular_kinds"].map { |key| ExerciseSection.for(key) }).values.flatten.map(&:key)
-    invalid! if value["version"] == 1 && (value["continuation"]["kind_order"] - eligible).any?
+    invalid! unless (value["continuation"]["kind_order"] - eligible).empty?
     value.deep_dup
-  end
-
-  def self.envelope!(value)
-    invalid! unless value.is_a?(Hash) && value["policy"].eql?(2)
-
-    case value["version"]
-    when 1
-      invalid! unless value["version"].eql?(1)
-      keys!(value, FIELDS + (value.key?("omitted_kind") ? %w[omitted_kind] : []))
-    when 2
-      invalid! unless value["version"].eql?(2)
-      keys!(value, FIELDS + %w[selection_policy])
-      invalid! unless value["selection_policy"] == "single_slot" && value["phase"].nil?
-    else
-      invalid!
-    end
   end
 
   def self.assignments!(value, selected)
@@ -99,5 +84,5 @@ class PracticeSchedule::Note
   def self.phase?(value) = value.is_a?(Integer) && (0...PracticeSchedule::Turns::CYCLE).cover?(value)
 
   def self.invalid! = raise ArgumentError, "Invalid practice schedule format"
-  private_class_method :envelope!, :assignments!, :continuation!, :service!, :identity!, :kinds!, :keys!, :integer!, :phase?, :invalid!
+  private_class_method :assignments!, :continuation!, :service!, :identity!, :kinds!, :keys!, :integer!, :phase?, :invalid!
 end

@@ -20,11 +20,12 @@ RSpec.describe DailyExercise, type: :model do
       expect(exercise.reload.active_section_keys).to eq(%w[challenge code_review])
     end
 
-    it "reads legacy sections when the connection has not loaded the new column" do
+    it "raises when a projection leaves out a column the model knows about" do
       exercise.save!
-      legacy = described_class.select(:id, :problem_set, :plan_notes).find(exercise.id)
+      exercise.update!(section_order: %w[challenge])
+      projected = described_class.select(:id, :problem_set, :plan_notes).find(exercise.id)
 
-      expect(legacy.active_section_keys).to eq(%w[code_review design_comparison architecture])
+      expect { projected.active_section_keys }.to raise_error(ActiveModel::MissingAttributeError, /section_order/)
     end
 
     [ [], {}, [ "unknown" ], [ "pattern" ], %w[code_review code_review] ].each do |order|

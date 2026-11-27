@@ -43,6 +43,8 @@ class DailyExercise < ApplicationRecord
 
   def self.set_id_from_scope(scope) = scope.to_s[DRAFT_SCOPE_FORMAT, 1]
 
+  def self.section_order_available? = column_names.include?("section_order")
+
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
   end
@@ -176,7 +178,7 @@ class DailyExercise < ApplicationRecord
   private
 
   def recorded_section_order
-    section_order if has_attribute?(:section_order)
+    self[:section_order] if self.class.section_order_available?
   end
 
   def section_order_matches_problem_set
