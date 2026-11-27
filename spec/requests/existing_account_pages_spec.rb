@@ -70,6 +70,16 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
     expect_snapshot("dashboard_unsubmitted")
   end
 
+  it "renders only the sections listed in an explicit manifest, in their recorded order" do
+    exercise.update!(section_order: %w[challenge code_review])
+
+    get root_path
+
+    expect(response).to have_http_status(:ok)
+    sections = Nokogiri::HTML(response.body).css("details[data-section-fold]")
+    expect(sections.map { |section| section["data-section-fold"] }).to eq(%w[challenge code_review])
+  end
+
   it "renders the submitted, reviewed dashboard unchanged" do
     submit_and_review
     get root_path

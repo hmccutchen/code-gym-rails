@@ -19,6 +19,8 @@ module AccountData
     "learner_items" => Fate.of(:delete, "The short items kept from the person's notes and explanations.", columns: %w[user_id], rows: owned(LearnerItem)),
     "learner_notes" => Fate.of(:delete, "The person's notes and explanations on their sets.",
       columns: %w[user_id daily_exercise_id], rows: owned(LearnerNote)),
+    "exercise_additions" => Fate.of(:delete, "The person's requests for extra exercises on their sets.",
+      columns: %w[daily_exercise_id], rows: ->(user) { ExerciseAddition.where(daily_exercise_id: DailyExercise.where(user_id: user.id).select(:id)) }),
     "daily_exercises" => Fate.of(:delete, "The sets generated for the person.", columns: %w[user_id], rows: owned(DailyExercise)),
     "push_subscriptions" => Fate.of(:delete, "The person's browser endpoints and push keys.", columns: %w[user_id], rows: owned(PushSubscription)),
     "api_usages" => Fate.of(:delete, "The person's provider calls; spend totals lose these rows.", columns: %w[user_id], rows: owned(ApiUsage)),

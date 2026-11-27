@@ -11,6 +11,8 @@ RSpec.describe AccountDeletion, type: :model do
     response = DailyResponse.create!(user: user, daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
                                      ai_review: { "design_comparison" => { "rating" => "solid" } })
     response.review_follow_ups.create!(section: "design_comparison", role: :user, content: "Why #{tag}?")
+    ExerciseAddition.create!(daily_exercise: exercise, request_uuid: SecureRandom.uuid, kind: "pattern",
+                             draft_scope: exercise.draft_scope, date: exercise.date)
     DuckThread.create!(user: user, daily_exercise: exercise, draft_scope: exercise.draft_scope, threads: {})
     JudgeSolve.create!(user_id: user.id, daily_exercise: exercise, set_generated_at: exercise.generated_at, source: "live",
                        section: "design_comparison", attempt: 0, edit_check: false, shipped: true, edit_reverted: false,
@@ -61,7 +63,7 @@ RSpec.describe AccountDeletion, type: :model do
       ref.target == :email ? rows_naming(ref, [ leaving.email ]).exists? : rows_naming(ref, held_before.fetch(ref.target, [])).exists?
     end
     expect(remaining.map { |ref| [ ref.table, ref.column ] }).to eq([])
-    expect(held_before.keys).to include("daily_responses", "review_follow_ups", "judge_solves", "api_usages", "suggested_concepts")
+    expect(held_before.keys).to include("daily_responses", "exercise_additions", "review_follow_ups", "judge_solves", "api_usages", "suggested_concepts")
     expect(rows_in_every_table(user_ids_held(staying, references))).to eq(staying_before)
     expect(SuggestedConcept.where(normalized_name: "leaving idea").pick(:reviewed_by_id, :status)).to eq([ nil, "dismissed" ])
     expect(DailyExercise.exists?(exercise.id)).to be(false)

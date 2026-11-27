@@ -52,6 +52,7 @@ two cannot disagree.
 | --- | --- | --- |
 | `users` | delete, last | the account itself |
 | `daily_exercises`, `daily_responses`, `review_follow_ups` | delete | the person's sets, answers, reviews and follow-up questions |
+| `exercise_additions` | delete before their sets | the person's requests for additional exercises |
 | `duck_threads`, `push_subscriptions` | delete | the person's conversations and browser endpoints |
 | `api_usages` | delete | the person's provider calls; spend totals lose them |
 | `concept_masteries`, `featured_concepts`, `level_suggestion_events`, `daily_kind_swaps` | delete | the person's standing, weekly concept and setting history |

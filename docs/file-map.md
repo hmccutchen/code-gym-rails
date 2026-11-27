@@ -1,5 +1,7 @@
 # File Map
 
+- `app/models/exercise_addition.rb` — `ExerciseAddition` stores an exercise-scoped request identity, its target context, status and claim timestamp. The database allows one active request per exercise and one row per request UUID within that exercise.
+
 What each listed file does. Specs, migrations and the skills under `.claude/` are not listed.
 
 - `app/models/practice_policy_mode.rb` — uncached validated durable enrollment and default-on initiation.

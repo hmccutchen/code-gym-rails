@@ -4,6 +4,39 @@ require "rails_helper"
 RSpec.describe DailyExercise, type: :model do
   let(:user) { User.create!(email: "exercise-owner@example.com") }
 
+  describe "#active_section_keys" do
+    let(:exercise) do
+      described_class.new(user: user, date: Date.current, generated_at: Time.current,
+        problem_set: { "code_review" => {}, "design_comparison" => {}, "architecture" => {}, "challenge" => {} })
+    end
+
+    it "keeps the historical slot resolution when the manifest is absent" do
+      expect(exercise.active_section_keys).to eq(%w[code_review design_comparison architecture])
+    end
+
+    it "uses the persisted order and only the manifest keys" do
+      exercise.update!(section_order: %w[challenge code_review])
+
+      expect(exercise.reload.active_section_keys).to eq(%w[challenge code_review])
+    end
+
+    it "reads legacy sections when the connection has not loaded the new column" do
+      exercise.save!
+      legacy = described_class.select(:id, :problem_set, :plan_notes).find(exercise.id)
+
+      expect(legacy.active_section_keys).to eq(%w[code_review design_comparison architecture])
+    end
+
+    [ [], {}, [ "unknown" ], [ "pattern" ], %w[code_review code_review] ].each do |order|
+      it "rejects an invalid manifest of #{order.inspect}" do
+        exercise.section_order = order
+
+        expect(exercise).not_to be_valid
+        expect(exercise.errors[:section_order]).to be_present
+      end
+    end
+  end
+
   it "defaults language to ruby_rails" do
     exercise = DailyExercise.create!(user: user, date: Date.current,
                                      problem_set: { "code_review" => {} }, generated_at: Time.current)
