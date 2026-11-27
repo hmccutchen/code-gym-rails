@@ -62,8 +62,8 @@ RSpec.describe "What happens to each row that refers to a user when the account 
     planted = AccountData::FATES.slice("daily_exercises").merge(AccountData::FATES)
 
     expect(deleted_before_parent_violations(planted)).to eq([
-      [ "daily_responses", "daily_exercises" ], [ "duck_threads", "daily_exercises" ], [ "judge_solves", "daily_exercises" ],
-      [ "learner_notes", "daily_exercises" ]
+      [ "daily_responses", "daily_exercises" ], [ "duck_threads", "daily_exercises" ], [ "exercise_additions", "daily_exercises" ],
+      [ "judge_solves", "daily_exercises" ], [ "learner_notes", "daily_exercises" ]
     ])
   end
 

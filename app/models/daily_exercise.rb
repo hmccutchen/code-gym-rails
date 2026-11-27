@@ -10,6 +10,7 @@ class DailyExercise < ApplicationRecord
   has_one    :duck_thread, dependent: :delete
   has_one    :learner_note, dependent: :delete
   has_many   :judge_solves, dependent: :destroy
+  has_many   :exercise_additions, dependent: :delete_all, inverse_of: :daily_exercise
 
   # Excludes "mixed": a stored "mixed" would flow back into generation through RegenerateExerciseJob.
   LANGUAGES = %w[ruby_rails javascript].freeze
@@ -32,6 +33,7 @@ class DailyExercise < ApplicationRecord
   validates :date, :problem_set, :generated_at, presence: true
   validates :date, uniqueness: { scope: :user_id }
   validates :language, inclusion: { in: LANGUAGES }
+  validate :section_order_matches_problem_set
 
   scope :for_date, ->(d = Date.current) { where(date: d) }
   # The same rule as UnopenedSets.unopened?, in SQL; daily_exercise_spec holds the two equal.
@@ -40,6 +42,8 @@ class DailyExercise < ApplicationRecord
   def self.acknowledge_unopened!(today:, at: Time.current) = unopened_before(today).update_all(opened_at: at)
 
   def self.set_id_from_scope(scope) = scope.to_s[DRAFT_SCOPE_FORMAT, 1]
+
+  def self.section_order_available? = column_names.include?("section_order")
 
   def self.planned_size_before(date)
     where(date: ...date).where("plan_notes ? 'size'").order(date: :desc).pick(Arel.sql("(plan_notes->>'size')::integer"))
@@ -90,7 +94,7 @@ class DailyExercise < ApplicationRecord
 
   # The single authority for section counts; never problem_set.keys, which can hold unrendered alternates.
   def active_section_keys
-    ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
+    recorded_section_order || ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
   end
 
   def adaptation_section_keys
@@ -172,6 +176,20 @@ class DailyExercise < ApplicationRecord
   end
 
   private
+
+  def recorded_section_order
+    self[:section_order] if self.class.section_order_available?
+  end
+
+  def section_order_matches_problem_set
+    order = recorded_section_order
+    return if order.nil?
+    return if order.is_a?(Array) && (1..ExerciseSection::MAX_SECTIONS).cover?(order.size) &&
+      order.uniq == order && (order - ExerciseSection.keys).empty? &&
+      problem_set.is_a?(Hash) && order.all? { |key| ExerciseSection.present?(problem_set, key) }
+
+    errors.add(:section_order, :invalid)
+  end
 
   def draft_revision
     return plan_notes["draft_revision"].to_i if plan_notes.is_a?(Hash)

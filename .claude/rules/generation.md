@@ -193,9 +193,9 @@ read it before changing that area.
   `generation_prompt_section_names_spec` fails on "third section" and the
   like in any prompt snapshot or any Ruby file under `app/` or `lib/`.
 - **Which sections count** (`docs/decisions/which-sections-count.md`):
-  `DailyExercise#active_section_keys` (through
-  `ExerciseSection.resolved_keys`, given the row's own pair from
-  `DailyExercise#daily_kinds`) is the single authority for which sections a
+  `DailyExercise#active_section_keys` reads the manifest when present and
+  otherwise uses `ExerciseSection.resolved_keys` with the row's own daily
+  kinds. It is the single authority for which sections a
   day has; every denominator, the answered count, the submit gate, param
   slices, the duck guard and the review fan-out derive from it. Never count
   `problem_set.keys` or `answers.keys`. `dropped_sections` records why a

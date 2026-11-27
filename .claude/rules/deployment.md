@@ -31,6 +31,8 @@ paths:
 
 ## Migrations
 
+- Daily practice ships its manifest and addition table with compatible readers before any feature writer emits those records. Verify web and worker are compatible and retire older processes before the writer release. See `docs/decisions/daily-practice-compatibility.md` for the format-2 writer rollback floor.
+
 - Protected practice has its own P-S/P-C/P-A gates. P-S #741 supplies the
   request column. P-C implements compatible writers with initiation false;
   no new migration. Before P-A, verify web/worker SUCCESS at P-C or compatible

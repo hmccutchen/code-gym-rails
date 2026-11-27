@@ -25,6 +25,20 @@ RSpec.describe CoverageException::History do
   end
 
   describe ".for" do
+    it "counts manifest sections when the column is available" do
+      row = exercise(Date.yesterday, %w[code_review architecture challenge])
+      row.update!(section_order: %w[challenge])
+
+      expect(described_class.for(user, coverage_dates: []).last_seen).to eq("challenge" => Date.yesterday)
+    end
+
+    it "uses legacy projection on a worker that loaded the schema before migration" do
+      row = exercise(Date.yesterday, %w[code_review architecture challenge])
+      row.update!(section_order: %w[challenge])
+      allow(DailyExercise).to receive(:column_names).and_return(DailyExercise.column_names - %w[section_order])
+
+      expect(described_class.for(user, coverage_dates: []).last_seen.keys).to eq(%w[code_review architecture])
+    end
     it "reads each delivered kind's last date and the oldest date in one query" do
       exercise(Date.current - 10, %w[code_review design_comparison plan_review])
       exercise(Date.current - 3, %w[code_review design_comparison pattern])

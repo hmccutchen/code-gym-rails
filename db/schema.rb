@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_27_120002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -93,6 +93,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
     t.bigint "user_id", null: false
     t.jsonb "plan_notes", default: {}, null: false
     t.datetime "opened_at"
+    t.jsonb "section_order"
     t.index ["user_id", "date"], name: "index_daily_exercises_on_user_id_and_date", unique: true
     t.index ["user_id"], name: "index_daily_exercises_on_user_id"
   end
@@ -140,6 +141,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
     t.datetime "updated_at", null: false
     t.index ["daily_exercise_id"], name: "index_duck_threads_on_daily_exercise_id", unique: true
     t.index ["user_id"], name: "index_duck_threads_on_user_id"
+  end
+
+  create_table "exercise_additions", force: :cascade do |t|
+    t.bigint "daily_exercise_id", null: false
+    t.uuid "request_uuid", null: false
+    t.string "kind", null: false
+    t.string "draft_scope", null: false
+    t.date "date", null: false
+    t.string "status", default: "queued", null: false
+    t.datetime "claimed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["daily_exercise_id", "request_uuid"], name: "index_exercise_additions_on_daily_exercise_id_and_request_uuid", unique: true
+    t.index ["daily_exercise_id"], name: "index_exercise_additions_one_active_per_exercise", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying]::text[])", name: "exercise_additions_status"
   end
 
   create_table "featured_concepts", force: :cascade do |t|
@@ -519,6 +535,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_120000) do
   add_foreign_key "daily_responses", "users"
   add_foreign_key "duck_threads", "daily_exercises"
   add_foreign_key "duck_threads", "users"
+  add_foreign_key "exercise_additions", "daily_exercises"
   add_foreign_key "featured_concepts", "users"
   add_foreign_key "judge_solves", "daily_exercises"
   add_foreign_key "judge_solves", "users"
