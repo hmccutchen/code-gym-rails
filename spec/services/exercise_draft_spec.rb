@@ -156,7 +156,6 @@ RSpec.describe ExerciseDraft do
     context = nil
     travel_to(Time.utc(2026, 11, 6, 23, 59)) { context = PracticeGeneration.capture(user, date: Date.current) }
     allow(DailyPlan).to receive(:size_for).and_call_original
-    allow(WeightedRoll).to receive(:pick).and_call_original
     expect(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_return(:application_code)
     travel_to(Time.utc(2026, 11, 7, 0, 1)) do
       described_class.call(user, language: "ruby_rails", provider: provider, schedule_context: context)
