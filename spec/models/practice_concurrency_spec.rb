@@ -87,7 +87,7 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
         end
         await(ready)
         case change
-        when :settings then user.update!(daily_section_count: 2)
+        when :settings then user.update!(skill_level: "senior")
         when :held_date
           user.update!(paused_generation_at: 2.days.ago)
           expect(user.carry_held_set_forward!&.id).to eq(exercise.id)
@@ -122,7 +122,7 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
       PracticeGeneration.commit_new(caller, context: context, judged: result, language: "ruby_rails", drafted_by: FakeService.new("fake-key"))
     end
     await(ready)
-    user.update!(daily_section_count: 2)
+    user.update!(skill_level: "senior")
     release << true
     expect(worker.value.status).to eq(:superseded)
     expect(user.daily_exercises).to be_empty

@@ -230,14 +230,14 @@ RSpec.describe RegenerateExerciseJob, type: :job do
         expect(schedule_context[:active]).to be(false)
         expect(language).to eq(exercise.language)
         expect(deadline).to be_a(GenerationDeadline)
-        User.find(user.id).update!(daily_section_count: 2)
+        User.find(user.id).update!(skill_level: "senior")
         judged_set({ "code_review" => { "question" => "paid replacement" } }).with(schedule_context: schedule_context)
       end
       described_class.new.perform(user_id: user.id)
       expect(exercise.reload.attributes.except("regenerating_since", "updated_at")).to eq(old_set)
       expect(exercise.regenerating_since).to be_nil
       expect(draft.reload.attributes).to eq(old_draft)
-      expect(user.reload.daily_section_count).to eq(2)
+      expect(user.reload.skill_level).to eq("senior")
       expect(user.last_generation_error).to be_nil
     end
 
