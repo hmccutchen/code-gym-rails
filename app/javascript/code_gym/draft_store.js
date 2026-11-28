@@ -36,6 +36,22 @@ function canonicalDraft({ answers, ratings }) {
   return JSON.stringify([ sortedEntries(answers), sortedEntries(ratings) ])
 }
 
+function matchesExpandedDraft(serialized, rendered) {
+  try {
+    const sent = JSON.parse(serialized)
+    if (!Array.isArray(sent) || sent.length !== 2 || !Array.isArray(sent[0]) || sent[0].length === 0) return false
+    const keys = new Set(sent[0].map(([key]) => key))
+    const entries = Object.entries(rendered.answers || {})
+    const added = entries.filter(([key]) => !keys.has(key))
+    if (added.length === 0 || !Array.isArray(rendered.emptyUnratedSections)) return false
+    if (added.some(([key]) => !rendered.emptyUnratedSections.includes(key))) return false
+    const answers = Object.fromEntries(entries.filter(([key]) => keys.has(key)))
+    return serialized === canonicalDraft({ answers: answers, ratings: rendered.ratings })
+  } catch (_) {
+    return false
+  }
+}
+
 export default class DraftCopy {
   constructor(token, scope) {
     this.lastSent = null
@@ -62,7 +78,7 @@ export default class DraftCopy {
 
   rendersUnconfirmedSave(draft, rendered) {
     if (draft.scope !== this.scope || !Array.isArray(draft.sent)) return false
-    return draft.sent.includes(canonicalDraft(rendered))
+    return draft.sent.includes(canonicalDraft(rendered)) || draft.sent.some((sent) => matchesExpandedDraft(sent, rendered))
   }
 
   takeOverUnconfirmedSaves() {

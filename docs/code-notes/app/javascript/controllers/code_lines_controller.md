@@ -29,3 +29,11 @@ observer fits the block when the disclosure opens and it gains a size.
 
 Only a block containing `.code-align-extra` has anything to hide, so only those
 are observed. Everything else costs nothing.
+
+## Appended exercises use the same observer
+
+The body's `code-gym:sections-added` action registers padded blocks after Add
+inserts a card. It reuses the observer created on connect; observing an already
+registered block is idempotent. Existing width guards, hidden-block fitting
+and disconnect cleanup remain unchanged, and no code or answer nodes are
+replaced.

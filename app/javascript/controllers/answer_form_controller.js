@@ -14,6 +14,7 @@ export default class extends Controller {
     submitBlocker: String,
     draftScope: String,
     manifestRevision: Number,
+    emptyUnratedSections: Array,
     draftToken: String,
     answeredCount: String,
     allAnswered: String,
@@ -86,7 +87,7 @@ export default class extends Controller {
   rendered() {
     const answers = {}
     this.textareas.forEach((area) => answers[area.dataset.field] = area.defaultValue)
-    return { answers: answers, ratings: this.ratings }
+    return { answers: answers, ratings: this.ratings, emptyUnratedSections: this.emptyUnratedSectionsValue }
   }
 
   onScreen(save = this.payload()) {

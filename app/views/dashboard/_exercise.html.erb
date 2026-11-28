@@ -42,6 +42,7 @@
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
        data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"
        data-answer-form-manifest-revision-value="<%= exercise.manifest_revision %>"
+       data-answer-form-empty-unrated-sections-value="<%= empty_unrated_draft_sections(response).to_json %>"
        data-answer-form-draft-token-value="<%= response.draft_token %>"
        data-answer-form-answered-count-value="<%= t("dashboard.exercise.answered_count") %>"
        data-answer-form-all-answered-value="<%= t("dashboard.exercise.all_answered") %>"

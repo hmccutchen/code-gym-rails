@@ -13,7 +13,9 @@ The module owns the copy whole: the key, the stored shape
 restored, rewritten or cleared. Its default export, `DraftCopy`, is what the
 answer form holds, one for the controller's whole life. It takes plain data,
 the answers and ratings as `{answers, ratings}`, and never reads the page; the
-answer form's code note says which page values it hands over.
+answer form's code note says which page values it hands over. For recovery,
+the rendered value also carries `emptyUnratedSections`, a server-rendered
+snapshot from `AnswerScaffoldsHelper.empty_unrated_draft_sections`.
 
 ## Reconnecting
 
@@ -122,9 +124,21 @@ is out of date when its scope is the page's and the answers and ratings the
 server rendered equal one of those saves. The server holds that save, so the
 copy's later edits go back on top of it. Any other mismatch still deletes the
 copy. The scope check keeps another day's copy out even when both days'
-answers happen to match. Start over keeps the scope, so a copy survives it
-only when one of its saves equals the blank or scaffold page the server
-renders after it.
+answers happen to match. Start over advances the scope, refusing a pre-reset
+copy even when its saved answers match the new form.
+
+After Add expands the form, a saved attempt can match the original fields
+while newly rendered fields are empty and unrated in the server snapshot.
+Every original answer key and value must still match exactly, as must the
+entire ratings map. Only extra answer fields listed in `emptyUnratedSections`
+may be excluded from that comparison. The helper includes a field only when
+its persisted answer is absent or exactly `""`, and its rating key is absent.
+This permits displayed scaffold defaults without parsing scaffolds or
+duplicating the server's answered rules in JavaScript. It proves the current
+snapshot is empty and unrated, not that nobody ever edited and cleared it.
+Missing or changed original fields, additional ratings, another scope and
+malformed saved attempts still refuse recovery. The five-attempt bound is
+unchanged.
 
 The page decides this itself, by comparing what it sent with what the server
 rendered, rather than the server deciding. It works only when the server

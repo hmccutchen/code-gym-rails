@@ -60,7 +60,10 @@ read it before changing that area.
   dashboard keeps unsent answers in `code_gym/draft_store` and restores them
   only when the stored `DailyResponse#draft_token` matches the rendered one,
   or when the copy's draft scope matches and the rendered answers equal one
-  of the unconfirmed saves the copy lists. The last tab to edit owns the copy.
+  of the unconfirmed saves the copy lists. After Add, only extra fields the
+  server snapshot declares exactly empty and unrated may be omitted from
+  that comparison; original answers and the whole ratings map must match.
+  The last tab to edit owns the copy.
   The answers queue retries only saves that got no reply, never a refusal or
   5xx. Confirmed saves, submits, submitted dashboards and every signed-out
   page clear the copy, and submit always stays manual.
