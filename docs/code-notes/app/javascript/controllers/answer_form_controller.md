@@ -266,7 +266,11 @@ inserting missing section cards. It preserves existing nodes, input values,
 ratings, folds and duck drafts. Each newly inserted key adopts only its own
 server-computed answered membership and rendered rating before progress and
 teaching-hint locks are refreshed. It does not replace the answered state of
-existing live inputs with a status poll's older snapshot.
+existing live inputs with a status poll's older snapshot. An autosave reply
+from an older manifest also cannot replace that state. When no newer save is
+queued or scheduled and the form is still editable, it schedules an autosave
+of the expanded form so the server recomputes answered state. Stale and
+submitted replies keep their existing leave paths before this check.
 
 The controller rescans answer fields and advances the manifest revision only
 after the cards are present. `code-gym:sections-added` lets the existing

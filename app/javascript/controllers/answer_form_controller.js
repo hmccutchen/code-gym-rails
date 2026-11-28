@@ -210,7 +210,10 @@ export default class extends Controller {
           this.draft.discard()
           return this.reloadWhenOtherSavesLand()
         }
-        if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) this.applyServerState(data)
+        if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) {
+          if (data?.manifest_revision < this.manifestRevisionValue) this.autoSave()
+          else this.applyServerState(data)
+        }
       })
   }
 
