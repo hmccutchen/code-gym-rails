@@ -141,20 +141,16 @@ class DailyPlan
   private_class_method :shared_assignment
 
   def self.addition_gotcha_for(user, language, mode, featured, context)
-    return code_review_gotcha_for(user, language, mode, featured) unless context&.dig(:requested_kind)
-    return unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
-
-    excluded = context.fetch(:existing_concepts, []) + [ featured ]
-    entries = BugHuntGotchas.for_language(language).reject { |entry| excluded.include?(entry.concept) }
-    seen = BugHuntGotchas.last_seen_for(user)
-    entries.reject { |entry| seen.key?(entry.id) }.first || entries.min_by { |entry| seen.fetch(entry.id) }
+    excluded = context&.dig(:requested_kind) ? context.fetch(:existing_concepts, []) : []
+    code_review_gotcha_for(user, language, mode, featured, excluded_concepts: excluded)
   end
   private_class_method :addition_gotcha_for
 
-  def self.code_review_gotcha_for(user, language, mode, featured_concept)
+  def self.code_review_gotcha_for(user, language, mode, featured_concept, excluded_concepts: [])
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
 
-    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user), featured_concept: featured_concept)
+    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user),
+      featured_concept: featured_concept, excluded_concepts: excluded_concepts)
   end
   private_class_method :code_review_gotcha_for
 

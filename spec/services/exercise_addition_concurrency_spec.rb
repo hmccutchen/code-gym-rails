@@ -84,7 +84,8 @@ RSpec.describe "Exercise addition coordination on PostgreSQL" do
     end
     GenerateAdditionalExerciseJob.perform_now(addition_id: addition.id)
     expect(calls.size).to eq(1)
-    expect(ExerciseAdditionRequest.recover!(exercise)).to eq(:busy)
+    expect(ExerciseAdditionRequest.recover!(exercise)).to eq(:unchanged)
+    expect(addition.reload.status).to eq("running")
     release << true
     worker.join
 

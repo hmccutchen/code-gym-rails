@@ -15,7 +15,8 @@ is also what `inert` is set on.
 ## The server decides; the page shows its answer
 
 `answeredSections` and `submitBlocker` arrive as Stimulus values and are
-replaced by every autosave reply. The controller never judges an answer
+replaced by eligible autosave replies. A reply that predates pending edits
+does not replace the live state. The controller never judges an answer
 itself. That rule is the project's, not this file's, and it is why the
 progress count, the hint lock and the nudge all read the same two fields.
 
@@ -34,8 +35,9 @@ The form still carries `submit->answer-form#submit`. Nothing dispatches that
 event today, and the action exists so a field added later cannot post the day
 around this controller.
 
-The "One finish action" decision (`docs/decisions/one-finish-action.md`) says the Submit button is always clickable,
-and it still is. A click before the module loads is lost the same way a rating
+The "One finish action" decision (`docs/decisions/one-finish-action.md`) keeps validation feedback on Submit rather than maintaining a second browser
+readiness rule. Submission or a pending addition can still disable the action
+while the corresponding work is in flight. A click before the module loads is lost the same way a rating
 click is, and clicking again works.
 
 ## Delegated listeners
@@ -66,8 +68,7 @@ scheduled, so the example times out.
 
 ## Submit waits for the page's controllers
 
-Submit is always clickable, and the payload reads each section's hidden
-field. A kind whose answer only reaches that field through its own controller
+A permitted Submit click reads each section's hidden field. A kind whose answer only reaches that field through its own controller
 — the design comparison's pick and reason — would post the previous answer if
 the click landed before that controller connected. So `submit()` awaits
 `CodeGymBootstrap.ready`, which resolves once every controller on the page
@@ -202,7 +203,10 @@ note has them. The controller builds one on its first connect and calls
 draft scope the server rendered, and hands it plain data: the answers and
 ratings on screen (`onScreen()`) on every edit and every save attempt, and
 the ones the server rendered (`rendered()`, the textareas' `defaultValue`)
-when it connects. The controller keeps the parts that touch the page.
+when it connects. The rendered values also carry the server-computed empty,
+unrated persisted baseline used for appended-field recovery; display scaffolds
+do not become a client-side answered rule. The controller keeps the parts
+that touch the page.
 
 `restoreDraft()` asks the copy for the stored answers and ratings it may
 restore and puts them into the fields. A restored field is skipped when its value already differs from
@@ -254,3 +258,27 @@ ok save reply clears it inside `settle`; `draft_store.md` says why both leave
 a newer tab's copy alone. A successful submit, and a reply saying the day is
 already submitted, clear it whoever wrote it (`discard`), since the day is
 finished.
+
+## Incremental additions
+
+`reconcileStructure` checks scope, revision and submission state before
+inserting missing section cards. It preserves existing nodes, input values,
+ratings, folds and duck drafts. Each newly inserted key adopts only its own
+server-computed answered membership and rendered rating before progress and
+teaching-hint locks are refreshed. It does not replace the answered state of
+existing live inputs with a status poll's older snapshot.
+
+The controller rescans answer fields and advances the manifest revision only
+after the cards are present. `code-gym:sections-added` lets the existing
+Mermaid and code-lines controllers initialize their new descendants. Add
+requests and new submissions carry the current revision as well as scope.
+A `manifest_changed` or `addition_busy` submit reply unlocks the form,
+refreshes additions and shows the refusal without discarding drafts,
+reloading or submitting again.
+
+`additionState` disables Submit and replacement controls while generation is
+pending. A held submit keeps the sections wrapper itself non-inert so Swap
+recovery controls remain reachable; the existing traversal still makes each
+section's answer content inert. The sibling Add picker remains locked during
+that hold. Reconciliation never reconnects the whole form or replaces its
+DraftCopy.

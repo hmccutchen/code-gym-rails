@@ -36,12 +36,16 @@ class ExerciseAdditionsController < ApplicationController
     state = page_state
     return stale_reply unless state
 
-    if [ :accepted, :replayed ].include?(outcome.status)
-      render json: state, status: outcome.status == :accepted ? :accepted : :ok
-    else
-      render_json_error(t("exercise_additions.refused"), status: :conflict,
-        outcome: outcome.status.to_s, **state)
+    status, message = case outcome.status
+    when :accepted then return render json: state, status: :accepted
+    when :replayed then return render json: state, status: :ok
+    when :invalid then [ :unprocessable_content, "exercise_additions.refused" ]
+    when :key_required then [ :unprocessable_content, "flash.application.api_key_needed" ]
+    when :manifest_changed, :submitted, :busy, :unavailable then [ :conflict, "exercise_additions.refused" ]
+    when :failed then [ :service_unavailable, "exercise_additions.failed" ]
+    else raise ArgumentError, "Unhandled addition outcome: #{outcome.status.inspect}"
     end
+    render_json_error(t(message), status: status, outcome: outcome.status.to_s, **state)
   end
 
   private
@@ -58,7 +62,7 @@ class ExerciseAdditionsController < ApplicationController
 
     response = @exercise.daily_response || @exercise.build_daily_response(user: current_user, date: @exercise.date)
     { draft_scope: @exercise.draft_scope, manifest_revision: @exercise.manifest_revision,
-      section_keys: @exercise.active_section_keys, submitted: response.submitted?,
+      section_keys: @exercise.active_section_keys, answered_sections: response.answered_sections, submitted: response.submitted?,
       available_kinds: response.submitted? ? [] : ExerciseAddition.available_kinds(current_user, @exercise).map(&:key),
       operation: addition && { request_uuid: addition.request_uuid, kind: addition.kind,
         status: addition.status, expired: addition.expired? }, cards: cards(response) }

@@ -21,12 +21,19 @@ class GenerateAdditionalExerciseJob < ApplicationJob
     return unless claimed
 
     user, addition, token = claimed
+    key_used = user.key_in_use
     context = PracticeGeneration.capture_addition(user, addition: addition, claim: token)
     return ExerciseAdditionRequest.fail!(addition, claim: token) unless context
 
     generate(user, addition, token, context)
-  rescue ProviderError, SetupError => error
+  rescue ProviderError::AllSectionsRejectedError
     ExerciseAdditionRequest.fail!(addition, claim: token) if token
+  rescue ProviderError, SetupError => error
+    if token
+      ExerciseAdditionRequest.fail!(addition, claim: token) do |fresh|
+        fresh.report_call_failure(key_used) { fresh.record_generation_failure!(error, counts_toward_key_hold: false) }
+      end
+    end
     Rails.logger.warn("[exercise_addition_failed] addition=#{addition.id} error=#{error.class}")
   rescue StandardError
     ExerciseAdditionRequest.fail!(addition, claim: token) if token

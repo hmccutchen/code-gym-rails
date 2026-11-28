@@ -42,7 +42,7 @@ RSpec.describe "Practice generation additions" do
     expect(response.reload.attributes).to eq(response_before)
     expect(exercise.draft_scope).to eq(addition.draft_scope)
     expect(exercise.practice_schedule.except("continuation")).to eq(original.dig("plan_notes", "practice_schedule").except("continuation"))
-    expect(exercise.plan_notes.fetch("additions")).to have_key(addition.kind)
+    expect(exercise.plan_notes).not_to have_key("additions")
     expect(addition.reload.status).to eq("succeeded")
     expect(PracticeGeneration.commit_append(user, addition: addition, claim: context.fetch(:addition_claim),
       context: context, judged: judged, drafted_by: service).status).to eq(:superseded)
@@ -91,6 +91,21 @@ RSpec.describe "Practice generation additions" do
       context: context, judged: judged, drafted_by: service).status).to eq(:saved)
     expect(exercise.reload.active_section_keys).to eq([ "pattern", addition.kind ])
     expect(exercise.problem_set.dig("pattern", "answer_key")).to eq("Private key")
+  end
+
+  it "preserves existing unknown plan metadata without extending the retired additions ledger" do
+    original = { "pattern" => { "sequence" => 1, "assignment" => nil } }
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: { "pattern" => { "question" => "Old prompt" } },
+      plan_notes: { "additions" => original, "future_metadata" => { "keep" => true } })
+    addition = start_addition(exercise)
+    context = PracticeGeneration.capture_addition(user, addition: addition, claim: addition.claimed_at)
+    judged = service.generate_judged_exercise(user, language: exercise.language, schedule_context: context)
+
+    expect(PracticeGeneration.commit_append(user, addition: addition, claim: addition.claimed_at,
+      context: context, judged: judged, drafted_by: service).status).to eq(:saved)
+    expect(exercise.reload.plan_notes.fetch("additions")).to eq(original)
+    expect(exercise.plan_notes.fetch("future_metadata")).to eq("keep" => true)
   end
 
   [ nil, 1, 2 ].each do |version|

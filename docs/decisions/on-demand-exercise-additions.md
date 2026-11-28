@@ -29,9 +29,14 @@ merging one accepted section and its metadata atomically with success status.
 A stale result is discarded without another provider call.
 
 The strict initial schedule-note envelope and automatic sequence remain.
-Added assignment metadata is bounded by committed kinds in plan_notes.additions.
-Only the added kind's committed service enters the canonical continuation.
-Historical continuation translation uses the current planner's reader rules.
+Only the added kind's committed service enters the target's continuation.
+Append never rewrites a different exercise that supplied scheduling context.
+A target without a note receives the generated continuation, preserving
+captured prior service while recording its original active keys and no
+reconstructed initial assignments. Historical continuation translation uses
+the current planner's reader rules. No separate additions ledger is written:
+the continuation is the service record, and no reader needs duplicate
+assignment metadata. Existing unknown plan metadata is preserved.
 No new schedule format, mastery update or retention-interval change is added.
 Existing Bug Hunt trap exclusions apply in both addition directions. Prior
 exposure to other practice content is not a semantic spoiler guarantee.

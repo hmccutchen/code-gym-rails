@@ -153,3 +153,23 @@ Old web binaries ignore this revision. Mixed-version writers and rollback
 therefore restore the previous late-save limitation; the local probe and
 upgrade caveat are recorded in
 `docs/decisions/idempotent-saves-and-frozen-evidence.md`.
+
+## Manifest and addition coordination
+
+`active_section_keys` reads an explicit `section_order` manifest when present;
+null retains the row's historical layout. `manifest_revision` is that active
+list's length. Append grows it without changing `draft_scope`; replacement or
+reset changes the scope, so the pair distinguishes structural additions from
+a different exercise or cleared draft.
+
+`addition_pending?` asks whether a queued or running operation exists. It does
+not treat an elapsed deadline as permission to overlap a worker. Start over
+and regeneration claims check it under `with_response_locked`, and replacement
+commit checks again before destructive writes. Expired-operation recovery is
+service orchestration because it needs an advisory lock before row locks;
+callers perform it before these model operations. See the request service's
+code note for the preflight and locked expiry recheck.
+
+PR2's deployment plan requires compatible web and worker writers before Add
+is available; the older mixed-writer limitation above is not a supported
+rollout path. See `docs/decisions/on-demand-exercise-additions.md`.

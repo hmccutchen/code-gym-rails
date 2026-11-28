@@ -80,3 +80,18 @@ A `bug_hunt` day picks its trap from `BugHuntGotchas` here, never-seen-first fro
 Kind service and assignment service are scoped to the generated language.
 Delivered history is filtered by that language before its count window.
 This preserves opportunities when a mixed-language learner alternates languages.
+
+## Requested-kind additions
+
+An addition passes `requested_kind` through the existing single-slot selector.
+It uses the current pending, reinforcement, retention and drill priorities
+and the ordinary host rules for that kind. It does not advance the automatic
+turn. A concept still due after the initial exercise may be assigned again to
+another suitable kind: generated or unsubmitted work does not satisfy its
+retention obligation, and there is no blanket same-day concept exclusion.
+The provider also receives delivered-content history for variety guidance.
+
+Captured Bug Hunt traps remain excluded from other concept hosts. When adding
+a new Bug Hunt, `BugHuntGotchas.pick` also excludes concepts already exposed
+by the current set, using its existing never-seen-first ordering. These
+specific trap rules do not promise general semantic spoiler prevention.

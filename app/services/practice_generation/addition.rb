@@ -56,13 +56,10 @@ class PracticeGeneration::Addition < PracticeGeneration
     notes = exercise.plan_notes.deep_dup
     notes["kind_rungs"] = notes.fetch("kind_rungs", {}).merge(@judged.plan_notes.fetch("kind_rungs", {}).slice(key))
     notes["bug_hunt"] = @judged.plan_notes["bug_hunt"] if @judged.plan_notes["bug_hunt"]
-    notes["additions"] ||= {}
-    notes["additions"][key] = generated ? generated.slice("sequence").merge("assignment" => generated.fetch("assignments")[key]).compact : {}
     return notes unless generated
 
     generated = PracticeSchedule::Note.decode(generated)
-    canonical = @user.daily_exercises.where("plan_notes ? 'practice_schedule'").order(id: :desc).first
-    original = canonical&.practice_schedule || {}
+    original = exercise.practice_schedule
     combined = original.empty? ? generated.merge("selected_kinds" => exercise.active_section_keys, "assignments" => {}) : original.deep_dup
     # Translate legacy continuation through the current planner, preserving its original envelope.
     combined["version"] = 3
@@ -70,12 +67,7 @@ class PracticeGeneration::Addition < PracticeGeneration
     combined.delete("phase")
     combined.delete("omitted_kind")
     combined["continuation"] = merged_continuation(original, generated, key, exercise.language)
-    combined = PracticeSchedule::Note.decode(combined)
-    if canonical && canonical.id != exercise.id
-      canonical.update!(plan_notes: canonical.plan_notes.merge("practice_schedule" => combined))
-    else
-      notes["practice_schedule"] = combined
-    end
+    notes["practice_schedule"] = PracticeSchedule::Note.decode(combined)
     notes
   end
   def merged_continuation(original, generated, key, language)

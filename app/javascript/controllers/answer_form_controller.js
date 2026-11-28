@@ -165,6 +165,7 @@ export default class extends Controller {
       const html = data.cards?.[key]
       if (!html) return false
       this.sectionsTarget.insertAdjacentHTML("beforeend", html)
+      if (data.answered_sections?.includes(key)) this.answered.add(key)
       this.element.dispatchEvent(new CustomEvent("code-gym:sections-added", { bubbles: true }))
       this.formTarget.querySelectorAll(`button.rating-btn.active[data-rating-for="${key}"]`).forEach((button) => {
         this.ratings[key] = button.dataset.rating

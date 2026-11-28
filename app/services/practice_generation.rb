@@ -71,7 +71,7 @@ class PracticeGeneration
         next outcome(:superseded, exercise) unless exercise.user_id == fresh.id &&
           exercise.regenerating_since == claim && exercise.id == @context.fetch(:replacing_id) &&
           exercise.date == @context.fetch(:date) && current?(fresh, active: active, replacement: true)
-        next outcome(:superseded, exercise) if exercise.exercise_additions.active.exists?
+        next outcome(:superseded, exercise) if exercise.addition_pending?
         next outcome(response.replace_blocker, exercise) if response&.replace_blocker
 
         response&.destroy!

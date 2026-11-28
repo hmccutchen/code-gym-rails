@@ -23,6 +23,8 @@ class ExerciseAdditionRequest
   end
 
   def self.recover!(exercise)
+    return :unchanged unless exercise.exercise_additions.active.first&.expired?
+
     result = :deleted
     held = AdvisoryLock.hold(claim_key(exercise)) do
       with_locked(exercise) { |_user, current, _response| result = recover_locked!(current) }
@@ -39,8 +41,10 @@ class ExerciseAdditionRequest
   end
 
   def self.fail!(addition, claim:)
-    with_locked(addition.daily_exercise) do |_user, exercise, _response|
-      exercise.exercise_additions.lock.find_by(id: addition.id)&.fail_claim!(claim)
+    with_locked(addition.daily_exercise) do |user, exercise, _response|
+      failed = exercise.exercise_additions.lock.find_by(id: addition.id)&.fail_claim!(claim)
+      yield user if failed && block_given?
+      failed
     end
   end
 
@@ -85,9 +89,9 @@ class ExerciseAdditionRequest
   end
 
   def acceptance_refusal(user, exercise, response)
-    return :manifest_changed unless exercise.active_section_keys.size == @revision
+    return :manifest_changed unless exercise.manifest_revision == @revision
     return :submitted if response&.submitted?
-    return :busy if exercise.regenerating? || exercise.exercise_additions.active.exists?
+    return :busy if exercise.regenerating? || exercise.addition_pending?
     return :key_required unless user.provider_ready?
     :unavailable unless ExerciseAddition.available_kinds(user, exercise).any? { |kind| kind.key == @kind }
   end

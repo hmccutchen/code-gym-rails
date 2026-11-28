@@ -45,6 +45,27 @@ RSpec.describe "Adding an exercise", type: :system do
     expect(page).to have_css('[data-section-fold="code_review"]', count: 1)
   end
 
+  it "merges an appended saved answer without replacing existing live answer state" do
+    fill_in_answer("pattern", "Keep my existing explanation.")
+    rate_section("pattern")
+    wait_for_answers_settled
+    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    append_from_another_tab
+    user.daily_responses.sole.update!(answers: { "code_review" => "Move the query outside the loop." },
+      section_ratings: { "code_review" => "right_level" })
+
+    page.execute_script('window.dispatchEvent(new Event("focus"))')
+
+    expect(page).to have_css('[data-section-fold="code_review"]')
+    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
+    expect(find('textarea[data-field="code_review"]').value).to eq("Move the query outside the loop.")
+    expect(find('textarea[data-field="pattern"]').value).to eq("Keep my existing explanation.")
+    expect(find('button[data-rating-for="pattern"][data-rating="right_level"]')["aria-pressed"]).to eq("true")
+    expect(find('button[data-rating-for="code_review"][data-rating="right_level"]')["aria-pressed"]).to eq("true")
+    expect(user.daily_responses.sole.answers).to eq("code_review" => "Move the query outside the loop.")
+  end
+
   it "refreshes an unseen manifest before submitting without discarding the current answer" do
     fill_in_answer("pattern", "Reuse the cached result.")
     rate_section("pattern")
