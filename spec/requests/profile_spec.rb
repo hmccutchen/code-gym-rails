@@ -420,14 +420,15 @@ RSpec.describe "Profile", type: :request do
       expect { save_daily_sections("2") }.not_to(change { user.reload.section_kind_preferences_version })
     end
 
-    it "answers with the daily kinds the saved setting holds, so the page can tell its Exercise mix moved" do
+    it "retains historical counts while replying with the current recommendation preferences" do
       user.update!(daily_section_kinds: %w[code_review design_comparison pattern], daily_section_count: 3)
       login_as(user)
 
       save_daily_sections(1)
 
-      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review])
-      expect(response.parsed_body["rotates"]).to be(false)
+      expect(user.reload.daily_section_count).to eq(1)
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review design_comparison])
+      expect(response.parsed_body["rotates"]).to be(true)
 
       save_daily_sections("automatic")
 
@@ -450,14 +451,14 @@ RSpec.describe "Profile", type: :request do
       expect(response).to have_http_status(:ok)
       expect(user.reload).to have_attributes(daily_section_count: 4,
                                              daily_section_kinds: %w[code_review design_comparison pattern plan_review])
-      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review design_comparison pattern plan_review])
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[code_review design_comparison])
     end
 
     it "saves the kept section first under a setting of 1" do
       choose(1, %w[design_comparison code_review])
 
       expect(user.reload).to have_attributes(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
-      expect(response.parsed_body["daily_kinds"]).to eq(%w[design_comparison])
+      expect(response.parsed_body["daily_kinds"]).to eq(%w[design_comparison code_review])
     end
 
     it "stores the default pair as empty, so the account reads as untouched" do

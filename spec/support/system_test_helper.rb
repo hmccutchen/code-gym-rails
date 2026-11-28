@@ -66,6 +66,22 @@ module AnswerFormHelper
 end
 
 module TodaysSetHelper
+  def create_existing_set(user, keys: %w[code_review design_comparison])
+    daily = DailyKinds::DEFAULT
+    result = ProblemSetIngest.call(FakeService::EXERCISE_PROBLEM_SET.slice(*keys).deep_dup, language: "ruby_rails",
+      expected_keys: keys, daily: daily, pitched_at: keys.index_with { user.skill_level })
+    raise "Historical fixture lost a requested section" unless result.problem_set.keys.sort == keys.sort
+
+    user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+      problem_set: result.problem_set, plan_notes: { "daily_kinds" => daily.map(&:key), "size" => keys.size })
+  end
+
+  def visit_with_existing_set(user, **options)
+    create_existing_set(user, **options)
+    visit_as(user)
+    wait_for_js
+  end
+
   def visit_with_todays_set(user)
     perform_enqueued_jobs do
       GenerateDailyExercisesJob.perform_now(user_id: user.id)

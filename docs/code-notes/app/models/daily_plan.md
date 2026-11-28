@@ -6,46 +6,34 @@ No `code_review`, pattern or third section can host a fourth bucket's concepts, 
 
 ## `.for`
 
-A captured active schedule context selects `PracticeSchedule`, never additive
-coverage. `Result#kinds` then uses the explicit selection, since the regular
-pair may omit a place on variety days. The configured pair stays separate
-from the held kinds at fixed counts, so a temporary one-section setting
-does not impersonate a pair change. The method-length exemption keeps the
-legacy and enrolled assembly paths together while their decisions live in
-separate collaborators.
+All plans select one exercise through `PracticeSchedule.single_turn`.
+`Result#kinds` uses that explicit selection. The regular pair still supplies
+preference and retry-budget inputs and is recorded separately in the notes.
 
-The captured date controls weekday mode and the workload cutoff; persistence
-uses the same work date. Initial rotation history, due/overdue checks,
-inactive coverage and featured selection still read their live clocks.
+`.single_selection` builds `DayHosts` again for the selected kind before
+allocating concepts. For an active schedule, `PracticeSchedule.single_plan`
+uses that same turn and rereads eligible reinforcement and drill candidates.
+Filtering the original list could miss a concept that the preliminary hosts
+excluded before the history query applied its limit. Inactive plans use the
+existing concept tracks with the selected host and omit the schedule note.
+The final hosts also determine waiting retention reasons.
 
-For enrolled plans, `.protected_selection` selects the turn once through
-`PracticeSchedule.select_turn`, including replacement of a held turn. It then
-builds hosts from those actual selected kinds before passing that turn to
-`PracticeSchedule.plan` for matching and spare-host sharing. The configured
-pair remains metadata, not a reconstruction of the selected set.
-
-The initial hosts still inform optional-pool seeding. Reinforcement and drill
-candidates are read again under the selected set's restrictions: filtering
-the old list cannot recover a concept that an omitted bug hunt had withheld
-before the history reader's limit. Final hosts also determine waiting reasons.
-The single picked trap applies only when the selected set contains CodeReview;
-the same applicability rule supplies the result, prompt and ladders. Adding
-the bug hunt withholds its concept without clearing requests or crediting
-service; omitting it removes that restriction. Replacement preserves its whole
-original continuation and does not select or spend another turn.
-
-The plan chooses the day's concepts so the caller can compare what was offered with what the provider used (`GenerationDiagnostics`' retention log).
-
-Rotation receives delivered/scheduled history independently of performance.
-`.size_for(user, before:)` returns fixed settings before replay, otherwise
-passes one exclusive date bound to `CompetencyGate`. The fold owns both
-strict results and basic core completion. `DaySize` exposes that one count
-and persistent coverage safety hold. `Result#notes(kind_rungs:)` serializes
-the draft's captured input map without making the plan query difficulty.
+The captured work date controls weekday mode. Kind selection uses delivered
+history and keeps it separate from assessed performance. The history window
+covers at least two eligible-kind rotations so overdue planning-host
+opportunities survive supplementary Bug Hunt deliveries. `.size_for` returns
+`DaySize.initial` for every new plan. The initial count is one, independent of the competency gate and coverage
+exception. Historical records retain their stored layout; obsolete planning
+algorithm cleanup is tracked in #862.
+`Result#notes(kind_rungs:)` records the draft's captured rung map without
+querying difficulty. The plan also lets retention diagnostics compare the
+concepts offered with those the provider used.
 
 ## `.concept_tracks`
 
-The fourth track takes the day's fourth kind from the planned kinds, so a daily fourth and a rotated fourth are planned the same way. Under the pair's layout a day never holds two. `Result#fourth` is derived from `#kinds` the same way rather than stored beside the rotation, so a hand-built plan cannot name one fourth kind in its rotation and another in its prompt lines.
+The fourth track takes its kind from the explicit selection.
+`Result#fourth` also reads `#kinds`, so the plan and prompt use the same
+kind.
 
 The fourth track also asks `DayHosts` which concepts that kind can tag, through `fourth_track(..., hosts:)`, for its reinforcement, its overdue check, its due checks and its established concepts. It used to take every concept in the bucket, because the fourth kind alone tags that bucket. It matters when the week's featured concept (`Result#featured_concept`) is one the fourth kind hides from itself: that concept is no longer planned onto the section, and a due check on it lands in `waiting_checks` as `no_host` until the week turns over (`docs/decisions/the-weekly-featured-concept.md`). On a day with a featured concept, `.for` also builds a `DayHosts` without it, and `waiting_checks` marks a `no_host` check `held_by_featured: true` when that one would host it; a day without a featured concept builds no second `DayHosts` and marks nothing. For any other day the answer is the kind's whole vocabulary, so nothing changes.
 
@@ -67,7 +55,7 @@ The files roll says only whether today's `code_review` may show several files; i
 
 ## `.hostable_buckets`
 
-Only `.established_concepts_for` reads this bucket list. Established concepts are optional prompt annotations, not concepts the prompt demands, so the looser bucket rule is enough there; reinforcement and retention checks use `DayHosts` instead. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, rather than always including the language, so a pair whose only regular section is architecture never lists a language concept. For the default pair the list is unchanged: the language first, then `architecture` when that kind is planned.
+Only `.established_concepts_for` reads this bucket list. Established concepts are optional prompt annotations, not concepts the prompt demands, so the looser bucket rule is enough there; reinforcement and retention checks use `DayHosts` instead. The buckets come from the day's non-fourth kinds, through `ConceptBucket.for`, so an architecture-only plan lists concepts from that bucket.
 
 ## `.retention_checks_for`
 
@@ -87,4 +75,8 @@ A weekday rolls `CODE_REVIEW_MODE_WEIGHTS`, which holds no `bug_hunt`. A weekend
 
 ## `.code_review_gotcha_for`
 
-A `bug_hunt` day picks its trap from `BugHuntGotchas` here, never-seen-first from `plan_notes["bug_hunt"]`, and `Result#notes` writes the id back there. The trap is picked once, on every `bug_hunt` roll, and `.day_gotcha` attaches it only to a version of the day whose plan includes a `code_review` section; a plan without one records none. A planned section the judge or ingest drops still records the trap, and `BugHuntGotchas.last_seen_for` is what requires delivery before the trap counts as seen. `.for` builds `DayHosts` through `hosts_for`, so when coverage adds `code_review`, the tracks are replanned with hosts that withhold the trap's concept from the other sections. The planner and the prompt therefore always see the same trap (#656). `BugHuntGotchas.last_seen_for` counts a day only when its stored `code_review` section has a `purpose`, so a section the judge or ingest dropped never counts as seen. It doesn't depend on the concept tracks, since a `bug_hunt` section serves no reinforcement entry or retention check. A `bug_hunt` day is also single-file without rolling: `ExerciseSection::CodeReview.multi_file_mode?` says so.
+A `bug_hunt` day picks its trap from `BugHuntGotchas` here, never-seen-first from `plan_notes["bug_hunt"]`, and `Result#notes` writes the id back there. The trap is picked once, on every `bug_hunt` roll, and `.day_gotcha` attaches it only to a version of the day whose plan includes a `code_review` section; a plan without one records none. `.for` uses the same selection to build the final `DayHosts` and attach the trap to the result, which keeps the planner, prompt, and ladders consistent. `BugHuntGotchas.last_seen_for` counts a day only when its stored `code_review` section has a `purpose`, so a section the judge or ingest dropped never counts as seen. It doesn't depend on the concept tracks, since a `bug_hunt` section serves no reinforcement entry or retention check. A `bug_hunt` day is also single-file without rolling: `ExerciseSection::CodeReview.multi_file_mode?` says so.
+
+Kind service and assignment service are scoped to the generated language.
+Delivered history is filtered by that language before its count window.
+This preserves opportunities when a mixed-language learner alternates languages.

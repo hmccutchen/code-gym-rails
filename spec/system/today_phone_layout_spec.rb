@@ -6,7 +6,7 @@ RSpec.describe "Today's phone layout", type: :system do
   def visit_today(width: 390, height: 844, prefs: {}, user: create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS))
     resize(width, height: height)
     user.update!(display_preferences: prefs)
-    visit_with_todays_set(user)
+    visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
   end
 
   # Playwright can't emulate display-mode, so the layout's standalone rule is switched on through the CSSOM.

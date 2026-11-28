@@ -43,13 +43,18 @@ RSpec.describe "Welcome", type: :request do
     expect(box["data-welcome-setup-url-value"]).to eq(setup_path)
   end
 
-  it "names the regular pair and explains within-capacity variety under the active default" do
+  it "introduces one substantial exercise and names the initial regular preferences" do
     login_as(new_account)
     get "/welcome"
 
     names = DailyKinds::DEFAULT.map { |kind| I18n.t("sections.#{kind.key}.name") }.to_sentence
     expect(response.body).to include(ERB::Util.h(I18n.t("protected_practice.welcome.daily_sections", sections: names)))
     expect(names).to eq("Code Review and Design Comparison")
+    expect(response.body).to include("Each new session starts with one substantial exercise.")
+    expect(response.body).not_to include("two-section days", "two daily sections", "Fixed counts")
+    %w[welcome.daily_sections protected_practice.welcome.daily_sections].each do |key|
+      expect(I18n.t(key, sections: names)).to include("one substantial exercise", "guide recommendations")
+    end
   end
 
   it "says what each track's exercises are like, never a job title" do

@@ -30,7 +30,6 @@
     "controllers/concept_alternates_controller": "/assets/controllers/concept_alternates_controller-DIGEST.js",
     "controllers/copy_text_controller": "/assets/controllers/copy_text_controller-DIGEST.js",
     "controllers/daily_kind_swap_controller": "/assets/controllers/daily_kind_swap_controller-DIGEST.js",
-    "controllers/daily_sections_controller": "/assets/controllers/daily_sections_controller-DIGEST.js",
     "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-DIGEST.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-DIGEST.js",
     "controllers/exercise_mix_controller": "/assets/controllers/exercise_mix_controller-DIGEST.js",
@@ -75,7 +74,6 @@
 <link rel="modulepreload" href="/assets/controllers/concept_alternates_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/copy_text_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/daily_kind_swap_controller-DIGEST.js" nonce="NONCE">
-<link rel="modulepreload" href="/assets/controllers/daily_sections_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/display_preferences_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/exercise_mix_controller-DIGEST.js" nonce="NONCE">
@@ -610,7 +608,7 @@
         </button>
       </div>
       <div class="daily-kind-choosing" data-daily-kind-swap-target="choosing">
-        <p class="daily-kind-note" id="daily-kind-0-next-set">Your current set keeps its sections. This starts with your next set.</p>
+        <p class="daily-kind-note" id="daily-kind-0-next-set">Your current set keeps its sections. This changes your preferences for future recommendations.</p>
           <div class="daily-kind-list">
             <fieldset id="daily-kind-0-picker" class="daily-kind-picker" data-daily-kind-swap-target="picker"
                       data-action="change->daily-kind-swap#choose">
@@ -629,7 +627,7 @@
   <span class="daily-kind-option-name">
     <input type="radio" form="daily-kind-swap" name="daily_kind_0" id="daily-kind-0-design_comparison" value="design_comparison" disabled="disabled" aria-labelledby="daily-kind-0-design_comparison-name daily-kind-0-design_comparison-badge-0" aria-describedby="daily-kind-0-design_comparison-short daily-kind-0-design_comparison-guide" data-daily-kind-swap-target="option" data-state="disabled">
     <span class="daily-kind-name" id="daily-kind-0-design_comparison-name">Design Comparison</span>
-      <span class="daily-kind-badge" id="daily-kind-0-design_comparison-badge-0">Already daily</span>
+      <span class="daily-kind-badge" id="daily-kind-0-design_comparison-badge-0">Already regular</span>
   </span>
   <span class="daily-kind-line" id="daily-kind-0-design_comparison-short">Both work — pick the one that suits the system.</span>
   <span id="daily-kind-0-design_comparison-guide" class="daily-kind-example" hidden="hidden" data-daily-kind-swap-target="example" data-kind="design_comparison"><strong>Example:</strong> A grocery list app will add new kinds of items later. Piece A and Piece B both save an item today, built two different ways. You choose one and point to the sentence that settles it.</span>
@@ -716,29 +714,24 @@
       </div>
       <div class="daily-kind-sheet-footer">
     <div id="daily-kind-0-pattern-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="pattern">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
 </div>    <div id="daily-kind-0-challenge-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="challenge">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
 </div>    <div id="daily-kind-0-architecture-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="architecture">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
-        <p>Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
 </div>    <div id="daily-kind-0-security_review-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="security_review">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
-        <p>Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
 </div>    <div id="daily-kind-0-parsons_problem-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="parsons_problem">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
 </div>    <div id="daily-kind-0-plan_review-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="plan_review">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
-        <p>Ambiguity Hunt and Pseudocode to Code won&#39;t appear on their own while Plan Review is a daily section. Swap one of them in to get it back.</p>
-        <p>Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
+        <p>Ambiguity Hunt and Pseudocode to Code stay outside the recommendation pool while Plan Review is a regular preference. Swap one of them in to get it back.</p>
 </div>    <div id="daily-kind-0-ambiguity_hunt-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="ambiguity_hunt">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
-        <p>Plan Review and Pseudocode to Code won&#39;t appear on their own while Ambiguity Hunt is a daily section. Swap one of them in to get it back.</p>
-        <p>Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
+        <p>Plan Review and Pseudocode to Code stay outside the recommendation pool while Ambiguity Hunt is a regular preference. Swap one of them in to get it back.</p>
 </div>    <div id="daily-kind-0-pseudocode_to_code-consequences" class="daily-kind-consequences" hidden="hidden" data-daily-kind-swap-target="consequences" data-kind="pseudocode_to_code">
-        <p class="daily-kind-warning">Code Review can return through an eligible variety place. Automatic two-section sets rotate a variety place, then show the regular pair twice; fixed or larger sets pause this cycle.</p>
-        <p>Plan Review and Ambiguity Hunt won&#39;t appear on their own while Pseudocode to Code is a daily section. Swap one of them in to get it back.</p>
-        <p>Your two daily sections will no longer look at the same idea from different sides on the same day.</p>
+        <p class="daily-kind-warning">Code Review remains eligible for future recommendations when your preferences allow it.</p>
+        <p>Plan Review and Ambiguity Hunt stay outside the recommendation pool while Pseudocode to Code is a regular preference. Swap one of them in to get it back.</p>
 </div>  <p class="daily-kind-error" id="daily-kind-0-error" role="status" data-daily-kind-swap-target="error"></p>
   <div class="daily-kind-actions">
     <button type="button" class="btn btn-primary" disabled data-label="Swap"

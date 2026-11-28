@@ -131,7 +131,7 @@ RSpec.describe GenerateDailyExercisesJob do
     end
 
     it "releases the claim when the commit is superseded" do
-      stub_provider(user) { |caller| User.find(caller.id).update!(daily_section_count: 2) }
+      stub_provider(user) { |caller| User.find(caller.id).update!(skill_level: "senior") }
 
       described_class.perform_now(user_id: user.id)
 

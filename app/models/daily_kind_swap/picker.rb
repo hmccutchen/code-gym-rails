@@ -91,22 +91,11 @@ class DailyKindSwap::Picker
   end
 
   def consequences(kind)
-    DailyKindSwap::Consequences.for(pair: @pair, place: @place, kind: kind, preferences: preferences, day: day,
-                                    languages: languages, pair_shares: pair_shares?)
+    DailyKindSwap::Consequences.for(pair: @pair, place: @place, kind: kind, preferences: preferences,
+      practice_policy: practice_policy)
   end
 
   def preferences = @preferences ||= KindPreferences.for(@user)
 
-  def languages = @languages ||= ConceptBucket.language_buckets_for(@user.language)
-
-  def day
-    @day ||= DailyKindSwap::Consequences::Day.new(setting: @user.daily_section_count, planned_size: @exercise.planned_size,
-                                                  brake: @exercise.planned_under_brake?, held: DailyKinds.for(@user).size,
-                                                  practice_policy: PracticePolicyMode.display_status(@user))
-  end
-
-  def pair_shares?
-    @pair_shares = DailyKindSwap::Consequences.shares_a_concept?(@pair, languages) if @pair_shares.nil?
-    @pair_shares
-  end
+  def practice_policy = @practice_policy ||= PracticePolicyMode.display_status(@user)
 end

@@ -1,20 +1,36 @@
 class PracticeSchedule
   Selection = Data.define(:kinds, :rotation, :assignments, :notes, :continuation)
 
+  def self.single_turn(**options) = SingleSlot.plan(**options)
+
+  def self.single_plan(context:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false, turn: nil)
+    options = { context: context, daily: daily, preferences: preferences, evidence: evidence, hosts: hosts,
+      rotation_history: rotation_history, due: due, drills: drills, replacing: replacing }
+    plan(**options, count: 1, setting: nil, turn: turn || single_turn(**options))
+  end
+
   def self.plan(context:, count:, setting:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false,
                 regular: daily.first(DailyKinds::COUNT), turn: nil)
     turn ||= select_turn(context: context, count: count, setting: setting, daily: daily, regular: regular, preferences: preferences,
       evidence: evidence, hosts: hosts, rotation_history: rotation_history, due: due, drills: drills, replacing: replacing)
+    prior_service = turn.note.fetch("continuation").fetch("service")
+    prior_service = prior_service.fetch(hosts.language, {}) if turn.note["version"] == 3
     assignments, service = Assignments.plan(kinds: turn.kinds, hosts: hosts, pending: evidence.fetch(:pending),
       reinforcement: evidence.fetch(:reinforcement, []), due: due, drills: drills,
-      service: turn.note.fetch("continuation").fetch("service"), sequence: turn.note.fetch("sequence"))
+      service: prior_service, sequence: turn.note.fetch("sequence"))
     assignments = SharedConcept.on_spare_hosts(assignments, evidence.fetch(:reinforcement, []), hosts, kinds: turn.kinds, daily: daily)
     note = turn.note.deep_dup
     note["assignments"] = assignments.transform_values do |entry|
       { "concept" => entry.fetch(:concept), "bucket" => entry.fetch(:bucket),
         "reason" => entry.fetch(:reason), "adjustment" => entry.fetch(:mode, "normal") }
     end
-    note["continuation"]["service"] = service unless replacing
+    unless replacing
+      if note["version"] == 3
+        note["continuation"]["service"][hosts.language] = service
+      else
+        note["continuation"]["service"] = service
+      end
+    end
     Selection.new(kinds: turn.kinds, rotation: turn.rotation, assignments: assignments,
       notes: Note.decode(note), continuation: note.fetch("continuation"))
   end

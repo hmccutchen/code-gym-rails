@@ -199,7 +199,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     user.update!(display_preferences: { "font" => "opendyslexic" })
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_css("pre.snippet")
 
       family = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).fontFamily") }
@@ -213,7 +213,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     user.update!(display_preferences: { "font" => "opendyslexic" })
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       wraps = page.evaluate_script(<<~JS)
         (() => {
           const main = document.querySelector("main");
@@ -231,7 +231,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     user.update!(display_preferences: { "font" => "atkinson" })
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_css("pre.snippet")
 
       family = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).fontFamily") }
@@ -247,7 +247,7 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_css(".progress-sticky")
 
       sticky = page.evaluate_script("(() => { const s = document.querySelector('.progress-sticky'); return [s.scrollHeight, s.clientHeight]; })()")

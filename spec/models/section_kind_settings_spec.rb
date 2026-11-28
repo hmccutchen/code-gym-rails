@@ -1,10 +1,10 @@
 require "rails_helper"
 
 RSpec.describe SectionKindSettings do
-  def settings(stored: {}, section_count: nil, **values)
+  def settings(stored: {}, **values)
     defaults = { section_kind_weights: {}, excluded_section_kinds: [], section_kind_levels: {}, locked_section_kinds: [],
                  daily_section_kinds: [] }
-    described_class.new(**defaults.merge(values), stored: defaults.merge(stored), section_count: section_count)
+    described_class.new(**defaults.merge(values), stored: defaults.merge(stored))
   end
 
   let(:thirds) { ExerciseSection.thirds.map(&:key) }
@@ -52,18 +52,27 @@ RSpec.describe SectionKindSettings do
   end
 
   it "accepts a weight on a stored extra section the setting leaves rotating" do
-    expect(settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 2,
+    expect(settings(daily_section_kinds: %w[code_review design_comparison challenge],
                     section_kind_weights: { "challenge" => 2.0 }).problems).to eq([])
   end
 
-  it "refuses a weight on an extra section the setting puts in every set" do
-    expect(settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 3,
+  it "accepts a weight on a former fixed extra now offered by the recommendation pool" do
+    expect(settings(daily_section_kinds: %w[code_review design_comparison challenge],
                     section_kind_weights: { "challenge" => 2.0 }).problems)
-      .to eq([ [ :section_kind_weights, "names an unknown section kind: challenge" ] ])
+      .to eq([])
+  end
+
+  it "uses the same regular preference pair for every historical count" do
+    [ nil, *User::DAILY_SECTION_COUNTS ].each do |count|
+      user = User.new(daily_section_kinds: %w[code_review design_comparison challenge], daily_section_count: count)
+      value = described_class.for(user)
+
+      expect(value.daily).to eq(DailyKinds::DEFAULT)
+    end
   end
 
   it "checks emptied slots against the pair alone, since rotation fills no place a chosen extra section holds" do
-    pinned = settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 3,
+    pinned = settings(daily_section_kinds: %w[code_review design_comparison challenge],
                       excluded_section_kinds: thirds - %w[challenge])
 
     expect(pinned.problems).to eq([])
@@ -105,10 +114,10 @@ RSpec.describe SectionKindSettings do
     expect(hidden.keep_unrendered(name: "Kept")).to eq(name: "Kept")
   end
 
-  it "keeps the stored weight of an extra section the setting puts in every set, since Setup renders no slider for it" do
-    pinned = settings(daily_section_kinds: %w[code_review design_comparison challenge], section_count: 3,
+  it "allows the newly visible weight of a former fixed extra to be cleared" do
+    pinned = settings(daily_section_kinds: %w[code_review design_comparison challenge],
                       section_kind_weights: { "challenge" => 2.0 })
 
-    expect(pinned.keep_unrendered(section_kind_weights: {})).to eq(section_kind_weights: { "challenge" => 2.0 })
+    expect(pinned.keep_unrendered(section_kind_weights: {})).to eq(section_kind_weights: {})
   end
 end

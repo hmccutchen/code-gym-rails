@@ -18,7 +18,8 @@ RSpec.describe PracticeGeneration do
       result = service.generate_judged_exercise(user, language: "ruby_rails", schedule_context: context)
       first = described_class.commit_new(user, context: context, judged: result, language: "ruby_rails", drafted_by: service)
       expect(first.status).to eq(:saved)
-      expect(first.exercise.active_section_keys).to match_array(DailyKinds::DEFAULT.map(&:key))
+      expect(first.exercise.active_section_keys).to eq(first.exercise.practice_schedule.fetch("selected_kinds"))
+      expect(first.exercise.active_section_keys.size).to eq(1)
       expect(first.exercise.plan_notes).not_to have_key("coverage")
       expect(first.exercise.practice_schedule).to include("policy" => 2, "sequence" => 1)
       expect(user.daily_responses).to be_empty
@@ -31,13 +32,44 @@ RSpec.describe PracticeGeneration do
       second = described_class.commit_new(user, context: next_context, judged: next_result, language: "ruby_rails", drafted_by: service)
       expect(second.status).to eq(:saved)
       expect(second.exercise.practice_schedule["sequence"]).to eq(2)
-      expect(second.exercise.active_section_keys.size).to eq(DailyKinds::COUNT)
+      expect(second.exercise.active_section_keys.size).to eq(1)
       expect(first.exercise.reload.practice_schedule["sequence"]).to eq(1)
       untouched = create_fake_provider_user
       inactive = described_class.capture(untouched, date: Date.current)
       expect(inactive[:active]).to be(false)
       expect(untouched.daily_exercises).to be_empty
     end
+  end
+
+  it "records the accepted single exercise as the active section manifest" do
+    user.update!(daily_section_count: 1)
+    context = described_class.capture(user, date: Date.current)
+    judged = service.generate_judged_exercise(user, language: "ruby_rails", schedule_context: context)
+
+    result = described_class.commit_new(user, context: context, judged: judged,
+      language: "ruby_rails", drafted_by: service)
+
+    expect(result.status).to eq(:saved)
+    expect(result.exercise.reload.section_order).to eq(judged.problem_set.keys)
+    expect(result.exercise.problem_set.size).to eq(1)
+    expect(result.exercise.active_section_keys).to eq(judged.problem_set.keys)
+  end
+
+  it "replaces a historical set with the accepted single exercise manifest" do
+    user.update!(daily_section_count: 1)
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
+      problem_set: { "pattern" => { "question" => "The original exercise" } }, section_order: %w[pattern])
+    claim = exercise.claim_regenerating!
+    context = described_class.capture(user, date: exercise.date, replacing: exercise)
+    judged = service.generate_judged_exercise(user, language: "ruby_rails", schedule_context: context)
+
+    result = described_class.commit_replacement(user, exercise: exercise, claim: claim,
+      context: context, judged: judged, drafted_by: service)
+
+    expect(result.status).to eq(:saved)
+    expect(exercise.reload.section_order).to eq(judged.problem_set.keys)
+    expect(exercise.active_section_keys.size).to eq(1)
+    expect(exercise.practice_schedule).to eq({})
   end
 
   def judged(context)
@@ -52,6 +84,52 @@ RSpec.describe PracticeGeneration do
       rotation_history: [], due: [], drills: [], replacing: context[:replacing_id].present?)
     judged(context).with(problem_set: selection.kinds.to_h { |kind| [ kind.key, { "question" => "A generated task" } ] },
       plan_notes: { "daily_kinds" => DailyKinds::DEFAULT.map(&:key), "practice_schedule" => selection.notes })
+  end
+
+  def single_judged(context, selected: %w[pattern])
+    judged(context).with(plan_notes: {
+      "daily_kinds" => DailyKinds::DEFAULT.map(&:key),
+      "practice_schedule" => {
+        "version" => 2, "policy" => 2, "sequence" => 1, "initial_ready" => false,
+        "regular_kinds" => DailyKinds::DEFAULT.map(&:key), "selected_kinds" => selected,
+        "assignments" => {}, "continuation" => { "kind_service" => { "pattern" => 1 }, "service" => {} }
+      }
+    })
+  end
+
+  it "commits the single-slot note and its matching manifest together" do
+    context = described_class.capture(user, date: Date.current)
+    result = described_class.commit_new(user, context: context, judged: single_judged(context),
+      language: "ruby_rails", drafted_by: service)
+
+    expect(result.status).to eq(:saved)
+    expect(result.exercise.reload.section_order).to eq(%w[pattern])
+    expect(result.exercise.practice_schedule).to include("version" => 2, "selected_kinds" => %w[pattern])
+  end
+
+  [ {}, { "code_review" => {} }, { "pattern" => {}, "code_review" => {} } ].each do |content|
+    it "rejects single-slot content #{content.keys.inspect} that differs from the selected kind" do
+      context = described_class.capture(user, date: Date.current)
+      result = single_judged(context).with(problem_set: content)
+
+      expect do
+        described_class.commit_new(user, context: context, judged: result,
+          language: "ruby_rails", drafted_by: service)
+      end.to raise_error(ArgumentError, "Generated sections do not match the selected exercise")
+      expect(user.daily_exercises).to be_empty
+    end
+  end
+
+  it "rejects a multi-section initial write even when the note supports a later appended session" do
+    context = described_class.capture(user, date: Date.current)
+    result = single_judged(context, selected: %w[pattern code_review])
+      .with(problem_set: { "pattern" => {}, "code_review" => {} })
+
+    expect do
+      described_class.commit_new(user, context: context, judged: result,
+        language: "ruby_rails", drafted_by: service)
+    end.to raise_error(ArgumentError, "Generated sections do not match the selected exercise")
+    expect(user.daily_exercises).to be_empty
   end
 
   [ false, true ].each do |change_after_capture|
@@ -76,16 +154,19 @@ RSpec.describe PracticeGeneration do
       end
       result = service.generate_judged_exercise(caller, language: "ruby_rails", schedule_context: context)
       expect(result.schedule_context).to equal(context)
-      expect(result.problem_set.keys).to match_array(%w[architecture pattern code_review])
-      expect(result.plan_notes).to include("size" => 3, "daily_kinds" => %w[architecture pattern code_review])
+      expect(result.problem_set.keys.size).to eq(1)
+      expect(result.plan_notes).to include("size" => 1)
       expect(result.plan_notes.fetch("practice_schedule").fetch("regular_kinds")).to eq(%w[architecture pattern])
       expect(result.problem_set.transform_values { |section| section["pitched_at"] })
-        .to eq("architecture" => "junior", "pattern" => "senior", "code_review" => "mid_level")
+        .to eq(context.fetch(:kind_rungs).slice(*result.problem_set.keys))
       expect(inputs).not_to be_empty
       inputs.each do |options, text|
         expect(options[:skill_level]).to eq("junior")
         expect(options[:difficulty].locked?(ExerciseSection::Pattern)).to be(true)
-        expect(text).to include("Sections at junior: architecture", "Sections at senior: pattern", "Sections at mid_level: code_review")
+        expect(options[:kind_rungs]).to eq(context.fetch(:kind_rungs))
+        result.problem_set.each_key do |key|
+          expect(text).to include("Sections at #{context.fetch(:kind_rungs).fetch(key)}: #{key}")
+        end
       end
       expect(user.reload.attributes.slice(*described_class::SETTINGS)).to eq(saved_settings)
       outcome = described_class.commit_new(caller, context: context, judged: result, language: "ruby_rails", drafted_by: service)
@@ -103,9 +184,48 @@ RSpec.describe PracticeGeneration do
     user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current, problem_set: prior.problem_set, plan_notes: note)
     user.update!(daily_section_kinds: %w[architecture pattern])
     expect(PracticeEvidence).to receive(:for).with(an_instance_of(User), before: Date.current,
-      kinds: %w[architecture pattern], initial_ready: true).and_call_original
+      kinds: KindPreferences.offered_to(user).map(&:key), initial_ready: true).and_call_original
     carried = described_class.capture(user, date: Date.current)
     expect(carried[:evidence]).to include(initial_reviewed_sets: 2, struggle: {}, pending: [])
+  end
+
+  it "captures reviewed struggle for an optional kind that can become the single recommendation" do
+    exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
+      problem_set: { "pattern" => { "concept" => "memoization" } })
+    user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: Time.current,
+      answers: { "pattern" => "Cache the computed result." }, section_ratings: { "pattern" => "too_hard" },
+      concept_tags: { "pattern" => "memoization" }, ai_review: { "pattern" => { "rating" => "developing" } })
+
+    context = described_class.capture(user, date: Date.current)
+
+    expect(context.fetch(:evidence).fetch(:struggle)).to include("pattern" => true)
+  end
+
+  %i[provider_failure all_rejected].each do |failure|
+    it "keeps the committed single-slot service history when the next generation ends in #{failure}" do
+      pin_code_review_mode(:application_code)
+      context = described_class.capture(user, date: Date.yesterday)
+      first_judged = service.generate_judged_exercise(user, language: "ruby_rails", schedule_context: context)
+      previous = described_class.commit_new(user, context: context, judged: first_judged,
+        language: "ruby_rails", drafted_by: service).exercise
+      note = previous.practice_schedule
+      expect(note.fetch("version")).to eq(3)
+      expect(note.dig("continuation", "kind_service")).not_to be_empty
+      if failure == :provider_failure
+        allow_any_instance_of(FakeService).to receive(:generate_problem_set).and_raise(ProviderError, "Draft failed")
+      else
+        allow_any_instance_of(FakeService).to receive(:judge_section)
+          .and_return(JudgeVerdict.new(status: :reject, principle: "underdetermined"))
+      end
+
+      GenerateDailyExercisesJob.perform_now(user_id: user.id)
+
+      expect(user.daily_exercises.count).to eq(1)
+      expect(user.daily_exercises.find_by(date: Date.current)).to be_nil
+      expect(previous.reload.practice_schedule).to eq(note)
+      expect(PracticeSchedule.context_for(user)).to eq(note)
+      expect(user.reload.last_generation_error_date).to eq(Date.current)
+    end
   end
 
   it "does not spend a turn while capturing and rejects a different-date stale completion" do
@@ -126,7 +246,21 @@ RSpec.describe PracticeGeneration do
     expect(user.daily_exercises.count).to eq(1)
   end
 
-  it "rejects count and baseline changes without overwriting them or buying another call" do
+  it "commits an in-flight draft after only the retired count changes" do
+    context = described_class.capture(user, date: Date.current)
+    draft = single_judged(context)
+    user.update!(daily_section_count: 2)
+
+    result = described_class.commit_new(user, context: context, judged: draft,
+      language: "ruby_rails", drafted_by: service)
+
+    expect(result.status).to eq(:saved)
+    expect(result.exercise.reload.problem_set).to eq(draft.problem_set)
+    expect(result.exercise.section_order).to eq(%w[pattern])
+    expect(user.reload.daily_section_count).to eq(2)
+  end
+
+  it "rejects baseline changes without overwriting them or buying another call" do
     context = described_class.capture(user, date: Date.current)
     user.update!(daily_section_count: 2, skill_level: "senior")
     expect(described_class.commit_new(user, context: context, judged: judged(context), language: "ruby_rails", drafted_by: service).status).to eq(:superseded)
@@ -203,7 +337,7 @@ RSpec.describe PracticeGeneration do
   end
 
   %w[pattern code_review].each do |old_key|
-    it "clears the previous manifest when it listed #{old_key}" do
+    it "replaces the previous manifest when it listed #{old_key}" do
       exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current,
         problem_set: { old_key => {} }, section_order: [ old_key ])
       claim = exercise.claim_regenerating!
@@ -213,7 +347,7 @@ RSpec.describe PracticeGeneration do
         judged: active_judged(context), drafted_by: service)
 
       expect(result.status).to eq(:saved)
-      expect(exercise.reload.section_order).to be_nil
+      expect(exercise.reload.section_order).to eq(%w[code_review design_comparison])
       expect(exercise.active_section_keys).to eq(%w[code_review design_comparison])
     end
   end

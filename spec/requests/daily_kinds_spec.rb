@@ -36,9 +36,9 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(body["panels"].keys).to eq(%w[0 1])
     expect(body["panels"].values).to all(include(%(data-version="#{version}")))
     expect(body["panels"]["1"]).to include(%(aria-label="Swap Design Comparison for another kind"))
-      .and include("Your next set uses #{I18n.t("sections.architecture.name")} here.")
+      .and include("#{I18n.t("sections.architecture.name")} is now one of your regular preferences.")
       .and include(%(id="daily-kind-1-design_comparison"))
-    expect(body["panels"]["0"]).to include(%(<span class="daily-kind-badge" id="daily-kind-0-architecture-badge-0">Already daily</span>))
+    expect(body["panels"]["0"]).to include(%(<span class="daily-kind-badge" id="daily-kind-0-architecture-badge-0">Already regular</span>))
     expect(exercise.reload.problem_set.keys).to eq(%w[code_review design_comparison])
   end
 
@@ -52,7 +52,7 @@ RSpec.describe "Swapping a daily section kind", type: :request do
     expect(sheet["aria-labelledby"]).to eq("daily-kind-0-title")
     expect(sheet.at_css("#daily-kind-0-title").text).to eq(I18n.t("daily_kinds.picker.title"))
     expect(sheet.at_css("label[data-kind='code_review'] .daily-kind-badge.daily-kind-badge-now").text).to eq("Now")
-    expect(sheet.at_css("label[data-kind='plan_review'] .daily-kind-badge:not(.daily-kind-badge-now)").text).to eq("Already daily")
+    expect(sheet.at_css("label[data-kind='plan_review'] .daily-kind-badge:not(.daily-kind-badge-now)").text).to eq("Already regular")
     expect(sheet.at_css("#daily-kind-0-ambiguity_hunt")["disabled"]).not_to be_nil
     expect(sheet.at_css("#daily-kind-0-ambiguity_hunt-note").text)
       .to eq("Only one of Plan Review, Ambiguity Hunt and Pseudocode to Code can be a daily section.")
@@ -160,7 +160,7 @@ RSpec.describe "Swapping a daily section kind", type: :request do
 
     expect(body["panels"].keys).to eq(%w[0 1])
     expect(body["panels"]["0"]).to include(%(data-version="#{user.reload.section_kind_preferences_version}"))
-      .and include("Swap Code Review").and include("Your next set uses #{I18n.t("sections.pattern.name")} here.")
+      .and include("Swap Code Review").and include("#{I18n.t("sections.pattern.name")} is now one of your regular preferences.")
 
     swap(1, "design_comparison")
     expect(response).to have_http_status(:unprocessable_content)

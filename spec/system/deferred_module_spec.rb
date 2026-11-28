@@ -59,7 +59,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
   it "waits for a page that arrives in parts to finish parsing before checking the modules have not run" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       deliver_html_in_two_parts
 
       reload_with_modules_stalled do |pw|
@@ -71,7 +71,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
   it "drops a Submit click made while the modules are still loading rather than posting the day" do
     travel_to(a_weekday) do
       watch_page_errors
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_content(/Code Review/i)
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
@@ -119,7 +119,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     travel_to(a_weekday) do
       watch_page_errors
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_content(/Code Review/i)
 
       reload_with_modules_stalled do |pw|
@@ -145,7 +145,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     travel_to(a_weekday) do
       watch_page_errors
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
@@ -186,7 +186,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     end
 
     travel_to(a_weekday) do
-      visit_with_todays_set(many)
+      visit_with_existing_set(many, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       url = page.current_url
       stalled[:held] = "answer_form_controller"
@@ -231,7 +231,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     reason = "Piece A keeps the retry bounded, which the stated requirement asks for here."
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
       fill_in_answer("design_comparison", reason)
       rate_section("design_comparison")
@@ -255,7 +255,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     travel_to(a_weekday) do
       watch_page_errors
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_content(/Code Review/i)
 
       url = page.current_url
@@ -295,7 +295,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
     note = "Typed before the note controller connected."
 
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_css("#learner-note textarea")
       url = page.current_url
       stalled[:held] = "learner_note_controller"
@@ -536,7 +536,7 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
 
     travel_to(a_weekday) do
       watch_page_errors
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       expect(page).to have_css(%([data-comparison-answer="design_comparison"]))
 
       reload_with_modules_stalled do |pw|

@@ -13,7 +13,7 @@ RSpec.describe "Save status", type: :system do
 
   it "reports a dropped connection while answers are auto-saving" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
 
       break_the_network
@@ -27,7 +27,7 @@ RSpec.describe "Save status", type: :system do
 
   it "replaces a stale answer form when another tab has submitted the day" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       exercise = user.daily_exercises.sole
       saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,
@@ -44,7 +44,7 @@ RSpec.describe "Save status", type: :system do
 
   it "reloads a form left open across a regeneration instead of saving into the new set" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       user.daily_exercises.sole.update!(generated_at: 1.minute.from_now)
 
@@ -57,7 +57,7 @@ RSpec.describe "Save status", type: :system do
 
   it "shows a carried explanation on the page the reload lands on" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       page.execute_script("window.CodeGymSaveStatus.carry('answers', 'That last change wasn\\'t saved')")
 
@@ -69,7 +69,7 @@ RSpec.describe "Save status", type: :system do
 
   it "shows a carried explanation only once" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       page.execute_script("window.CodeGymSaveStatus.carry('answers', 'That last change wasn\\'t saved')")
 
@@ -84,7 +84,7 @@ RSpec.describe "Save status", type: :system do
 
   it "keeps a carried explanation off a page it was not about" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       page.execute_script("window.CodeGymSaveStatus.carry('answers', 'A message about the dashboard')")
 
@@ -97,7 +97,7 @@ RSpec.describe "Save status", type: :system do
 
   it "reloads a stale rated form without restoring a skipped section's discarded rating" do
     travel_to(a_weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
       exercise = user.daily_exercises.sole
       saved = user.daily_responses.create!(daily_exercise: exercise, date: exercise.date,

@@ -35,19 +35,18 @@ RSpec.describe GenerateDailyExercisesJob do
     expect(service).to receive(:generate_judged_exercise).once do |_caller, language:, schedule_context:|
       expect(schedule_context[:active]).to be(false)
       expect(language).to eq("ruby_rails")
-      User.find(user.id).update!(daily_section_count: 2)
+      User.find(user.id).update!(skill_level: "senior")
       AiService::JudgedSet.new(problem_set: { "code_review" => { "question" => "paid draft" } },
         dropped_sections: [], outcomes: {}, plan_notes: {}, schedule_context: schedule_context)
     end
     expect { described_class.new.perform(user_id: user.id) }.not_to change { user.daily_exercises.count }
-    expect(user.reload).to have_attributes(daily_section_count: 2, last_generation_error_date: Date.current,
+    expect(user.reload).to have_attributes(skill_level: "senior", last_generation_error_date: Date.current,
       last_generation_error: "Settings or another set changed while this set was being prepared. Generate again when ready.")
   end
 
   describe "concept write-ups for the new set" do
     let(:tagged_set) do
-      { "code_review" => { "question" => "q", "concept" => "n_plus_one" },
-        "design_comparison" => { "question" => "q", "concept" => "memoization" } }
+      { "code_review" => { "question" => "q", "concept" => "n_plus_one" } }
     end
 
     it "queues the user's missing write-ups at background priority once the set is saved" do
@@ -72,7 +71,7 @@ RSpec.describe GenerateDailyExercisesJob do
       move_to_solid_queue(ActiveJob::Base.queue_adapter.enqueued_jobs.select { |job| job["queue_name"] == "provider_calls" })
 
       expect(solid_queue_claim_order("provider_calls"))
-        .to eq(%w[GenerateDailyExercisesJob GenerateConceptReferenceJob GenerateConceptReferenceJob])
+        .to eq(%w[GenerateDailyExercisesJob GenerateConceptReferenceJob])
     end
 
     it "queues none for a concept the set hides until it is submitted" do
@@ -342,37 +341,37 @@ RSpec.describe GenerateDailyExercisesJob do
     end
   end
 
-  it "judges on the cron path and records dropped sections" do
-    stub_provider(problem_set: { "code_review" => { "question" => "q", "concept" => "n_plus_one" } }, dropped: [ "pattern" ])
+  it "judges one exercise on the cron path without unrequested dropped sections" do
+    stub_provider(problem_set: { "code_review" => { "question" => "q", "concept" => "n_plus_one" } })
 
     travel_to(Time.utc(2026, 7, 13, 15, 0)) do
       run_batch_and_its_jobs
       exercise = DailyExercise.find_by(user: user, date: Date.current)
-      expect(exercise.dropped_sections).to eq([ "pattern" ])
+      expect(exercise.dropped_sections).to eq([])
     end
   end
 
   it "judges an on-demand generation on a weekday" do
     user.update!(language: "javascript")
-    svc = stub_provider(dropped: [ "pattern" ])
+    svc = stub_provider
 
     travel_to(Time.utc(2026, 7, 13, 6, 0)) do
       described_class.new.perform(user_id: user.id)
 
       expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: true))
-      expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "pattern" ])
+      expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([])
     end
   end
 
   it "judges an on-demand generation on a weekend too, since its code review is a bug hunt" do
     user.update!(language: "javascript")
-    svc = stub_provider(dropped: [ "design_comparison" ])
+    svc = stub_provider
 
     travel_to(Time.utc(2026, 7, 18, 12, 0)) do
       described_class.new.perform(user_id: user.id)
 
       expect(svc).to have_received(:generate_judged_exercise).with(user, language: "javascript", schedule_context: hash_including(active: true))
-      expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([ "design_comparison" ])
+      expect(DailyExercise.find_by(user: user, date: Date.current).dropped_sections).to eq([])
     end
   end
 

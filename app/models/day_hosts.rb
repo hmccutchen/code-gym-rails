@@ -1,5 +1,7 @@
 # The plan passes no rungs, so each kind reads the strictest list: the plan never reads difficulty targets.
 class DayHosts
+  attr_reader :language
+
   def initialize(language, mode:, gotcha: nil, featured_concept: nil, rungs: {})
     @language         = language
     @mode             = mode

@@ -703,14 +703,14 @@ RSpec.describe "Small screen layout", type: :system do
           end
         end
 
-        it "draws provider and Daily sections segments" do
+        it "draws provider segments" do
           user = three_key_user
           user.update!(display_preferences: prefs)
           resize(width)
           visit_settings_open(user)
           apply_text_spacing if prefs.any?
 
-          { "#provider-choice" => 3, "#daily-sections" => User::DAILY_SECTION_COUNTS.size + 1 }.each do |control, count|
+          { "#provider-choice" => 3 }.each do |control, count|
             facts = segment_facts(control)
             expect(facts.size).to eq(count)
             expect(facts.map(&:first)).to all(be >= 44)
@@ -726,7 +726,7 @@ RSpec.describe "Small screen layout", type: :system do
           page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
           fail_requests_to(profile_path)
 
-          find("#daily-sections .segment", text: "2").click
+          find("#level-suggestions").click
           expect(page).to have_css("#save-status", visible: :visible)
 
           banner, focused, viewport = page.evaluate_script(<<~JS)
@@ -750,11 +750,9 @@ RSpec.describe "Small screen layout", type: :system do
         resize(320)
         visit_settings_open(user)
         apply_text_spacing
-        find("#daily-sections .segment", text: "4").click
-        expect(page).to have_css("#daily-sections-choice-4", visible: :visible)
 
         facts = value_row_facts
-        expect(facts.size).to eq(5)
+        expect(facts.size).to eq(3)
         facts.each do |_height, shown, selected, clipped, overflow, too_narrow|
           expect(shown).to eq(selected)
           expect([ clipped, overflow, too_narrow ]).to eq([ false, false, false ])

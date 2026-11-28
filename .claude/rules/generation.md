@@ -30,6 +30,12 @@ paths:
 
 # Generation, judging and section kinds
 
+The initial draft and its schema request only the kind chosen by `DailyPlan`.
+A successful commit writes the delivered key in `section_order` with its
+content. Read active sections through `DailyExercise#active_section_keys`
+for both new manifests and historical sets.
+See [Single initial exercise](../../docs/decisions/single-initial-exercise.md).
+
 Enrolled protected-practice generation takes one captured adjustment per
 kind through prompt, retry and ingest. Locks suppress easing and gap help;
 only simplified reasoning stamps eased. Validate fixed concepts on the
@@ -77,11 +83,10 @@ read it before changing that area.
   `GenerationPrompt::RetryReasons`, or no reason when none is recorded, and
   never the draft or the judge's own words; a judge failure keeps the draft,
   except where the kind's `.ships_unjudged?` says no (a `bug_hunt` section,
-  or a `code_review` with files, is dropped);
-  a day with every section dropped raises `AllSectionsRejectedError` and
-  writes no row. A dropped kind still counts as
-  scheduled, and nothing in the rotation compensates, on purpose; drops
-  supply no workload completion credit. The judge sees one section
+  or a `code_review` with files, is dropped). When the only planned section
+  is dropped, `AllSectionsRejectedError`
+  leaves generation eligible for the existing retry flow. Failed generation
+  earns no scheduling service or workload credit. The judge sees one section
   with no concept history, answer keys, `SERVER_STAMPS` or the kind's
   `.judge_hidden_fields`, plus the kind's `.judge_attachment` (a multi-file
   code review's files, every line numbered).
@@ -138,10 +143,11 @@ read it before changing that area.
   traps a formatter rewrites. What needs a re-measure is listed once, at
   the end of the decision doc's measurement section; the run steps are in
   `docs/code-notes/script/bug_hunt_measure.md`.
-- **Design comparison, the second fixed section**
-  (`docs/decisions/design-comparison-the-second-fixed-section.md`): The second
-  default daily kind (`ExerciseSection::DesignComparison`): two working pieces that
-  differ on one principle; the engineer picks one and names the deciding fact.
+- **Design comparison**
+  (`docs/decisions/design-comparison-the-second-fixed-section.md`):
+  `ExerciseSection::DesignComparison` is one of the default preferred kinds.
+  The exercise offers two working pieces that differ on one principle.
+  The engineer picks one and names the deciding fact.
   The server rolls A/B order in `.arrange!`. `answer_key` never reaches the
   page, the judge, the duck (which gains only `piece_a` and `piece_b`) or the
   `[difficulty_diagnostics]` log before review, and the judge's outcomes for
@@ -153,8 +159,7 @@ read it before changing that area.
   `.reject_unusable!` refuses unusable pieces or keys; `DEFERRED_CONCEPTS`
   stay out of its vocabulary; `.rejudge_edits?` is true only here;
   `REJECT_SOLVE_MISMATCH_BELOW_PRINCIPAL` stays false until a person has read
-  the disagreements; its reference stays closed until opened. A day still
-  holds at most `ExerciseSection::MAX_SECTIONS`, daily kinds first.
+  the disagreements; its reference stays closed until opened.
 - **Scenario flavor** (`docs/decisions/scenario-flavor.md`): Each day's
   scenario setting comes from one prompt line offering a pool from
   `ScenarioPools::ALL`, rolled once a day by `DailyPlan`

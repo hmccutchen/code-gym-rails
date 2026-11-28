@@ -78,7 +78,20 @@ class GeminiCapacityProbe
     def elapsed_ms(started) = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
   end
 
-  def self.calls_per_day = 1 + DailyKinds::COUNT + DailyKinds::COUNT + 1 + 1 + DUCK_TURNS
+  class MemoryResponse < DailyResponse
+    def update!(attributes)
+      assign_attributes(attributes)
+      true
+    end
+  end
+
+  def self.review_calls(kinds: nil)
+    (kinds&.size || DaySize.initial.count) + 1 + Array(kinds).count(&:translated_before_grading?)
+  end
+
+  def self.calls_per_day(kinds: nil)
+    1 + (kinds&.size || DaySize.initial.count) + review_calls(kinds: kinds) + 1 + DUCK_TURNS
+  end
 
   def initialize(api_key:, user:, pace: DEFAULT_PACE_SECONDS, max_days: nil, out: $stdout,
                  output_dir: Rails.root.join(OUTPUT_DIR), adapter: [ :net_http ], sleeper: ->(seconds) { sleep(seconds) })
@@ -92,16 +105,17 @@ class GeminiCapacityProbe
     @sleeper    = sleeper
     @attempts   = AttemptLog.new
     @records    = []
+    @completed_days = []
+    @planned_calls = {}
     @captured   = 0
     @calls_made = 0
     @last_step_attempts = 0
-    @user.daily_section_count = CompetencyGate::FLOOR
   end
 
   def run
     Time.use_zone(@user.effective_time_zone) do
       @output_dir.mkpath
-      @out.puts "Probing with user #{@user.id} (#{language}); #{self.class.calls_per_day} calls per tester-day, pace #{@pace}s."
+      @out.puts "Probing with user #{@user.id} (#{language}); at least #{self.class.calls_per_day} calls per tester-day, pace #{@pace}s."
       day = 0
       loop do
         day += 1
@@ -123,11 +137,15 @@ class GeminiCapacityProbe
     return false if stopped?
     return true if draft.nil?
 
-    judge(day, draft) && review(day, draft) && reference(day, draft) && duck(day, draft)
+    @planned_calls[day] = self.class.calls_per_day(kinds: draft.kinds)
+    @out.puts "  planned #{@planned_calls.fetch(day)} requests for #{draft.kinds.map(&:key).join(', ')}"
+    completed = judge(day, draft) && review(day, draft) && reference(day, draft) && duck(day, draft)
+    @completed_days << day if completed && @records.last.ok?
+    completed
   end
 
   def judge(day, draft)
-    draft.plan.daily_kinds.each do |kind|
+    draft.kinds.each do |kind|
       section = draft.problem_set[kind.key] or next
       step(day, "judge #{kind.key}") do
         service.judge_section(@user, kind, section, rung: draft.difficulty.rung_for(kind, skill_level: @user.skill_level),
@@ -139,37 +157,43 @@ class GeminiCapacityProbe
   end
 
   def review(day, draft)
-    exercise = DailyExercise.new(user: @user, date: Date.current, problem_set: draft.problem_set,
-                                 plan_notes: draft.plan.notes, language: language, generated_at: Time.current)
+    exercise = exercise_for(draft)
     sections = exercise.active_section_keys
-    response = DailyResponse.new(user: @user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
+    response = MemoryResponse.new(user: @user, daily_exercise: exercise, date: Date.current, submitted_at: Time.current,
                                  answers: sections.index_with { |key| sample_answer(key) },
                                  section_ratings: sections.index_with { "right_level" })
-    step(day, "review (#{sections.size} grading + difficulty)", requests: sections.size + 1) do
+    step(day, "review (#{sections.size} grading + difficulty)", requests: self.class.review_calls(kinds: draft.kinds)) do
       service.review_sections(@user, exercise, response, sections: sections)
     end
     !stopped?
   end
 
   def reference(day, draft)
-    concept = draft.problem_set.dig(ExerciseSection::CodeReview.key, "concept").presence || "other"
-    step(day, "reference #{concept}") { service.generate_concept_reference(@user, concept, language) }
+    key = draft.kinds.sole.key
+    concept = draft.problem_set.dig(key, "concept").presence || "other"
+    bucket = ConceptBucket.for(key, draft.language)
+    step(day, "reference #{concept}") { service.generate_concept_reference(@user, concept, bucket) }
     !stopped?
   end
 
   def duck(day, draft)
-    exercise = DailyExercise.new(user: @user, date: Date.current, problem_set: draft.problem_set,
-                                 plan_notes: draft.plan.notes, language: language)
-    thread   = []
+    exercise = exercise_for(draft)
+    key = exercise.active_section_keys.sole
+    thread = []
     DUCK_MESSAGES.first(DUCK_TURNS).each_with_index do |message, turn|
       answer = step(day, "duck turn #{turn + 1}") do
-        service.duck_response(@user, exercise, section: ExerciseSection::CodeReview.key, message: message, thread: thread)
+        service.duck_response(@user, exercise, section: key, message: message, thread: thread)
       end
       return false if stopped?
 
       thread += [ { role: "user", content: message }, { role: "assistant", content: answer.to_s } ]
     end
     true
+  end
+
+  def exercise_for(draft)
+    DailyExercise.new(user: @user, date: Date.current, problem_set: draft.problem_set,
+      section_order: draft.kinds.map(&:key), plan_notes: draft.plan.notes, language: draft.language, generated_at: Time.current)
   end
 
   def sample_answer(key)
@@ -308,11 +332,14 @@ class GeminiCapacityProbe
     return "not a daily limit" unless hit.quota_id.to_s.match?(ProviderFailure::DAILY_QUOTA_PATTERN)
     return "unknown (no quotaValue)" unless hit.quota_value.to_s.match?(/\A\d+\z/)
 
-    hit.quota_value.to_i / self.class.calls_per_day
+    calls = @planned_calls[hit.day]
+    return "unknown (no completed draft)" unless calls
+
+    hit.quota_value.to_i / calls
   end
 
   def tokens_per_completed_day
-    completed = @records.group_by(&:day).select { |_, rows| rows.size >= self.class.calls_per_day && rows.none?(&:rate_limited?) }
+    completed = @records.group_by(&:day).slice(*@completed_days)
     completed.transform_values { |rows| rows.sum(&:tokens) }
   end
 

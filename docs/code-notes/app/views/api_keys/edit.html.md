@@ -3,8 +3,8 @@
 ## Card order
 
 The page is four cards on `.phone-page`: Connection (the key, the provider
-choice, the exercise language and Save), Your day (time zone, Daily
-sections, Track), then the Exercise mix and Display disclosures, which are
+choice, the exercise language and Save), Your day (time zone and Track),
+then the Exercise mix and Display disclosures, which are
 `details.card`. The Connection heading carries a "Tap Save to apply" tag
 (`.card-heading` and `.card-tag`). Track has its own inline preview with
 explicit Apply and Cancel; the other preference controls save by themselves.
@@ -154,10 +154,8 @@ snapshot, taken for an account with a key, doesn't carry the guide.
 
 - The level suggestions switch and the Account nudges switch say "Saved" on a
   status line under the switch (`save_switch_controller`).
-- The time zone, Daily sections, exercise mix and Display controls say
-  nothing when a save works. A failure shows in the fixed `#save-status`
-  banner, except a Daily sections choice the server refuses, which shows
-  inside the open chooser so the person can change it there.
+- The time zone, exercise mix and Display controls say nothing when a save
+  works. A failure shows in the fixed `#save-status` banner.
 - Track selection shows loading, unsaved consequences or an error inline.
   Apply and Cancel are explicit; Refresh preview can recover a lost successful
   reply. The consequence partial is server-rendered, and Apply stays disabled
@@ -189,9 +187,6 @@ a minimum height. The rules sit with the markup that needs them:
   rules, because neither the page nor the difficulty partial carries that
   class.
 - Display's option labels are 44px, in `api_keys/_display_preferences`.
-- The Daily sections labels are `.segment`s, which carry their own 44px height.
-  The chooser's keep options are `label.daily-sections-option` rows, 48px
-  like the difficulty options, and its extra-section selects are value rows.
 
 48px is the size the other cards use for a row. The About summary and the
 slider are secondary controls, so they stay at 44px, shorter than a switch
@@ -199,16 +194,16 @@ row; 44px is still above the WCAG 2.5.8 minimum of 24px.
 
 ## Daily and single-kind groups
 
-These groups complement the rotating loop below them: a slot holding one
-candidate has nothing to weigh or exclude, but its difficulty can still be
-set. The user's daily kinds (`DailyKinds.for`) share one group because they
-share a promise, that they are in every set. The other groups come from
-`ExerciseSection.optional_slots` for that pair, so a daily kind is never
-offered a weight or an exclusion. Any other single-kind slot appears in some sets only, so it
-gets a group of its own. When the Daily sections setting leaves nothing to
-rotate (`DailyKinds.rotates?`), every group after the daily one keeps its
-controls but is labelled "not in your sets at this setting", under one note,
-since its settings apply again once the setting changes.
+The regular kinds (`DailyKinds.for`) share one group of recommendation
+preferences. Each new session starts with one exercise, so membership never
+promises that a kind appears every day. The other groups come from
+`ExerciseSection.optional_slots` for that pair. Existing difficulty, frequency
+and exclusion controls keep their registered-kind rules.
+
+Setup no longer renders daily-count controls. Historical count values and
+stored extra kinds remain untouched, while the current regular pair and
+eligible kinds determine the controls shown. No replacement count setting
+is introduced.
 
 ## Rotating groups
 
@@ -221,30 +216,25 @@ without an edit here.
 
 Each row asks two separate questions, and each gets its own labelled
 fieldset. A rotating row has "How often" (the weight slider and Skip) and
-"How hard" (the difficulty target and lock); a row that is always in the set,
-or alone in its slot, has only "How hard", since there is nothing to weigh.
+"How hard" (the difficulty target and lock); a regular-preference row,
+or one alone in its slot, has only "How hard", since there is nothing to weigh.
 The two intro notes use the same two names, so a reader can match the text
 to the controls. The kind's name heads the row above both fieldsets, and each
 fieldset's accessible name is the kind's name plus its legend. The How often
 fieldset holds its slider, stop and Skip in a `.mix-frequency-controls`
 wrapper, which carries the grid, for the fieldset reason below.
 
-Every group after the daily one is named by the kinds it holds
-("Added on some days, one of: …"), never by a position such as "third
-section". A slot is not a place in the day: rotation fills slots by
-staleness, so the "third" slot can be a day's third or fourth section, and a
-daily extra taken from a slot's list leaves that slot in place. A name by
-position told people the wrong section.
+Every group after the regular preferences is named by the kinds it holds
+("Other eligible kinds: …"). These groups describe the preference controls,
+not a required number or position of exercises in a session.
 
 ## Where the behavior lives
 
-This page carries no script. Its controls are wired by four Stimulus
+This page carries no script. Its controls are wired by three Stimulus
 controllers, each with a note of its own:
 
 - `profile_preferences_controller` — the time zone and Skill level controls,
   and the skill-level labels inside the difficulty fieldsets.
-- `daily_sections_controller` — the Daily sections radios and their
-  choosers, rendered by `api_keys/_daily_sections`.
 - `exercise_mix_controller` — the sliders, exclusions, difficulty radios,
   locks, the preferences version and the ladder-preparation button.
 - `display_preferences_controller` — the Display disclosure, rendered by

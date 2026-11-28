@@ -51,9 +51,10 @@ folder, so a migration spec added later is covered without opting in.
 capybara-playwright-driver) covering flows unit/request specs can't fully
 verify — rating-gated submit, review loading state — driven exclusively
 against a `FakeService` (`provider: "fake"`) test user, never a real API key.
-`FakeService` returns every section kind at once rather than the two to four
-a real provider is asked for, so system specs can't assert which third
-`DailyPlan` chose — cover that in service/job specs instead.
+`FakeService` returns every section kind at once; the generation pipeline
+keeps the one kind the new-session planner requested. Test kind selection in
+service/job specs. System specs pin only the initial equal-weight default-pair
+tie to Code Review; learning priorities and other candidate groups remain real.
 `FakeService` picks each reply by the request's purpose from its `REPLIES`
 table, and raises on a purpose with no entry. It answers `judge_section` with
 a canned `keep` verdict (plus a matching `better` for a kind the judge solves
@@ -92,11 +93,15 @@ motion first (`emulate_media(reducedMotion: "reduce")`), since a click can press
 on one row and release on another while it slides;
 `docs/code-notes/spec/system/daily_kind_swap_spec.md` has the details.
 
-A system spec that needs today's set calls `visit_with_todays_set(user)`,
+A system spec that needs a newly generated set calls `visit_with_todays_set(user)`,
 which generates it before the first page load, since visiting first would wait
 out the dashboard's 3-second "generating" poll, and returns only once every
 controller on the page has connected (`wait_for_js`). `dashboard_generation_spec.rb` is
 the one spec that goes through that poll on purpose.
+Tests of existing multi-section interactions use `visit_with_existing_set(user,
+keys:)`, which ingests the requested fake sections into a historical set with
+no manifest. They do not change the new-session planner or reinterpret stored
+counts as current workload settings.
 Running them locally requires a one-time install of the pinned Playwright CLI
 and a Chromium build, the same commands CI runs:
 

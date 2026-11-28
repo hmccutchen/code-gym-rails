@@ -6,6 +6,8 @@ RSpec.describe "Authentic PR Review", type: :request do
   it "generates, submits, grades, and replays an ordinary progression-eligible review" do
     user.update!(skill_level: "mid_level")
     pin_code_review_mode(:application_code)
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::CodeReview)
     allow(WeightedRoll).to receive(:pick)
       .with(ExerciseSection::CodeReview::PrReview::SELECTION_WEIGHTS).and_return("acceptable")
 

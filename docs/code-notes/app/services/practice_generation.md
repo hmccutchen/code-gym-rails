@@ -1,5 +1,21 @@
 # app/services/practice_generation.rb
 
+## Capture and commit
+
+`.capture` freezes the owner's settings, date, and schedule context under
+the user lock. Active capture reads practice evidence for all offered kinds
+through `KindPreferences.offered_to`, so eligible optional kinds can carry
+their own requests and struggle evidence. Initial commit checks the captured
+predecessor again. An existing set for the date wins a duplicate attempt.
+
+Commit writes `section_order` with the content. For formats 2 and 3, the generated
+keys must match the single selected key. Historical-format and inactive
+results derive the manifest through the recorded layout. Replacement checks
+the exercise claim under lock and writes content and manifest together. For
+a row with a schedule, the replacement's single-slot plan already carries the
+original turn and service continuation. Replacement of a row without a
+schedule leaves the schedule absent.
+
 ## `#record_judge_solves`
 
 `#commit_new` and `#commit_replacement` call it inside the transaction that

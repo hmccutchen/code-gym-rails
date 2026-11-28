@@ -28,7 +28,7 @@ RSpec.describe "Requesting an AI review", type: :system, with_csrf: true do
     weekday = a_weekday
 
     travel_to(weekday) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
       expect(page).to have_content(/Code Review/i)
 
       fields = all("textarea[data-field]").map { |area| area["data-field"] }.uniq

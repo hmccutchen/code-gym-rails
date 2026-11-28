@@ -8,7 +8,7 @@ class DailyKinds
 
   MOST = ExerciseSection::MAX_SECTIONS
 
-  def self.for(user) = held(user.daily_section_kinds, user.daily_section_count)
+  def self.for(user) = pair(user)
 
   def self.pair(user) = pair_of(user.daily_section_kinds)
 
@@ -17,7 +17,7 @@ class DailyKinds
   # A fixed setting holds that many places; Automatic holds the pair and lets the gate grow the day.
   def self.held(keys, setting) = normalize(keys).first((setting || COUNT).clamp(FEWEST, MOST))
 
-  def self.rotates?(user) = user.daily_section_count.nil? || self.for(user).size < user.daily_section_count.clamp(FEWEST, MOST)
+  def self.rotates?(_user) = true
 
   def self.shared_pair(kinds) = kinds.size < COUNT ? [] : kinds.first(COUNT)
 

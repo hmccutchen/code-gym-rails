@@ -1,5 +1,25 @@
 require "rails_helper"
 
+RSpec.shared_context "a multi-section pipeline plan" do
+  before do
+    rotation = nil
+    allow(DailyPlan).to receive(:size_for) do |account, **|
+      daily = DailyKinds.for(account)
+      history = account.recent_exercise_history(limit: SectionRotation::LOOKBACK)
+      rotation = SectionRotation.for(history, count: account.daily_section_count || CompetencyGate::FLOOR,
+        preferences: KindPreferences.for(account), daily: daily)
+      DaySize.for(setting: ExerciseSection.for_plan(daily: daily, rotation: rotation).size)
+    end
+    allow(DailyPlan).to receive(:single_selection) do |_account, daily, _preferences, _history, _due, _hosts, context, hosts_for|
+      raise "The multi-section fixture is for direct pipeline calls" if context.fetch(:active)
+
+      kinds = ExerciseSection.for_plan(daily: daily, rotation: rotation)
+      selection = PracticeSchedule::Turns::Result.new(kinds: kinds, rotation: rotation, note: {})
+      [ selection, hosts_for.call(kinds) ]
+    end
+  end
+end
+
 RSpec.describe AiService do
   let(:user) { User.create!(email: "prompt@example.com") }
 
@@ -169,6 +189,8 @@ RSpec.describe AiService do
   end
 
   describe "single-shot purposes" do
+    include_context "a multi-section pipeline plan"
+
     SINGLE_SHOT_PURPOSES = %w[
       generate_exercise
       retry_section
@@ -1790,6 +1812,8 @@ RSpec.describe AiService do
   end
 
   describe "generation runs the ingest boundary" do
+    include_context "a multi-section pipeline plan"
+
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
     it "runs on generation, so a bad diagram never reaches a persisted problem set" do
@@ -2002,6 +2026,8 @@ RSpec.describe AiService do
   end
 
   describe "#generate_judged_exercise, the drafted set" do
+    include_context "a multi-section pipeline plan"
+
     before { user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS) }
 
     it "refuses an unsupported language with a setup error before planning" do
@@ -2140,7 +2166,7 @@ RSpec.describe AiService do
       def capture_prompt_for(third:)
         svc = double_class.new(canned_text: full_problem_set("code_review" => { "concept" => "n_plus_one" }).to_json)
         user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
-        allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: :plan_review)
+        allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: third, fourth: nil)
         allow(WeightedRoll).to receive(:pick).with(DailyPlan::CODE_REVIEW_MODE_WEIGHTS).and_call_original
 
         svc.generate_judged_exercise(user, language: "ruby_rails").problem_set
@@ -2188,6 +2214,8 @@ RSpec.describe AiService do
   end
 
   describe "retention instrumentation" do
+    include_context "a multi-section pipeline plan"
+
     def due_mastery
       user.concept_masteries.create!(concept: "memoization", language: "ruby_rails", tier: :standard,
                                      mastered_at: 1.month.ago, retention_interval_days: 7,
@@ -2251,6 +2279,8 @@ RSpec.describe AiService do
   end
 
   describe "difficulty diagnostics instrumentation" do
+    include_context "a multi-section pipeline plan"
+
     def diagnostics_payload(svc)
       logged = nil
       allow(Rails.logger).to receive(:info) do |msg|
@@ -2832,10 +2862,13 @@ RSpec.describe AiService do
     end
 
     it "sends the generation call with the long generation budget" do
-      svc = double_class.new(canned_text: full_problem_set.to_json)
+      allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+        .and_return(ExerciseSection::CodeReview)
+      svc = double_class.new(canned_text: FakeService::EXERCISE_PROBLEM_SET.slice("code_review").to_json)
       ExerciseDraft.call(user, language: user.language_for_today, provider: svc.exercise_draft_provider)
 
       expect(svc.last_read_timeout).to eq(CallProfiles::GENERATION_READ_TIMEOUT)
+      expect(double_class.read_timeouts_by_purpose).to eq([ [ "generate_exercise", CallProfiles::GENERATION_READ_TIMEOUT ] ])
     end
 
     it "computes the worst-case wait for whichever read timeout it is given" do
@@ -4525,6 +4558,8 @@ RSpec.describe AiService do
   end
 
   describe "#generate_judged_exercise threads the fourth slot through" do
+    include_context "a multi-section pipeline plan"
+
     it "asks the provider for a fourth section matching the plan's rolled kind" do
       allow(DailyPlan).to receive(:for).and_call_original
       allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
@@ -4919,6 +4954,8 @@ RSpec.describe AiService, "generation prompt without feedback" do
 end
 
 RSpec.describe AiService, "rung stamps on a generated set" do
+  include_context "a multi-section pipeline plan"
+
   let(:user) { User.create!(email: "rung-stamp@example.com", skill_level: "senior", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   it "stamps each section with its target when set, else the skill level's rung" do
@@ -5155,6 +5192,8 @@ RSpec.describe AiService, "single-section retry prompt" do
 end
 
 RSpec.describe AiService, "#generate_judged_exercise" do
+  include_context "a multi-section pipeline plan"
+
   let(:user) { User.create!(email: "two-stage@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   def verdict(hash, kind)
@@ -5177,8 +5216,8 @@ RSpec.describe AiService, "#generate_judged_exercise" do
 
     judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails")
 
-    expect(judged.plan_notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => CompetencyGate::FLOOR,
-                                    "size_reason" => "gate", "shared_concept" => "feature_envy",
+    expect(judged.plan_notes).to eq("daily_kinds" => %w[code_review design_comparison], "size" => 4,
+                                    "size_reason" => "setting", "shared_concept" => "feature_envy",
                                     "kind_rungs" => KindDifficulty.for(user).rungs(skill_level: user.skill_level))
   end
 
@@ -5555,10 +5594,7 @@ RSpec.describe AiService, "#generate_judged_exercise" do
   end
 
   it "does not replay ingest on an already-built judged parsons_problem set" do
-    allow(DailyPlan).to receive(:for).and_wrap_original do |m, *args, **kw|
-      plan = m.call(*args, **kw)
-      plan.with(rotation: plan.rotation.merge(third: :parsons_problem))
-    end
+    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :parsons_problem, fourth: nil)
     allow_any_instance_of(FakeService).to receive(:judge_section) { |_, _, kind, _section, **| verdict({ "status" => "keep" }, kind) }
 
     ingest_orders = []
@@ -6142,6 +6178,8 @@ end
 end
 
 RSpec.describe AiService, "the shared concept" do
+  include_context "a multi-section pipeline plan"
+
   let(:user) { User.create!(email: "shared@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   def service_tagging_design_comparison(concept)
@@ -6236,6 +6274,8 @@ RSpec.describe AiService, "the shared concept" do
 end
 
 RSpec.describe AiService, "waiting retention checks" do
+  include_context "a multi-section pipeline plan"
+
   let(:user) { User.create!(email: "waiting@example.com", provider: "fake", api_keys: { "fake" => "fake-test-key" }) }
 
   it "logs each check the day did not offer on one [retention] line" do
@@ -6305,7 +6345,7 @@ RSpec.describe AiService, "the day's size" do
                                  problem_set: { "code_review" => { "concept" => "n_plus_one" } })
   end
 
-  it "logs the decision and the gate's evidence before the provider is contacted" do
+  it "logs the single-exercise decision before the provider is contacted" do
     failing = Class.new(FakeService) { def call(_request) = raise(ProviderError, "provider down") }.new("fake-key")
     lines = lines_from("[set_size]") do
       expect { failing.generate_judged_exercise(user, language: "ruby_rails").problem_set }.to raise_error(ProviderError, "provider down")
@@ -6313,9 +6353,8 @@ RSpec.describe AiService, "the day's size" do
 
     decision = decision_from(lines)
 
-    expect(decision).to include("count" => CompetencyGate::FLOOR, "reason" => "gate", "setting" => "automatic")
-    expect(decision["gate"]["evidence"]["kinds"]).to eq({})
-    expect(decision["gate"]["evidence"]).to include("capacity", "overload", "causes", "qualifying_required")
+    expect(decision).to include("count" => 1, "reason" => "single", "setting" => nil)
+    expect(decision["gate"]).to be_nil
   end
 
   it "logs once for each generated set" do
@@ -6327,12 +6366,13 @@ RSpec.describe AiService, "the day's size" do
     expect(lines.grep(/\A\[set_size\] user=#{user.id} date=/).size).to eq(2)
   end
 
-  it "logs a fixed setting without fabricating unqueried gate evidence" do
+  it "retains a historical fixed setting without applying it to the generation decision" do
     user.update!(daily_section_count: 3)
 
     decision = decision_from(generated_lines("[set_size]"))
 
-    expect(decision).to include("count" => 3, "reason" => "setting", "setting" => 3)
+    expect(decision).to include("count" => 1, "reason" => "single", "setting" => nil)
+    expect(user.reload.daily_section_count).to eq(3)
     expect(decision["gate"]).to be_nil
   end
 
@@ -6341,13 +6381,13 @@ RSpec.describe AiService, "the day's size" do
     planned_day(Date.current - 3, size: 4)
     planned_day(Date.current - 1, size: 2)
 
-    expect(generated_lines("[set_size]")).to include("[set_size] user=#{user.id} from=2 to=3 reason=setting")
+    expect(generated_lines("[set_size]")).to include("[set_size] user=#{user.id} from=2 to=1 reason=single")
   end
 
   it "compares against the planned size, not a coverage-added delivered one" do
     planned_day(Date.current - 1, size: CompetencyGate::FLOOR, plan_notes: { "coverage" => "pattern", "coverage_reason" => "gap" })
 
-    expect(generated_lines("[set_size]").grep(/from=/)).to eq([])
+    expect(generated_lines("[set_size]").grep(/from=/)).to eq([ "[set_size] user=#{user.id} from=2 to=1 reason=single" ])
   end
 
   it "logs no transition when no earlier day recorded a planned size" do
@@ -6360,8 +6400,8 @@ RSpec.describe AiService, "the day's size" do
   it "carries the same decision in the diagnostics payload" do
     payload = JSON.parse(generated_lines("[difficulty_diagnostics]").last.delete_prefix("[difficulty_diagnostics] "))
 
-    expect(payload["requested"]["size"]).to include("count" => CompetencyGate::FLOOR, "reason" => "gate")
-    expect(payload["requested"]["size"]["gate"]["evidence"]).to include("kinds", "capacity", "overload")
+    expect(payload["requested"]["size"]).to include("count" => 1, "reason" => "single")
+    expect(payload["requested"]["size"]["gate"]).to be_nil
   end
 end
 

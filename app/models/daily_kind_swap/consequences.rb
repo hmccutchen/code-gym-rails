@@ -1,37 +1,16 @@
 # Design notes: docs/code-notes/app/models/daily_kind_swap/consequences.md
 class DailyKindSwap::Consequences
-  WEEKDAYS_PER_WEEK = 5
-
   Result = Data.define(:sentences, :warning)
 
-  # held is how many places the user's setting fills with daily kinds.
-  Day = Data.define(:setting, :planned_size, :brake, :held, :practice_policy) do
-    def initialize(practice_policy: :inactive, **values) = super
+  def self.for(pair:, place:, kind:, preferences:, practice_policy:)
+    new(pair: pair, place: place, kind: kind, preferences: preferences, practice_policy: practice_policy).result
   end
 
-  def self.for(pair:, place:, kind:, preferences:, day:, languages:, pair_shares:)
-    new(pair: pair, place: place, kind: kind, preferences: preferences, day: day,
-        languages: languages, pair_shares: pair_shares).result
-  end
-
-  def self.shares_a_concept?(pair, languages)
-    languages.product(DailyPlan::CODE_REVIEW_MODES).any? do |language, mode|
-      hosts  = DayHosts.new(language, mode: mode)
-      bucket = ConceptBucket.for(pair.first.key, language)
-      ConceptVocabulary.selectable_for_section(pair.first.key, language, mode: mode)
-        .any? { |concept| pair.all? { |kind| hosts.can_tag?(kind, concept, bucket) } }
-    end
-  end
-
-  def initialize(pair:, place:, kind:, preferences:, day:, languages:, pair_shares:)
+  def initialize(pair:, place:, kind:, preferences:, practice_policy:)
     @kind        = kind
-    @place       = place
     @outgoing    = pair[place]
-    @proposed    = pair.dup.tap { |kinds| kinds[place] = kind }
     @preferences = preferences
-    @day         = day
-    @languages   = languages
-    @pair_shares = pair_shares
+    @practice_policy = practice_policy
   end
 
   def result = Result.new(sentences: sentences, warning: warning)
@@ -39,17 +18,13 @@ class DailyKindSwap::Consequences
   private
 
   def sentences
-    [ fourth_siblings, shared_concept, stored_weight, stored_exclusion ].compact
+    [ fourth_siblings, stored_weight, stored_exclusion ].compact
   end
 
   def fourth_siblings
     return unless @kind.fourth?
 
     line(:fourth_siblings, siblings: names(ExerciseSection.fourths - [ @kind ]), kind: name(@kind))
-  end
-
-  def shared_concept
-    line(:shared_concept) if @pair_shares && !self.class.shares_a_concept?(@proposed, @languages)
   end
 
   def stored_weight
@@ -63,41 +38,12 @@ class DailyKindSwap::Consequences
     line(:excluded_incoming, kind: name(@kind)) if @preferences.excluded?(@kind)
   end
 
-  # Suppression outranks size: neither a larger day nor coverage brings back a kind a daily fourth or an exclusion keeps out.
   def warning
-    return [ I18n.t("protected_practice.unavailable") ] if @day.practice_policy == :unavailable
-    return [ line(:hidden_place, count: @day.setting, kind: name(@kind)) ] if hidden_place?
+    return [ I18n.t("protected_practice.unavailable") ] if @practice_policy == :unavailable
     return [ line(:outgoing_one_fourth, outgoing: name(@outgoing), kind: name(@kind)) ] if @outgoing.fourth? && @kind.fourth?
-    return [ outgoing_excluded ] if rotation_skips_outgoing?
-    return [ line(:outgoing_fixed, count: @day.setting, outgoing: name(@outgoing)) ] if fixed_without_rotation?
-    return [ I18n.t("protected_practice.daily_kinds.outgoing", outgoing: name(@outgoing)) ] if @day.practice_policy == :active
-    return [] unless coverage_day?(brake: false)
-    return [ outgoing_excluded ] if @preferences.excluded?(@outgoing)
-    return [ line(:outgoing_braked, outgoing: name(@outgoing)), line(:outgoing_gate) ] unless coverage_day?(brake: @day.brake)
+    return [ line(:outgoing_excluded, outgoing: name(@outgoing)) ] if @preferences.excluded?(@outgoing)
 
-    [ line(:outgoing_weeks, outgoing: name(@outgoing), weeks: coverage_weeks), line(:outgoing_gate) ]
-  end
-
-  def outgoing_excluded = line(:outgoing_excluded, outgoing: name(@outgoing))
-
-  def fixed_without_rotation? = !@day.setting.nil? && @day.setting <= @day.held
-
-  def hidden_place? = @place >= @day.held
-
-  def rotation_skips_outgoing?
-    group = ExerciseSection.optional_slots(daily: @proposed).values.find { |kinds| kinds.include?(@outgoing) }
-    group.present? && !@preferences.eligible(group).include?(@outgoing)
-  end
-
-  def coverage_day?(brake:)
-    @day.planned_size.present? &&
-      CoverageException.applies_to_day?(count: @day.planned_size, fixed: @day.setting, brake: brake)
-  end
-
-  def coverage_weeks
-    candidates = CoverageException.candidate_kinds(daily: @proposed, preferences: @preferences).size
-
-    (CoverageException.expected_gap_weekdays(candidates: candidates).to_f / WEEKDAYS_PER_WEEK).round
+    [ I18n.t("protected_practice.daily_kinds.outgoing", outgoing: name(@outgoing)) ]
   end
 
   def line(key, **values) = I18n.t("daily_kinds.picker.consequences.#{key}", **values)

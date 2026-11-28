@@ -59,7 +59,7 @@ RSpec.describe "Reduced motion", type: :system do
 
   def sheet_animation_name
     travel_to(a_weekday + 12.hours) do
-      visit_with_todays_set(user)
+      visit_with_existing_set(user)
       within("#daily-kind-swap-panel-1") { find("button.daily-kind-trigger").click }
       expect(page).to have_css("#daily-kind-1-sheet[open]")
       computed("getComputedStyle(document.getElementById('daily-kind-1-sheet')).animationName")

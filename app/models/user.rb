@@ -398,8 +398,9 @@ class User < ApplicationRecord
   end
   private :history_concept
 
-  def recent_exercise_history(limit:, before: Date.current)
-    daily_exercises
+  def recent_exercise_history(limit:, before: Date.current, language: nil)
+    exercises = language ? daily_exercises.where(language: language) : daily_exercises
+    exercises
       .where(date: ...before)
       .order(date: :desc)
       .limit(limit)
@@ -408,7 +409,9 @@ class User < ApplicationRecord
         ExerciseHistoryEntry.new(
           section_keys:           delivered + exercise.dropped_sections,
           delivered_section_keys: delivered,
-          dropped:                exercise.dropped_sections.size
+          dropped:                exercise.dropped_sections.size,
+          planning_host_keys:     delivered.select { |key| ExerciseSection.for(key).mastery_evidence?(exercise.problem_set[key]) },
+          schedule_sequence:      exercise.practice_schedule["sequence"]
         )
       end
   end
