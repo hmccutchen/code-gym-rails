@@ -91,6 +91,7 @@ RSpec.describe "Persisted weekly practice opportunities", type: :model do
         plan = DailyPlan.for(user, language: language, schedule_context: context)
         kind = plan.kinds.sole
         section = { "question" => "Generated exercise", "snippet" => "def call; work; end" }
+        section["concept"] = plan.assignments.fetch(kind.key).fetch(:concept) if plan.assignments.key?(kind.key)
         section["purpose"] = "Find the defect in this operation" if kind == ExerciseSection::CodeReview && plan.code_review_mode == :bug_hunt
         judged = AiService::JudgedSet.new(problem_set: { kind.key => section }, dropped_sections: [], outcomes: {},
           schedule_context: context, plan_notes: plan.notes)
