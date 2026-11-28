@@ -60,7 +60,7 @@ class PracticeSchedule::SingleSlot
   def priority(kind)
     pending = @evidence.fetch(:pending).select { |entry| eligible?(kind, entry) }
     return 0 if pending.any? { |entry| entry[:mode] == "normal_retry" }
-    return 1 if pending.any? || @evidence.fetch(:struggle, {})[kind.key]
+    return 1 if pending.any? || (@hosts.planning_host?(kind) && @evidence.fetch(:struggle, {})[kind.key])
     return 2 if @evidence.fetch(:reinforcement, []).any? { |entry| eligible?(kind, entry) }
     return 3 if @due.any? { |entry| eligible?(kind, entry) }
     return 4 if @drills.any? { |entry| eligible?(kind, entry) }

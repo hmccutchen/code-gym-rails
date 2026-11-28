@@ -82,12 +82,18 @@ Regeneration reuses the original turn and preserves its service counters. It kee
 single kind and it remains eligible. A format-1 or format-2 replacement translates
 the continuation without spending service.
 
-Deploy the schema and compatible manifest readers first. Then release the
-format-3 reader checkpoint (`82bdbb63`). Before releasing the single-exercise
-writers, verify web and worker are on compatible revisions and retire older
-writers. Once format-3 notes exist, the rollback floor must retain
+Deploy the PR0 schema and compatible manifest readers first. Prepare the
+reader release from PR0 by applying only the reader patches `6f763795` and
+`82bdbb63`; verify its two-file reader/spec diff, passing reader specs and
+unchanged legacy format-1 writers. Deploy the resulting artifact to web
+and worker and retire every older process before releasing the PR1
+single-exercise writers. `82bdbb63` itself is not a reader-only release:
+its ancestry already enables format-2 writers, which PR0 cannot read.
+The exact preparation and verification steps are in
+[Daily practice compatibility](daily-practice-compatibility.md).
+
+Once format-3 notes exist, the rollback floor must retain
 compatible writers for both initial generation and regeneration. The
-reader-only checkpoint by itself is insufficient after that point. The earlier
+reader-only release by itself is insufficient after that point. The earlier
 format-2 checkpoint cannot decode format 3 and is not a compatible rollback. Rollout
 uses release ordering and introduces no new flags.
-[Daily practice compatibility](daily-practice-compatibility.md)

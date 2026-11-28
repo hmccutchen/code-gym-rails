@@ -25,6 +25,18 @@ RSpec.describe PracticeSchedule::SingleSlot do
     turns.each_slice(pool.size) { |round| expect(round).to match_array(pool) }
   end
 
+  { application_code: ExerciseSection::CodeReview, bug_hunt: ExerciseSection::Pattern }.each do |mode, expected|
+    it "prioritizes struggle only when its kind can host core practice in #{mode}" do
+      facts = evidence.merge(struggle: { "code_review" => true })
+      selected = plan(facts: facts, pair: [ ExerciseSection::CodeReview, ExerciseSection::Pattern ],
+        host: DayHosts.new("ruby_rails", mode: mode),
+        due: [ { concept: "memoization", bucket: "ruby_rails", overdue_ratio: 3 } ])
+
+      expect(selected.kinds).to eq([ expected ])
+      expect(selected.assignments.fetch(expected.key)).to include(concept: "memoization", reason: "retention")
+    end
+  end
+
   it "alternates contested practice and maintenance without losing retention or drills" do
     prefs = KindPreferences.new(weights: {}, excluded: ExerciseSection.keys - %w[pattern])
     facts = evidence.merge(pending: [ { kind: "pattern", concept: "memoization", bucket: "ruby_rails", mode: "support" } ])
