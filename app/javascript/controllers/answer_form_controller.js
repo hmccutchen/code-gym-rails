@@ -37,6 +37,7 @@ export default class extends Controller {
     this.saveTimer = null
     this.reviewRequested = false
     this.answersConfirmed = true
+    this.pendingSaveState = null
     this.heldEdits = false
     this.additionPending = this.additionPendingValue
 
@@ -66,6 +67,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.pendingSaveState = null
     clearTimeout(this.saveTimer)
     this.saveTimer = null
   }
@@ -166,11 +168,13 @@ export default class extends Controller {
 
   reconcileStructure(data) {
     if (data.draft_scope !== this.draftScopeValue || data.manifest_revision < this.manifestRevisionValue || this.formTarget.inert) return false
+    const addedKeys = []
     for (const key of data.section_keys) {
       if (this.sectionsTarget.querySelector(`[data-section-fold="${key}"]`)) continue
       const html = data.cards?.[key]
       if (!html) return false
       this.sectionsTarget.insertAdjacentHTML("beforeend", html)
+      addedKeys.push(key)
       if (data.answered_sections?.includes(key)) this.answered.add(key)
       else this.answered.delete(key)
       this.element.dispatchEvent(new CustomEvent("code-gym:sections-added", { bubbles: true }))
@@ -181,6 +185,7 @@ export default class extends Controller {
     this.textareas = [...this.formTarget.querySelectorAll("textarea[data-field]")]
     const expanded = this.manifestRevisionValue !== data.manifest_revision
     this.manifestRevisionValue = data.manifest_revision
+    this.applyPendingSaveState(data, addedKeys)
     if (expanded && this.answersConfirmed && this.blocker === null) {
       this.blocker = data.submit_blocker || null
       this.refreshNudge()
@@ -188,6 +193,27 @@ export default class extends Controller {
     this.updateHints()
     if (expanded) window.CodeGymBootstrap.controllersReady().then(() => this.refreshConnectedControls())
     return true
+  }
+
+  applyPendingSaveState(structure, addedKeys) {
+    const data = this.pendingSaveState
+    if (!data) return
+    if (data.draft_scope !== this.draftScopeValue || data.manifest_revision < this.manifestRevisionValue) {
+      this.pendingSaveState = null
+      return
+    }
+    if (data.manifest_revision !== this.manifestRevisionValue || !this.saveStateEligible()) return
+    this.pendingSaveState = null
+    if (!Array.isArray(data.answered_sections)) return
+    this.applyServerState({ ...data,
+      submit_blocker: data.submit_blocker || structure.submit_blocker || null,
+      answered_sections: [...data.answered_sections.filter((key) => !addedKeys.includes(key)),
+        ...(structure.answered_sections || []).filter((key) => addedKeys.includes(key))],
+      section_statuses: Object.fromEntries(Object.entries(data.section_statuses || {}).filter(([key]) => !addedKeys.includes(key))) })
+  }
+
+  saveStateEligible() {
+    return this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert && !this.submitHeld
   }
 
   additionState(pending) {
@@ -202,6 +228,7 @@ export default class extends Controller {
   }
 
   invalidateReadiness() {
+    this.pendingSaveState = null
     this.answersConfirmed = false
     this.updateSubmit()
   }
@@ -225,7 +252,6 @@ export default class extends Controller {
         if (skipped || this.submitHeld) return
         if (ok) this.settleSubmitFailure()
         if (ok) this.settleDraft(data)
-        if (ok && data?.manifest_revision > this.manifestRevisionValue) this.refreshAdditions()
         if (!ok && status === 409 && data?.status === "stale") {
           this.draft.clearOwn()
           if (this.bannerTookStale(data, "answers")) return this.stopSavingBehindBanner()
@@ -236,7 +262,11 @@ export default class extends Controller {
           this.draft.discard()
           return this.reloadWhenOtherSavesLand()
         }
-        if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) {
+        if (ok && data?.manifest_revision > this.manifestRevisionValue) {
+          if (this.saveStateEligible() && data.draft_scope === this.draftScopeValue) this.pendingSaveState = data
+          this.refreshAdditions()
+        }
+        if (ok && this.saveStateEligible()) {
           if (data?.manifest_revision < this.manifestRevisionValue) this.autoSave()
           else if (data?.manifest_revision === this.manifestRevisionValue) this.applyServerState(data)
         }
@@ -248,6 +278,7 @@ export default class extends Controller {
   }
 
   leaveWhenOtherSavesLand(leave, ...ignored) {
+    this.pendingSaveState = null
     this.submitHeld = true
     clearTimeout(this.saveTimer)
     this.saveTimer = null
@@ -261,6 +292,7 @@ export default class extends Controller {
   }
 
   stopSavingBehindBanner() {
+    this.pendingSaveState = null
     this.heldEdits ||= !this.answersConfirmed
     this.submitHeld = true
     clearTimeout(this.saveTimer)
@@ -420,6 +452,7 @@ export default class extends Controller {
   }
 
   lockForSubmit() {
+    this.pendingSaveState = null
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     this.formTarget.inert = true

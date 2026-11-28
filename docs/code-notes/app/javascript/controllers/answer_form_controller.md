@@ -300,6 +300,20 @@ queued or scheduled and the form is still editable, it schedules an autosave
 of the expanded form so the server recomputes answered state. Stale and
 submitted replies keep their existing leave paths before this check.
 
+A current successful local autosave may acknowledge a newer manifest before
+its cards arrive. The form retains that acknowledgement in `pendingSaveState`
+only when its scope matches and no later save, edit, submission or hold is
+pending. After that exact manifest is mounted, it applies the acknowledged
+state to existing sections while retaining the newly inserted cards' newer
+server-derived membership and status. A newer poll's blocker can only tighten
+the acknowledged blocker. No answer POST is needed for this confirmation.
+
+Any later edit or send invalidates the retained acknowledgement. Disconnect,
+hold, submission and discard clear it too, and reconciliation beyond its
+revision discards it. A different-scope structure reply cannot consume it.
+This is one deferred local acknowledgement, not permission for polling to
+confirm an otherwise unconfirmed form.
+
 The controller rescans answer fields and advances the manifest revision only
 after the cards are present. Expansion itself sends no answer save: polling
 must not write old displayed answers over another tab's newer work. The status
