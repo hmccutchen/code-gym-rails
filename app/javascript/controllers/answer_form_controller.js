@@ -164,6 +164,7 @@ export default class extends Controller {
       const html = data.cards?.[key]
       if (!html) return false
       this.sectionsTarget.insertAdjacentHTML("beforeend", html)
+      this.element.dispatchEvent(new CustomEvent("code-gym:sections-added", { bubbles: true }))
       this.formTarget.querySelectorAll(`button.rating-btn.active[data-rating-for="${key}"]`).forEach((button) => {
         this.ratings[key] = button.dataset.rating
       })
@@ -417,7 +418,7 @@ export default class extends Controller {
   freezeAnswers() {
     this.formTarget.inert = false
     this.formTarget.querySelectorAll(":scope > *, details.section > *").forEach((element) => {
-      if (!element.matches("details.section, summary, .daily-kind-swap")) element.inert = true
+      if (element !== this.sectionsTarget && !element.matches("details.section, summary, .daily-kind-swap")) element.inert = true
     })
     this.submitButtonTarget.disabled = true
     this.setReplaceButtonsDisabled(true)

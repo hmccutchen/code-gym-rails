@@ -5,7 +5,6 @@
   </div>
 <% end %>
 <% submitted = response.persisted? && response.submitted? %>
-<% unless submitted %><form id="exercise-addition-options" hidden></form><% end %>
 <% if @daily_kind_pickers.present? %>
   <%# Owns the swap radios, which sit inside #gym-form but must never post with the day's answers. %>
   <form id="daily-kind-swap" hidden></form>
@@ -34,6 +33,7 @@
     </div>
   </div>
 <% else %>
+  <form id="exercise-addition-options" hidden></form>
   <% submit_blocker = response.submit_blocker %>
   <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
                        unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>

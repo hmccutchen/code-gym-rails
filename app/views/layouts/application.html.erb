@@ -427,7 +427,7 @@
 </head>
 <body <%= script_text_attributes %>
       data-controller="glossary code-lines mermaid"
-      data-action="click->glossary#click keydown->glossary#key focusin->glossary#reposition pointerover->glossary#reposition resize@window->glossary#repositionOpen">
+      data-action="click->glossary#click keydown->glossary#key focusin->glossary#reposition pointerover->glossary#reposition resize@window->glossary#repositionOpen code-gym:sections-added->mermaid#renderPending">
   <% if display_preferences["background_pattern"] == "on" %>
     <div id="background-pattern" aria-hidden="true"></div>
   <% end %>

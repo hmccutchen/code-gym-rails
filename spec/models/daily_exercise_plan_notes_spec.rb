@@ -6,6 +6,7 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
 
   WRITE_PATHS = {
     "app/services/practice_generation.rb"     => "serializes new and replacement content with captured plan notes",
+    "app/services/practice_generation/addition.rb" => "preserves the existing pair and rungs when appending one requested kind",
     "app/services/preview_seed.rb"             => "seeds a preview app's past days with the user's pair"
   }.freeze
 
@@ -46,6 +47,24 @@ RSpec.describe "Every path that writes a daily exercise records its pair" do
 
     expect(legacy.reload.plan_notes["daily_kinds"]).to eq(pair)
     expect(legacy.plan_notes["kind_rungs"]).to eq(KindDifficulty.for(user).rungs(skill_level: user.skill_level))
+  end
+
+  it "preserves the set's recorded pair and original rungs when appending under different current preferences" do
+    original_pair = %w[code_review design_comparison]
+    exercise = user.daily_exercises.create!(date: Date.current, generated_at: Time.current, language: "ruby_rails",
+      problem_set: { "code_review" => { "question" => "Existing review" } },
+      plan_notes: { "daily_kinds" => original_pair, "kind_rungs" => { "code_review" => "senior" } })
+    user.update!(section_kind_levels: { "code_review" => "junior", "pattern" => "senior" })
+    addition = exercise.exercise_additions.create!(request_uuid: SecureRandom.uuid, kind: "pattern",
+      draft_scope: exercise.draft_scope, date: exercise.date)
+
+    GenerateAdditionalExerciseJob.perform_now(addition_id: addition.id)
+
+    expect(addition.reload.status).to eq("succeeded")
+    expect(exercise.reload.active_section_keys).to eq(%w[code_review pattern])
+    expect(exercise.plan_notes["daily_kinds"]).to eq(original_pair)
+    expect(exercise.plan_notes["kind_rungs"]).to eq("code_review" => "senior", "pattern" => "senior")
+    expect(user.reload.daily_section_kinds).to eq(pair)
   end
 
   it "keeps a carried-forward set's own pair, since moving a held set is not a new plan" do
