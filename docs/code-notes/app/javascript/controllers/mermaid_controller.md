@@ -42,8 +42,11 @@ lists the package's jsDelivr directory explicitly, so a version bump edits both
 the pin and the policy's list; `spec/requests/content_security_policy_spec.rb`
 fails if they disagree. The import still carries no Subresource Integrity hash.
 
-## Known limit
+## Appended exercises
 
-`connect` returns when no container is present, so a diagram inserted into the
-page later would never render. Nothing inserts one today — every diagram is in
-the server's first response.
+The answer form emits `code-gym:sections-added` after inserting a new card.
+The body's controller scans pending containers again, including when the page
+initially had no diagrams. A render already in progress drains newly appended
+containers before finishing. Containers marked `data-mermaid-done` are never
+rendered again, preserving existing SVG and answer inputs. The same strict
+initialization and failure cleanup apply to appended diagrams.

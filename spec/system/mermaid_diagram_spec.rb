@@ -23,6 +23,50 @@ RSpec.describe "Mermaid diagram failure cleanup", type: :system do
   EMPTY_DIAGRAMS      = %q{Array.from(document.querySelectorAll(".mermaid-diagram")).filter((e) => !e.innerHTML.trim()).length}
   RENDERED_DIAGRAMS   = %q{document.querySelectorAll(".mermaid-diagram svg").length}
 
+  [ false, true ].each do |initial_diagram|
+    it "renders an appended diagram without replacing existing content, initial diagram=#{initial_diagram}" do
+      travel_to(weekday) do
+        page.driver.with_playwright_page do |pw|
+          pw.route("**/mermaid@*/**", ->(route, _request) {
+            route.fulfill(status: 200, contentType: "application/javascript", body: <<~JS)
+              export default {
+                initialize(options) { if (options.securityLevel !== 'strict') throw new Error('Unsafe configuration'); },
+                async parse() {},
+                async render() { return { svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Diagram</text></svg>' }; }
+              };
+            JS
+          })
+        end
+        original = FakeService::EXERCISE_PROBLEM_SET.fetch("pattern").deep_dup
+        original["diagram"] = "flowchart TD\n  A[Original] --> B[Result]" if initial_diagram
+        exercise = user.daily_exercises.create!(date: Date.current, language: "ruby_rails", generated_at: Time.current,
+          problem_set: { "pattern" => original }, section_order: %w[pattern])
+        visit_as(user)
+        wait_for_js
+        wait_for { count(RENDERED_DIAGRAMS) == 1 } if initial_diagram
+        fill_in_answer("pattern", "Keep the answer while adding a diagram.")
+        page.execute_script(<<~JS)
+          window.keptAnswer = document.querySelector('textarea[data-field="pattern"]');
+          window.keptDiagram = document.querySelector('.mermaid-diagram svg');
+        JS
+        added = FakeService::EXERCISE_PROBLEM_SET.fetch("code_review").deep_dup
+        added["diagram"] = "flowchart TD\n  C[Added] --> D[Result]"
+        exercise.update!(problem_set: exercise.problem_set.merge("code_review" => added), section_order: %w[pattern code_review])
+
+        page.execute_script('window.dispatchEvent(new Event("focus"))')
+
+        expect(page).to have_css('[data-section-fold="code_review"]')
+        wait_for { count(RENDERED_DIAGRAMS) == (initial_diagram ? 2 : 1) }
+        expect(page.evaluate_script('window.keptAnswer === document.querySelector("textarea[data-field=pattern]")')).to be(true)
+        expect(find('textarea[data-field="pattern"]').value).to eq("Keep the answer while adding a diagram.")
+        if initial_diagram
+          expect(page.evaluate_script('window.keptDiagram === document.querySelector(".mermaid-diagram svg")')).to be(true)
+        end
+        expect(count(EMPTY_DIAGRAMS)).to eq(0)
+      end
+    end
+  end
+
   it "removes the whole disclosure it owns when the diagram cannot be parsed" do
     ps = FakeService::EXERCISE_PROBLEM_SET.deep_dup
     ps["code_review"]["diagram"] = bad_diagram

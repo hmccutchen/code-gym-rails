@@ -11,6 +11,39 @@ RSpec.describe PracticeSchedule::SingleSlot do
       evidence: facts, hosts: host, rotation_history: history, due: due, drills: drills, replacing: replacing)
   end
 
+  it "services an explicitly requested kind without advancing the automatic sequence" do
+    previous = plan.notes
+    turn = described_class.plan(context: previous, daily: daily, preferences: preferences,
+      evidence: evidence, hosts: hosts, rotation_history: [], due: [], drills: [], requested_kind: "challenge")
+    selected = PracticeSchedule.single_plan(context: previous, daily: daily, preferences: preferences,
+      evidence: evidence, hosts: hosts, rotation_history: [], due: [], drills: [], turn: turn)
+
+    expect(selected.kinds).to eq([ ExerciseSection::Challenge ])
+    expect(selected.notes.fetch("sequence")).to eq(previous.fetch("sequence"))
+    expect(selected.notes.dig("continuation", "kind_service", "ruby_rails", "challenge")).to eq(previous.fetch("sequence"))
+    expect(previous.fetch("selected_kinds")).not_to eq([])
+  end
+
+  it "assigns and records useful retention service for the requested kind" do
+    previous = plan.notes
+    due = [ { concept: "memoization", bucket: "ruby_rails", overdue_ratio: 3 } ]
+    options = { context: previous, daily: daily, preferences: preferences, evidence: evidence,
+      hosts: hosts, rotation_history: [], due: due, drills: [] }
+    turn = described_class.plan(**options, requested_kind: "pattern")
+    selected = PracticeSchedule.single_plan(**options, turn: turn)
+
+    expect(selected.assignments.fetch("pattern")).to include(concept: "memoization", reason: "retention")
+    expect(selected.notes.dig("continuation", "service", "ruby_rails", "pattern", "last_lane")).to eq("maintenance")
+    expect(selected.notes.fetch("sequence")).to eq(previous.fetch("sequence"))
+  end
+
+  it "rejects a requested kind excluded from the available pool" do
+    expect {
+      described_class.plan(context: {}, daily: daily, preferences: KindPreferences.new(weights: {}, excluded: [ "challenge" ]),
+        evidence: evidence, hosts: hosts, rotation_history: [], due: [], drills: [], requested_kind: "challenge")
+    }.to raise_error(ArgumentError, /eligible/)
+  end
+
   it "serves every eligible kind before repeating despite a persistent struggling request" do
     facts = evidence.merge(pending: [ { kind: "pattern", concept: "memoization", bucket: "ruby_rails", mode: "support" } ])
     previous = {}

@@ -28,7 +28,10 @@ the longest wait before an entry comes round again by the size of the
 list, which is why entries are appended, never inserted. The week's featured
 concept is skipped by name (#687), so the bound holds over the entries that
 remain. A spec holds that every language's list teaches at least two concepts,
-so the skip never leaves nothing to pick.
+so the featured-concept skip never leaves nothing to pick. Add can also pass
+`excluded_concepts` for concepts already exposed in its set. Both exclusions
+filter the same registry before the existing ordering runs; if none remain,
+the picker returns nil.
 
 ## `.last_seen_for`
 

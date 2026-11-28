@@ -61,9 +61,10 @@ class DailyPlan
     daily            = DailyKinds.for(user)
     history          = user.recent_exercise_history(limit: [ SectionRotation::LOOKBACK, 2 * preferences.offered(daily: daily).size ].max, language: language)
     code_review_mode = WeightedRoll.pick(weekend ? WEEKEND_CODE_REVIEW_MODE_WEIGHTS : CODE_REVIEW_MODE_WEIGHTS)
-    trap             = code_review_gotcha_for(user, language, code_review_mode, featured_concept)
+    existing_trap    = BugHuntGotchas.find(schedule_context&.dig(:existing_bug_hunt))
+    trap             = existing_trap || addition_gotcha_for(user, language, code_review_mode, featured_concept, schedule_context)
     hosts_for        = lambda do |kinds, featured = featured_concept|
-      DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, kinds), featured_concept: featured)
+      DayHosts.new(language, mode: code_review_mode, gotcha: existing_trap || day_gotcha(trap, kinds), featured_concept: featured)
     end
     hosts            = hosts_for.call([])
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
@@ -85,7 +86,7 @@ class DailyPlan
                assignments: context.fetch(:active) ? selection.assignments : {},
                code_review_mode: code_review_mode, code_review_source: source,
                code_review_files: single ? :single : WeightedRoll.pick(CODE_REVIEW_FILE_WEIGHTS),
-               code_review_gotcha: day_gotcha(trap, selection.kinds), featured_concept: featured_concept,
+               code_review_gotcha: existing_trap || day_gotcha(trap, selection.kinds), featured_concept: featured_concept,
                scenario_flavor: WeightedRoll.pick(SCENARIO_FLAVOR_WEIGHTS))
   end
 
@@ -99,7 +100,7 @@ class DailyPlan
     options = { context: context.fetch(:note), daily: daily,
       preferences: preferences, evidence: evidence.merge(reinforcement: ordinary), hosts: hosts, rotation_history: history, due: checks,
       drills: drilled, replacing: context[:replacing_id].present? }
-    turn = PracticeSchedule.single_turn(**options)
+    turn = PracticeSchedule.single_turn(**options, requested_kind: context[:requested_kind])
     hosts = hosts_for.call(turn.kinds)
     return [ turn, hosts ] unless context.fetch(:active)
 
@@ -139,10 +140,17 @@ class DailyPlan
   end
   private_class_method :shared_assignment
 
-  def self.code_review_gotcha_for(user, language, mode, featured_concept)
+  def self.addition_gotcha_for(user, language, mode, featured, context)
+    excluded = context&.dig(:requested_kind) ? context.fetch(:existing_concepts, []) : []
+    code_review_gotcha_for(user, language, mode, featured, excluded_concepts: excluded)
+  end
+  private_class_method :addition_gotcha_for
+
+  def self.code_review_gotcha_for(user, language, mode, featured_concept, excluded_concepts: [])
     return nil unless ExerciseSection::CodeReview::BugHunt.mode?(mode)
 
-    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user), featured_concept: featured_concept)
+    BugHuntGotchas.pick(language, last_seen: BugHuntGotchas.last_seen_for(user),
+      featured_concept: featured_concept, excluded_concepts: excluded_concepts)
   end
   private_class_method :code_review_gotcha_for
 

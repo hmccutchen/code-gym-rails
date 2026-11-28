@@ -32,6 +32,7 @@
     "controllers/daily_kind_swap_controller": "/assets/controllers/daily_kind_swap_controller-DIGEST.js",
     "controllers/display_preferences_controller": "/assets/controllers/display_preferences_controller-DIGEST.js",
     "controllers/duck_thread_controller": "/assets/controllers/duck_thread_controller-DIGEST.js",
+    "controllers/exercise_addition_controller": "/assets/controllers/exercise_addition_controller-DIGEST.js",
     "controllers/exercise_mix_controller": "/assets/controllers/exercise_mix_controller-DIGEST.js",
     "controllers/follow_ups_controller": "/assets/controllers/follow_ups_controller-DIGEST.js",
     "controllers/fresh_day_controller": "/assets/controllers/fresh_day_controller-DIGEST.js",
@@ -76,6 +77,7 @@
 <link rel="modulepreload" href="/assets/controllers/daily_kind_swap_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/display_preferences_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/duck_thread_controller-DIGEST.js" nonce="NONCE">
+<link rel="modulepreload" href="/assets/controllers/exercise_addition_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/exercise_mix_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/follow_ups_controller-DIGEST.js" nonce="NONCE">
 <link rel="modulepreload" href="/assets/controllers/fresh_day_controller-DIGEST.js" nonce="NONCE">
@@ -504,11 +506,12 @@
   </style>
   <link rel="stylesheet" href="/assets/phone_cards-DIGEST.css" />
   <link rel="stylesheet" href="/assets/desktop-DIGEST.css" />
+  <link rel="stylesheet" href="/assets/components/exercise_addition-DIGEST.css" />
   <link rel="stylesheet" href="/assets/pages/today-DIGEST.css" />
 </head>
 <body data-signed-out-text="Your session expired, so that didn&#39;t go through. Reload the page and sign in again." data-save-failed-text="Couldn&#39;t save your last change. It hasn&#39;t reached the server — check your connection and try again."
       data-controller="glossary code-lines mermaid"
-      data-action="click->glossary#click keydown->glossary#key focusin->glossary#reposition pointerover->glossary#reposition resize@window->glossary#repositionOpen">
+      data-action="click->glossary#click keydown->glossary#key focusin->glossary#reposition pointerover->glossary#reposition resize@window->glossary#repositionOpen code-gym:sections-added->mermaid#renderPending code-gym:sections-added->code-lines#registerBlocks">
     <div id="background-pattern" aria-hidden="true"></div>
   <a class="skip-link" href="#main-content">Skip to content</a>
   <nav data-controller="nav-menu"
@@ -557,10 +560,13 @@
   <div id="dashboard-content">
         <form id="daily-kind-swap" hidden></form>
 
+  <form id="exercise-addition-options" hidden></form>
   <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft"
        data-answer-form-answered-sections-value="[]"
        data-answer-form-submit-blocker-value="unanswered"
        data-answer-form-draft-scope-value="900002-1790694000000000"
+       data-answer-form-manifest-revision-value="2"
+       data-answer-form-empty-unrated-sections-value="[&quot;architecture&quot;,&quot;design_comparison&quot;]"
        data-answer-form-draft-token-value="900002-1790694000000000:new:643d5437104296e2"
        data-answer-form-answered-count-value="%{answered} of %{total} answered"
        data-answer-form-all-answered-value="✓ All answered"
@@ -584,7 +590,8 @@
       </div>
 
       <form id="gym-form" data-turbo="false" data-answer-form-target="form" data-action="submit-&gt;answer-form#submit input-&gt;answer-form#input change-&gt;answer-form#change click-&gt;answer-form#rate" action="/responses" accept-charset="UTF-8" method="post">
-          <details class="section" open data-slot="1" data-section-fold="architecture">
+        <div data-answer-form-target="sections">
+            <details class="section" open data-slot="1" data-section-fold="architecture">
   <summary class="section-label"><h2 class="section-title">  1 — Architecture Decision: Queue
 </h2>
     <span class="section-status" data-status-for="architecture"></span>
@@ -1064,6 +1071,131 @@ Tradeoffs you considered:
 
 </details>
 
+
+        </div>
+        <div data-controller="exercise-addition"
+     data-action="focus@window->exercise-addition#present visibilitychange@document->exercise-addition#present"
+     data-exercise-addition-url-value="/exercise_additions"
+     data-exercise-addition-pending-value="false"
+     data-exercise-addition-working-value="Preparing %{kind}…"
+     data-exercise-addition-failed-value="The exercise wasn&#39;t added. Choose Add exercise to try again."
+     data-exercise-addition-added-value="Exercise added."
+     data-exercise-addition-unreachable-value="Couldn&#39;t check your exercise. Try again when you&#39;re connected.">
+  <button type="button" class="btn btn-secondary" data-exercise-addition-target="trigger"
+          data-action="exercise-addition#open" aria-haspopup="dialog" >+ Add exercise</button>
+  <p role="status" aria-live="polite" data-exercise-addition-target="status"></p>
+  <dialog class="daily-kind-sheet" aria-labelledby="exercise-addition-title" data-exercise-addition-target="sheet"
+          data-action="cancel->exercise-addition#escape click->exercise-addition#backdrop pointerdown->exercise-addition#press">
+    <div class="daily-kind-sheet-body">
+      <div class="daily-kind-sheet-header">
+        <h2 id="exercise-addition-title">Choose an exercise</h2>
+        <button type="button" class="daily-kind-close" aria-label="Close"
+                data-action="exercise-addition#close">×</button>
+      </div>
+      <div class="daily-kind-choosing"><div class="daily-kind-list">
+      <fieldset class="daily-kind-picker" data-action="change->exercise-addition#choose">
+        <legend class="visually-hidden">Choose an exercise</legend>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="code_review"
+                 data-name="Code Review" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="code_review" form="exercise-addition-options"
+                     aria-describedby="addition-code_review-description">
+              <span class="daily-kind-name">Code Review</span>
+            </span>
+            <span class="daily-kind-line" id="addition-code_review-description">Find the one problem in a short piece of code.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="design_comparison"
+                 data-name="Design Comparison" hidden>
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="design_comparison" form="exercise-addition-options"
+                     aria-describedby="addition-design_comparison-description">
+              <span class="daily-kind-name">Design Comparison</span>
+            </span>
+            <span class="daily-kind-line" id="addition-design_comparison-description">Both work — pick the one that suits the system.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="pattern"
+                 data-name="Pattern of the Month" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="pattern" form="exercise-addition-options"
+                     aria-describedby="addition-pattern-description">
+              <span class="daily-kind-name">Pattern of the Month</span>
+            </span>
+            <span class="daily-kind-line" id="addition-pattern-description">Apply a named pattern to a real problem.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="challenge"
+                 data-name="Coding Challenge" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="challenge" form="exercise-addition-options"
+                     aria-describedby="addition-challenge-description">
+              <span class="daily-kind-name">Coding Challenge</span>
+            </span>
+            <span class="daily-kind-line" id="addition-challenge-description">Write code for a small, self-contained task.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="architecture"
+                 data-name="Architecture Decision" hidden>
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="architecture" form="exercise-addition-options"
+                     aria-describedby="addition-architecture-description">
+              <span class="daily-kind-name">Architecture Decision</span>
+            </span>
+            <span class="daily-kind-line" id="addition-architecture-description">Choose an approach and name what it costs.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="security_review"
+                 data-name="Security Review" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="security_review" form="exercise-addition-options"
+                     aria-describedby="addition-security_review-description">
+              <span class="daily-kind-name">Security Review</span>
+            </span>
+            <span class="daily-kind-line" id="addition-security_review-description">Find the weakness an attacker could use.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="parsons_problem"
+                 data-name="Parsons Problem" hidden>
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="parsons_problem" form="exercise-addition-options"
+                     aria-describedby="addition-parsons_problem-description">
+              <span class="daily-kind-name">Parsons Problem</span>
+            </span>
+            <span class="daily-kind-line" id="addition-parsons_problem-description">Put shuffled pieces of code back in order.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="plan_review"
+                 data-name="Plan Review" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="plan_review" form="exercise-addition-options"
+                     aria-describedby="addition-plan_review-description">
+              <span class="daily-kind-name">Plan Review</span>
+            </span>
+            <span class="daily-kind-line" id="addition-plan_review-description">Find the flaws in a plan before any code.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="ambiguity_hunt"
+                 data-name="Ambiguity Hunt" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="ambiguity_hunt" form="exercise-addition-options"
+                     aria-describedby="addition-ambiguity_hunt-description">
+              <span class="daily-kind-name">Ambiguity Hunt</span>
+            </span>
+            <span class="daily-kind-line" id="addition-ambiguity_hunt-description">Find what a request leaves undecided.</span>
+          </label>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="pseudocode_to_code"
+                 data-name="Pseudocode to Code" >
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="pseudocode_to_code" form="exercise-addition-options"
+                     aria-describedby="addition-pseudocode_to_code-description">
+              <span class="daily-kind-name">Pseudocode to Code</span>
+            </span>
+            <span class="daily-kind-line" id="addition-pseudocode_to_code-description">Write steps in plain words, then see the code.</span>
+          </label>
+      </fieldset>
+      </div></div>
+      <p role="status" data-exercise-addition-target="error"></p>
+      <div class="daily-kind-sheet-footer">
+        <button type="button" class="btn btn-secondary" data-action="exercise-addition#close">Close</button>
+        <button type="button" class="btn btn-primary" disabled data-exercise-addition-target="confirm"
+                data-action="exercise-addition#confirm">Add exercise</button>
+      </div>
+    </div>
+  </dialog>
+</div>
 
 
 </form>    </div>

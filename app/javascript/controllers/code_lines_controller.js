@@ -16,6 +16,10 @@ export default class extends Controller {
       })
     })
 
+    this.registerBlocks()
+  }
+
+  registerBlocks() {
     for (const code of this.element.querySelectorAll("code.highlight")) {
       // Observes the <pre>, since an inline <code> reports no size.
       if (code.querySelector(".code-align-extra")) this.observer.observe(code.parentElement)

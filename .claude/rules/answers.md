@@ -1,5 +1,9 @@
 ---
 paths:
+  - "app/controllers/exercise_additions_controller.rb"
+  - "app/views/exercise_additions/**"
+  - "app/javascript/controllers/exercise_addition_controller.js"
+  - "spec/**/*exercise_addition*"
   - "app/controllers/{responses,dashboard,daily_exercises}_controller.rb"
   - "app/controllers/concerns/current_set_lookup.rb"
   - "app/models/stale_set_notice.rb"
@@ -56,7 +60,10 @@ read it before changing that area.
   dashboard keeps unsent answers in `code_gym/draft_store` and restores them
   only when the stored `DailyResponse#draft_token` matches the rendered one,
   or when the copy's draft scope matches and the rendered answers equal one
-  of the unconfirmed saves the copy lists. The last tab to edit owns the copy.
+  of the unconfirmed saves the copy lists. After Add, only extra fields the
+  server snapshot declares exactly empty and unrated may be omitted from
+  that comparison; original answers and the whole ratings map must match.
+  The last tab to edit owns the copy.
   The answers queue retries only saves that got no reply, never a refusal or
   5xx. Confirmed saves, submits, submitted dashboards and every signed-out
   page clear the copy, and submit always stays manual.
@@ -145,3 +152,9 @@ read it before changing that area.
   reorderable with Ctrl+↑/↓ (bare ↑/↓ moves focus), with an `aria-live` status
   line announcing each move — that keyboard path, not the arrows, is what keeps
   the section answerable without a mouse.
+
+Add preserves draft scope and increases the manifest revision. New submits
+require both; old-tab partial autosaves remain valid. Active additions block
+submit/reset/regeneration, with advisory-locked recovery before row locks.
+Missing cards are inserted without replacing existing inputs. See
+[On-demand additions](../../docs/decisions/on-demand-exercise-additions.md).

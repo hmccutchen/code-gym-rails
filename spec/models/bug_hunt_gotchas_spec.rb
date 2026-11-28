@@ -86,6 +86,33 @@ RSpec.describe BugHuntGotchas do
       expect(described_class.pick("ruby_rails", last_seen: { "rb_cut_long_ago" => Date.current - 100 })).to eq(entries.first)
     end
 
+    context "when additions exclude concepts already shown" do
+      let(:excluded) { [ entries.first.concept, "memoization" ] }
+      let(:available) { entries.reject { |entry| excluded.include?(entry.concept) || entry.concept == "allocation_rounding" } }
+
+      it "keeps never-seen ordering after both exclusions" do
+        seen = { available.first.id => Date.yesterday }
+
+        expect(described_class.pick("ruby_rails", last_seen: seen, featured_concept: "allocation_rounding", excluded_concepts: excluded))
+          .to eq(available.second)
+      end
+
+      it "keeps oldest-seen and registry tie ordering after exclusions" do
+        seen = entries.to_h { |entry| [ entry.id, Date.yesterday ] }
+        seen[available.last.id] = Date.current - 2
+        expect(described_class.pick("ruby_rails", last_seen: seen, featured_concept: "allocation_rounding", excluded_concepts: excluded))
+          .to eq(available.last)
+
+        seen[available.last.id] = Date.yesterday
+        expect(described_class.pick("ruby_rails", last_seen: seen, featured_concept: "allocation_rounding", excluded_concepts: excluded))
+          .to eq(available.first)
+      end
+
+      it "returns no trap when every concept is excluded" do
+        expect(described_class.pick("ruby_rails", last_seen: {}, excluded_concepts: described_class.concepts("ruby_rails"))).to be_nil
+      end
+    end
+
     context "when a concept is the week's featured one" do
       it "skips every entry for that concept, even the first never-seen one" do
         first = entries.first

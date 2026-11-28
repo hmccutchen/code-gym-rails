@@ -162,7 +162,12 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     source = Rails.root.join("app/javascript/controllers/answer_form_controller.js").read
     carried = source.scan(/saveStatus\.carry\("answers",[^\n]*\n\s*(?:window\.location\.reload\(\)|return this\.reloadWhenOtherSavesLand\(\))/)
     delegated = source.scan(/if \((\w+)\.status === 409\) \{\s*(?:if \(this\.bannerTookStale\(\1\.data[^\n]*\n\s*)?return this\.leaveWhenOtherSavesLand\(\(\) => this\.reloadAfterSubmit\(\1, true\)/)
-    expect(carried.length + delegated.length).to eq(source.scan(/status === 409/).length)
+    retained = source.scan(/if \(result\.status === 409 && \["manifest_changed", "addition_busy"\]\.includes\(result\.data\?\.status\)\) \{([^}]+)\}/).flatten
+    expect(retained.size).to eq(1)
+    expect(retained.sole).to match(/this\.unlock\(\).*this\.refreshAdditions\(\).*saveStatus\.report\("submit", result\.message\).*return\s*\z/m)
+    expect(retained.sole).not_to match(/reload|draft\.discard|leaveWhenOtherSavesLand/)
+    expect(source.index(retained.sole)).to be < source.index("const stale = result.status === 409")
+    expect(carried.length + delegated.length + retained.length).to eq(source.scan(/status === 409/).length)
     expect(carried).not_to be_empty
   end
 

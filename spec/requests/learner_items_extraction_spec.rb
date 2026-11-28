@@ -19,8 +19,9 @@ RSpec.describe "When learner items are extracted", type: :request do
   end
 
   def submit
+    exercise = user.daily_exercises.find_by!(date: Date.current)
     post responses_path, params: { response: { answers: { code_review: "It loads per row.", pattern: "" },
-                                               section_ratings: { code_review: "right_level" }, submit: "1" } }, as: :json
+                                               section_ratings: { code_review: "right_level" }, draft_scope: exercise.draft_scope, manifest_revision: exercise.manifest_revision, submit: "1" } }, as: :json
   end
 
   describe "at submit" do

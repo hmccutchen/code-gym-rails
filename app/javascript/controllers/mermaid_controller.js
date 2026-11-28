@@ -2,16 +2,23 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  async connect() {
-    if (this.pending.length === 0) return
+  connect() { this.renderPending() }
+
+  async renderPending() {
+    if (this.rendering || this.pending.length === 0) return
+    this.rendering = true
 
     try {
       const mermaid = (await import("mermaid")).default
       // securityLevel stays strict: the diagram source is model-generated.
       mermaid.initialize({ startOnLoad: false, securityLevel: "strict" })
-      await this.renderAll(mermaid)
+      do {
+        await this.renderAll(mermaid)
+      } while (this.pending.length > 0)
     } catch {
       this.pending.forEach((element) => this.removeFailed(element))
+    } finally {
+      this.rendering = false
     }
   }
 

@@ -22,7 +22,8 @@ when the reply token cap was raised.
 
 ## `#explain_differently`
 
-Synchronous: the caller posts through `fetch` and appends the reply in place.
+Synchronous: the caller uses the shared request module and appends the reply
+in place.
 
 ## `#explain_differently` and `#follow_ups`
 
@@ -128,8 +129,10 @@ unchanged.
 
 
 Runs under the exercise lock, after `lock!` has re-read the row, so a
-regeneration cannot land between the check and the save. A post that names no
-scope still saves, so a page loaded before the scope existed keeps working.
+regeneration cannot land between the check and the save. A partial autosave that names no
+scope retains its legacy behavior. A new submission must carry the exact
+current scope and manifest revision; this compatibility path cannot submit
+an unseen addition.
 
 ## `#save_answers_under_lock`
 
@@ -188,3 +191,18 @@ engineer never saw neither enters concept history nor bills a reference.
 
 The `exists?` check only skips obvious no-ops. The job checks again, so a
 duplicate enqueue from a race is harmless.
+
+## Submission and Add coordination
+
+A new submit tries expired-addition recovery before taking row locks, then
+checks scope, `DailyExercise#addition_pending?` and manifest revision under
+`with_response_locked` before assigning any request data. Busy or unseen-card
+refusals write nothing and return distinct conflict outcomes. The browser
+refreshes missing cards while retaining drafts. Already-submitted retries
+remain idempotent and do not reapply the new payload.
+
+Partial autosaves merge the submitted keys into the current locked response.
+An old tab that lacks an added section therefore cannot erase its saved answer
+or rating. Start over also attempts recovery before its model operation;
+`DailyExercise#start_over!` rechecks pending additions under the destructive
+operation's locks. Recovery never substitutes for the locked refusal checks.

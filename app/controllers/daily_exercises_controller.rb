@@ -5,7 +5,8 @@ class DailyExercisesController < ApplicationController
     stale:               "flash.daily_exercises.regenerate_stale",
     reviewed:            "flash.daily_exercises.already_reviewed",
     reviewing:           "flash.daily_exercises.review_in_progress",
-    already_regenerated: "flash.daily_exercises.already_regenerated"
+    already_regenerated: "flash.daily_exercises.already_regenerated",
+    addition_busy:       "flash.daily_exercises.addition_in_progress"
   }.freeze
 
   GENERATE_PER_HOUR = 3
@@ -35,6 +36,7 @@ class DailyExercisesController < ApplicationController
     exercise, refusal = set_to_regenerate
     return redirect_to root_path, alert: t(refusal) if refusal
 
+    ExerciseAdditionRequest.recover!(exercise)
     claim, refused = exercise.claim_regeneration!(shown_scope: params[:draft_scope])
     return redirect_to root_path, alert: t(REGENERATION_REFUSED.fetch(refused)) if refused
 

@@ -3,6 +3,10 @@ paths:
   - "app/models/practice*.rb"
   - "app/models/practice_schedule/**"
   - "app/services/practice_generation.rb"
+  - "app/services/practice_generation/**"
+  - "app/models/exercise_addition.rb"
+  - "app/services/exercise_addition_request.rb"
+  - "app/jobs/generate_additional_exercise_job.rb"
   - "spec/**/*practice*"
   - "app/models/concept_mastery/**"
   - "app/models/adaptation_history.rb"
@@ -215,3 +219,7 @@ read it before changing that area.
   A skipped, due retention check is
   deferred one interval without changing tier, streak or rating, and only for
   a concept answered nowhere on that response.
+
+Add selects one explicitly requested eligible kind through the ordinary
+planner and quality pipeline. It preserves the automatic sequence and records
+only committed added-kind service. See [On-demand additions](../../docs/decisions/on-demand-exercise-additions.md).
