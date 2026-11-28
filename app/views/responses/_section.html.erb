@@ -4,7 +4,8 @@
 <% presentation = kind.presentation_key(data) %>
 <% name = t("sections.#{presentation || key}.name") %>
 <% label = capture do %>
-  <% if kind.titled_label? %><%= t("responses.section.titled_label", slot: slot, name: name, title: data["title"]) %><% else %><%= t("responses.section.label", slot: slot, name: name) %><% end %>
+  <% label_key = kind.titled_label? ? "titled_label" : "label" %>
+  <%= t("responses.section.#{submitted ? label_key : "practice_#{label_key}"}", slot: slot, name: name, title: data["title"]) %>
 <% end %>
 <details class="section"<%= " open".html_safe unless local_assigns[:folded] %> data-slot="<%= slot %>" data-section-fold="<%= key %>">
   <%# No glossary terms in the summary (a control nested in a control), and never role="button": it erases the <h2>. %>

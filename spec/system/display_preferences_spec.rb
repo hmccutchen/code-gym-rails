@@ -242,16 +242,13 @@ RSpec.describe "Display preferences", type: :system, with_csrf: true do
     end
   end
 
-  it "fits a phone screen at the largest text size, with the sticky bar unclipped" do
+  it "fits a phone screen at the largest text size" do
     user.update!(display_preferences: { "text_size" => "140" })
     page.driver.with_playwright_page { |pw| pw.set_viewport_size(width: 390, height: 844) }
 
     travel_to(a_weekday) do
       visit_with_existing_set(user, keys: %w[code_review design_comparison pattern challenge])
-      expect(page).to have_css(".progress-sticky")
-
-      sticky = page.evaluate_script("(() => { const s = document.querySelector('.progress-sticky'); return [s.scrollHeight, s.clientHeight]; })()")
-      expect(sticky.first).to be <= sticky.last
+      expect(page).to have_no_css(".progress-sticky")
 
       [ root_path, history_path, learn_path, progress_path, setup_path, account_path ].each do |path|
         visit path

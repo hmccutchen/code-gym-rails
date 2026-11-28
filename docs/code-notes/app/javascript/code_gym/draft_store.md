@@ -85,7 +85,10 @@ the answers.
 `settle()` runs on an ok save reply. It clears the copy when the reply is for
 exactly the answers on screen, comparing answers and ratings with their keys
 sorted (`canonicalDraft`), like the server's digest, since two tabs can insert
-the same ratings in different orders. Otherwise it tells the caller the
+the same ratings in different orders. Explicit null rating clears are omitted
+from the canonical persisted-state comparison because the server removes those
+keys. The actual stored draft retains null so a reload can replay the clear.
+A competing non-null rating still fails the match. Otherwise it tells the caller the
 screen moved on, and the caller rewrites the copy on the reply's token, so
 later edits stay kept. A submit, a stale refusal and a reload into the
 submitted page all clear it too.

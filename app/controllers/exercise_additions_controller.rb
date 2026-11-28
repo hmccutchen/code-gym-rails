@@ -62,7 +62,8 @@ class ExerciseAdditionsController < ApplicationController
 
     response = @exercise.daily_response || @exercise.build_daily_response(user: current_user, date: @exercise.date)
     { draft_scope: @exercise.draft_scope, manifest_revision: @exercise.manifest_revision,
-      section_keys: @exercise.active_section_keys, answered_sections: response.answered_sections, submitted: response.submitted?,
+      section_keys: @exercise.active_section_keys, answered_sections: response.answered_sections,
+      submit_blocker: response.submit_blocker, submitted: response.submitted?,
       available_kinds: response.submitted? ? [] : ExerciseAddition.available_kinds(current_user, @exercise).map(&:key),
       operation: addition && { request_uuid: addition.request_uuid, kind: addition.kind,
         status: addition.status, expired: addition.expired? }, cards: cards(response) }

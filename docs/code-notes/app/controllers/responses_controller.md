@@ -206,3 +206,13 @@ An old tab that lacks an added section therefore cannot erase its saved answer
 or rating. Start over also attempts recovery before its model operation;
 `DailyExercise#start_over!` rechecks pending additions under the destructive
 operation's locks. Recovery never substitutes for the locked refusal checks.
+
+## Explicit draft rating clears
+
+Within the existing response lock, an explicit JSON null in `section_ratings`
+removes that active section's draft rating. Omitted keys preserve saved ratings,
+and invalid non-null values are ignored without clearing anything. Submitted
+responses ignore the entire incoming draft payload, including clears. A clear
+sent with Submit participates in the same `submit_blocker` check and rollback
+as any other proposed answer or rating change. Autosave replies therefore report
+an answered section whose rating was cleared as unrated.

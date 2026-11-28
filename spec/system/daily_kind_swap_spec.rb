@@ -440,7 +440,7 @@ RSpec.describe "Swapping a daily section kind", type: :system do
     expect(user.reload.daily_section_kinds).to eq(%w[code_review pattern])
   end
 
-  it "lets only the review handoff run when an autosave outlasts a held submit" do
+  it "waits for an outstanding autosave before submitting and hands off once" do
     page.execute_script(<<~JS)
       const originalFetch = window.fetch;
       window.fetch = (url, options) => {
@@ -450,14 +450,21 @@ RSpec.describe "Swapping a daily section kind", type: :system do
       };
       HTMLFormElement.prototype.submit = function () { window.reviewHandoffs = (window.reviewHandoffs || 0) + 1; };
     JS
-    fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
+    page.execute_script("window.swapPage = true")
+    fill_in_answer("code_review", "The answer stays editable while its autosave is outstanding.")
+    rate_section("code_review")
     wait_for_js_condition("window.releaseAutosave")
-    submit_one_answer
-    expect(page).to have_css("#leave-held")
+
+    expect(page).to have_button("Submit answers", disabled: true)
+    expect(user.daily_responses.where.not(submitted_at: nil)).to be_empty
+    expect(page.evaluate_script("window.reviewHandoffs || 0")).to eq(0)
 
     page.execute_script("window.releaseAutosave()")
+    expect_ready_to_submit
+    click_button "Submit answers"
     wait_for_js_condition("window.reviewHandoffs === 1")
-    sleep 1.5
+
+    expect(user.daily_responses.sole).to be_submitted
     expect(page.evaluate_script("window.swapPage")).to be(true)
     expect(page.evaluate_script("window.reviewHandoffs")).to eq(1)
   end

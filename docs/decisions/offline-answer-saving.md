@@ -1,6 +1,6 @@
 # Offline answer saving
 
-the dashboard keeps answers typed during a lost
+The dashboard keeps answers typed during a lost
 connection and sends them when it returns
 (`docs/offline-answer-saving-2026-10-12.md`). `code_gym/draft_store` keeps
 one copy of the unsent answers and ratings in localStorage, written on every
@@ -25,8 +25,16 @@ the server to render back exactly what it received, so an answer the server
 normalizes still loses the later edits, and since the whole payload is
 compared, one such field makes every save of the session miss; the draft
 store's code note (`docs/code-notes/app/javascript/code_gym/draft_store.md`) lists those cases. Every tab shares the copy, and the last
-tab to edit owns all of it, its list of saves included. Submit stays manual: offline, it
-says the answers were not submitted and are kept, and stays enabled.
+tab to edit owns all of it, its list of saves included. The stored draft
+and queued save preserve explicit rating clears as JSON null. The server's
+saved rating map omits cleared keys, so draft recovery compares sent rating
+state with restored state after accounting for those clears.
+
+Submit stays manual. Offline edits keep it disabled while the latest answer
+or rating edit awaits server confirmation. The existing save status shows
+when edits are kept on the device. Reconnection retries unanswered saves
+through the same queue. The latest reply can restore readiness if the server
+reports no blocker and the remaining guards allow submission.
 Parsons answers are not restored, and opening the app offline still shows
 the browser's offline page, since nothing caches the dashboard.
 

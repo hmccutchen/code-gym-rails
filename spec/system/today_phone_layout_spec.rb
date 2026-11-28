@@ -114,12 +114,10 @@ RSpec.describe "Today's phone layout", type: :system do
       expect(submit_row["top"]).to be > cards.last["bottom"]
     end
 
-    it "shows a refused submit's nudge under the button" do
+    it "shows the readiness nudge under the disabled button" do
       visit_today
-      click_button "Submit answers"
-
-      # The nudge is already visible before submit, so its focus is what says the refusal has landed.
-      expect(page).to have_css("#rating-nudge:focus", visible: true)
+      expect(page).to have_button("Submit answers", disabled: true)
+      expect(page).to have_css("#rating-nudge", visible: true)
       nudge, button = page.evaluate_script(<<~JS)
         ["#rating-nudge", "#submit-answers"].map((selector) => document.querySelector(selector).getBoundingClientRect().toJSON())
       JS
@@ -128,16 +126,10 @@ RSpec.describe "Today's phone layout", type: :system do
 
     it "brings a held submit's notice on screen" do
       visit_today
-      page.execute_script(<<~JS)
-        const originalFetch = window.fetch;
-        window.fetch = (url, options) => {
-          const body = options?.body ? JSON.parse(options.body) : {};
-          if (!body.response || body.response.submit === "1") return originalFetch(url, options);
-          return new Promise(() => {});
-        };
-      JS
-      fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
+      fill_in_answer("code_review", "The query should be loaded outside the loop.")
       rate_section("code_review")
+      expect_ready_to_submit
+      page.execute_script('window.CodeGymSaveStatus.report("layout-held-save", "Another save still needs attention.")')
       click_button "Submit answers"
 
       expect(page).to have_css("#leave-held")

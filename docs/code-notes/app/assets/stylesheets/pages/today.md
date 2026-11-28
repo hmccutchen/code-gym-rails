@@ -12,19 +12,6 @@ form renders. Rules for a response partial that History also renders, such
 as `.section` and the teaching hint, stay in the layout, since this sheet
 loads on Today only.
 
-## Sticky progress bar height
-
-The sticky progress bar has a fixed height, `--progress-sticky-height`, so the
-page can keep a focused field clear of it. A browser that scrolls a field to
-the top edge stops at `scroll-padding-top`, which reads the same variable. The
-focus ring's width and offset are added because the ring sits outside the
-field.
-
-## The progress fill
-
-`.progress-fill` starts at `width: 0`; the answer-form controller sets its
-width from the answered count once it connects.
-
 ## Under 600px
 
 The phone rules sit in one `@media (max-width: 599.98px)` block at the end,
@@ -35,18 +22,14 @@ the Submit row change together.
   each section is a full-width card that runs to the safe area, as on the
   card pages, while the title block and the controls keep the phone gutter,
   16px in from the safe area.
-  The title block, the progress bar and each section are 16px apart. A trial's banner gets its own margin there: its
+  The title block and each section are 16px apart. A trial's banner gets its own margin there: its
   wider rule pulls it up into the title block's 2rem margin, which the 16px
   gap would otherwise cancel.
 - **The side column.** It ends the page: the Submit row, with the button full
   width and 48px tall and the "saves as you type" note and the nudge centered
   under it, then the regenerate row.
-- **No sticky Submit bar.** The phone board drew Submit as a bar stuck above
-  the tab bar, and one was built. It was taken out before merge: with the
-  progress bar already stuck at the top, a bar and the tab bar at the bottom
-  left the answers scrolling through a narrow middle of the screen the whole
-  time. It also needed space reserved above it for focus, a lifted save
-  banner, a rule for while someone types and a minimum window height.
+- **Normal-flow Submit.** The action follows the exercises and Add picker. It
+  occupies no fixed strip above code, inputs or the virtual keyboard.
 - **A held submit.** When a submit waits on another save, the answer-form
   controller scrolls its notice into view
   (`docs/code-notes/app/javascript/controllers/answer_form_controller.md`).
@@ -63,6 +46,4 @@ the Submit row change together.
   with a column it can't scroll to the end of. It is a side column, so it
   takes nothing from the answers' height, unlike the phone bar that was taken
   out.
-- The progress bar stays in the main column, still stuck to the top, and the
-  featured concept card stays below the day, as the dashboard's code note
-  says.
+- The featured concept card stays below the day.

@@ -49,7 +49,7 @@ RSpec.describe "Adding an exercise", type: :system do
     fill_in_answer("pattern", "Keep my existing explanation.")
     rate_section("pattern")
     wait_for_answers_settled
-    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     append_from_another_tab
     user.daily_responses.sole.update!(answers: { "code_review" => "Move the query outside the loop." },
       section_ratings: { "code_review" => "right_level" })
@@ -57,7 +57,7 @@ RSpec.describe "Adding an exercise", type: :system do
     page.execute_script('window.dispatchEvent(new Event("focus"))')
 
     expect(page).to have_css('[data-section-fold="code_review"]')
-    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
     expect(find('textarea[data-field="code_review"]').value).to eq("Move the query outside the loop.")
     expect(find('textarea[data-field="pattern"]').value).to eq("Keep my existing explanation.")
@@ -70,7 +70,7 @@ RSpec.describe "Adding an exercise", type: :system do
     fill_in_answer("pattern", "Keep my existing explanation.")
     rate_section("pattern")
     wait_for_answers_settled
-    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     append_from_another_tab
     page.execute_script(<<~JS)
       const form = document.querySelector('[data-controller~="answer-form"]');
@@ -82,7 +82,7 @@ RSpec.describe "Adding an exercise", type: :system do
     page.execute_script('window.dispatchEvent(new Event("focus"))')
 
     expect(page).to have_css('[data-section-fold="code_review"]')
-    expect(page).to have_css("#progress-label", exact_text: "1 of 2 answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     expect(page).to have_css('[data-hint-for="code_review"] > .hint-locked')
     expect(page).to have_no_css('[data-hint-for="code_review"] > details.hint')
     expect(find('textarea[data-field="code_review"]').value).to eq("")

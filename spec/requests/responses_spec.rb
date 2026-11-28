@@ -583,7 +583,7 @@ RSpec.describe "Responses", type: :request do
       expect(resp.attributes).not_to have_key("feedback_text")
     end
 
-    it "merges set-only: a later payload never clears an already-saved section rating" do
+    it "preserves an already-saved section rating when the payload omits it" do
       exercise = create_exercise(section)
       DailyResponse.create!(user: user, daily_exercise: exercise, date: Date.current,
                             answers: {}, section_ratings: { "code_review" => "too_easy" })
@@ -593,6 +593,74 @@ RSpec.describe "Responses", type: :request do
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(DailyResponse.last.section_ratings).to eq("code_review" => "too_easy")
+    end
+
+    it "clears an explicitly null draft rating and reports the answered section as unrated" do
+      exercise = create_exercise(section)
+      draft = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "Move the query out of the loop." }, section_ratings: { "code_review" => "right_level" })
+
+      post responses_path, params: { response: { section_ratings: { code_review: nil } } }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(draft.reload.section_ratings).to eq({})
+      expect(draft.answers).to eq("code_review" => "Move the query out of the loop.")
+      expect(response.parsed_body).to include("answered_sections" => [ "code_review" ], "submit_blocker" => "unrated",
+        "section_statuses" => { "code_review" => "in progress" })
+    end
+
+    it "does not interpret invalid rating values as clears" do
+      exercise = create_exercise(section)
+      draft = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "Move the query out of the loop." }, section_ratings: { "code_review" => "right_level" })
+
+      [ "", "bogus", false, [], {} ].each do |invalid|
+        post responses_path, params: { response: { section_ratings: { code_review: invalid } } }, as: :json
+
+        expect(response).to have_http_status(:ok)
+        expect(draft.reload.section_ratings).to eq("code_review" => "right_level")
+        expect(response.parsed_body["submit_blocker"]).to be_nil
+      end
+    end
+
+    it "does not clear a submitted rating" do
+      exercise = create_exercise(section)
+      saved = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "Move the query out of the loop." }, section_ratings: { "code_review" => "right_level" },
+        submitted_at: 1.minute.ago)
+      evidence = saved.attributes
+
+      post responses_path, params: { response: { section_ratings: { code_review: nil } } }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["submitted"]).to be(true)
+      expect(saved.reload.attributes).to eq(evidence)
+    end
+
+    it "applies a clear only to an active section and preserves omitted ratings" do
+      exercise = create_exercise(section.merge("pattern" => { "question" => "q" }))
+      draft = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "My answer", "pattern" => "Another answer" },
+        section_ratings: { "code_review" => "right_level", "pattern" => "too_easy", "challenge" => "too_hard" })
+
+      post responses_path, params: { response: { section_ratings: { code_review: nil, challenge: nil } } }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(draft.reload.section_ratings).to eq("pattern" => "too_easy", "challenge" => "too_hard")
+      expect(response.parsed_body["submit_blocker"]).to eq("unrated")
+    end
+
+    it "refuses a submit that clears its only answered rating without changing the saved draft" do
+      exercise = create_exercise(section)
+      draft = user.daily_responses.create!(daily_exercise: exercise, date: Date.current,
+        answers: { "code_review" => "My answer" }, section_ratings: { "code_review" => "right_level" })
+      evidence = draft.attributes
+
+      post responses_path, params: { response: { section_ratings: { code_review: nil }, **submission_metadata, submit: "1" } }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["submit_blocker"]).to eq("unrated")
+      expect(draft.reload.attributes).to eq(evidence)
     end
 
     it "ignores a value outside the self-rating set instead of raising" do

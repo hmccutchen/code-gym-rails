@@ -64,7 +64,7 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
 
   before { login_as(user) }
 
-  it "renders the unsubmitted dashboard unchanged" do
+  it "renders the unsubmitted dashboard with current practice controls" do
     exercise
     get root_path
     expect_snapshot("dashboard_unsubmitted")
@@ -100,7 +100,7 @@ RSpec.describe "Pages for an account that predates the learning track", type: :r
   context "with LEARNER_NOTES on and the account's setting off" do
     before { stub_env("LEARNER_NOTES" => "1") }
 
-    it "renders the unsubmitted dashboard unchanged" do
+    it "renders the unsubmitted dashboard with current practice controls" do
       exercise
       get root_path
       expect_snapshot("dashboard_unsubmitted")

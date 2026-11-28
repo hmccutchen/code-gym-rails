@@ -4,8 +4,9 @@ Today offers Add exercise before submission. The learner chooses a registered
 kind from the same allowed pool used by planning. Existing keys, including
 unrendered historical keys, cannot be requested again. Existing fourth-kind
 conflicts and the four-active-section limit apply. Add never changes stored
-preferences. Submission closes the whole set; added sections need not all be
-answered. Submit readiness presentation and daily recall belong to later PRs.
+preferences. Submission closes the whole set, and unanswered sections can
+be skipped. Today places Add before the single Submit action in normal flow.
+See [One finish action](one-finish-action.md) for submission readiness.
 
 ## Storage and generation
 
@@ -92,13 +93,16 @@ acceptance request, polls read-only state, and offers explicit recovery. Status
 replies render missing cards through existing section helpers. The browser
 inserts only absent cards, rescans new controls, and keeps existing inputs,
 focus, ratings, folds and duck drafts. A manifest conflict refreshes structure
-without clearing drafts or automatically submitting. Scope replacement retains
-existing stale-page handling. At capacity or after submission, Add is absent.
+without clearing drafts or automatically submitting. Submit stays disabled
+during an active addition or stale-manifest reconciliation. Readiness uses
+the latest applicable server state and any outstanding answer edits. Scope
+replacement retains existing stale-page handling. At capacity or after
+submission, Add is absent.
 
 ## Rollout and verification
 
-PR2 is stacked on PR1 by owner approval. Merge and compatible deployment of
-PR0/PR1 remain prerequisites for production release. PR0 supplies the manifest
+PR2 is stacked on PR1 and PR3 is stacked on PR2 by owner approval. Merge and
+compatible deployment of PR0/PR1 remain prerequisites for production release. PR0 supplies the manifest
 and operation table; PR1 supplies single generation and strict note readers.
 Deploy compatible web and worker together after draining older writers as
 specified in daily-practice-compatibility.md. An old web process does not know

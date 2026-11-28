@@ -2,7 +2,7 @@ require "rails_helper"
 
 # with_csrf: the submit script reads the CSRF meta tag, which test config blanks (see spec/support/csrf_helper.rb).
 RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true do
-  it "refuses an early click with the server's reason, then submits once every answered section is rated" do
+  it "disables submission until every answered section is rated" do
     user = create_fake_provider_user
     weekday = a_weekday
 
@@ -11,19 +11,16 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       # Regex: `.section-label` is uppercased by CSS and Playwright matches the rendered text.
       expect(page).to have_content(/Code Review/i)
 
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect_blocked("Answer at least one section to finish up.")
 
       fields = rating_row_fields
       fields.each { |field| fill_in_answer(field, "A substantive answer for #{field} that clears the length floor.") }
 
       fields[0..-2].each { |field| rate_section(field) }
-      expect(page).to have_selector("#progress-label", exact_text: "✓ All answered")
       expect_blocked("Rate each section you answered to finish up.")
 
-      click_button "Submit answers"
-      expect(page).to have_selector("#rating-nudge:focus", text: "Rate each section you answered to finish up.")
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(user.daily_responses.sole).not_to be_submitted
 
       rate_section(fields.last)
@@ -42,6 +39,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     travel_to(a_weekday) do
       visit_with_existing_set(user)
       fill_in_answer("code_review", "An answer long enough to count, so the day has a response to start over.")
+      rate_section("code_review")
       wait_for_answers_settled
       visit root_path
       wait_for_js
@@ -50,7 +48,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
         window.fetch = (url, options) => {
           const body = options?.body ? JSON.parse(options.body) : {};
           if (body.response?.submit !== "1") return originalFetch(url, options);
-          return new Promise((resolve) => { window.releaseSubmit = () => resolve(originalFetch(url, options)); });
+          return new Promise((resolve) => { window.releaseSubmit = () => resolve(new Response(JSON.stringify({ submit_blocker: "unrated", answered_sections: ["code_review"] }), { status: 422, headers: { "Content-Type": "application/json" } })); });
         };
       JS
 
@@ -154,19 +152,19 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
           const textarea = document.querySelector('textarea[data-field="code_review"]');
           textarea.value = #{final.to_json};
           textarea.dispatchEvent(new Event("input", { bubbles: true }));
-          document.querySelector("#gym-form").requestSubmit();
         JS
 
+        expect(page).to have_button("Submit answers", disabled: false)
+        click_button "Submit answers"
         page.execute_script('document.querySelector("textarea[data-field]").dispatchEvent(new Event("input"))')
         expect(page).to have_button("Submitting…", disabled: true)
         expect(page).to have_selector("#gym-form[inert]")
         page.execute_script('document.querySelector("#gym-form").dispatchEvent(new Event("submit", { cancelable: true }))')
         expect(page.evaluate_script("window.submitRequests")).to eq(1)
-        expect(user.daily_responses.reload.sole.answers["code_review"]).to eq(original)
+        expect(user.daily_responses.reload.sole.answers["code_review"]).to eq(final)
 
         page.execute_script("window.finishSubmit()")
         expect(page).to have_no_selector("#gym-form[inert]")
-        expect(page).to have_button("Submit answers", disabled: false)
         expect(page).to have_css("#save-status", text: I18n.t(failure == :http ? "dashboard.exercise.submit_failed" : "dashboard.exercise.submit_offline"))
         expect(page.evaluate_script("window.alerts")).to eq([])
         wait_for_saved_answer(user, "code_review", final)
@@ -338,7 +336,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
-  it "ignores a late autosave acknowledgement during partial submit and still requests the review" do
+  it "waits for partial autosaves before submission and still requests the review" do
     user = create_fake_provider_user(daily_section_count: ExerciseSection::MAX_SECTIONS)
 
     travel_to(a_weekday) do
@@ -352,10 +350,12 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       expect(page).to have_selector("#gym-form[data-autosave-queued]")
 
       fill_in_answer("pattern", "")
+      expect(page).to have_button("Submit answers", disabled: true)
+      page.execute_script("window.releaseAutosave()")
+      wait_for_answers_settled
       click_button "Submit answers"
       expect(page).to have_selector("#gym-form[data-submit-stored]")
-      page.execute_script("window.releaseAutosave()")
-      expect(page).to have_selector('#gym-form[data-autosave-returned="true"]')
+      expect(page).to have_selector('#gym-form[data-autosave-returned="false"]')
       page.driver.with_playwright_page { |browser| browser.wait_for_load_state(state: "networkidle") }
       expect(page).to have_button("Submitting…", disabled: true)
       expect(page).to have_selector("#gym-form[inert]")
@@ -368,7 +368,7 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
     end
   end
 
-  it "doesn't write the draft copy back from a save that was queued behind a successful submit" do
+  it "settles queued saves before submission without writing a draft after success" do
     user = create_fake_provider_user
 
     travel_to(a_weekday) do
@@ -410,9 +410,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
       wait_for_js_condition("window.heldAutosaves === 1")
       find('textarea[data-field="code_review"]').send_keys(" A second addition, queued behind it.")
       wait_for_js_condition("window.CodeGymSaveStatus.queued('answers')")
-      click_button "Submit answers"
-      wait_for_js_condition("sessionStorage.getItem('submitSucceeded') === '1' && !document.querySelector('#gym-form').inert")
+      expect(page).to have_button("Submit answers", disabled: true)
       page.execute_script("window.releaseAutosaves()")
+      wait_for_answers_settled
+      click_button "Submit answers"
 
       expect(page).to have_content("Review ready!")
       expect(page.evaluate_script("sessionStorage.getItem('savesSentAfterRelease')")).to eq("1")
@@ -440,9 +441,10 @@ RSpec.describe "Rating-gated answer submission", type: :system, with_csrf: true 
             return new Promise(resolve => { window.releaseSubmission = () => resolve(response); });
           });
         }
+        if (window.autosaveReleased) return originalFetch(url, options);
         document.querySelector("#gym-form").dataset.autosaveQueued = "true";
         return new Promise(resolve => {
-          window.releaseAutosave = () => originalFetch(url, options).then(resolve);
+          window.releaseAutosave = () => { window.autosaveReleased = true; originalFetch(url, options).then(resolve); };
         });
       };
     JS

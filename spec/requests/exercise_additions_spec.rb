@@ -41,6 +41,7 @@ RSpec.describe "Additional exercise requests", type: :request do
     status
 
     expect(body.fetch("answered_sections")).to eq(saved.answered_sections)
+    expect(body.fetch("submit_blocker")).to eq(saved.submit_blocker)
     expect(body.fetch("answered_sections")).to eq(%w[code_review])
   end
 

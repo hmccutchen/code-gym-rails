@@ -164,9 +164,13 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
         JS
         wait_for { pw.evaluate(connected_js("answer-form")) }
         expect(pw.evaluate(connected_js("comparison-answer"))).to be(false)
-        pw.evaluate("[...document.querySelectorAll('button')].find((b) => /Submit answers/i.test(b.textContent)).click()")
+        expect(pw.evaluate("document.querySelector('#submit-answers').disabled")).to be(true)
+        pw.evaluate("document.querySelector('#submit-answers').click()")
+        expect(user.daily_responses.sole).not_to be_submitted
       end
       stalled[:held] = nil
+      expect_ready_to_submit
+      click_button "Submit answers"
 
       wait_for { user.daily_responses.reload.first&.submitted? }
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:b\n#{reason}")
@@ -241,10 +245,10 @@ RSpec.describe "Interaction before the deferred modules run", type: :system, wit
       visit current_path
       wait_for { answer_form_connected? }
       within(%([data-comparison-answer="design_comparison"])) { all('input[type="radio"]')[1].click }
-      click_button "Submit answers"
+      expect(page).to have_button("Submit answers", disabled: true)
 
       expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.controls_not_ready"))
-      expect(page).to have_button("Submit answers", disabled: false)
+      expect(page).to have_button("Submit answers", disabled: true)
       expect(user.daily_responses.sole.reload).not_to be_submitted
       expect(user.daily_responses.sole.answers["design_comparison"]).to eq("pick:a\n#{reason}")
     end
