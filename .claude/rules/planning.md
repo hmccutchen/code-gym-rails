@@ -41,7 +41,10 @@ New sessions start with one selected kind. `DaySize.initial` supplies the
 size without replaying the competency gate. `PracticeSchedule::SingleSlot`
 chooses a host from eligible kinds using generated-language service and
 language-filtered delivered history, outstanding
-needs and kind preferences. Coverage never creates an extra slot.
+needs and kind preferences. A hostable need waiting one eligible-kind
+rotation can use the older core-practice opportunity age; supplementary
+Bug Hunt deliveries do not reset that wait. History covers at least two
+rotations, with no new schedule-note fields. Coverage never creates an extra slot.
 [Single initial exercise](../../docs/decisions/single-initial-exercise.md)
 records the policy and rollout order.
 

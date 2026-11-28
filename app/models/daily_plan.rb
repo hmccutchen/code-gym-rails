@@ -56,10 +56,10 @@ class DailyPlan
 
   def self.for(user, language:, featured_concept: nil, weekend: Date.current.on_weekend?, schedule_context: nil) # rubocop:disable Metrics/MethodLength
     weekend = schedule_context.fetch(:date).on_weekend? if schedule_context
-    history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK, language: language)
     size             = schedule_context ? size_for(user, before: schedule_context.fetch(:date)) : size_for(user)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)
+    history          = user.recent_exercise_history(limit: [ SectionRotation::LOOKBACK, 2 * preferences.offered(daily: daily).size ].max, language: language)
     code_review_mode = WeightedRoll.pick(weekend ? WEEKEND_CODE_REVIEW_MODE_WEIGHTS : CODE_REVIEW_MODE_WEIGHTS)
     trap             = code_review_gotcha_for(user, language, code_review_mode, featured_concept)
     hosts_for        = lambda do |kinds, featured = featured_concept|

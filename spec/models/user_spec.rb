@@ -487,6 +487,49 @@ RSpec.describe User, type: :model do
       expect(CompetencyGate::Evidence.new(user).to_a).to be_empty
     end
 
+    it "preserves history entries constructed without host metadata" do
+      entry = ExerciseHistoryEntry.new(section_keys: %w[pattern], delivered_section_keys: %w[pattern], dropped: 0)
+
+      expect(entry.planning_host_keys).to be_nil
+      expect(entry.schedule_sequence).to be_nil
+    end
+
+    it "projects delivered planning hosts using each kind's persisted-section evidence rule" do
+      bug = exercise_on(Date.yesterday, %w[code_review pattern])
+      bug.update!(problem_set: { "code_review" => { "purpose" => "Find the trap" }, "pattern" => {} },
+        dropped_sections: %w[challenge])
+      exercise_on(Date.current - 2, %w[code_review])
+      exercise_on(Date.current - 3, %w[code_review]).update!(problem_set: { "code_review" => { "purpose" => nil } })
+
+      entries = user.recent_exercise_history(limit: 5)
+
+      expect(entries.first.delivered_section_keys).to eq(%w[code_review pattern])
+      expect(entries.first.planning_host_keys).to eq(%w[pattern])
+      expect(entries.second.planning_host_keys).to eq(%w[code_review])
+      expect(entries.last.planning_host_keys).to eq([])
+      expect(entries.map(&:schedule_sequence)).to eq([ nil, nil, nil ])
+    end
+
+    it "carries the stored schedule sequence without synthesizing a legacy sequence" do
+      exercise = exercise_on(Date.yesterday, %w[pattern])
+      exercise.update!(plan_notes: { "practice_schedule" => {
+        "version" => 3, "policy" => 2, "sequence" => 7, "initial_ready" => false,
+        "regular_kinds" => %w[code_review design_comparison], "selected_kinds" => %w[pattern],
+        "assignments" => {}, "continuation" => { "kind_service" => {}, "service" => {} }
+      } })
+
+      expect(user.recent_exercise_history(limit: 5).sole.schedule_sequence).to eq(7)
+    end
+
+    it "reads at least two eligible kind rotations in the planned language" do
+      stub_const("SectionRotation::LOOKBACK", 1)
+      pool_size = KindPreferences.for(user).offered(daily: DailyKinds.for(user)).size
+      expect(user).to receive(:recent_exercise_history)
+        .with(limit: [ SectionRotation::LOOKBACK, 2 * pool_size ].max, language: "javascript").and_call_original
+
+      DailyPlan.for(user, language: "javascript")
+    end
+
     it "does not turn a draft's answers into completion" do
       exercise_on(Date.current - 1, %w[code_review pattern],
                   answers: { "code_review" => "a real answer well past ten characters" })

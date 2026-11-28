@@ -19,10 +19,12 @@ existing concept tracks with the selected host and omit the schedule note.
 The final hosts also determine waiting retention reasons.
 
 The captured work date controls weekday mode. Kind selection uses delivered
-history and keeps it separate from assessed performance. `.size_for` returns
+history and keeps it separate from assessed performance. The history window
+covers at least two eligible-kind rotations so overdue planning-host
+opportunities survive supplementary Bug Hunt deliveries. `.size_for` returns
 `DaySize.initial` for every new plan. The initial count is one, independent of the competency gate and coverage
-exception. Both historical
-calculations remain available to earlier records and their consumers.
+exception. Historical records retain their stored layout; obsolete planning
+algorithm cleanup is tracked in #862.
 `Result#notes(kind_rungs:)` records the draft's captured rung map without
 querying difficulty. The plan also lets retention diagnostics compare the
 concepts offered with those the provider used.

@@ -193,4 +193,75 @@ RSpec.describe PracticeSchedule::SingleSlot do
     end
     expect(legacy.dig("continuation", "service", "code_review", "last_lane")).to eq("practice")
   end
+
+  context "when supplementary delivery has not served a hostable need" do
+    let(:pool) { preferences.offered(daily: daily) }
+    let(:prior) do
+      { "version" => 3, "policy" => 2, "sequence" => 100, "initial_ready" => true,
+        "regular_kinds" => daily.map(&:key), "selected_kinds" => [ "code_review" ], "assignments" => {},
+        "continuation" => { "kind_service" => { "ruby_rails" => pool.each_with_index.to_h { |kind, index| [ kind.key, 100 - index ] } },
+          "service" => {} } }
+    end
+    let(:need) { { kind: "code_review", concept: "memoization", bucket: "ruby_rails", mode: "support" } }
+    let(:recent) do
+      pool.each_with_index.map { |kind, index| delivery(kind.key, sequence: 100 - index, host: kind != ExerciseSection::CodeReview) }
+    end
+    let(:last_host) { delivery("code_review", sequence: 50) }
+
+    def delivery(key, sequence: nil, host: true)
+      ExerciseHistoryEntry.new(section_keys: [ key ], delivered_section_keys: [ key ], dropped: 0,
+        planning_host_keys: host ? [ key ] : [], schedule_sequence: sequence)
+    end
+
+    [ :pending, :struggle, :reinforcement, :retention, :drill ].each do |reason|
+      it "uses older host service for a #{reason} need after one eligible-pool worth of delivered days" do
+        facts = evidence.merge(pending: reason == :pending ? [ need ] : [],
+          struggle: reason == :struggle ? { "code_review" => true } : {},
+          reinforcement: reason == :reinforcement ? [ need ] : [])
+        selected = plan(previous: prior, facts: facts, history: recent + [ last_host ],
+          due: reason == :retention ? [ need ] : [], drills: reason == :drill ? [ need ] : [])
+
+        expect(selected.kinds).to eq([ ExerciseSection::CodeReview ])
+        expect(selected.notes.dig("continuation", "kind_service", "ruby_rails", "code_review")).to eq(101)
+      end
+    end
+
+    it "does not promote the need one delivery before the pool-size boundary" do
+      selected = plan(previous: prior, facts: evidence.merge(pending: [ need ]), history: recent.take(pool.size - 1) + [ last_host ])
+      expect(selected.kinds).to eq([ pool.last ])
+    end
+
+    it "does not count a fully dropped set toward successful deliveries" do
+      dropped = ExerciseHistoryEntry.new(section_keys: [ "code_review" ], delivered_section_keys: [], dropped: 1,
+        planning_host_keys: [], schedule_sequence: 99)
+      history = recent.take(pool.size - 1) + [ dropped, last_host ]
+      expect(plan(previous: prior, facts: evidence.merge(pending: [ need ]), history: history).kinds).to eq([ pool.last ])
+    end
+
+    it "uses a conservative debt floor for an absent or unversioned host delivery" do
+      [ recent, recent + [ delivery("code_review") ] ].each do |history|
+        expect(plan(previous: prior, facts: evidence.merge(pending: [ need ]), history: history).kinds).to eq([ ExerciseSection::CodeReview ])
+      end
+    end
+
+    it "does not promote an unhostable need or a kind without a current need" do
+      [ { facts: evidence }, { facts: evidence.merge(pending: [ need ]), host: DayHosts.new("ruby_rails", mode: :bug_hunt) } ].each do |options|
+        expect(plan(previous: prior, history: recent + [ last_host ], **options).kinds).to eq([ pool.last ])
+      end
+    end
+
+    it "resets host debt after the actual host delivery and leaves proposals uncredited until committed" do
+      facts = evidence.merge(pending: [ need ])
+      history = recent + [ last_host ]
+      selected = plan(previous: prior, facts: facts, history: history)
+      expect(plan(previous: prior, facts: facts, history: history).kinds).to eq(selected.kinds)
+      expect(prior.dig("continuation", "kind_service", "ruby_rails", "code_review")).to eq(100)
+      expect(history).to eq(recent + [ last_host ])
+
+      committed = [ delivery("code_review", sequence: selected.notes.fetch("sequence")) ] + history
+      expect(plan(previous: selected.notes, facts: facts, history: committed).kinds).to eq([ pool.last ])
+      replacement = plan(previous: selected.notes, facts: facts, history: history, replacing: true)
+      expect(replacement.notes.slice("sequence", "continuation")).to eq(selected.notes.slice("sequence", "continuation"))
+    end
+  end
 end

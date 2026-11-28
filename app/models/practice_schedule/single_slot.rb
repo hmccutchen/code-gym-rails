@@ -1,4 +1,6 @@
 class PracticeSchedule::SingleSlot
+  NO_NEED_PRIORITY = 5
+
   def self.plan(**options) = new(**options).plan
 
   def initialize(context:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false)
@@ -52,9 +54,24 @@ class PracticeSchedule::SingleSlot
   def choose(pool)
     raise ArgumentError, "No eligible practice kind" if pool.empty?
 
-    groups = pool.group_by { |kind| [ @continuation["kind_service"].fetch(@hosts.language, {}).fetch(kind.key, 0), priority(kind), @daily.include?(kind) ? 0 : 1 ] }
+    groups = pool.group_by do |kind|
+      need = priority(kind)
+      [ effective_service(kind, pool.size, need), need, @daily.include?(kind) ? 0 : 1 ]
+    end
     candidates = groups.fetch(groups.keys.min)
     WeightedRoll.pick(candidates.index_with { |kind| @daily.include?(kind) ? KindPreferences::DEFAULT_MULTIPLIER : @preferences.multiplier_for(kind) })
+  end
+
+  def effective_service(kind, bound, need)
+    service = @continuation["kind_service"].fetch(@hosts.language, {}).fetch(kind.key, 0)
+    return service if need == NO_NEED_PRIORITY
+
+    deliveries = @history.reject { |entry| entry.delivered_section_keys.empty? }
+    index = deliveries.index { |entry| (entry.planning_host_keys || entry.delivered_section_keys).include?(kind.key) }
+    return service if (index || deliveries.size) < bound
+
+    host_sequence = index ? deliveries[index].schedule_sequence : nil
+    [ service, host_sequence || 0 ].min
   end
 
   def priority(kind)
@@ -65,7 +82,7 @@ class PracticeSchedule::SingleSlot
     return 3 if @due.any? { |entry| eligible?(kind, entry) }
     return 4 if @drills.any? { |entry| eligible?(kind, entry) }
 
-    5
+    NO_NEED_PRIORITY
   end
 
   def eligible?(kind, entry)

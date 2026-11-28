@@ -24,17 +24,47 @@ can take the slot if allowed by the pool and the user's exclusions.
 language, mode and concept restrictions. Weekend bug hunts retain their mode rules and cannot carry a
 core retention assignment.
 
-`PracticeSchedule::SingleSlot` ranks eligible kinds by oldest service in the generated language first.
-A mixed-language learner keeps separate Ruby/Rails and JavaScript service,
-so an even kind rotation cannot permanently pair a kind with only one language.
-Among kinds with equal service, priority goes to a host for a normal retry,
-then pending practice or struggle, reinforcement, retention and a drill.
-Among otherwise equal kinds, the regular pair takes precedence. For the
-remaining tie, `WeightedRoll.pick` samples the candidates in registry
-order. Regular kinds use the default multiplier. Stored multipliers apply
-only to tied optional kinds. Seeding Ruby's random source makes the
-weighted tie reproducible. A need that persists cannot keep a
-recently served kind ahead of an older eligible kind.
+`PracticeSchedule::SingleSlot` normally ranks eligible kinds by oldest
+successful delivery in the generated language. A mixed-language learner
+keeps separate Ruby/Rails and JavaScript service.
+
+An overdue learning opportunity can override that order. Let N be the current
+eligible kind count. After N successful same-language deliveries without a
+planning-host delivery of a kind, a currently hostable learning need lets
+that kind use its older planning-host service timestamp. A Bug Hunt advances
+ordinary delivery service but cannot erase this wait for core practice.
+A successful core-practice delivery advances both kinds of opportunity.
+This measures opportunities offered, not answers, grades or mastery.
+
+Among equal service ages, priority goes to a host for a normal retry, then
+pending practice or struggle, reinforcement, retention and a drill. Among
+otherwise equal kinds, the regular pair takes precedence. `WeightedRoll.pick`
+settles the remaining tie in registry order. Regular kinds use the default
+multiplier; stored multipliers apply only to tied optional kinds.
+
+The history window covers at least twice the eligible kind count and is
+filtered by generated language before limiting rows. Delivered section
+eligibility comes from the kind's existing evidence rules, including the
+stored Bug Hunt shape. A historical row without a schedule sequence has
+unknown old host service, represented by zero; do not invent a global
+sequence from a language-filtered position. The waiting threshold uses
+same-language history positions, while ordering uses recorded service
+sequences. No new continuation field or schema is needed.
+
+This gives ordinary variety and overdue learning opportunities separate
+claims on the single slot. With a stable eligible pool, ordinary kinds wait
+at most 2N successful same-language turns: another kind can move ahead for
+its ordinary delivery and its older host opportunity, then both are newer.
+The persisted weekly-mode regressions cover support, normal retry and
+mixed-language practice with retention and drills.
+
+This finite history window does not promise a universal deadline for a
+rarely hostable need: old opportunities can fall outside it between eligible
+days. Calendar-day waits also cannot be bounded when the
+learner does not practice or the language, mode or concept restrictions
+never permit the need. Individual concepts still use the existing
+assignment policy below; an offered host is not a promise that every pending
+concept is served at once.
 
 Enrolled protected-practice accounts use `PracticeSchedule::Assignments`
 with the selected host alone. Its service records are also scoped to the
