@@ -35,6 +35,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
     expect(page).to have_css('[data-section-fold="code_review"]')
     expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
+    expect(page).to have_button("Submit answers", disabled: true)
   end
 
   it "keeps the newer card answered and refreshes the expanded form after an older reply" do
@@ -45,6 +46,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
     expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
     expect(find('textarea[data-field="code_review"]').value).to eq("Move the query outside the loop.")
     wait_for_answers_settled
+    expect_ready_to_submit
     saves = page.evaluate_script("window.answerSaves")
     expect(saves.size).to eq(2)
     expect(saves.last.fetch("response")).to include("manifest_revision" => 2,
@@ -64,6 +66,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
         window.releaseAnswerReply();
       JS
       wait_for_answers_settled
+      expect_ready_to_submit
 
       expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
       expect(page).to have_css('[data-hint-for="code_review"] > details.hint')

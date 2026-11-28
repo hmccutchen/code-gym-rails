@@ -36,6 +36,7 @@ function controllersConnected() {
 window.CodeGymRequest = request
 window.CodeGymSaveStatus = saveStatus
 window.CodeGymBootstrap.flush()
+window.CodeGymBootstrap.controllersReady = controllersConnected
 // Stimulus imports each controller on its own, so start() resolving says nothing about any of them having connected.
 window.CodeGymBootstrap.ready = application.start()
   .then(controllersConnected)

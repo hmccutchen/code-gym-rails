@@ -138,7 +138,8 @@ RSpec.describe "section rendering", type: :request do
 
           it "renders each section's label, scenario, question, and body" do
             keys.each do |key|
-              expect(response.body).to include(SLOT_LABELS.fetch(key))
+              expect(Nokogiri::HTML(response.body).at_css(%([data-section-fold="#{key}"] .section-title)).text.strip)
+                .to eq(SLOT_LABELS.fetch(key).sub(/\A\d+ — /, ""))
               expect(response.body).to include(PAYLOADS.fetch(key)["question"])
               expect(response.body).to include(PAYLOADS.fetch(key)["scenario"])
               BODY_MARKERS.fetch(key).each { |marker| expect(page_text).to include(marker) }
@@ -155,8 +156,11 @@ RSpec.describe "section rendering", type: :request do
             end
           end
 
-          it "counts the day's sections in the progress label" do
-            expect(response.body).to include("0 of #{keys.size} answered")
+          it "renders every section without a completion quota" do
+            document = Nokogiri::HTML(response.body)
+            expect(document.css("details[data-section-fold]").map { |section| section["data-section-fold"] }).to eq(keys)
+            expect(document.css(".progress-sticky, #progress-label, #progress-fill")).to be_empty
+            expect(document.at_css("#submit-answers")["disabled"]).to be_present
           end
         end
 

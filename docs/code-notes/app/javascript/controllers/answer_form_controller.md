@@ -167,6 +167,14 @@ not-current submit is.
 When nobody cancels the event, which is always the case with the switch
 off, the reload below runs as before.
 
+A passive freshness banner also stops sending answers and disables Submit.
+An unconfirmed edit whose timer is canceled remains marked by `heldEdits`.
+Further editable answer or rating changes still update the local draft and
+that marker. The existing `watchUnsent` hook reports these edits without a
+pending timer, so Reload warns before discarding them and does not wait for a
+save that cannot run. Queued answer work checks the hold before sending;
+explicit discard clears the marker as well as the owned draft.
+
 The banner's "Reload and discard changes" raises `code-gym:discard-draft`
 right before it reloads, and `#discardDraft` clears the copy this tab owns.
 Without it, a refused edit to a held set that the reload carries forward
@@ -293,8 +301,21 @@ of the expanded form so the server recomputes answered state. Stale and
 submitted replies keep their existing leave paths before this check.
 
 The controller rescans answer fields and advances the manifest revision only
-after the cards are present. Expansion invalidates readiness and schedules an
-autosave so the server evaluates every displayed answer and rating. `code-gym:sections-added` lets the existing
+after the cards are present. Expansion itself sends no answer save: polling
+must not write old displayed answers over another tab's newer work. The status
+reply carries the existing response authority's submit blocker. It can block
+an already-confirmed valid form, for example when an added card is answered
+but unrated, but it cannot promote an unconfirmed or previously blocked form.
+A valid initial answer with a blank addition remains ready after the new
+controllers connect. Other cross-tab changes need a real edit acknowledgement
+or reload; this is not a cross-device draft merge. The inherited older-revision
+reply refresh above follows an explicit local edit, retaining existing
+last-editor-wins behavior.
+
+`CodeGymBootstrap.controllersReady` reuses the bounded initial connection wait
+for added cards before refreshing the readiness gate. A module still absent
+after that wait leaves Submit disabled with reload guidance, without an ongoing
+observer. `code-gym:sections-added` lets the existing
 Mermaid and code-lines controllers initialize their new descendants. Add
 requests and new submissions carry the current revision as well as scope.
 A `manifest_changed` or `addition_busy` submit reply unlocks the form,

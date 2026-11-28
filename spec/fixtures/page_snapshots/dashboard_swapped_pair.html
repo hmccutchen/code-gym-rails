@@ -561,15 +561,14 @@
         <form id="daily-kind-swap" hidden></form>
 
   <form id="exercise-addition-options" hidden></form>
-  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft"
+  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft code-gym:stale-practice@window->answer-form#stopSavingBehindBanner"
        data-answer-form-answered-sections-value="[]"
        data-answer-form-submit-blocker-value="unanswered"
+       data-answer-form-addition-pending-value="false"
        data-answer-form-draft-scope-value="900002-1790694000000000"
        data-answer-form-manifest-revision-value="2"
        data-answer-form-empty-unrated-sections-value="[&quot;architecture&quot;,&quot;design_comparison&quot;]"
        data-answer-form-draft-token-value="900002-1790694000000000:new:643d5437104296e2"
-       data-answer-form-answered-count-value="%{answered} of %{total} answered"
-       data-answer-form-all-answered-value="✓ All answered"
        data-answer-form-stale-reloaded-value="The set changed, so that last change wasn&#39;t saved. This is the current set — your saved work is still there."
        data-answer-form-submitting-value="Submitting…"
        data-answer-form-submit-label-value="Submit answers"
@@ -582,17 +581,10 @@
        data-answer-form-leave-held-value="Another change on this page hasn&#39;t saved, so the page waits for it before moving on. Your answers can&#39;t be edited now, since the server already has them or has a newer set. Retry the change above, or reload now."
        data-answer-form-reload-now-value="Reload now">
     <div class="today-main">
-      <div class="progress-sticky">
-        <div class="progress-bar">
-          <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
-        </div>
-        <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel">0 of 2 answered</div>
-      </div>
-
       <form id="gym-form" data-turbo="false" data-answer-form-target="form" data-action="submit-&gt;answer-form#submit input-&gt;answer-form#input change-&gt;answer-form#change click-&gt;answer-form#rate" action="/responses" accept-charset="UTF-8" method="post">
         <div data-answer-form-target="sections">
             <details class="section" open data-slot="1" data-section-fold="architecture">
-  <summary class="section-label"><h2 class="section-title">  1 — Architecture Decision: Queue
+  <summary class="section-label"><h2 class="section-title">  Architecture Decision: Queue
 </h2>
     <span class="section-status" data-status-for="architecture"></span>
   </summary>
@@ -819,7 +811,7 @@ Tradeoffs you considered:
 </details>
 
   <details class="section" open data-slot="2" data-section-fold="design_comparison">
-  <summary class="section-label"><h2 class="section-title">  2 — Design Comparison: 
+  <summary class="section-label"><h2 class="section-title">  Design Comparison: 
 </h2>
     <span class="section-status" data-status-for="design_comparison"></span>
   </summary>
@@ -1201,7 +1193,7 @@ Tradeoffs you considered:
 </form>    </div>
     <div class="today-side">
       <div class="submit-row" id="submit-row">
-        <button name="button" type="button" id="submit-answers" class="btn btn-primary" data-answer-form-target="submitButton" data-action="answer-form#submit">Submit answers</button>
+        <button name="button" type="button" id="submit-answers" class="btn btn-primary" disabled="disabled" data-answer-form-target="submitButton" data-action="answer-form#submit">Submit answers</button>
         <span class="auto-saved">Auto-saved as you type</span>
         <p class="progress-label" id="rating-nudge" tabindex="-1" data-unanswered="Answer at least one section to finish up." data-unrated="Rate each section you answered to finish up." data-answer-form-target="nudge" aria-live="polite">Answer at least one section to finish up.</p>
       </div>

@@ -37,6 +37,7 @@ export default class extends Controller {
     this.saveTimer = null
     this.reviewRequested = false
     this.answersConfirmed = true
+    this.heldEdits = false
     this.additionPending = this.additionPendingValue
 
     this.ratings = {}
@@ -50,15 +51,18 @@ export default class extends Controller {
     const restored = this.restoreDraft()
 
     saveStatus.watch(() => this.saveTimer !== null)
+    saveStatus.watchUnsent(() => this.element.isConnected && this.heldEdits)
     if (restored || this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
 
     this.updateHints()
     this.updateSubmit()
-    window.CodeGymBootstrap?.ready?.then(() => {
-      if (!this.element.isConnected) return
-      if (!this.formControllersConnected()) saveStatus.report("submit", this.controlsNotReadyValue)
-      this.updateSubmit()
-    })
+    window.CodeGymBootstrap?.ready?.then(() => this.refreshConnectedControls())
+  }
+
+  refreshConnectedControls() {
+    if (!this.element.isConnected) return
+    if (!this.formControllersConnected()) saveStatus.report("submit", this.controlsNotReadyValue)
+    this.updateSubmit()
   }
 
   disconnect() {
@@ -110,7 +114,7 @@ export default class extends Controller {
   }
 
   nextSave() {
-    if (this.formTarget.inert) return null
+    if (this.formTarget.inert || this.submitHeld) return null
     const save = this.payload()
     this.draft.recordSend(this.onScreen(save))
     return save
@@ -177,8 +181,12 @@ export default class extends Controller {
     this.textareas = [...this.formTarget.querySelectorAll("textarea[data-field]")]
     const expanded = this.manifestRevisionValue !== data.manifest_revision
     this.manifestRevisionValue = data.manifest_revision
-    if (expanded) this.autoSave()
+    if (expanded && this.answersConfirmed && this.blocker === null) {
+      this.blocker = data.submit_blocker || null
+      this.refreshNudge()
+    }
     this.updateHints()
+    if (expanded) window.CodeGymBootstrap.controllersReady().then(() => this.refreshConnectedControls())
     return true
   }
 
@@ -205,9 +213,13 @@ export default class extends Controller {
   sendSave() {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
-    if (this.formTarget.inert || this.submitHeld) return
+    if (this.formTarget.inert) return
     this.invalidateReadiness()
     this.storeDraft()
+    if (this.submitHeld) {
+      this.heldEdits = true
+      return
+    }
     saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
         if (skipped || this.submitHeld) return
@@ -249,6 +261,7 @@ export default class extends Controller {
   }
 
   stopSavingBehindBanner() {
+    this.heldEdits ||= !this.answersConfirmed
     this.submitHeld = true
     clearTimeout(this.saveTimer)
     this.saveTimer = null
@@ -258,6 +271,7 @@ export default class extends Controller {
   discardDraft() {
     this.stopSavingBehindBanner()
     this.draft.clearOwn()
+    this.heldEdits = false
   }
 
   showStaleSubmitBehindBanner(result) {
@@ -280,9 +294,12 @@ export default class extends Controller {
 
   autoSave() {
     this.invalidateReadiness()
-    if (this.submitHeld) return
-    clearTimeout(this.saveTimer)
     this.storeDraft()
+    if (this.submitHeld) {
+      this.heldEdits = true
+      return
+    }
+    clearTimeout(this.saveTimer)
     this.saveTimer = this.formTarget.inert ? null : setTimeout(() => this.sendSave(), AUTOSAVE_DELAY_MS)
   }
 
