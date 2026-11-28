@@ -13,6 +13,7 @@ RSpec.describe "Today's desktop layout", type: :system do
   def submit_the_day
     fill_in_answer("code_review", "It re-runs the query inside the loop; load it once before.")
     rate_section("code_review")
+    expect_ready_to_submit
     click_button "Submit answers"
     expect(page).to have_css("#ai-review")
   end
@@ -68,7 +69,14 @@ RSpec.describe "Today's desktop layout", type: :system do
   it "keeps the gap before Submit at one section margin between 600 and 899px" do
     visit_today(width: 768)
 
-    expect(rect("#submit-row")["top"] - rects(".today-main .section").last["bottom"]).to be_within(0.5).of(24)
+    expect(page).to have_no_css('[data-exercise-addition-target="trigger"]')
+    gap = page.evaluate_script(<<~JS)
+      (() => {
+        const last = [...document.querySelectorAll(".today-main .section")].pop().getBoundingClientRect();
+        return document.querySelector("#submit-row").getBoundingClientRect().top - last.bottom;
+      })()
+    JS
+    expect(gap).to be_within(0.5).of(24)
   end
 
   it "ends the page with Submit and then the regenerate row on a phone" do
@@ -123,16 +131,10 @@ RSpec.describe "Today's desktop layout", type: :system do
 
     it "shows a held submit's notice in the main column, on screen" do
       visit_today(width: 1280)
-      page.execute_script(<<~JS)
-        const originalFetch = window.fetch;
-        window.fetch = (url, options) => {
-          const body = options?.body ? JSON.parse(options.body) : {};
-          if (!body.response || body.response.submit === "1") return originalFetch(url, options);
-          return new Promise(() => {});
-        };
-      JS
-      fill_in_answer("code_review", "The answer an autosave is still carrying when the submit goes out.")
+      fill_in_answer("code_review", "The query should be loaded outside the loop.")
       rate_section("code_review")
+      expect_ready_to_submit
+      page.execute_script('window.CodeGymSaveStatus.report("layout-held-save", "Another save still needs attention.")')
       click_button "Submit answers"
 
       expect(page).to have_css(".today-main #leave-held")

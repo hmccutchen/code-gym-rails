@@ -172,7 +172,7 @@ What changed:
 Specs: `spec/system/focus_ring_spec.rb` (a field on each form page, and a
 screenshot check for the slider thumb), `spec/system/teaching_hint_lock_spec.rb`
 (Tab, Enter and Space on a locked hint, then unlocking and re-locking),
-`spec/system/sticky_progress_focus_spec.rb`, `spec/system/rating_buttons_spec.rb`,
+`spec/system/answer_focus_layout_spec.rb` (replaced the sticky-quota check when Today moved to normal flow), `spec/system/rating_buttons_spec.rb`,
 and request specs for the hint's server render and unwrapped titles.
 
 No migration was needed for any of this, and no dependency was added.

@@ -486,8 +486,6 @@ en:
       start_over: "Start over"
       starting_over: "Starting over…"
       start_over_confirm: "This will clear today's answers and ratings so you can start fresh. This can't be undone. Continue?"
-      answered_count: "%{answered} of %{total} answered"
-      all_answered: "✓ All answered"
       submit: "Submit answers"
       submitting: "Submitting…"
       auto_saved: "Auto-saved as you type"
@@ -809,6 +807,8 @@ en:
     section:
       label: "%{slot} — %{name}"
       titled_label: "%{slot} — %{name}: %{title}"
+      practice_label: "%{name}"
+      practice_titled_label: "%{name}: %{title}"
       featured: "This week's concept"
     kind_about:
       summary: "About %{name}"

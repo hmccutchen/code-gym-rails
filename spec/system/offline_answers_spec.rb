@@ -467,26 +467,36 @@ RSpec.describe "Answers through a lost connection", type: :system do
     end
   end
 
-  it "keeps saying the answers were not submitted when a retry already waiting fails again" do
+  it "keeps an offline edit pending and Submit disabled when a retry fails again" do
     travel_to(a_weekday) do
       open_dashboard
       fill_in_answer("code_review", answer)
       rate_section("code_review")
       expect_ready_to_submit
+      page.execute_script(<<~JS)
+        const originalFetch = window.fetch;
+        window.offlineAnswerAttempts = 0;
+        window.fetch = (url, options) => {
+          if (new URL(url, location.href).pathname === '/responses' && options?.method === 'POST') window.offlineAnswerAttempts++;
+          return originalFetch(url, options);
+        };
+      JS
       go_offline
       find(code_review_field).fill_in(with: "#{answer} One more line typed offline.")
       expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
 
-      click_button I18n.t("dashboard.exercise.submit")
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"))
+      expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: true)
       page.execute_script("window.dispatchEvent(new Event('online'))")
-      sleep 0.5
+      wait_for_js_condition("window.offlineAnswerAttempts >= 2")
 
-      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"))
+      expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.saving_offline"))
+      expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: true)
+      expect(stored_draft["answers"]["code_review"]).to eq("#{answer} One more line typed offline.")
+      expect(user.daily_responses.sole).not_to be_submitted
     end
   end
 
-  it "keeps the answers and Submit when submitting offline, and submits once back online" do
+  it "keeps answers after an offline Submit and waits for recovery before another submission" do
     travel_to(a_weekday) do
       open_dashboard
       fill_in_answer("code_review", answer)
@@ -497,11 +507,12 @@ RSpec.describe "Answers through a lost connection", type: :system do
       click_button I18n.t("dashboard.exercise.submit")
 
       expect(page).to have_css("#save-status", text: I18n.t("dashboard.exercise.submit_offline"))
-      expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+      expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: true)
       expect(user.daily_responses.sole).not_to be_submitted
 
       go_offline(false)
       expect(page).to have_no_css("#save-status", visible: true)
+      expect_ready_to_submit
       click_button I18n.t("dashboard.exercise.submit")
 
       expect(page).to have_no_css("#gym-form")

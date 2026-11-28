@@ -82,7 +82,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
         stub_sortable_cdn(:loaded)
         visit_as(user)
 
-        expect(page).to have_content("0 of 3 answered")
+        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: true)
         expect(hidden_answer).to be_empty
         expect(page).to have_no_css('.hint-slot[data-hint-for="parsons_problem"] > details')
         expect(page).to have_selector("#rating-nudge", text: "Answer at least one section to finish up.")
@@ -95,14 +95,13 @@ RSpec.describe "Parsons reorder controls", type: :system do
           find("ol[data-parsons-blocks] .parsons-block", match: :first).send_keys([ :control, :down ])
         end
 
-        expect(page).to have_content("1 of 3 answered")
         expect(page).to have_css('.hint-slot[data-hint-for="parsons_problem"] > details.hint')
         expect(page).to have_selector("#rating-nudge", visible: :hidden)
         wait_for do
           user.daily_responses.reload.first&.answered?("parsons_problem")
         end
         visit root_path
-        expect(page).to have_content("1 of 3 answered")
+        expect(page).to have_css('.hint-slot[data-hint-for="parsons_problem"] > details.hint')
         expect(page).to have_selector("#rating-nudge", visible: :hidden)
         click_button "Submit answers"
         expect(page).to have_content("Review ready!")
@@ -122,7 +121,7 @@ RSpec.describe "Parsons reorder controls", type: :system do
         stub_sortable_cdn(:loaded)
         visit_as(user)
 
-        expect(page).to have_content("1 of 3 answered")
+        expect(page).to have_css('.hint-slot[data-hint-for="parsons_problem"] > details.hint')
         expect(page).to have_selector("#rating-nudge", text: "Rate each section you answered to finish up.")
         rate_section("parsons_problem")
         expect(page).to have_selector("#rating-nudge", visible: :hidden)

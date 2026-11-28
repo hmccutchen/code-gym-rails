@@ -268,7 +268,9 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       page.execute_script("document.querySelector('#submit-answers').click()")
 
       expect(page).to have_css("#save-status", text: "nope")
-      expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+      wait_for_js_condition("!document.querySelector('#gym-form').inert")
+      advance_browser_clock(800)
+      expect_ready_to_submit
       expect(user.daily_responses.sole).not_to be_submitted
       expect(find("#learner-note textarea").value).to eq("The loop hid the query.")
       expect(page.evaluate_script("document.querySelector('#learner-note textarea').closest('[inert]')")).to be_nil
@@ -411,7 +413,10 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
         expect(page.evaluate_script("window.__noteBodies")).to eq([ text ])
 
         page.execute_script("document.querySelector('#submit-answers').click()")
-        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+        expect(page).to have_css("#save-status", text: error)
+        wait_for_js_condition("!document.querySelector('#gym-form').inert")
+        advance_browser_clock(800)
+        expect_ready_to_submit
         expect(page.evaluate_script("window.__noteBodies")).to eq([ text, text ])
         expect(page).to have_css("#save-status", text: error)
         expect(user.daily_responses.sole).not_to be_submitted
@@ -474,8 +479,10 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
           expect(page).to have_button(I18n.t("dashboard.exercise.submitting"), disabled: true)
         end
         page.execute_script("window.__failNote = true; window.__releaseNote()")
-        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
         expect(page).to have_css("#save-status", text: "nope")
+        wait_for_js_condition("!document.querySelector('#gym-form').inert")
+        advance_browser_clock(800)
+        expect_ready_to_submit
         expect(user.daily_responses.sole).not_to be_submitted
         expect(page.evaluate_script("document.querySelector('#learner-note textarea').closest('[inert]')")).to be_nil
         expected = newer_edit ? [ "The first thought.", "The latest thought." ] : [ "The first thought." ]
@@ -500,6 +507,14 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
 
     travel_to(a_weekday) do
       visit_with_todays_set(user)
+      fill_in_answer("code_review", "It queries once per row in the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
+      stub_fetch(responses_path, <<~JS)
+        JSON.parse(options.body).response.submit ?
+          new Response(JSON.stringify({ error: "Submission refused" }), { status: 422, headers: { "Content-Type": "application/json" } }) :
+          passThrough(url, options)
+      JS
       page.execute_script("window.__noteBodies = []")
       stub_fetch(learner_note_path, "(window.__noteBodies.push(JSON.parse(options.body).learner_note), passThrough(url, options))")
       type_note("The saved thought.")
@@ -523,6 +538,8 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
     travel_to(a_weekday) do
       visit_with_todays_set(user)
       fill_in_answer("code_review", "It queries once per row in the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
       type_note("A note for the old response.")
       wait_for_answers_settled
       visit root_path
@@ -584,7 +601,9 @@ RSpec.describe "The note box", type: :system, with_csrf: true do
       2.times do |attempt|
         page.execute_script("document.querySelector('#submit-answers').click()")
         wait_for_js_condition("window.__noteStatuses.length === #{attempt + 2}")
-        expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
+        wait_for_js_condition("!document.querySelector('#gym-form').inert")
+        advance_browser_clock(800)
+        expect_ready_to_submit
         expect(page).to have_css("#save-status", text: I18n.t("learner_notes.note.unavailable"))
         expect(find("#learner-note textarea").value).to eq("The old tab's unsent edit.")
         expect(page.evaluate_script("document.querySelector('#learner-note textarea').closest('[inert]')")).to be_nil

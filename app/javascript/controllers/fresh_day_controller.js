@@ -86,6 +86,7 @@ export default class extends Controller {
 
   showBanner(sentence) {
     this.stopped = true
+    window.dispatchEvent(new CustomEvent("code-gym:stale-practice"))
     if (this.bannerTarget.hidden) {
       this.unsavedTarget.textContent = this.unsavedTextValue
       this.refreshBanner()

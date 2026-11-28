@@ -129,25 +129,25 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-rating="too_hard"')
   end
 
-  it "keeps Submit clickable and asks for ratings on answered sections that have none" do
+  it "disables Submit and asks for ratings on answered sections that have none" do
     exercise = create_exercise
     create_response(exercise, submitted: false)
 
     get root_path
 
-    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(Nokogiri::HTML(response.body).at_css("#submit-answers")["disabled"]).to be_present
     expect(response.body).to include('data-answer-form-submit-blocker-value="unrated"')
     expect(response.body).to match(/id="rating-nudge"(?![^>]*hidden)/)
     expect(response.body).to include("Rate each section you answered to finish up.")
   end
 
-  it "keeps Submit clickable and asks for an answer when nothing is answered yet" do
+  it "disables Submit and asks for an answer when nothing is answered yet" do
     exercise = create_exercise
     create_response(exercise, submitted: false).update!(answers: {})
 
     get root_path
 
-    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(Nokogiri::HTML(response.body).at_css("#submit-answers")["disabled"]).to be_present
     expect(response.body).to include('data-answer-form-answered-sections-value="[]"')
     expect(response.body).to include("Answer at least one section to finish up.")
   end
@@ -220,13 +220,34 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
     expect(response.body).to include('data-rating-for="code_review" data-rating="right_level">Just right</button>')
   end
 
-  it "keeps the submit button visible and clickable before anything is answered" do
+  it "keeps the submit button visible and disabled before anything is answered" do
     create_exercise
 
     get root_path
 
-    expect(response.body).to match(/id="submit-answers"(?![^>]*disabled)/)
+    expect(Nokogiri::HTML(response.body).at_css("#submit-answers")["disabled"]).to be_present
     expect(response.body).not_to match(/id="submit-row"[^>]*style="display:none"/)
+  end
+
+  it "keeps a ready draft disabled while an addition is pending" do
+    exercise = create_exercise
+    create_response(exercise, submitted: false).update!(answers: { "code_review" => "Load once." },
+      section_ratings: { "code_review" => "right_level" })
+    allow_any_instance_of(DailyExercise).to receive(:addition_pending?).and_return(true)
+
+    get root_path
+
+    expect(Nokogiri::HTML(response.body).at_css("#submit-answers")["disabled"]).to be_present
+  end
+
+  it "presents unsubmitted exercise headings without a numbered workload" do
+    create_exercise
+
+    get root_path
+
+    headings = Nokogiri::HTML(response.body).css(".section-title").map { |heading| heading.text.strip }
+    expect(headings).to include("Code Review", "Pattern of the Month: Service Objects")
+    expect(headings).not_to include(match(/\A\d+ — /))
   end
 
   describe "the day's two columns" do
@@ -239,7 +260,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       day = page_html.at_css(".today-day[data-controller='answer-form']")
       expect(day.element_children.map { |child| child["class"] }).to eq(%w[today-main today-side])
       expect(day.at_css(".today-main #gym-form")).to be_present
-      expect(day.at_css(".today-main .progress-sticky")).to be_present
+      expect(day.css(".progress-sticky, #progress-label, #progress-fill")).to be_empty
       expect(day.at_css(".today-side").element_children.map { |child| child["class"] }).to eq([ "submit-row", "regenerate-row" ])
       expect(page_html.at_css("#gym-form #submit-row")).to be_nil
       expect(page_html.css(".regenerate-row").size).to eq(1)
@@ -250,7 +271,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
       get root_path
 
       expect(page_html.at_css(".today-day")["data-action"])
-        .to eq("pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft")
+        .to eq("pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft code-gym:stale-practice@window->answer-form#stopSavingBehindBanner")
     end
 
     it "drives the review button on a submitted day with the loading-form controller" do
@@ -1327,7 +1348,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).not_to include("4 —")
+      expect(Nokogiri::HTML(response.body).css("details.section").size).to eq(3)
     end
 
     it "renders a plan_review fourth section on the dashboard form" do
@@ -1340,7 +1361,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("4 — Plan Review")
+      expect(Nokogiri::HTML(response.body).at_css('[data-section-fold="plan_review"] .section-title').text.strip).to eq("Plan Review: Cache plan")
       expect(response.body).to include(%(<div class="plan-excerpt">Cache for 300 seconds))
       expect(response.body).to include('data-rating-for="plan_review"')
     end
@@ -1374,7 +1395,7 @@ RSpec.describe "Dashboard feedback and review display", type: :request do
 
       get root_path
 
-      expect(response.body).to include("4 — Ambiguity Hunt")
+      expect(Nokogiri::HTML(response.body).at_css('[data-section-fold="ambiguity_hunt"] .section-title').text.strip).to eq("Ambiguity Hunt: Leaderboard ask")
       expect(response.body).to include(%(<div class="plan-excerpt">Add a leaderboard to the dashboard.))
       expect(response.body).not_to include("Which metric ranks users is unstated")
       expect(response.body).not_to include("Tie-breaking is unstated")
@@ -2008,7 +2029,7 @@ RSpec.describe "Dashboard section folding", type: :request do
 
     body = response.body
     expect(body.scan(/<details class="section"[^>]*\bopen\b/).size).to eq(2)
-    expect(body).to match(%r{<summary[^>]*><h2 class="section-title">\s*1 — Code Review\s*</h2>}m)
+    expect(body).to match(%r{<summary[^>]*><h2 class="section-title">\s*Code Review\s*</h2>}m)
     expect(body).to match(%r{data-status-for="code_review"})
   end
 

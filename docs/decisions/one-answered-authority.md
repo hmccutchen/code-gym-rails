@@ -11,9 +11,12 @@ the arrangement. A one-block exercise has nothing to move, so only it shows a
 "Use this order" button; with two or more blocks the scramble never starts in
 the correct order and every move already saves. The browser holds no copy
 of these rules. The page starts from the server's answered sections and
-submit blocker, rendered on the form, and every autosave reply and refused
-submit carries them again (`answered_sections`, `submit_blocker`). Progress,
-the hint lock, the status lines and the nudge show the latest reply.
+submit blocker. Autosave replies and refused submits carry them again
+(`answered_sections`, `submit_blocker`), along with section statuses, draft
+scope and manifest revision. The hint lock, status lines and nudge show the
+latest applicable server state. `DailyResponse#submit_blocker` owns submission
+validity. Submit also waits for confirmation of the latest answer or rating
+edit and for the relevant save and page guards to clear.
 History, mastery and generation ask the same authority.
 
 `DailyResponse#answer_for` delegates review/display representation to the

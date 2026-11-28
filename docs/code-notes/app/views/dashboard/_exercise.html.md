@@ -3,7 +3,7 @@
 ## Two columns
 
 The day is a main column and a side column after it (`.today-main`,
-`.today-side`). The main column holds the progress bar and the answer form,
+`.today-side`). The main column holds the answer form,
 or the submitted day's answers and review. The side column holds the submit
 row and then the regenerate row, or only the regenerate row on a submitted
 day. Coming after the main column keeps Submit after the last answer in tab
@@ -13,10 +13,12 @@ button it means. At 900px and wider it sits beside the answers
 (`docs/code-notes/app/assets/stylesheets/pages/today.md`). The regenerate row
 is `dashboard/_regenerate_row`, rendered once in either state.
 
-## Progress bar
+## Daily workload
 
-The progress bar is sticky so progress stays visible while scrolling through
-the sections on small screens.
+The form has no numbered quota or progress bar. Each exercise retains its
+heading, disclosure, saved status and hint lock. Add follows the exercises;
+Submit is the single completion action. Submitted and History headings keep
+their existing numbering.
 
 ## Answer form
 
@@ -27,7 +29,7 @@ through fetch.
 ## The controller
 
 `data-controller="answer-form"` is on the two-column wrapper, since the
-progress bar and the form are in the main column and the submit button and
+form is in the main column and the submit button and
 the nudge are in the side column;
 `docs/code-notes/app/javascript/controllers/answer_form_controller.md` covers
 why the form is a target, why the submit button is `type="button"` rather
@@ -48,7 +50,7 @@ The page never judges an answer. It starts from the answered sections and
 submit blocker the server rendered on the form, and replaces both with each
 autosave reply (`applyServerState`). Holding no copy of the rules is the point:
 the browser and the server can't disagree about what counts, and the rules
-aren't published to the page. The cost is that progress, the hint lock, the
+aren't published to the page. The hint lock, the
 status lines and the nudge follow the latest save, not each keystroke.
 
 The status lines come as text, `section_statuses`, rendered by
@@ -117,7 +119,10 @@ controller disables it.
 
 ## Refused submission
 
-Submit is never disabled. When the day isn't ready, `#create` answers with a
+Submit starts disabled when the server reports a blocker or generation is
+pending. The controller keeps it disabled until the current draft has a
+successful acknowledgement. Server validation remains authoritative: if a
+submission is no longer ready, `#create` answers with a
 422 carrying `submit_blocker`; the page shows that blocker's sentence in the
 nudge and moves focus to it once the form is editable again, so a screen
 reader hears why nothing happened. Any other failure shows in the save banner

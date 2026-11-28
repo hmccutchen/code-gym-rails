@@ -49,13 +49,20 @@ read it before changing that area.
   offers the scaffold again without storing its labels as the user's work.
   Other draft text remains intact; grading and read-only displays use
   `answer_for` (`docs/decisions/one-answered-authority.md`).
-- **One finish action** (`docs/decisions/one-finish-action.md`): Submit is
-  always clickable and the server decides via `DailyResponse#submit_blocker`;
-  the browser keeps no copy of the rule. `ResponsesController#create` refuses
-  a blocked submit with a 422 and saves nothing, slices ratings to
-  `answered_sections` at submission, and a successful submit fires exactly one
-  review from the same click. A refused or dropped submission restarts the
-  draft autosave.
+- **One finish action** (`docs/decisions/one-finish-action.md`): Today has one
+  Submit button in normal flow. `DailyResponse#submit_blocker` owns validity.
+  Answer or rating edits disable Submit immediately. It enables only when
+  the server confirms the latest edits with no blocker and the save, addition,
+  generation, stale-page and submission guards allow it. Keep
+  server-driven section statuses and hint locks in the quota-free form.
+  Explicit JSON null clears a draft rating, missing keys preserve ratings,
+  and invalid tokens are ignored. A second click on a selected rating clears
+  it. Submitted ratings are immutable. Submit waits for a pending note before
+  posting. `ResponsesController#create` revalidates under lock and refuses a
+  blocked submit with a 422 and saves nothing. It slices ratings to
+  `answered_sections` when accepting a submission and the same click starts
+  exactly one review. A refused or dropped submission restarts the draft
+  autosave.
 - **Offline answer saving** (`docs/decisions/offline-answer-saving.md`): The
   dashboard keeps unsent answers in `code_gym/draft_store` and restores them
   only when the stored `DailyResponse#draft_token` matches the rendered one,
@@ -66,7 +73,8 @@ read it before changing that area.
   The last tab to edit owns the copy.
   The answers queue retries only saves that got no reply, never a refusal or
   5xx. Confirmed saves, submits, submitted dashboards and every signed-out
-  page clear the copy, and submit always stays manual.
+  page clear the copy. Submit stays manual and awaits server confirmation
+  after offline edits.
 - **Folding a section** (`docs/decisions/folding-a-section.md`): Each
   section is a native `<details>` the user folds by hand. It starts open on
   the answer form and folded on the submitted dashboard, so the review is

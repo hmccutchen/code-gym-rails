@@ -144,7 +144,9 @@ The sentence always comes from the server, in the reply or the event's
 `detail.banner`, so the script holds no copy of `StaleSetNotice`. A later
 sentence replaces an earlier one. Once the banner shows, `stopped` is set and
 no further freshness check runs: the page has its answer, and the banner
-stays until the page reloads.
+stays until the page reloads. Showing it also dispatches
+`code-gym:stale-practice`, so the answer form disables Submit and stops sending
+answers behind a known stale page.
 
 ### Where it sits
 

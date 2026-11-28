@@ -259,8 +259,8 @@ class ResponsesController < ApplicationController
     )
     incoming_ratings = (response_params[:section_ratings] || {})
       .slice(*exercise.active_section_keys)
-      .select { |_, value| DailyResponse::SELF_RATINGS.include?(value) }
-    @response.section_ratings = @response.section_ratings.merge(incoming_ratings)
+      .select { |_, value| value.nil? || DailyResponse::SELF_RATINGS.include?(value) }
+    @response.section_ratings = @response.section_ratings.merge(incoming_ratings).compact
     if response_params[:submit] == "1"
       @response.section_ratings = @response.section_ratings.slice(*@response.answered_sections)
     end

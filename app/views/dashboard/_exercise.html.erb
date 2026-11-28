@@ -35,17 +35,17 @@
 <% else %>
   <form id="exercise-addition-options" hidden></form>
   <% submit_blocker = response.submit_blocker %>
+  <% addition_pending = exercise.addition_pending? %>
   <% submit_nudges = { unanswered: t("dashboard.exercise.submit_nudges.unanswered"),
                        unrated:    t("dashboard.exercise.submit_nudges.unrated") } %>
-  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft"
+  <div class="today-day" data-controller="answer-form" data-action="pageshow@window->answer-form#pageShow code-gym:discard-draft@window->answer-form#discardDraft code-gym:stale-practice@window->answer-form#stopSavingBehindBanner"
        data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
+       data-answer-form-addition-pending-value="<%= addition_pending %>"
        data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"
        data-answer-form-manifest-revision-value="<%= exercise.manifest_revision %>"
        data-answer-form-empty-unrated-sections-value="<%= empty_unrated_draft_sections(response).to_json %>"
        data-answer-form-draft-token-value="<%= response.draft_token %>"
-       data-answer-form-answered-count-value="<%= t("dashboard.exercise.answered_count") %>"
-       data-answer-form-all-answered-value="<%= t("dashboard.exercise.all_answered") %>"
        data-answer-form-stale-reloaded-value="<%= t("dashboard.exercise.stale_reloaded") %>"
        data-answer-form-submitting-value="<%= t("dashboard.exercise.submitting") %>"
        data-answer-form-submit-label-value="<%= t("dashboard.exercise.submit") %>"
@@ -58,13 +58,6 @@
        data-answer-form-leave-held-value="<%= t("dashboard.exercise.leave_held") %>"
        data-answer-form-reload-now-value="<%= t("dashboard.exercise.reload_now") %>">
     <div class="today-main">
-      <div class="progress-sticky">
-        <div class="progress-bar">
-          <div class="progress-fill" id="progress-fill" data-answer-form-target="progressFill"></div>
-        </div>
-        <div class="progress-label" id="progress-label" data-answer-form-target="progressLabel"><%= t("dashboard.exercise.answered_count", answered: 0, total: exercise.active_section_keys.size) %></div>
-      </div>
-
       <%= form_with url: responses_path, method: :post, id: "gym-form",
             data: { turbo: false, answer_form_target: "form",
                     action: "submit->answer-form#submit input->answer-form#input change->answer-form#change click->answer-form#rate" } do %>
@@ -93,6 +86,7 @@
     <div class="today-side">
       <div class="submit-row" id="submit-row">
         <%= button_tag t("dashboard.exercise.submit"), type: "button", id: "submit-answers", class: "btn btn-primary",
+              disabled: submit_blocker.present? || addition_pending,
               data: { answer_form_target: "submitButton", action: "answer-form#submit" } %>
         <span class="auto-saved"><%= t("dashboard.exercise.auto_saved") %></span>
         <%= tag.p submit_nudges[submit_blocker], class: "progress-label", id: "rating-nudge", tabindex: "-1",

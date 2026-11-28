@@ -5,9 +5,15 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
 
   before { stub_env("STALE_SET_BANNER" => "1") }
 
-  def open_dashboard
+  def open_dashboard(ready: false)
     visit_with_todays_set(user)
     expect(page).to have_content(/Code Review/i)
+    if ready
+      fill_in_answer("code_review", "Move the query outside the loop.")
+      rate_section("code_review")
+      expect_ready_to_submit
+      wait_for_answers_settled
+    end
     watch_this_load
   end
 
@@ -144,7 +150,7 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
 
     it "shows the banner when a submit is refused" do
       travel_to(a_weekday) do
-        open_dashboard
+        open_dashboard(ready: true)
         pass_midnight
 
         find("#submit-answers").click
@@ -216,7 +222,7 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
 
     it "shows the banner and keeps unsent duck text when a submit is refused as stale" do
       travel_to(a_weekday) do
-        open_dashboard
+        open_dashboard(ready: true)
         duck = open_duck
         duck.find(".duck-input").fill_in(with: "Not sent yet")
         replace_todays_set
@@ -234,7 +240,7 @@ RSpec.describe "The out-of-date banner on a dashboard left open", type: :system,
       user.update!(learner_notes_enabled: true)
 
       travel_to(a_weekday) do
-        open_dashboard
+        open_dashboard(ready: true)
         duck = open_duck
         duck.find(".duck-input").fill_in(with: "Not sent yet")
         replace_todays_set

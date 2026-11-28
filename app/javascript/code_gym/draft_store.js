@@ -33,7 +33,7 @@ function sortedEntries(object) {
 }
 
 function canonicalDraft({ answers, ratings }) {
-  return JSON.stringify([ sortedEntries(answers), sortedEntries(ratings) ])
+  return JSON.stringify([ sortedEntries(answers), sortedEntries(Object.fromEntries(Object.entries(ratings || {}).filter(([, rating]) => rating !== null))) ])
 }
 
 function matchesExpandedDraft(serialized, rendered) {

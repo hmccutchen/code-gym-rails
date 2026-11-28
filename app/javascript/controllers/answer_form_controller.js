@@ -7,17 +7,16 @@ import DraftCopy from "code_gym/draft_store"
 const AUTOSAVE_DELAY_MS = 800
 
 export default class extends Controller {
-  static targets = ["form", "sections", "progressFill", "progressLabel", "submitButton", "nudge", "replaceButton"]
+  static targets = ["form", "sections", "submitButton", "nudge", "replaceButton"]
 
   static values = {
     answeredSections: Array,
     submitBlocker: String,
     draftScope: String,
     manifestRevision: Number,
+    additionPending: Boolean,
     emptyUnratedSections: Array,
     draftToken: String,
-    answeredCount: String,
-    allAnswered: String,
     staleReloaded: String,
     submitting: String,
     submitLabel: String,
@@ -33,11 +32,12 @@ export default class extends Controller {
 
   connect() {
     this.textareas = [...this.formTarget.querySelectorAll("textarea[data-field]")]
-    this.sectionFields = this.textareas.map((area) => area.dataset.field)
     this.answered = new Set(this.answeredSectionsValue)
     this.blocker = this.submitBlockerValue || null
     this.saveTimer = null
     this.reviewRequested = false
+    this.answersConfirmed = true
+    this.additionPending = this.additionPendingValue
 
     this.ratings = {}
     this.formTarget.querySelectorAll("button.rating-btn.active").forEach((button) => {
@@ -52,7 +52,13 @@ export default class extends Controller {
     saveStatus.watch(() => this.saveTimer !== null)
     if (restored || this.textareas.some((area) => area.value !== area.defaultValue)) this.autoSave()
 
-    this.updateProgress()
+    this.updateHints()
+    this.updateSubmit()
+    window.CodeGymBootstrap?.ready?.then(() => {
+      if (!this.element.isConnected) return
+      if (!this.formControllersConnected()) saveStatus.report("submit", this.controlsNotReadyValue)
+      this.updateSubmit()
+    })
   }
 
   disconnect() {
@@ -118,7 +124,9 @@ export default class extends Controller {
     if (!Array.isArray(data?.answered_sections)) return
     this.answered = new Set(data.answered_sections)
     this.blocker = data.submit_blocker || null
-    this.updateProgress()
+    this.answersConfirmed = true
+    this.updateSubmit()
+    this.updateHints()
     this.refreshNudge()
     Object.entries(data.section_statuses || {}).forEach(([section, text]) => {
       const status = this.formTarget.querySelector(`.section-status[data-status-for="${section}"]`)
@@ -131,13 +139,7 @@ export default class extends Controller {
     if (this.blocker) this.nudgeTarget.textContent = this.nudgeTarget.dataset[this.blocker]
   }
 
-  updateProgress() {
-    const total = this.sectionFields.length
-    const filled = this.textareas.filter((area) => this.isAnswered(area)).length
-    this.progressFillTarget.style.width = (filled / total * 100) + "%"
-    this.progressLabelTarget.textContent = filled === total
-      ? this.allAnsweredValue
-      : this.answeredCountValue.replace("%{answered}", filled).replace("%{total}", total)
+  updateHints() {
     this.formTarget.querySelectorAll(".hint-slot[data-hint-for]").forEach((slot) => {
       const area = this.formTarget.querySelector(`textarea[data-field="${slot.dataset.hintFor}"]`)
       if (area) this.setHintLocked(slot, !this.isAnswered(area))
@@ -173,16 +175,27 @@ export default class extends Controller {
       })
     }
     this.textareas = [...this.formTarget.querySelectorAll("textarea[data-field]")]
-    this.sectionFields = this.textareas.map((area) => area.dataset.field)
+    const expanded = this.manifestRevisionValue !== data.manifest_revision
     this.manifestRevisionValue = data.manifest_revision
-    this.updateProgress()
+    if (expanded) this.autoSave()
+    this.updateHints()
     return true
   }
 
   additionState(pending) {
     this.additionPending = pending
-    if (!this.formTarget.inert) this.submitButtonTarget.disabled = pending
+    this.updateSubmit()
     this.setReplaceButtonsDisabled(pending || this.formTarget.inert)
+  }
+
+  updateSubmit() {
+    this.submitButtonTarget.disabled = !this.answersConfirmed || this.blocker !== null ||
+      Boolean(this.additionPending || this.submitHeld || this.formTarget.inert) || !this.formControllersConnected()
+  }
+
+  invalidateReadiness() {
+    this.answersConfirmed = false
+    this.updateSubmit()
   }
 
   refreshAdditions() {
@@ -193,6 +206,7 @@ export default class extends Controller {
     clearTimeout(this.saveTimer)
     this.saveTimer = null
     if (this.formTarget.inert || this.submitHeld) return
+    this.invalidateReadiness()
     this.storeDraft()
     saveStatus.queue("answers", "POST", this.formTarget.action, () => this.nextSave(), { latest: true, offline: () => this.offlineSentence() })
       .then(({ ok, status, data, skipped }) => {
@@ -212,7 +226,7 @@ export default class extends Controller {
         }
         if (ok && this.saveTimer === null && !saveStatus.queued("answers") && !this.formTarget.inert) {
           if (data?.manifest_revision < this.manifestRevisionValue) this.autoSave()
-          else this.applyServerState(data)
+          else if (data?.manifest_revision === this.manifestRevisionValue) this.applyServerState(data)
         }
       })
   }
@@ -238,6 +252,7 @@ export default class extends Controller {
     this.submitHeld = true
     clearTimeout(this.saveTimer)
     this.saveTimer = null
+    this.updateSubmit()
   }
 
   discardDraft() {
@@ -264,6 +279,7 @@ export default class extends Controller {
   }
 
   autoSave() {
+    this.invalidateReadiness()
     if (this.submitHeld) return
     clearTimeout(this.saveTimer)
     this.storeDraft()
@@ -271,13 +287,13 @@ export default class extends Controller {
   }
 
   change(event) {
-    if (event.target.closest("[data-field], [data-comparison-answer]")) this.sendSave()
+    if (!this.answersConfirmed && event.target.closest("[data-field], [data-comparison-answer]")) this.sendSave()
   }
 
   input(event) {
-    const field = event.target.closest("textarea[data-field]")
+    const field = event.target.closest("textarea[data-field], [data-comparison-answer]")
     if (!field) return
-    this.reopenIfRated(field.dataset.field)
+    if (field.dataset.field) this.reopenIfRated(field.dataset.field)
     this.autoSave()
   }
 
@@ -289,14 +305,15 @@ export default class extends Controller {
   rate(event) {
     const button = event.target.closest("button[data-rating-for]")
     if (!button) return
-    this.showRating(button.dataset.ratingFor, button.dataset.rating)
+    const rating = this.ratings[button.dataset.ratingFor] === button.dataset.rating ? null : button.dataset.rating
+    this.showRating(button.dataset.ratingFor, rating)
     this.sendSave()
   }
 
   showRating(section, rating) {
     const buttons = [...this.formTarget.querySelectorAll(`button[data-rating-for="${section}"]`)]
     const chosen = buttons.find((button) => button.dataset.rating === rating)
-    if (!chosen) return
+    if (rating !== null && !chosen) return
     this.ratings[section] = rating
     buttons.forEach((other) => {
       other.classList.toggle("active", other === chosen)
@@ -319,7 +336,7 @@ export default class extends Controller {
 
   async submit(event) {
     event.preventDefault()
-    if (this.formTarget.inert || this.additionPending) return
+    if (this.submitButtonTarget.disabled || this.formTarget.inert || this.additionPending || this.submitHeld) return
     this.lockForSubmit()
 
     // A kind whose answer only reaches the hidden field through its own controller would otherwise submit the stale one.
@@ -464,7 +481,7 @@ export default class extends Controller {
     this.element.querySelector("#learner-note")?.toggleAttribute("inert", false)
     this.submitButtonTarget.classList.remove("btn-loading")
     this.submitButtonTarget.textContent = this.submitLabelValue
-    this.submitButtonTarget.disabled = Boolean(this.additionPending)
+    this.invalidateReadiness()
     this.setReplaceButtonsDisabled(Boolean(this.additionPending))
     this.autoSave()
   }

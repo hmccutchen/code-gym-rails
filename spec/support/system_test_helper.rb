@@ -58,6 +58,7 @@ module AnswerFormHelper
 
   def expect_ready_to_submit
     expect(page).to have_selector("#rating-nudge", visible: :hidden)
+    expect(page).to have_button(I18n.t("dashboard.exercise.submit"), disabled: false)
   end
 
   def open_folded_section(key)

@@ -48,15 +48,6 @@ RSpec.describe "Reduced motion", type: :system do
     expect(computed("getComputedStyle(document.getElementById('t-content')).transitionDuration")).not_to eq("0s")
   end
 
-  it "fills the dashboard progress bar without sliding" do
-    travel_to(a_weekday) do
-      prefer_reduced_motion
-      visit_with_todays_set(user)
-
-      expect(computed("getComputedStyle(document.querySelector('.progress-fill')).transitionDuration")).to eq("0s")
-    end
-  end
-
   def sheet_animation_name
     travel_to(a_weekday + 12.hours) do
       visit_with_existing_set(user)

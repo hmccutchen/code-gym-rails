@@ -7,12 +7,12 @@ RSpec.describe "Matching an unconfirmed draft after append", type: :system do
 
   before { visit_with_existing_set(user, keys: %w[code_review]) }
 
-  def recovered(rendered:, scope: "same", sent: nil)
+  def recovered(rendered:, scope: "same", sent: nil, ratings: { code_review: "right_level" })
     page.evaluate_async_script(<<~JS)
       const done = arguments[0];
       import('code_gym/draft_store').then(({ default: DraftCopy }) => {
         const copy = new DraftCopy('before-save', 'same');
-        const first = { answers: { code_review: 'Sent answer' }, ratings: { code_review: 'right_level' } };
+        const first = { answers: { code_review: 'Sent answer' }, ratings: #{ratings.to_json} };
         copy.store(first);
         copy.recordSend(first);
         copy.store({ answers: { code_review: 'Later unsent edit' }, ratings: first.ratings });
@@ -35,6 +35,14 @@ RSpec.describe "Matching an unconfirmed draft after append", type: :system do
   it "permits server-declared empty appended fields even when their display contains a scaffold" do
     expect(recovered(rendered: rendered)).to eq("answers" => { "code_review" => "Later unsent edit" },
       "ratings" => { "code_review" => "right_level" })
+  end
+
+  it "matches a confirmed rating clear after append without accepting a competing rating" do
+    cleared = rendered.merge(ratings: {})
+
+    expect(recovered(rendered: cleared, ratings: { code_review: nil })).to eq(
+      "answers" => { "code_review" => "Later unsent edit" }, "ratings" => { "code_review" => nil })
+    expect(recovered(rendered: rendered, ratings: { code_review: nil })).to be_nil
   end
 
   it "rejects conflicts, absent originals, other scopes and malformed saved attempts" do

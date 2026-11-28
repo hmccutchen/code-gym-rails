@@ -2,13 +2,13 @@
 
 ## What it owns
 
-The dashboard's answer form: autosave, the progress bar, the hint lock, the
+The dashboard's answer form: autosave, the hint lock, the
 self-rating buttons, the submit nudge, and the submit-then-review chain.
 
 ## The controller wraps the form, not the form alone
 
-The progress bar sits above the form in the markup, outside it, so the
-controller's element is a wrapper around both and the form itself is a target.
+The completion action sits outside the form in the markup, so the
+controller's element wraps both and the form itself is a target.
 Everything that reads the form's own contents goes through `formTarget`, which
 is also what `inert` is set on.
 
@@ -18,7 +18,7 @@ is also what `inert` is set on.
 replaced by eligible autosave replies. A reply that predates pending edits
 does not replace the live state. The controller never judges an answer
 itself. That rule is the project's, not this file's, and it is why the
-progress count, the hint lock and the nudge all read the same two fields.
+hint lock, completion action and nudge all read the same two fields.
 
 ## The submit button is not a submit button
 
@@ -35,10 +35,30 @@ The form still carries `submit->answer-form#submit`. Nothing dispatches that
 event today, and the action exists so a field added later cannot post the day
 around this controller.
 
-The "One finish action" decision (`docs/decisions/one-finish-action.md`) keeps validation feedback on Submit rather than maintaining a second browser
-readiness rule. Submission or a pending addition can still disable the action
-while the corresponding work is in flight. A click before the module loads is lost the same way a rating
-click is, and clicking again works.
+The "One finish action" decision (`docs/decisions/one-finish-action.md`)
+uses the server's blocker to render and update the disabled state. Each answer
+or rating edit invalidates readiness synchronously. Only a successful reply
+for the mounted manifest, with no later scheduled or queued answer save,
+confirms it again. The queue resolves reply callbacks before starting its next
+save, so the existing timer and queue checks also reject late acknowledgements.
+A blur only flushes unconfirmed edits, so leaving an already acknowledged
+textarea cannot disable Submit during its click. Structured answer controllers
+emit input when they update their hidden fields. Failed or offline saves leave Submit disabled. No browser rule interprets the
+answer or rating content. Initially rendered valid work is confirmed unless
+restoration or early typing needs saving. Submit also requires the existing
+form-controller connection check. The bootstrap-ready callback refreshes that
+gate and reports the existing controls-not-ready message if a module never
+connected. Raw comparison-control input invalidates readiness even before its
+controller can compose the hidden answer; connection then composes and saves
+the actual pick before Submit can enable. The rendered addition-pending value
+keeps Submit disabled before the Add controller's first poll.
+
+A selected rating toggles to an explicit null clear. The payload and local
+draft retain that null; omission continues to mean preserve. Restoring a clear
+unselects the rendered buttons before autosaving it. Editing answer text keeps
+its rating. Submit rechecks its own disabled state, holds, and Add before
+starting the existing note flush and server validation flow. Note failures
+remain retryable through that flow after answer autosaving settles.
 
 ## Delegated listeners
 
@@ -264,7 +284,7 @@ finished.
 `reconcileStructure` checks scope, revision and submission state before
 inserting missing section cards. It preserves existing nodes, input values,
 ratings, folds and duck drafts. Each newly inserted key adopts only its own
-server-computed answered membership and rendered rating before progress and
+server-computed answered membership and rendered rating before
 teaching-hint locks are refreshed. It does not replace the answered state of
 existing live inputs with a status poll's older snapshot. An autosave reply
 from an older manifest also cannot replace that state. When no newer save is
@@ -273,7 +293,8 @@ of the expanded form so the server recomputes answered state. Stale and
 submitted replies keep their existing leave paths before this check.
 
 The controller rescans answer fields and advances the manifest revision only
-after the cards are present. `code-gym:sections-added` lets the existing
+after the cards are present. Expansion invalidates readiness and schedules an
+autosave so the server evaluates every displayed answer and rating. `code-gym:sections-added` lets the existing
 Mermaid and code-lines controllers initialize their new descendants. Add
 requests and new submissions carry the current revision as well as scope.
 A `manifest_changed` or `addition_busy` submit reply unlocks the form,

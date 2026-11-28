@@ -33,7 +33,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
       section_ratings: response.section_ratings.merge("code_review" => "right_level"))
     page.execute_script('window.dispatchEvent(new Event("focus"))')
     expect(page).to have_css('[data-section-fold="code_review"]')
-    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
   end
 
@@ -41,7 +41,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
     page.execute_script("window.releaseAnswerReply()")
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
 
-    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
     expect(find('textarea[data-field="code_review"]').value).to eq("Move the query outside the loop.")
     wait_for_answers_settled
@@ -65,7 +65,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
       JS
       wait_for_answers_settled
 
-      expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+      expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
       expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
       expect(page.evaluate_script("window.answerSaves.length")).to eq(2)
       expect(user.daily_responses.sole.answers).to include("pattern" => "Keep this newer explanation.",
@@ -80,7 +80,7 @@ RSpec.describe "Autosave replies across an appended exercise", type: :system do
     JS
     wait_for_js_condition("!window.CodeGymSaveStatus.pending()")
 
-    expect(page).to have_css("#progress-label", exact_text: "✓ All answered")
+    expect(page).to have_css('[data-hint-for="pattern"] > details.hint')
     expect(page).to have_css('[data-hint-for="code_review"] > details.hint')
     expect(page.evaluate_script("window.answerSaves.length")).to eq(1)
   end
