@@ -696,11 +696,14 @@ RSpec.describe DailyPlan do
     it "withholds no concept from the other sections on a day without a code_review section" do
       user.update!(daily_section_count: 1, daily_section_kinds: %w[design_comparison code_review])
       pin_kind("design_comparison")
-      allow(DayHosts).to receive(:new).and_call_original
+      trap = BugHuntGotchas.find("rb_memo_falsy")
+      allow(BugHuntGotchas).to receive(:pick).and_return(trap)
 
-      plan
+      result = plan
+      hosts = DayHosts.new("ruby_rails", mode: result.code_review_mode, gotcha: result.code_review_gotcha,
+        featured_concept: result.featured_concept)
 
-      expect(DayHosts).to have_received(:new).with("ruby_rails", mode: :bug_hunt, gotcha: nil, featured_concept: nil)
+      expect(hosts.can_tag?(ExerciseSection::DesignComparison, trap.concept, "ruby_rails")).to be(true)
     end
 
     it "picks no gotcha on any other mode" do

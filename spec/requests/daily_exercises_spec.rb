@@ -223,15 +223,7 @@ RSpec.describe "DailyExercises", type: :request do
           get dashboard_status_path
           expect(JSON.parse(response.body)["status"]).to eq("pending")
 
-          fresh = {
-            "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" },
-            "pattern" => {
-              "title" => "Service Objects", "why" => "Because", "question" => "When?",
-              "reference" => { "tagline" => "T", "explanation" => "E",
-                               "code_example" => "code", "senior_lens" => "S" }
-            },
-            "challenge" => { "title" => "Build", "question" => "Implement X", "starter_code" => "" }
-          }
+          fresh = { "code_review" => { "question" => "freshly generated", "snippet" => "def a; end" } }
           fake_service = instance_double(ClaudeService)
           allow(fake_service).to receive(path) do |caller, language:, schedule_context:, **|
             result = AiService::JudgedSet.new(problem_set: fresh, dropped_sections: [], outcomes: {}, plan_notes: {})
@@ -241,6 +233,8 @@ RSpec.describe "DailyExercises", type: :request do
           perform_enqueued_jobs
 
           expect(exercise.reload.regenerating_since).to be_nil
+          expect(exercise.problem_set.keys).to eq([ "code_review" ])
+          expect(exercise.section_order).to eq([ "code_review" ])
           expect(fake_service).to have_received(path)
 
           get dashboard_status_path

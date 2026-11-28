@@ -127,6 +127,8 @@ RSpec.describe GenerationDiagnostics do
   end
 
   it "keeps the judge's pick, the answer key and the solves out of the payload a judged generation logs" do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::DesignComparison)
     judged = nil
     lines = logged_lines { judged = FakeService.new("fake-key").generate_judged_exercise(user, language: "ruby_rails") }
 

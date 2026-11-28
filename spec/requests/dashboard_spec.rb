@@ -2238,13 +2238,14 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
 
   before { login_as(user) }
 
-  it "says tomorrow's set is larger when the gate and completion both allow it" do
+  it "does not promise more initial exercises when historical capacity would grow" do
     stub_gate(3, :grew)
     day(Date.current, planned: 2)
+    expect(CompetencyGate).not_to receive(:for)
 
     get root_path
 
-    expect(response.body).to include(larger_line)
+    expect(response.body).not_to include(larger_line)
     expect(response.body).not_to include(CGI.escapeHTML(smaller_line))
   end
 
@@ -2258,23 +2259,23 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  it "says tomorrow's set is smaller when the brake lowers it" do
+  it "does not show an adaptive size forecast for a historical brake" do
     stub_gate(CompetencyGate::FLOOR, :brake)
     day(Date.current, planned: 3)
 
     get root_path
 
-    expect(response.body).to include(CGI.escapeHTML(smaller_line))
+    expect(response.body).not_to include(CGI.escapeHTML(smaller_line))
     expect(response.body).not_to include(larger_line)
   end
 
-  it "names tomorrow's count, not the floor, in the smaller line" do
+  it "does not promise the historical gate count for the next session" do
     stub_gate(3, :brake)
     day(Date.current, planned: 4)
 
     get root_path
 
-    expect(response.body).to include(CGI.escapeHTML(I18n.t("dashboard.size_change.smaller", count: 3)))
+    expect(response.body).not_to include(CGI.escapeHTML(I18n.t("dashboard.size_change.smaller", count: 3)))
   end
 
   it "says nothing when today's size came from a fixed setting" do
@@ -2337,7 +2338,7 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
   end
 
-  it "counts today's completion only once all its answered sections are assessed" do
+  it "keeps the next initial size unchanged when historical answers become assessed" do
     both = { "code_review" => "answer", "design_comparison" => "\nreason" }
     5.times do |n|
       prior = day(Date.current - 6 + n, planned: 2, answered: both, assessed: true)
@@ -2352,14 +2353,14 @@ RSpec.describe "Dashboard lines about tomorrow's size", type: :request do
     expect(response.body).not_to include(larger_line)
     today.update!(ai_review: today.answers.transform_values { { "rating" => "solid" } })
     get root_path
-    expect(response.body).to include(larger_line)
+    expect(response.body).not_to include(larger_line)
   end
 
-  it "explains completion reductions and never calls an unchanged floor smaller" do
+  it "does not forecast completion reductions for historical counts" do
     stub_gate(2, :completion)
     today = day(Date.current, planned: 3)
     get root_path
-    expect(response.body).to include(CGI.escapeHTML(smaller_line))
+    expect(response.body).not_to include(CGI.escapeHTML(smaller_line))
     today.daily_exercise.update!(plan_notes: { "size" => 2 })
     get root_path
     expect(response.body).not_to include(CGI.escapeHTML(smaller_line))

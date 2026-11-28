@@ -27,6 +27,11 @@ RSpec.describe ExerciseDraft do
     )
   end
 
+  before do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::CodeReview)
+  end
+
   def draft_for(language: "ruby_rails", mode: :application_code)
     described_class::Draft.new(user: user, skill_level: user.skill_level, language: language, problem_set: {}, plan: plan_for(code_review_mode: mode),
                                kinds: [], difficulty: KindDifficulty.none, kind_rungs: KindDifficulty.none.rungs(skill_level: user.skill_level), ladders: {}, history: [], delivered_history: [],
@@ -53,9 +58,18 @@ RSpec.describe ExerciseDraft do
     first = BugHuntGotchas.for_language("ruby_rails").first
     submit_set_showing(user, first.concept, date: Date.current - 2)
     pin_code_review_mode(:bug_hunt)
+    allow(user).to receive(:recent_exercise_history).and_return([])
+    allow(user).to receive(:concepts_needing_reinforcement).and_return([])
+    reply["code_review"] = {
+      "concept" => "memoization", "question" => "What is wrong and how would you fix it?",
+      "purpose" => "Cache the enabled flag, including false, after the first lookup.",
+      "snippet" => "def enabled?\n  @enabled ||= lookup_enabled\nend"
+    }
 
     draft = described_class.call(user, language: "ruby_rails", provider: provider)
 
+    expect(draft.kinds).to eq([ ExerciseSection::CodeReview ])
+    expect(draft.unusable_sections).to be_empty
     expect(FeaturedConcept.for(user)&.concept).to eq(first.concept)
     expect(draft.plan.featured_concept).to eq(first.concept)
     expect(draft.plan.code_review_gotcha.concept).not_to eq(first.concept)
@@ -67,24 +81,13 @@ RSpec.describe ExerciseDraft do
     expect(described_class.call(user, language: "ruby_rails", provider: provider).plan.featured_concept).to be_nil
   end
 
-  it "keeps the selected weekend trap out of Pattern's initial and retry assignments and vocabulary" do
+  it "keeps an unselected weekend trap available to Pattern's practice, vocabulary and retry" do
     travel_to(Time.zone.local(2026, 11, 7, 9)) do
       user.update!(daily_section_kinds: %w[pattern design_comparison], daily_section_count: nil)
       pin_code_review_mode(:bug_hunt)
       trap = BugHuntGotchas.find("rb_memo_falsy")
       expect(BugHuntGotchas).to receive(:pick).once.and_return(trap)
-      expect(PracticeSchedule::Turns).to receive(:plan).once.and_call_original
-      daily = DailyKinds.for(user)
-      pool = ExerciseSection.optional_slots(daily: daily).values.flatten.map(&:key)
-      note = PracticeSchedule::Note.decode({
-        "version" => 1, "policy" => 2, "sequence" => 3, "initial_ready" => true,
-        "regular_kinds" => daily.map(&:key), "selected_kinds" => daily.map(&:key), "phase" => 2, "assignments" => {},
-        "continuation" => { "next_phase" => 0, "kind_order" => [ "code_review" ] + (pool - [ "code_review" ]),
-          "next_kind_index" => 0, "last_omitted_kind" => nil, "service" => {} }
-      })
-      user.daily_exercises.create!(date: Date.yesterday, generated_at: Time.current,
-        problem_set: daily.to_h { |kind| [ kind.key, { "question" => "Explain the choice." } ] },
-        plan_notes: { "daily_kinds" => daily.map(&:key), "practice_schedule" => note })
+      expect(PracticeSchedule::SingleSlot).to receive(:plan).once.and_call_original
       row = user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails",
         practice_requests: { "pattern" => { "mode" => "normal_retry", "source_response_id" => 17,
           "requested_at" => "2026-11-06T12:00:00.123456Z" } })
@@ -93,16 +96,7 @@ RSpec.describe ExerciseDraft do
         ConceptReference.create!(user: user, concept: concept, language: "ruby_rails",
           **ConceptReference::LADDER_FIELDS.index_with { "Reason about #{concept}." })
       end
-      reply["pattern"]["concept"] = "service_objects"
-      reply["code_review"] = {
-        "concept" => trap.concept, "question" => "What is wrong and how would you fix it?",
-        "purpose" => "Return the first supplied value for a key without replacing a cached value.",
-        "snippet" => "def cached(values, key)\n  cache = {}\n  2.times { cache[key] ||= values.shift }\n  cache[key]\nend",
-        "answer_key" => { "issue" => "`cache[key] ||= values.shift` replaces a false value.", "why_it_matters" => "A later value wins.",
-          "fix" => "Use key? to test presence.", "witness" => { "call" => "cached([false, true], :a)", "expected" => "false", "returns" => "true" },
-          "looks_right_on" => { "call" => "cached([1, 2], :a)", "expected" => "1" },
-          "fixed_snippet" => "def cached(values, key)\n  cache = {}\n  2.times { cache[key] = values.shift unless cache.key?(key) }\n  cache[key]\nend" }
-      }
+      reply["pattern"]["concept"] = trap.concept
       plans = []
       ladders = []
       real_prompts = provider.with(prompt: ->(person, language, **options) {
@@ -112,29 +106,28 @@ RSpec.describe ExerciseDraft do
       })
       captured = described_class.call(user, language: "ruby_rails", provider: real_prompts,
         schedule_context: PracticeGeneration.capture(user, date: Date.current))
-      retried = described_class.retry_section(captured, ExerciseSection::Pattern, "service_objects", provider: real_prompts)
+      retried = described_class.retry_section(captured, ExerciseSection::Pattern, trap.concept, provider: real_prompts)
 
-      expect(captured.plan.kinds.map(&:key)).to eq(%w[pattern code_review])
-      expect(captured.plan.size.count).to eq(DailyKinds::COUNT)
+      expect(captured.plan.kinds).to eq([ ExerciseSection::Pattern ])
+      expect(captured.plan.size.count).to eq(1)
       expect(captured.unusable_sections).to be_empty
-      expect(captured.plan.code_review_gotcha).to eq(trap)
+      expect(captured.plan.code_review_gotcha).to be_nil
+      expect(captured.plan.assignments.fetch("pattern")).to include(concept: trap.concept, reason: "normal_retry")
       expect(plans.last).to equal(plans.first)
       expect(generated.map { |request| request[:purpose] }).to eq(%w[generate_exercise retry_section])
-      expect(captured.problem_set.fetch("pattern")["concept"]).to eq("service_objects")
-      expect(retried["concept"]).to eq("service_objects")
-      expect(generated.first[:prompt]).to include("- Plant exactly this trap: #{trap.rule}")
-      expect(generated.last[:prompt]).to include("Its concept must be exactly `service_objects`")
+      expect(captured.problem_set.fetch("pattern")["concept"]).to eq(trap.concept)
+      expect(retried["concept"]).to eq(trap.concept)
+      expect(generated.first[:prompt]).to include("- pattern: Use exactly `#{trap.concept}`.")
+      expect(generated.last[:prompt]).to include("Its concept must be exactly `#{trap.concept}`")
       generated.each do |request|
         vocabulary = request[:prompt].lines.find { |line| line.include?("Choose the pattern concept from this vocabulary") }
-        expect(vocabulary).to include("service_objects")
-        expect(vocabulary).not_to include(trap.concept)
-        expect(request[:prompt]).not_to include("- pattern: Use exactly `#{trap.concept}`.")
+        expect(vocabulary).to include("service_objects", trap.concept)
+        expect(request[:prompt]).not_to include("- Plant exactly this trap: #{trap.rule}")
       end
       ladders.each do |by_kind|
-        expect(by_kind.fetch(ExerciseSection::Pattern)).to have_key("service_objects")
-        expect(by_kind.fetch(ExerciseSection::Pattern)).not_to have_key(trap.concept)
+        expect(by_kind.fetch(ExerciseSection::Pattern)).to have_key("service_objects").and have_key(trap.concept)
+        expect(by_kind).not_to have_key(ExerciseSection::CodeReview)
       end
-      expect(ladders.first.fetch(ExerciseSection::CodeReview)).to have_key(trap.concept)
       expect(row.reload.practice_requests).to eq(pending)
     end
   end
@@ -383,6 +376,7 @@ RSpec.describe ExerciseDraft do
         original.call(*args, **options)
       end
       user.update!(skill_level: "mid_level")
+      reply["code_review"] = FakeService::MULTI_FILE_CODE_REVIEW.deep_dup
     end
 
     it "holds the draft to the range its rung gives a multi-file day" do
@@ -435,6 +429,8 @@ RSpec.describe ExerciseDraft do
   end
 
   it "renders a retry prompt carrying none of the rejected section's text, so the retry starts from fresh pieces" do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::DesignComparison)
     real_prompt = provider.with(prompt: lambda { |*args, **options|
       GenerationPrompt.new(*args, **options, retention_annotation: ->(*) { })
     })

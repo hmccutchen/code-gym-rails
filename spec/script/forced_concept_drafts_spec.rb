@@ -152,7 +152,8 @@ RSpec.describe ForcedConceptDrafts do
     before do
       pin_code_review_mode(:application_code)
       allow(WeightedRoll).to receive(:pick).with(DailyPlan::SCENARIO_FLAVOR_WEIGHTS).and_return(:general)
-      allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+      allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+        .and_return(ExerciseSection::DesignComparison)
     end
 
     def ordinary_prompt(service)

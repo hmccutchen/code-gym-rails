@@ -19,13 +19,18 @@ RSpec.describe FakeService do
     expect { AiService.for(user) }.to raise_error(SetupError, /test-only fake provider/)
   end
 
+  before do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::CodeReview)
+  end
+
   describe "#generate_judged_exercise" do
-    it "answers with every ExerciseSection kind, and delivers sections with valid, non-'other' concepts" do
+    it "offers every ExerciseSection kind and delivers one section with a valid, non-other concept" do
       problem_set = described_class.new(user.api_key).generate_judged_exercise(user, language: "ruby_rails").problem_set
 
       # Derived from the registry so "every kind" stays true when a kind is added.
       expect(described_class::EXERCISE_PROBLEM_SET.keys).to match_array(ExerciseSection.keys)
-      expect(ExerciseSection.resolved_keys(problem_set, daily: DailyKinds::DEFAULT)).to include(*DailyKinds::DEFAULT.map(&:key))
+      expect(problem_set.keys).to eq([ "code_review" ])
       problem_set.each_value do |section|
         expect(section["concept"]).to be_present
         expect(section["concept"]).not_to eq("other")
@@ -49,11 +54,11 @@ RSpec.describe FakeService do
       expect(ExerciseSection.resolved_key(described_class::EXERCISE_PROBLEM_SET, ExerciseSection.fourths)).to eq("plan_review")
     end
 
-    it "delivers no more sections than a day holds" do
+    it "delivers exactly one initial section" do
       problem_set = described_class.new(user.api_key).generate_judged_exercise(user, language: "ruby_rails").problem_set
       exercise = DailyExercise.new(problem_set: problem_set)
 
-      expect(exercise.active_section_keys.size).to be <= ExerciseSection::MAX_SECTIONS
+      expect(exercise.active_section_keys).to eq([ "code_review" ])
     end
 
     it "logs API usage with zero cost" do

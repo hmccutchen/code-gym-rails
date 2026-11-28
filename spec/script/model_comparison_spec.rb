@@ -14,6 +14,8 @@ RSpec.describe ModelComparison do
 
   # Answers in Anthropic's response shape so each mode's real prompt building and parsing runs end to end.
   before do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::CodeReview)
     requests = posted
     replies  = judge_replies
     judge_tokens = judge_output_tokens
@@ -71,8 +73,10 @@ RSpec.describe ModelComparison do
   end
 
   it "never prints any kind's answer key" do
-    allow(SectionRotation).to receive(:for).and_return(pattern: nil, third: :challenge, fourth: :ambiguity_hunt)
-    comparison.generate(user.id)
+    [ ExerciseSection::AmbiguityHunt, ExerciseSection::DesignComparison ].each do |kind|
+      allow(DailyPlan).to receive(:for).and_return(plan_for(selected_kinds: [ kind ], size: DaySize.initial))
+      comparison.generate(user.id)
+    end
 
     expect(out.string).to include("ambiguity_hunt", "design_comparison")
     ExerciseSection.all_answer_key_fields.each { |field| expect(out.string).not_to include(field) }
@@ -234,7 +238,7 @@ end
 
   it "never prints the ambiguity hunt's planted answer key while judging" do
     rolled = DailyPlan.for(user, language: "ruby_rails")
-    plan   = rolled.with(rotation: rolled.rotation.merge(fourth: :ambiguity_hunt))
+    plan   = rolled.with(selected_kinds: [ ExerciseSection::AmbiguityHunt ])
     allow(DailyPlan).to receive(:for).and_return(plan)
 
     comparison.judge(user.id)
@@ -333,7 +337,8 @@ end
   end
 
   it "judge mode reports each candidate's blind-solve agreement against the drafted key" do
-    allow(SectionRotation).to receive(:for).and_return(pattern: :pattern, third: :challenge, fourth: nil)
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::DesignComparison)
 
     comparison.judge(user.id)
 

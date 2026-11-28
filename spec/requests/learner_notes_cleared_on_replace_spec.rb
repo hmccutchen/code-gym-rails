@@ -182,7 +182,7 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
       service = instance_double(ClaudeService)
       allow(AiService).to receive(:for).with(user).and_return(service)
       allow(service).to receive(:generate_judged_exercise) do |caller, language:, schedule_context:, **|
-        judged = AiService::JudgedSet.new(problem_set: problem_set("A new bug"), dropped_sections: [], outcomes: {}, plan_notes: {})
+        judged = AiService::JudgedSet.new(problem_set: problem_set("A new bug").slice("code_review"), dropped_sections: [], outcomes: {}, plan_notes: {})
         with_practice_context(judged, user: caller, language: language, schedule_context: schedule_context)
       end
       allow(service).to receive(:model_for).and_return("model")
@@ -197,6 +197,7 @@ RSpec.describe "A replaced set starts with no learner note", type: :request do
       RegenerateExerciseJob.new.perform(user_id: user.id)
 
       expect(exercise.reload.problem_set.dig("code_review", "question")).to eq("A new bug")
+      expect(exercise.active_section_keys).to eq([ "code_review" ])
       expect_the_days_note_forgotten(exercise, items)
     end
 

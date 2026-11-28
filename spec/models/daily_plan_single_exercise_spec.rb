@@ -68,4 +68,74 @@ RSpec.describe DailyPlan, "one initial exercise" do
     expect(described_class.size_for(user).reduction?).to be(false)
     expect(described_class.size_for(user).brake?).to be(false)
   end
+
+  context "when the regular pair includes an unselected weekend bug hunt" do
+    let(:trap) { BugHuntGotchas.find("rb_memo_falsy") }
+
+    around { |example| travel_to(Time.zone.local(2026, 11, 7, 9)) { example.run } }
+
+    before do
+      pin_code_review_mode(:bug_hunt)
+      allow(BugHuntGotchas).to receive(:pick).and_return(trap)
+    end
+
+    def weekend_plan(active: true)
+      context = PracticeGeneration.capture(user, date: Date.current).merge(active: active)
+      described_class.for(user, language: "ruby_rails", schedule_context: context)
+    end
+
+    it "selects a hostable Pattern retry ahead of equally served regular kinds" do
+      user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails", tier: :standard,
+        practice_requests: { "pattern" => { "mode" => "normal_retry", "source_response_id" => 17,
+          "requested_at" => "2026-11-06T12:00:00.123456Z" } })
+
+      plan = weekend_plan
+
+      expect(plan.kinds).to eq([ ExerciseSection::Pattern ])
+      expect(plan.code_review_gotcha).to be_nil
+      expect(plan.assignments.fetch("pattern")).to include(concept: trap.concept, mode: "normal_retry")
+    end
+
+    it "selects an eligible retention host without excluding the unselected trap" do
+      user.update!(daily_section_kinds: %w[code_review architecture])
+      due = user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails", tier: :standard,
+        mastered_at: 1.month.ago, retention_interval_days: 7, next_retention_check_on: Date.yesterday)
+
+      plan = weekend_plan
+
+      expect(plan.code_review_gotcha).to be_nil
+      expect(plan.due_checks).to eq([ due ])
+      expect(plan.assignments.values).to include(include(concept: trap.concept, reason: "retention"))
+      expect(due.reload.next_retention_check_on).to eq(Date.yesterday)
+    end
+
+    it "selects an eligible drill host without excluding the unselected trap" do
+      user.update!(daily_section_kinds: %w[code_review architecture])
+      mastery = user.concept_masteries.create!(concept: trap.concept, language: "ruby_rails", tier: :standard,
+        drilled_at: Time.current)
+
+      plan = weekend_plan
+
+      expect(plan.code_review_gotcha).to be_nil
+      expect(plan.assignments.values).to include(include(concept: trap.concept, reason: "drill"))
+      expect(mastery.reload.drilled_at).to be_present
+    end
+
+    [ false, true ].each do |active|
+      it "retains ordinary reinforcement priority with protected scheduling #{active ? 'active' : 'inactive'}" do
+        user.update!(daily_section_kinds: %w[code_review architecture])
+        exercise = user.daily_exercises.create!(date: Date.yesterday, generated_at: 1.day.ago, language: "ruby_rails",
+          section_order: [ "code_review" ], problem_set: { "code_review" => { "concept" => trap.concept } })
+        user.daily_responses.create!(daily_exercise: exercise, date: exercise.date, submitted_at: 1.day.ago,
+          answers: { "code_review" => "The cached false value needs to be retained." },
+          section_ratings: { "code_review" => "too_hard" }, concept_tags: { "code_review" => trap.concept },
+          ai_review: { "code_review" => { "rating" => "developing" } })
+
+        plan = weekend_plan(active: active)
+
+        expect(plan.code_review_gotcha).to be_nil
+        expect(plan.reinforcement).to include(include(concept: trap.concept, bucket: "ruby_rails"))
+      end
+    end
+  end
 end

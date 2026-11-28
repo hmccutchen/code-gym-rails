@@ -9,7 +9,7 @@ RSpec.describe FakeService, "Authentic PR Review" do
 
   it "delivers, judges and grades both cases with the same public task and zero paid tokens" do
     plan = DailyPlan.for(user, language: "ruby_rails").with(
-      code_review_mode: :pr_review, code_review_files: :multi, code_review_source: nil, code_review_gotcha: nil
+      selected_kinds: [ kind ], code_review_mode: :pr_review, code_review_files: :multi, code_review_source: nil, code_review_gotcha: nil
     )
     artifacts = %w[acceptable flawed].map.with_index do |target, index|
       allow(DailyPlan).to receive(:for).and_return(plan.with(pr_review_target: target))

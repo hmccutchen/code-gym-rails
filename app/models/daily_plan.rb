@@ -65,7 +65,7 @@ class DailyPlan
     hosts_for        = lambda do |kinds, featured = featured_concept|
       DayHosts.new(language, mode: code_review_mode, gotcha: day_gotcha(trap, kinds), featured_concept: featured)
     end
-    hosts            = hosts_for.call(daily)
+    hosts            = hosts_for.call([])
     due              = user.concepts_due_for_retention_check_in(due_buckets(user, language))
     context = schedule_context || { active: false, note: {}, replacing_id: nil }
     selection, hosts = single_selection(user, daily, preferences, history, due, hosts, context, hosts_for)

@@ -234,13 +234,14 @@ RSpec.describe "ApiKeys", type: :request do
       expect(response.body).to include(KindPreferences::MULTIPLIERS.to_json)
     end
 
-    it "distinguishes skipping from protected ordering and ordinary frequency" do
+    it "distinguishes optional skipping from one-exercise recommendation ordering" do
       login_as(user)
 
       get setup_path
 
-      expect(response.body).to include("equal shares of scheduled variety turns", "Frequency sliders only break ties in the initial order")
-      expect(response.body).to include("places that still rotate use frequency weights", "Fixed chosen sections stay chosen")
+      expect(response.body).to include("Each new session starts with one exercise", "Your regular sections guide recommendations")
+      expect(response.body).to include("Frequency helps choose between eligible kinds with similar practice needs and recent use")
+      expect(response.body).to include("Skipping removes an optional kind from recommendations", "Your regular sections remain eligible")
       expect(response.body).to include("Skip means never")
     end
 
@@ -324,7 +325,7 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
       expect(first_cards.size).to eq(2)
       first_cards.each { |card| expect(card.css(".hint")).to be_empty }
-      expect(first_cards.sum { |card| card.css(".card-note").count { |note| note.ancestors(".daily-sections-choice").empty? } }).to eq(10)
+      expect(first_cards.sum { |card| card.css(".card-note").size }).to eq(9)
       preview_status = first_cards.last.at_css('[data-profile-preferences-target="trackPanel"][hidden] .card-note[role="status"]')
       expect(preview_status["data-profile-preferences-target"]).to eq("trackStatus")
       expect(preview_status.text).to be_empty
@@ -452,7 +453,7 @@ RSpec.describe "ApiKeys", type: :request do
       get setup_path
 
       text = Nokogiri::HTML(response.body).at_css("#exercise-mix").text
-      expect(text).to include("Skip means never", "Skipping can change which group fills those places.")
+      expect(text).to include("Skip means never", "Skipping removes an optional kind from recommendations.")
       expect(text).to include("will not appear again until you turn Skip off.")
       expect(text).not_to include("turn it back on")
       expect(text).not_to include("Exclude")
