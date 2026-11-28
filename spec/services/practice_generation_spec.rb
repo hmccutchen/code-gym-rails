@@ -209,7 +209,7 @@ RSpec.describe PracticeGeneration do
       previous = described_class.commit_new(user, context: context, judged: first_judged,
         language: "ruby_rails", drafted_by: service).exercise
       note = previous.practice_schedule
-      expect(note.fetch("version")).to eq(2)
+      expect(note.fetch("version")).to eq(3)
       expect(note.dig("continuation", "kind_service")).not_to be_empty
       if failure == :provider_failure
         allow_any_instance_of(FakeService).to receive(:generate_problem_set).and_raise(ProviderError, "Draft failed")

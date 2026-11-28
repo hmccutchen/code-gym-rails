@@ -228,7 +228,9 @@ scenario strings, without a response requirement, raw answers or answer keys.
 ## `#recent_exercise_history`
 
 Rotation reads delivered plus dropped scheduled kinds, never responses.
-`before:` defaults to today.
+`before:` defaults to today. The optional `language:` filter runs before the
+history limit; single-exercise planning uses it to seed service for the generated
+language. Other callers retain the unfiltered projection.
 
 The old separate completion reader is retired. `CompetencyGate::Evidence`
 projects basic core completion independently of strict results, without drop

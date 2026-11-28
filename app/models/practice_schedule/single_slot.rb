@@ -14,8 +14,8 @@ class PracticeSchedule::SingleSlot
     original = @previous.fetch("selected_kinds", []).map { |key| ExerciseSection.for(key) }
     kind = @replacing && original.one? && pool.include?(original.first) ? original.first : choose(pool)
     sequence = @replacing ? [ @sequence, 1 ].max : @sequence + 1
-    @continuation["kind_service"][kind.key] = sequence unless @replacing
-    note = { "version" => 2, "policy" => 2, "sequence" => sequence,
+    (@continuation["kind_service"][@hosts.language] ||= {})[kind.key] = sequence unless @replacing
+    note = { "version" => 3, "policy" => 2, "sequence" => sequence,
       "initial_ready" => !!(@previous["initial_ready"] || @evidence.fetch(:initial_reviewed_sets) >= PracticeSchedule::Turns::INITIAL_REVIEWED_SETS),
       "regular_kinds" => @daily.map(&:key), "selected_kinds" => [ kind.key ],
       "assignments" => {}, "continuation" => @continuation }
@@ -26,20 +26,33 @@ class PracticeSchedule::SingleSlot
   private
 
   def continuation
-    return @previous.fetch("continuation").deep_dup if @previous["version"] == 2
+    service = @previous["version"] == 3 ? @previous.dig("continuation", "service") : legacy_service
+    kinds = @previous["version"] == 3 ? @previous.dig("continuation", "kind_service").deep_dup : {}
+    kinds[@hosts.language] ||= historical_service unless @replacing && @previous["version"] == 3
+    { "kind_service" => kinds, "service" => service.deep_dup }
+  end
 
+  def legacy_service
     service = @previous.dig("continuation", "service") || {}
-    kind_service = {}
-    @history.each_with_index do |entry, index|
-      entry.delivered_section_keys.each { |key| kind_service[key] ||= [ @sequence - index, 0 ].max }
+    DailyExercise::LANGUAGES.to_h do |language|
+      records = service.to_h do |kind, record|
+        concepts = record.fetch("concepts").select { |entry| entry["bucket"] == ConceptBucket.for(kind, language) }
+        [ kind, { "last_lane" => nil, "last_maintenance" => nil, "concepts" => concepts } ]
+      end
+      [ language, records ]
     end
-    { "kind_service" => kind_service, "service" => service.deep_dup }
+  end
+
+  def historical_service
+    @history.each_with_index.with_object({}) do |(entry, index), service|
+      entry.delivered_section_keys.each { |key| service[key] ||= [ @sequence - index, 0 ].max }
+    end
   end
 
   def choose(pool)
     raise ArgumentError, "No eligible practice kind" if pool.empty?
 
-    groups = pool.group_by { |kind| [ @continuation["kind_service"].fetch(kind.key, 0), priority(kind), @daily.include?(kind) ? 0 : 1 ] }
+    groups = pool.group_by { |kind| [ @continuation["kind_service"].fetch(@hosts.language, {}).fetch(kind.key, 0), priority(kind), @daily.include?(kind) ? 0 : 1 ] }
     candidates = groups.fetch(groups.keys.min)
     WeightedRoll.pick(candidates.index_with { |kind| @daily.include?(kind) ? KindPreferences::DEFAULT_MULTIPLIER : @preferences.multiplier_for(kind) })
   end

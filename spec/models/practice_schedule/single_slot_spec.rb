@@ -18,7 +18,7 @@ RSpec.describe PracticeSchedule::SingleSlot do
     turns = (pool.size * 3).times.map do
       selected = plan(previous: previous, facts: facts)
       expect(selected.kinds.size).to eq(1)
-      expect(selected.notes).to include("version" => 2, "policy" => 2)
+      expect(selected.notes).to include("version" => 3, "policy" => 2)
       previous = selected.notes
       selected.kinds.sole
     end
@@ -62,7 +62,7 @@ RSpec.describe PracticeSchedule::SingleSlot do
 
   it "keeps fourth siblings unavailable when a fourth is a regular preference" do
     selected = plan(pair: [ ExerciseSection::CodeReview, ExerciseSection::PlanReview ])
-    expect(selected.notes.fetch("continuation").fetch("kind_service").keys & %w[ambiguity_hunt pseudocode_to_code]).to be_empty
+    expect(selected.notes.fetch("continuation").fetch("kind_service").fetch("ruby_rails").keys & %w[ambiguity_hunt pseudocode_to_code]).to be_empty
   end
 
   it "retains valid prior practice service when translating format one" do
@@ -71,13 +71,13 @@ RSpec.describe PracticeSchedule::SingleSlot do
     legacy["continuation"]["service"] = { "pattern" => { "last_lane" => "maintenance", "last_maintenance" => "retention", "concepts" => [] } }
     selected = plan(previous: legacy)
     expect(selected.notes["sequence"]).to eq(legacy["sequence"] + 1)
-    expect(selected.notes.dig("continuation", "service", "pattern")).to eq(legacy.dig("continuation", "service", "pattern"))
+    expect(selected.notes.dig("continuation", "service", "ruby_rails", "pattern")).to eq({ "last_lane" => nil, "last_maintenance" => nil, "concepts" => [] })
     expect(selected.notes["continuation"].keys).to match_array(%w[kind_service service])
   end
   it "does not credit dropped historical sections or mutate captured notes" do
     history = [ ExerciseHistoryEntry.new(section_keys: %w[code_review pattern], delivered_section_keys: %w[code_review], dropped: %w[pattern]) ]
     selected = plan(history: history)
-    expect(selected.notes.dig("continuation", "kind_service", "code_review")).to eq(1)
+    expect(selected.notes.dig("continuation", "kind_service", "ruby_rails", "code_review")).to eq(1)
     previous = selected.notes.deep_dup
     plan(previous: selected.notes)
     expect(selected.notes).to eq(previous)
@@ -112,7 +112,7 @@ RSpec.describe PracticeSchedule::SingleSlot do
     expect(plan(prefs: prefs, history: history).kinds).to eq([ optional.last ])
   end
 
-  it "translates a format-one replacement without advancing sequence or assignment service" do
+  it "translates a format-one replacement without advancing sequence or guessing lane language" do
     legacy = PracticeSchedule.plan(context: nil, count: 2, setting: 2, daily: daily,
       preferences: preferences, evidence: evidence, hosts: hosts, rotation_history: [], due: [], drills: []).notes
     legacy["continuation"]["service"] = { "pattern" => { "last_lane" => "maintenance", "last_maintenance" => "drill", "concepts" => [] } }
@@ -120,10 +120,10 @@ RSpec.describe PracticeSchedule::SingleSlot do
     selected = plan(previous: legacy, replacing: true)
 
     expect(selected.kinds.size).to eq(1)
-    expect(selected.notes["version"]).to eq(2)
+    expect(selected.notes["version"]).to eq(3)
     expect(selected.notes["sequence"]).to eq(legacy["sequence"])
-    expect(selected.notes.dig("continuation", "service")).to eq(legacy.dig("continuation", "service"))
-    expect(selected.notes.dig("continuation", "kind_service")).to eq({})
+    expect(selected.notes.dig("continuation", "service", "ruby_rails", "pattern")).to eq({ "last_lane" => nil, "last_maintenance" => nil, "concepts" => [] })
+    expect(selected.notes.dig("continuation", "kind_service")).to eq({ "ruby_rails" => {} })
   end
 
   it "gives a weekend bug hunt no core retention or practice assignment" do
@@ -135,7 +135,7 @@ RSpec.describe PracticeSchedule::SingleSlot do
 
     expect(selected.kinds).to eq([ ExerciseSection::CodeReview ])
     expect(selected.assignments).to eq({})
-    expect(selected.notes.dig("continuation", "service")).to eq({})
+    expect(selected.notes.dig("continuation", "service", "ruby_rails")).to eq({})
   end
 
   it "assigns only the current language bucket's hostable obligation" do
@@ -146,5 +146,39 @@ RSpec.describe PracticeSchedule::SingleSlot do
       due: [ { concept: "memoization", bucket: "ruby_rails", overdue_ratio: 3 } ])
 
     expect(selected.assignments.fetch("code_review")).to include(concept: "closures", bucket: "javascript", reason: "support")
+  end
+
+  it "preserves both languages when switching and regenerating a format-three set" do
+    ruby = plan
+    javascript = plan(previous: ruby.notes, host: DayHosts.new("javascript", mode: :application_code))
+    again = plan(previous: javascript.notes)
+    expect(javascript.notes.dig("continuation", "kind_service", "ruby_rails")).to eq(ruby.notes.dig("continuation", "kind_service", "ruby_rails"))
+    expect(again.notes.dig("continuation", "kind_service", "javascript")).to eq(javascript.notes.dig("continuation", "kind_service", "javascript"))
+    replacement = plan(previous: javascript.notes, host: DayHosts.new("javascript", mode: :application_code), replacing: true)
+    expect(replacement.notes.slice("sequence", "continuation")).to eq(javascript.notes.slice("sequence", "continuation"))
+  end
+
+  it "translates format two without assigning global kind or lane service to a language" do
+    legacy = { "version" => 2, "policy" => 2, "sequence" => 4, "initial_ready" => true,
+      "regular_kinds" => daily.map(&:key), "selected_kinds" => [ "code_review" ], "assignments" => {},
+      "continuation" => { "kind_service" => { "code_review" => 4 }, "service" => {
+        "code_review" => { "last_lane" => "practice", "last_maintenance" => "retention", "concepts" => [
+          { "concept" => "memoization", "bucket" => "ruby_rails", "sequence" => 2 },
+          { "concept" => "closures", "bucket" => "javascript", "sequence" => 4 }
+        ] },
+        "architecture" => { "last_lane" => "practice", "last_maintenance" => nil, "concepts" => [
+          { "concept" => "sync_vs_async", "bucket" => "architecture", "sequence" => 3 }
+        ] }
+      } } }
+    translated = plan(previous: legacy, replacing: true).notes
+    expect(translated["sequence"]).to eq(4)
+    expect(translated.dig("continuation", "kind_service")).to eq("ruby_rails" => {})
+    %w[ruby_rails javascript].each do |language|
+      service = translated.dig("continuation", "service", language)
+      expect(service.fetch("code_review")).to include("last_lane" => nil, "last_maintenance" => nil)
+      expect(service.dig("code_review", "concepts").pluck("bucket")).to eq([ language ])
+      expect(service.dig("architecture", "concepts")).to eq(legacy.dig("continuation", "service", "architecture", "concepts"))
+    end
+    expect(legacy.dig("continuation", "service", "code_review", "last_lane")).to eq("practice")
   end
 end

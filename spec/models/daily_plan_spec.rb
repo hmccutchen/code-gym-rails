@@ -1184,10 +1184,13 @@ RSpec.describe DailyPlan, "protected weekend variety hosts" do
     expect(mastery.reload.practice_requests).to eq(requests)
     if replacing
       expect(plan.practice_schedule["sequence"]).to eq(previous["sequence"])
-      expect(plan.practice_schedule.dig("continuation", "service")).to eq(previous.dig("continuation", "service"))
+      previous.dig("continuation", "service").each do |key, service|
+        expect(plan.practice_schedule.dig("continuation", "service", "ruby_rails", key)).to eq(
+          "last_lane" => nil, "last_maintenance" => nil, "concepts" => service.fetch("concepts"))
+      end
     else
       expect(plan.practice_schedule["sequence"]).to eq(previous.fetch("sequence") + 1)
-      expect(plan.practice_schedule.dig("continuation", "kind_service", replacement)).to eq(plan.practice_schedule["sequence"])
+      expect(plan.practice_schedule.dig("continuation", "kind_service", "ruby_rails", replacement)).to eq(plan.practice_schedule["sequence"])
     end
     plan
   end
@@ -1201,7 +1204,9 @@ RSpec.describe DailyPlan, "protected weekend variety hosts" do
       expect(plan.assignments).to eq({})
       expect(plan.due_checks + plan.fourth_due_checks).to be_empty
       expect(plan.waiting_checks).to include(a_hash_including(concept: trap.concept, reason: :no_host))
-      expect(plan.practice_schedule.dig("continuation", "service")).to eq(note.dig("continuation", "service"))
+      expect(plan.practice_schedule.dig("continuation", "service", "ruby_rails")).to eq(
+        "pattern" => { "last_lane" => nil, "last_maintenance" => nil,
+          "concepts" => note.dig("continuation", "service", "pattern", "concepts") })
     end
   end
 

@@ -398,8 +398,9 @@ class User < ApplicationRecord
   end
   private :history_concept
 
-  def recent_exercise_history(limit:, before: Date.current)
-    daily_exercises
+  def recent_exercise_history(limit:, before: Date.current, language: nil)
+    exercises = language ? daily_exercises.where(language: language) : daily_exercises
+    exercises
       .where(date: ...before)
       .order(date: :desc)
       .limit(limit)

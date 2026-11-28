@@ -152,10 +152,10 @@ RSpec.describe "Protected practice on PostgreSQL", type: :model do
       exercise = user.daily_exercises.sole
       expect(exercise.practice_schedule["sequence"]).to eq(1)
       if single
-        expect(exercise.practice_schedule["version"]).to eq(2)
+        expect(exercise.practice_schedule["version"]).to eq(3)
         expect(exercise.section_order.size).to eq(1)
         expect(exercise.problem_set.keys).to eq(exercise.section_order)
-        expect(exercise.practice_schedule.dig("continuation", "kind_service")).to eq(exercise.section_order.sole => 1)
+        expect(exercise.practice_schedule.dig("continuation", "kind_service", "ruby_rails")).to eq(exercise.section_order.sole => 1)
       end
     ensure
       threads&.size&.times { release << true }

@@ -11,6 +11,11 @@ RSpec.describe GeminiCapacityProbe, type: :model do
   let(:posted) { [] }
   let(:refuse_after) { nil }
 
+  before do
+    allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+      .and_return(ExerciseSection::CodeReview)
+  end
+
   after { FileUtils.remove_entry(output_dir) }
 
   def reply(text)
@@ -46,20 +51,20 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     records = probe(max_days: 1).run
 
     expect(records.map(&:step)).to eq([
-      "draft", "judge code_review", "judge design_comparison",
-      "review (2 grading + difficulty) [1]", "review (2 grading + difficulty) [2]", "review (2 grading + difficulty) [3]",
+      "draft", "judge code_review",
+      "review (1 grading + difficulty) [1]", "review (1 grading + difficulty) [2]",
       "reference n_plus_one", "duck turn 1", "duck turn 2", "duck turn 3"
     ])
     expect(records.size).to eq(described_class.calls_per_day)
     expect(records).to all(have_attributes(status: 200, input_tokens: 120, output_tokens: 40, thought_tokens: 10, error: nil))
     expect(posted.first["model"]).to eq(GeminiService::DEFAULT_ROUTE[:model])
     expect(posted.map { |body| body["model"] }.uniq).to eq([ GeminiService::DEFAULT_ROUTE[:model] ])
-    expect(sleeps).to eq([ 15, 15, 45, 45, 15, 15, 15 ])
+    expect(sleeps).to eq([ 15, 30, 30, 15, 15, 15 ])
     expect(zones.uniq).to eq([ "America/New_York" ])
-    expect(out.string).to include("Tokens per completed tester-day: {1=>1700}").and include("Largest single request: 120 input tokens")
+    expect(out.string).to include("Tokens per completed tester-day: {1=>1360}").and include("Largest single request: 120 input tokens")
   end
 
-  # The review sends three calls at once, so pacing must wait around fan-outs to stay under 5 RPM.
+  # The review sends two calls at once, so pacing must wait around fan-outs to stay under 5 RPM.
   it "keeps every rolling minute within five requests at the default pace" do
     records = probe(max_days: 1).run
 
@@ -110,7 +115,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
         posted << body
         case posted.size
         when 1 then [ 200, {}, reply(fake.send(:call, AiService.request_for(purpose_for(body["system_instruction"]), system: body["system_instruction"], prompt: body["input"]))[:text]) ]
-        when 5 then [ 400, {}, key_invalid_body ]
+        when 4 then [ 400, {}, key_invalid_body ]
         else [ 503, {}, "<html>down</html>" ]
         end
       end
@@ -120,11 +125,11 @@ RSpec.describe GeminiCapacityProbe, type: :model do
 
     captures = Dir[File.join(output_dir, "*.json")].sort
     expect(captures.count { |path| path.end_with?("-400.json") }).to eq(1)
-    expect(captures.count { |path| path.end_with?("-503.json") }).to eq(4)
+    expect(captures.count { |path| path.end_with?("-503.json") }).to eq(2)
     rejected = File.read(captures.find { |path| path.end_with?("-400.json") })
     expect(rejected).to include("omitted")
     expect(rejected).not_to include("AIzaProbe")
-    expect(posted.size).to eq(6)
+    expect(posted.size).to eq(4)
     expect(out.string).to include("Stopped before any 429: Gemini refused the key.")
   end
 
@@ -175,12 +180,91 @@ RSpec.describe GeminiCapacityProbe, type: :model do
     expect(probe.send(:quota_violation, { "error" => { "details" => [] } })).to eq({})
   end
 
-  it "plans a two-section day without changing the stored setting" do
+  it "plans one initial exercise without changing the in-memory or stored setting" do
     user.update!(daily_section_count: 4)
     probe(max_days: 1).run
 
+    expect(user.daily_section_count).to eq(4)
     expect(user.reload.daily_section_count).to eq(4)
-    expect(posted.first["input"]).to include("code_review").and include("design_comparison")
+    expect(posted.first["input"]).to include('"code_review"')
+    expect(posted.first["input"]).not_to include('"design_comparison"')
+  end
+
+  it "judges, reviews, references and discusses a selected kind outside the regular pair" do
+    plan = DailyPlan.for(user, language: "ruby_rails").with(selected_kinds: [ ExerciseSection::Architecture ])
+    allow(DailyPlan).to receive(:for).and_return(plan)
+    runner = probe(max_days: 1)
+    service = runner.send(:service)
+    allow(service).to receive(:review_sections).and_call_original
+    allow(service).to receive(:generate_concept_reference).and_call_original
+    allow(service).to receive(:duck_response).and_call_original
+
+    records = runner.run
+
+    expect(records.size).to eq(described_class.calls_per_day)
+    expect(records.map(&:step)).to include("judge architecture", "review (1 grading + difficulty) [1]")
+    expect(service).to have_received(:review_sections).with(user,
+      have_attributes(section_order: [ "architecture" ], active_section_keys: [ "architecture" ]), anything, sections: [ "architecture" ])
+    expect(service).to have_received(:generate_concept_reference).with(user,
+      FakeService::EXERCISE_PROBLEM_SET.dig("architecture", "concept"), "architecture")
+    expect(service).to have_received(:duck_response).with(user,
+      have_attributes(section_order: [ "architecture" ], active_section_keys: [ "architecture" ]),
+      section: "architecture", message: anything, thread: anything).exactly(described_class::DUCK_TURNS).times
+    expect(records).to all(have_attributes(status: 200, error: nil))
+    expect(out.string).to include("Tokens per completed tester-day: {1=>1360}")
+  end
+
+  it "includes translation for a selected kind without persisting the exercise or response" do
+    kind = ExerciseSection::PseudocodeToCode
+    plan = DailyPlan.for(user, language: "ruby_rails").with(selected_kinds: [ kind ])
+    allow(DailyPlan).to receive(:for).and_return(plan)
+    runner = probe(max_days: 1)
+    reviewed_response = nil
+    allow(runner.send(:service)).to receive(:review_sections).and_wrap_original do |original, *args, **options|
+      reviewed_response = args.last
+      original.call(*args, **options)
+    end
+
+    records = runner.run
+
+    expect([ ApiUsage.count, DailyExercise.count, DailyResponse.count, ConceptReference.count, SuggestedConcept.count ]).to eq([ 0, 0, 0, 0, 0 ])
+    expect(reviewed_response).to be_new_record
+    expect(reviewed_response).to be_translated(kind.key)
+    expect(records.size).to eq(described_class.calls_per_day(kinds: [ kind ]))
+    expect(records.size).to eq(9)
+    expect(out.string).to include("planned 9 requests for pseudocode_to_code")
+    expect(sleeps).to eq([ 15, 45, 45, 15, 15, 15 ])
+    expect(records).to all(have_attributes(status: 200, error: nil))
+    expect(out.string).to include("Tokens per completed tester-day: {1=>1530}")
+  end
+
+  it "counts a completed day when the final duck step records multiple HTTP replies" do
+    runner = probe(max_days: 1)
+    allow(runner.send(:service)).to receive(:duck_response).and_wrap_original do |original, *args, **options|
+      original.call(*args, **options) if options.fetch(:thread).size == (described_class::DUCK_TURNS - 1) * 2
+      original.call(*args, **options)
+    end
+
+    records = runner.run
+
+    expect(records.last.step).to eq("duck turn 3 [2]")
+    expect(records.size).to eq(described_class.calls_per_day + 1)
+    expect(out.string).to include("Tokens per completed tester-day: {1=>1530}")
+  end
+
+  it "omits a day whose final duck request receives no reply" do
+    runner = probe(max_days: 1)
+    allow(runner.send(:service)).to receive(:duck_response).and_wrap_original do |original, *args, **options|
+      if options.fetch(:thread).size == (described_class::DUCK_TURNS - 1) * 2
+        raise ProviderError, "No final reply"
+      end
+      original.call(*args, **options)
+    end
+
+    records = runner.run
+
+    expect(records.last).to have_attributes(step: "duck turn 3", sent: false, status: nil)
+    expect(out.string).to include("Tokens per completed tester-day: {}")
   end
 
   context "when the provider refuses partway through the second day" do
@@ -196,7 +280,7 @@ RSpec.describe GeminiCapacityProbe, type: :model do
       expect(records.size).to eq(13)
       expect(out.string).to include("First 429 on request 13: per-day limit (quotaId=GenerateRequestsPerDayPerProjectPerModel-FreeTier, quotaValue=20).")
       expect(out.string).to include("Tester-days per quota day: 2.")
-      expect(out.string).to include("Tokens per completed tester-day: {1=>1700}")
+      expect(out.string).to include("Tokens per completed tester-day: {1=>1360}")
 
       captures = Dir[File.join(output_dir, "*-429.json")]
       expect(captures.size).to eq(1)
@@ -209,13 +293,24 @@ RSpec.describe GeminiCapacityProbe, type: :model do
   end
 
   context "when the 429 lands inside the review fan-out, which raises nothing of its own" do
-    let(:refuse_after) { 4 }
+    let(:refuse_after) { 2 }
 
     it "still stops the run" do
       records = probe.run
 
       expect(records.count(&:rate_limited?)).to be >= 1
       expect(records.map(&:step)).not_to include(a_string_starting_with("reference"))
+    end
+  end
+
+  context "when the draft itself is refused" do
+    let(:refuse_after) { 0 }
+
+    it "does not invent a per-kind quota-day estimate" do
+      records = probe.run
+
+      expect(records.map(&:step)).to eq([ "draft" ])
+      expect(out.string).to include("Tester-days per quota day: unknown (no completed draft).")
     end
   end
 

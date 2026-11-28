@@ -74,3 +74,7 @@ A weekday rolls `CODE_REVIEW_MODE_WEIGHTS`, which holds no `bug_hunt`. A weekend
 ## `.code_review_gotcha_for`
 
 A `bug_hunt` day picks its trap from `BugHuntGotchas` here, never-seen-first from `plan_notes["bug_hunt"]`, and `Result#notes` writes the id back there. The trap is picked once, on every `bug_hunt` roll, and `.day_gotcha` attaches it only to a version of the day whose plan includes a `code_review` section; a plan without one records none. `.for` uses the same selection to build the final `DayHosts` and attach the trap to the result, which keeps the planner, prompt, and ladders consistent. `BugHuntGotchas.last_seen_for` counts a day only when its stored `code_review` section has a `purpose`, so a section the judge or ingest dropped never counts as seen. It doesn't depend on the concept tracks, since a `bug_hunt` section serves no reinforcement entry or retention check. A `bug_hunt` day is also single-file without rolling: `ExerciseSection::CodeReview.multi_file_mode?` says so.
+
+Kind service and assignment service are scoped to the generated language.
+Delivered history is filtered by that language before its count window.
+This preserves opportunities when a mixed-language learner alternates languages.

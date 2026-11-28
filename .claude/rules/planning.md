@@ -39,7 +39,8 @@ paths:
 
 New sessions start with one selected kind. `DaySize.initial` supplies the
 size without replaying the competency gate. `PracticeSchedule::SingleSlot`
-chooses a host from eligible kinds using delivered history, outstanding
+chooses a host from eligible kinds using generated-language service and
+language-filtered delivered history, outstanding
 needs and kind preferences. Coverage never creates an extra slot.
 [Single initial exercise](../../docs/decisions/single-initial-exercise.md)
 records the policy and rollout order.
@@ -47,7 +48,8 @@ records the policy and rollout order.
 Protected-practice enrollment follows its existing rollout gate.
 Inactive accounts use delivered history and keep their existing concept
 guidance without writing a schedule note. Enrolled accounts keep durable
-continuation, with the format-1 cadence available for historical rows
+format-3 continuation for kind and assignment service by generated language,
+with strict format-1 and format-2 readers available for historical rows
 ([Protected practice opportunities](../../docs/decisions/protected-practice-opportunities.md)).
 Capture under the user lock and validate again at commit.
 

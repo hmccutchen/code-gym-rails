@@ -56,7 +56,7 @@ class DailyPlan
 
   def self.for(user, language:, featured_concept: nil, weekend: Date.current.on_weekend?, schedule_context: nil) # rubocop:disable Metrics/MethodLength
     weekend = schedule_context.fetch(:date).on_weekend? if schedule_context
-    history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK)
+    history          = user.recent_exercise_history(limit: SectionRotation::LOOKBACK, language: language)
     size             = schedule_context ? size_for(user, before: schedule_context.fetch(:date)) : size_for(user)
     preferences      = KindPreferences.for(user)
     daily            = DailyKinds.for(user)

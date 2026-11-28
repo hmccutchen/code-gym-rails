@@ -2862,10 +2862,13 @@ RSpec.describe AiService do
     end
 
     it "sends the generation call with the long generation budget" do
-      svc = double_class.new(canned_text: full_problem_set.to_json)
+      allow(WeightedRoll).to receive(:pick).with(DailyKinds::DEFAULT.index_with { KindPreferences::DEFAULT_MULTIPLIER })
+        .and_return(ExerciseSection::CodeReview)
+      svc = double_class.new(canned_text: FakeService::EXERCISE_PROBLEM_SET.slice("code_review").to_json)
       ExerciseDraft.call(user, language: user.language_for_today, provider: svc.exercise_draft_provider)
 
       expect(svc.last_read_timeout).to eq(CallProfiles::GENERATION_READ_TIMEOUT)
+      expect(double_class.read_timeouts_by_purpose).to eq([ [ "generate_exercise", CallProfiles::GENERATION_READ_TIMEOUT ] ])
     end
 
     it "computes the worst-case wait for whichever read timeout it is given" do

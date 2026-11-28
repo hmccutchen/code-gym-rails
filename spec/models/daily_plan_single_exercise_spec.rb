@@ -43,7 +43,7 @@ RSpec.describe DailyPlan, "one initial exercise" do
     active = described_class.for(user, language: "ruby_rails", schedule_context: context)
     inactive = described_class.for(user, language: "ruby_rails", schedule_context: context.merge(active: false))
 
-    expect(active.practice_schedule).to include("version" => 2, "selected_kinds" => active.kinds.map(&:key))
+    expect(active.practice_schedule).to include("version" => 3, "selected_kinds" => active.kinds.map(&:key))
     expect(inactive.kinds.size).to eq(1)
     expect(inactive.practice_schedule).to be_nil
     expect(inactive.assignments).to be_empty

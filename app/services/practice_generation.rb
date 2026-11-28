@@ -96,7 +96,7 @@ class PracticeGeneration
   end
 
   def section_order(note)
-    return ExerciseSection.resolved_keys(@judged.problem_set, daily: DailyKinds.recorded(@judged.plan_notes)) unless note&.fetch("version") == 2
+    return ExerciseSection.resolved_keys(@judged.problem_set, daily: DailyKinds.recorded(@judged.plan_notes)) unless note && [ 2, 3 ].include?(note.fetch("version"))
 
     selected = note.fetch("selected_kinds")
     raise ArgumentError, "Generated sections do not match the selected exercise" unless selected.one? && @judged.problem_set.keys.sort == selected.sort
@@ -119,7 +119,7 @@ class PracticeGeneration
     return notes.except("practice_schedule") if original.empty?
 
     changed = notes.fetch("practice_schedule")
-    return notes if changed.fetch("version") == 2
+    return notes if [ 2, 3 ].include?(changed.fetch("version"))
 
     notes["practice_schedule"] = PracticeSchedule::Note.decode(changed.merge(
       original.slice("sequence", "phase", "regular_kinds", "initial_ready", "continuation")))
