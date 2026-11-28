@@ -33,7 +33,7 @@ RSpec.describe "The queue each job runs on" do
 
   it "finds the job classes, the provider jobs among them and an environment block to check" do
     expect(job_classes).to include(GenerateDailyExercisesJob, EnqueueDueGenerationsJob, SendPushReminderJob, SweepDuckThreadsJob)
-    expect(provider_job_classes).to contain_exactly(GenerateDailyExercisesJob, RegenerateExerciseJob,
+    expect(provider_job_classes).to contain_exactly(GenerateDailyExercisesJob, RegenerateExerciseJob, GenerateAdditionalExerciseJob,
                                                     GenerateConceptReferenceJob, GenerateRecognitionGuideJob, ExtractLearnerItemsJob)
     expect(worker_environments.keys).to include("production", "development", "test")
   end

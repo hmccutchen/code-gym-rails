@@ -1,0 +1,46 @@
+<% component_stylesheet "exercise_addition" %>
+<% available = ExerciseAddition.available_kinds(current_user, exercise).map(&:key) %>
+<div data-controller="exercise-addition"
+     data-action="focus@window->exercise-addition#present visibilitychange@document->exercise-addition#present"
+     data-exercise-addition-url-value="<%= exercise_additions_path %>"
+     data-exercise-addition-pending-value="<%= exercise.addition_pending? %>"
+     data-exercise-addition-working-value="<%= t("exercise_additions.working") %>"
+     data-exercise-addition-failed-value="<%= t("exercise_additions.failed") %>"
+     data-exercise-addition-added-value="<%= t("exercise_additions.added") %>"
+     data-exercise-addition-unreachable-value="<%= t("exercise_additions.unreachable") %>">
+  <button type="button" class="btn btn-secondary" data-exercise-addition-target="trigger"
+          data-action="exercise-addition#open" aria-haspopup="dialog" <%= "hidden" if available.empty? %>><%= t("exercise_additions.trigger") %></button>
+  <p role="status" aria-live="polite" data-exercise-addition-target="status"></p>
+  <dialog class="daily-kind-sheet" aria-labelledby="exercise-addition-title" data-exercise-addition-target="sheet"
+          data-action="cancel->exercise-addition#escape click->exercise-addition#backdrop pointerdown->exercise-addition#press">
+    <div class="daily-kind-sheet-body">
+      <div class="daily-kind-sheet-header">
+        <h2 id="exercise-addition-title"><%= t("exercise_additions.title") %></h2>
+        <button type="button" class="daily-kind-close" aria-label="<%= t("daily_kinds.picker.close") %>"
+                data-action="exercise-addition#close">×</button>
+      </div>
+      <div class="daily-kind-choosing"><div class="daily-kind-list">
+      <fieldset class="daily-kind-picker" data-action="change->exercise-addition#choose">
+        <legend class="visually-hidden"><%= t("exercise_additions.title") %></legend>
+        <% ExerciseSection.all.each do |kind| %>
+          <label class="daily-kind-option" data-exercise-addition-target="option" data-kind="<%= kind.key %>"
+                 data-name="<%= t("sections.#{kind.key}.name") %>" <%= "hidden" unless available.include?(kind.key) %>>
+            <span class="daily-kind-option-name">
+              <input type="radio" name="addition_kind" value="<%= kind.key %>" form="exercise-addition-options"
+                     aria-describedby="addition-<%= kind.key %>-description">
+              <span class="daily-kind-name"><%= t("sections.#{kind.key}.name") %></span>
+            </span>
+            <span class="daily-kind-line" id="addition-<%= kind.key %>-description"><%= SectionKindGuide.for(kind.key)[:short] %></span>
+          </label>
+        <% end %>
+      </fieldset>
+      </div></div>
+      <p role="status" data-exercise-addition-target="error"></p>
+      <div class="daily-kind-sheet-footer">
+        <button type="button" class="btn btn-secondary" data-action="exercise-addition#close"><%= t("daily_kinds.picker.close") %></button>
+        <button type="button" class="btn btn-primary" disabled data-exercise-addition-target="confirm"
+                data-action="exercise-addition#confirm"><%= t("exercise_additions.confirm") %></button>
+      </div>
+    </div>
+  </dialog>
+</div>

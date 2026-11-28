@@ -5,6 +5,7 @@
   </div>
 <% end %>
 <% submitted = response.persisted? && response.submitted? %>
+<% unless submitted %><form id="exercise-addition-options" hidden></form><% end %>
 <% if @daily_kind_pickers.present? %>
   <%# Owns the swap radios, which sit inside #gym-form but must never post with the day's answers. %>
   <form id="daily-kind-swap" hidden></form>
@@ -40,6 +41,7 @@
        data-answer-form-answered-sections-value="<%= response.answered_sections.to_json %>"
        data-answer-form-submit-blocker-value="<%= submit_blocker %>"
        data-answer-form-draft-scope-value="<%= exercise.draft_scope %>"
+       data-answer-form-manifest-revision-value="<%= exercise.manifest_revision %>"
        data-answer-form-draft-token-value="<%= response.draft_token %>"
        data-answer-form-answered-count-value="<%= t("dashboard.exercise.answered_count") %>"
        data-answer-form-all-answered-value="<%= t("dashboard.exercise.all_answered") %>"
@@ -65,7 +67,10 @@
       <%= form_with url: responses_path, method: :post, id: "gym-form",
             data: { turbo: false, answer_form_target: "form",
                     action: "submit->answer-form#submit input->answer-form#input change->answer-form#change click->answer-form#rate" } do %>
-        <%= render "responses/sections", exercise: exercise, response: response, submitted: false, pickers: @daily_kind_pickers %>
+        <div data-answer-form-target="sections">
+          <%= render "responses/sections", exercise: exercise, response: response, submitted: false, pickers: @daily_kind_pickers %>
+        </div>
+        <%= render "exercise_additions/picker", exercise: exercise %>
 
         <% if exercise.dropped_sections.any? %>
           <p class="hint"><%= t("dashboard.section_left_out", count: exercise.dropped_sections.size) %></p>

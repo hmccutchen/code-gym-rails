@@ -141,3 +141,8 @@ The client applies the response for its latest edit and keeps guidance
 preparation disabled until pending saves finish. Preparing guidance is
 optional: difficulty targets already apply without it, and the action writes
 concept-specific difficulty descriptions for future generation, not a new set.
+
+ExerciseAddition uses its existing UUID, status and claimed_at fields for Add.
+Queued/running status blocks conflicting set mutations until advisory-locked
+recovery or completion. DailyExercise.manifest_revision is active manifest
+length. See [On-demand additions](../../docs/decisions/on-demand-exercise-additions.md).

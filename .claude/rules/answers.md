@@ -1,5 +1,9 @@
 ---
 paths:
+  - "app/controllers/exercise_additions_controller.rb"
+  - "app/views/exercise_additions/**"
+  - "app/javascript/controllers/exercise_addition_controller.js"
+  - "spec/**/*exercise_addition*"
   - "app/controllers/{responses,dashboard,daily_exercises}_controller.rb"
   - "app/controllers/concerns/current_set_lookup.rb"
   - "app/models/stale_set_notice.rb"
@@ -145,3 +149,9 @@ read it before changing that area.
   reorderable with Ctrl+↑/↓ (bare ↑/↓ moves focus), with an `aria-live` status
   line announcing each move — that keyboard path, not the arrows, is what keeps
   the section answerable without a mouse.
+
+Add preserves draft scope and increases the manifest revision. New submits
+require both; old-tab partial autosaves remain valid. Active additions block
+submit/reset/regeneration, with advisory-locked recovery before row locks.
+Missing cards are inserted without replacing existing inputs. See
+[On-demand additions](../../docs/decisions/on-demand-exercise-additions.md).

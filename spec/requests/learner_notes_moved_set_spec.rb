@@ -30,7 +30,7 @@ RSpec.describe "Learner notes on a held set that an autosave moved", type: :requ
     expect(held.reload.date).to eq(Date.current)
 
     post responses_path, params: { response: { draft_scope: scope, answers: { code_review: "It loads per row." },
-                                               section_ratings: { code_review: "right_level" }, submit: "1" } }, as: :json
+                                               section_ratings: { code_review: "right_level" }, manifest_revision: held.manifest_revision, submit: "1" } }, as: :json
     expect(response.parsed_body).to include("submitted" => true)
 
     allow_any_instance_of(AiService).to receive(:extract_learner_items) do |_service, _user, day:, buckets:, **|

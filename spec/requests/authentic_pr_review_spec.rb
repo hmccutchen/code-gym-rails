@@ -25,7 +25,7 @@ RSpec.describe "Authentic PR Review", type: :request do
     expect(response.body).not_to include(section.dig("answer_key", "reason"))
     post responses_path, params: { response: {
       answers: { code_review: "Approve. The caller forwards the service outcome, including an unavailable result." },
-      section_ratings: { code_review: "right_level" }, submit: "1"
+      section_ratings: { code_review: "right_level" }, draft_scope: exercise.draft_scope, manifest_revision: exercise.manifest_revision, submit: "1"
     } }, as: :json
     saved = exercise.daily_response
     expect(saved).to be_submitted

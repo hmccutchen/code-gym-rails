@@ -32,7 +32,7 @@ RSpec.describe "Responses", type: :request do
 
     it "keeps retries idempotent and supplies the original review URL" do
       submitted_at = saved_response.submitted_at
-      post responses_path, params: stale_payload.deep_merge(response: { submit: "1" }), as: :json
+      post responses_path, params: stale_payload.deep_merge(response: { **submission_metadata, submit: "1" }), as: :json
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["review_url"]).to eq(review_response_path(saved_response))
@@ -119,7 +119,7 @@ RSpec.describe "Responses", type: :request do
 
     it "finalizes merged answers once and cannot restore discarded evidence with a stale save or retry" do
       post responses_path, params: { response: {
-        answers: { pattern: "" }, submit: "1"
+        answers: { pattern: "" }, **submission_metadata, submit: "1"
       } }, as: :json
       saved = user.daily_responses.sole
       expect(saved.answers).to eq("code_review" => "An answer to keep", "pattern" => "")
@@ -131,7 +131,7 @@ RSpec.describe "Responses", type: :request do
       expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
 
       expect {
-        post responses_path, params: draft_payload.deep_merge(response: { submit: "1" }), as: :json
+        post responses_path, params: draft_payload.deep_merge(response: { **submission_metadata, submit: "1" }), as: :json
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
       expect(response.parsed_body).to include("submitted" => true, "review_url" => review_response_path(saved))
       expect(saved.reload.attributes.slice(*evidence.keys)).to eq(evidence)
@@ -157,7 +157,7 @@ RSpec.describe "Responses", type: :request do
         tier: :standard, streak: 2, last_rating: "strong", mastered_at: 30.days.ago,
         retention_interval_days: 7, next_retention_check_on: Date.current)
       knowledge = skipped.attributes.except("next_retention_check_on", "updated_at")
-      post responses_path, params: { response: { answers: { pattern: "" }, submit: "1" } }, as: :json
+      post responses_path, params: { response: { answers: { pattern: "" }, **submission_metadata, submit: "1" } }, as: :json
       saved = user.daily_responses.sole
       saved.update!(ai_review: { "code_review" => { "rating" => "strong" }, "pattern" => { "rating" => "beginner" } })
 
@@ -172,6 +172,11 @@ RSpec.describe "Responses", type: :request do
         { key: "code_review", concept: "n_plus_one", self_rating: "right_level", ai_rating: "strong" }
       ])
     end
+  end
+
+  def submission_metadata
+    exercise = user.daily_exercises.find_by!(date: Date.current)
+    { draft_scope: exercise.draft_scope, manifest_revision: exercise.manifest_revision }
   end
 
   def create_exercise(problem_set)
@@ -262,7 +267,7 @@ RSpec.describe "Responses", type: :request do
 
       post responses_path,
            params: { response: { answers: { "parsons_problem" => "order:0,1,2" },
-                                 section_ratings: { "parsons_problem" => "right_level" }, submit: "1" } },
+                                 section_ratings: { "parsons_problem" => "right_level" }, **submission_metadata, submit: "1" } },
            as: :json
 
       expect(response).to have_http_status(:conflict)
@@ -294,7 +299,7 @@ RSpec.describe "Responses", type: :request do
 
     def save_with_scope(scope, submit: false)
       body = { answers: { "code_review" => answer }, draft_scope: scope }
-      body.merge!(section_ratings: { "code_review" => "right_level" }, submit: "1") if submit
+      body.merge!(section_ratings: { "code_review" => "right_level" }, manifest_revision: exercise.manifest_revision, submit: "1") if submit
       post responses_path, params: { response: body }, as: :json
     end
 
@@ -454,7 +459,7 @@ RSpec.describe "Responses", type: :request do
       create_exercise("code_review" => pr_review, "pattern" => { "question" => "q", "concept" => "n_plus_one" })
       post responses_path, params: { response: {
         answers: { code_review: "a" * 20, pattern: "b" * 20 },
-        section_ratings: { code_review: "right_level", pattern: "right_level" }, submit: "1"
+        section_ratings: { code_review: "right_level", pattern: "right_level" }, **submission_metadata, submit: "1"
       } }, as: :json
 
       saved = user.daily_responses.sole
@@ -464,7 +469,7 @@ RSpec.describe "Responses", type: :request do
       travel_to(1.day.from_now) do
         create_exercise("code_review" => pr_review)
         post responses_path, params: { response: {
-          answers: { code_review: "c" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1"
+          answers: { code_review: "c" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1"
         } }, as: :json
 
         expect(user.daily_responses.find_by!(date: Date.current)).to have_attributes(
@@ -613,7 +618,7 @@ RSpec.describe "Responses", type: :request do
       expect(DailyResponse.count).to eq(1)
 
       post responses_path,
-        params: { response: { answers: { code_review: "b" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
+        params: { response: { answers: { code_review: "b" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(response).to have_http_status(:ok)
@@ -644,7 +649,7 @@ RSpec.describe "Responses", type: :request do
           } }, as: :json
           expect(user.daily_responses.sole.section_ratings).to include("pattern" => "too_hard")
 
-          post responses_path, params: { response: { submit: "1" } }, as: :json
+          post responses_path, params: { response: { **submission_metadata, submit: "1" } }, as: :json
 
           expect(response).to have_http_status(:ok)
           expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level")
@@ -653,7 +658,7 @@ RSpec.describe "Responses", type: :request do
 
       it "keeps the rating at submission when an answer becomes a short one" do
         post responses_path, params: { response: { answers: { code_review: "A substantive answer", pattern: "N+1 query" } } }, as: :json
-        post responses_path, params: { response: { submit: "1" } }, as: :json
+        post responses_path, params: { response: { **submission_metadata, submit: "1" } }, as: :json
 
         expect(response).to have_http_status(:ok)
         expect(user.daily_responses.sole.section_ratings).to eq("code_review" => "right_level", "pattern" => "too_hard")
@@ -661,7 +666,7 @@ RSpec.describe "Responses", type: :request do
 
       it "uses the merged answers and ratings when submitting a partial payload" do
         post responses_path, params: { response: {
-          answers: { pattern: "" }, section_ratings: { code_review: "too_easy" }, submit: "1"
+          answers: { pattern: "" }, section_ratings: { code_review: "too_easy" }, **submission_metadata, submit: "1"
         } }, as: :json
 
         saved = user.daily_responses.sole
@@ -674,7 +679,7 @@ RSpec.describe "Responses", type: :request do
         draft.update!(answers: draft.answers.merge("challenge" => "An old substantive answer"),
                       section_ratings: draft.section_ratings.merge("challenge" => "too_hard"))
 
-        post responses_path, params: { response: { submit: "1" } }, as: :json
+        post responses_path, params: { response: { **submission_metadata, submit: "1" } }, as: :json
 
         expect(draft.reload.section_ratings.keys).to match_array(exercise.active_section_keys)
         expect(draft.answers.keys).to match_array(exercise.active_section_keys)
@@ -713,7 +718,7 @@ RSpec.describe "Responses", type: :request do
 
     it "refuses a submit that answers nothing, saving nothing and enqueuing nothing" do
       expect {
-        post responses_path, params: { response: { answers: { code_review: "   " }, submit: "1" } }, as: :json
+        post responses_path, params: { response: { answers: { code_review: "   " }, **submission_metadata, submit: "1" } }, as: :json
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
 
       expect(response).to have_http_status(:unprocessable_content)
@@ -726,7 +731,7 @@ RSpec.describe "Responses", type: :request do
       post responses_path, params: { response: { answers: { code_review: "A substantive answer" } } }, as: :json
       draft = user.daily_responses.sole.attributes
 
-      post responses_path, params: { response: { answers: { pattern: "Another substantive answer" }, submit: "1" } }, as: :json
+      post responses_path, params: { response: { answers: { pattern: "Another substantive answer" }, **submission_metadata, submit: "1" } }, as: :json
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to include("error" => "Rate each section you answered to finish up.",
@@ -736,7 +741,7 @@ RSpec.describe "Responses", type: :request do
 
     it "accepts the same submit once every answered section is rated" do
       post responses_path, params: { response: {
-        answers: { code_review: "A substantive answer" }, section_ratings: { code_review: "right_level" }, submit: "1"
+        answers: { code_review: "A substantive answer" }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1"
       } }, as: :json
 
       expect(response).to have_http_status(:ok)
@@ -1108,7 +1113,7 @@ RSpec.describe "Responses", type: :request do
         "challenge" => { "title" => "t", "question" => "q", "concept" => "n_plus_one" }
       )
       post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
+        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
     end
 
@@ -1132,7 +1137,7 @@ RSpec.describe "Responses", type: :request do
 
       expect {
         post responses_path,
-          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
+          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "service_objects", language: "ruby_rails", user_id: user.id)
@@ -1175,7 +1180,7 @@ RSpec.describe "Responses", type: :request do
       )
       expect {
         post responses_path,
-          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
+          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.not_to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "other", language: "ruby_rails", user_id: user.id)
@@ -1190,7 +1195,7 @@ RSpec.describe "Responses", type: :request do
 
       expect {
         post responses_path,
-          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
+          params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "service_boundaries", language: "architecture", user_id: user.id)
@@ -1209,7 +1214,7 @@ RSpec.describe "Responses", type: :request do
 
       expect {
         post responses_path,
-          params: { response: { answers: { security_review: "a" * 20 }, section_ratings: { security_review: "right_level" }, submit: "1" } }.to_json,
+          params: { response: { answers: { security_review: "a" * 20 }, section_ratings: { security_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
           headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
       }.to have_enqueued_job(GenerateConceptReferenceJob)
         .with(concept: "sql_injection_prevention", language: "ruby_rails", user_id: user.id)
@@ -1228,7 +1233,7 @@ RSpec.describe "Responses", type: :request do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s", "concept" => "n_plus_one" })
 
       post responses_path,
-        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }.to_json,
+        params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
       expect(JSON.parse(response.body)["review_url"]).to eq(review_response_path(DailyResponse.last))
@@ -1247,7 +1252,7 @@ RSpec.describe "Responses", type: :request do
     it "redirects a native (no-JS) final submit back to the dashboard" do
       create_exercise("code_review" => { "question" => "q", "snippet" => "s" })
 
-      post responses_path, params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, submit: "1" } }
+      post responses_path, params: { response: { answers: { code_review: "a" * 20 }, section_ratings: { code_review: "right_level" }, **submission_metadata, submit: "1" } }
 
       expect(response).to redirect_to(root_path)
     end
@@ -1577,7 +1582,7 @@ RSpec.describe "Responses", type: :request do
         params: { response: {
           answers: { code_review: "a" * 20, pattern: "b" * 20, security_review: "c" * 20 },
           section_ratings: { code_review: "right_level", pattern: "right_level", security_review: "right_level" },
-          submit: "1"
+          **submission_metadata, submit: "1"
         } }.to_json,
         headers: { "Content-Type" => "application/json", "Accept" => "application/json" }
 
@@ -1922,7 +1927,7 @@ RSpec.describe "Responses", type: :request do
         response: {
           answers: exercise.problem_set.keys.index_with { "a substantive answer here" },
           section_ratings: exercise.problem_set.keys.index_with { "right_level" },
-          submit: "1"
+          **submission_metadata, submit: "1"
         }
       }, as: :json
 

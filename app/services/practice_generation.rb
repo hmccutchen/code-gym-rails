@@ -27,6 +27,14 @@ class PracticeGeneration
     new(user, context, judged, drafted_by).commit_replacement(exercise, claim)
   end
 
+  def self.capture_addition(user, addition:, claim:)
+    Addition.capture(user, addition: addition, claim: claim)
+  end
+
+  def self.commit_append(user, addition:, claim:, context:, judged:, drafted_by:)
+    Addition.new(user, context, judged, drafted_by).commit(addition, claim)
+  end
+
   def self.freeze_context(value)
     case value
     when Hash then value.each { |key, entry| freeze_context(key); freeze_context(entry) }
@@ -63,6 +71,7 @@ class PracticeGeneration
         next outcome(:superseded, exercise) unless exercise.user_id == fresh.id &&
           exercise.regenerating_since == claim && exercise.id == @context.fetch(:replacing_id) &&
           exercise.date == @context.fetch(:date) && current?(fresh, active: active, replacement: true)
+        next outcome(:superseded, exercise) if exercise.exercise_additions.active.exists?
         next outcome(response.replace_blocker, exercise) if response&.replace_blocker
 
         response&.destroy!

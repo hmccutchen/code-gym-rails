@@ -97,6 +97,10 @@ class DailyExercise < ApplicationRecord
     recorded_section_order || ExerciseSection.resolved_keys(problem_set, daily: daily_kinds)
   end
 
+  def manifest_revision = active_section_keys.size
+
+  def addition_pending? = exercise_additions.active.exists?
+
   def adaptation_section_keys
     return [] unless problem_set.is_a?(Hash) && plan_notes.is_a?(Hash)
 
@@ -143,6 +147,7 @@ class DailyExercise < ApplicationRecord
         next :reviewed if blocker == :reviewed
         next :not_today unless response.date == Date.current
         next :reviewing if blocker == :reviewing
+        next :addition_busy if addition_pending?
 
         validate_reset_notes!
         DuckThread.start_over!(self)
@@ -160,6 +165,7 @@ class DailyExercise < ApplicationRecord
 
       blocker = response&.replace_blocker
       next [ nil, blocker ] if blocker
+      next [ nil, :addition_busy ] if addition_pending?
 
       claim = claim_regenerating!(regenerated_at: nil)
       claim ? [ claim, nil ] : [ nil, :already_regenerated ]

@@ -73,6 +73,7 @@ Rails.application.routes.draw do
   patch "profile", to: "profile#update", as: :profile
   post "profile/track_preview", to: "profile#track_preview", as: :profile_track_preview
   patch "daily_kinds/:place", to: "daily_kinds#update", as: :daily_kind
+  resources :exercise_additions, only: [ :index, :create ]
 
   post "level_suggestion/dismissal", to: "level_suggestion_dismissals#create", as: :level_suggestion_dismissal
   post "level_suggestion/answer", to: "level_suggestion_answers#create", as: :level_suggestion_answer

@@ -20,9 +20,11 @@ class ResponsesController < ApplicationController
     exercise = current_set
     return reply_set_not_current unless exercise
 
+    ExerciseAdditionRequest.recover!(exercise) if submitting?
     outcome = save_answers_under_lock(exercise)
     return redirect_to(login_path, alert: t("flash.application.login_required")) if outcome == :deleted
     return render_stale_answers(**stale_set_banner(exercise)) if outcome == :stale
+    return render_addition_conflict(outcome, exercise) if %i[addition_busy manifest_changed].include?(outcome)
 
     if outcome == :newly_submitted
       GenerateConceptReferenceJob.queue_missing(current_user, exercise.concept_pairs)
@@ -56,11 +58,13 @@ class ResponsesController < ApplicationController
   # DELETE /responses/:id/start_over
   def start_over
     carry_held_set_forward_if_named
+    ExerciseAdditionRequest.recover!(@response.daily_exercise)
     outcome = @response.daily_exercise.start_over!(response_id: @response.id)
     case outcome
     when :reviewed then redirect_to root_path, alert: t("flash.responses.start_over_after_review")
     when :not_today then redirect_to root_path, alert: t("flash.responses.start_over_not_today")
     when :reviewing then redirect_to root_path, alert: t("flash.responses.start_over_while_reviewing")
+    when :addition_busy then redirect_to root_path, alert: t("flash.responses.start_over_while_adding")
     when :stale then render_stale_answers(t("flash.responses.start_over_stale"))
     when :cleared then redirect_to root_path, notice: t("flash.responses.answers_cleared")
     else raise ArgumentError, "Unhandled start-over outcome: #{outcome.inspect}"
@@ -182,6 +186,8 @@ class ResponsesController < ApplicationController
   def save_answers_under_lock(exercise)
     exercise.with_response_locked do |locked|
       next :stale if stale_draft_scope?(exercise) || stale_answer_sections(exercise).any?
+      refusal = submission_refusal(exercise, locked)
+      next refusal if refusal
 
       @response = locked || persisted_response_for(exercise).lock!
       newly_submitted = false
@@ -198,6 +204,27 @@ class ResponsesController < ApplicationController
     raise if User.exists?(current_user.id)
 
     :deleted
+  end
+
+  def submitting? = response_params[:submit] == "1"
+
+  def submission_refusal(exercise, response)
+    return unless submitting? && !response&.submitted?
+    return :stale unless response_params[:draft_scope].to_s == exercise.draft_scope
+    return :addition_busy if exercise.addition_pending?
+    :manifest_changed unless response_params[:manifest_revision].to_s == exercise.manifest_revision.to_s
+  end
+
+  def render_addition_conflict(outcome, exercise)
+    message = t("errors.responses.#{outcome}")
+    respond_to do |format|
+      format.json { render_json_error(message, status: :conflict, outcome: outcome.to_s, **manifest_state(exercise)) }
+      format.html { redirect_to root_path, alert: message }
+    end
+  end
+
+  def manifest_state(exercise)
+    { draft_scope: exercise.draft_scope, manifest_revision: exercise.manifest_revision }
   end
 
   def refuse_unsubmittable
@@ -240,7 +267,7 @@ class ResponsesController < ApplicationController
   end
 
   def submit_state
-    { answered_sections: @response.answered_sections, submit_blocker: @response.submit_blocker,
+    { **manifest_state(@response.daily_exercise), answered_sections: @response.answered_sections, submit_blocker: @response.submit_blocker,
       section_statuses: @response.section_keys.index_with { |key| helpers.section_status(@response, key) } }
   end
 
@@ -424,6 +451,7 @@ class ResponsesController < ApplicationController
     @response_params ||= params.require(:response).permit(
       :submit,
       :draft_scope,
+      :manifest_revision,
       answers: ExerciseSection.keys,
       section_ratings: ExerciseSection.keys
     )

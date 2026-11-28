@@ -1,4 +1,13 @@
 en:
+  exercise_additions:
+    trigger: "+ Add exercise"
+    title: "Choose an exercise"
+    confirm: "Add exercise"
+    working: "Preparing %{kind}…"
+    failed: "The exercise wasn't added. Choose Add exercise to try again."
+    added: "Exercise added."
+    unreachable: "Couldn't check your exercise. Try again when you're connected."
+    refused: "This exercise couldn't be added. Refresh the choices and try again."
   date:
     formats:
       long: "%B %-d, %Y"
@@ -254,6 +263,7 @@ en:
       no_changes: "No changes made."
       preferences_saved: "Preferences saved!"
     daily_exercises:
+      addition_in_progress: "Wait for the exercise to finish being added before regenerating."
       nothing_to_regenerate: "This set is no longer current, so it wasn't replaced."
       regenerate_stale: "This page was out of date, so nothing was replaced."
       generate_limited: "You've asked for a new set several times in the last hour. Try again later."
@@ -275,6 +285,7 @@ en:
       start_over_after_review: "This set has already been reviewed — nothing to start over."
       start_over_not_today: "You can only start over on today's set."
       start_over_while_reviewing: "A review is being generated for this — try again in a moment."
+      start_over_while_adding: "Wait for the exercise to finish being added before starting over."
       start_over_stale: "This page is out of date. Refresh it before starting over."
       start_over_failed: "Couldn't start over. Nothing was cleared."
       answers_cleared: "Today's answers have been cleared — start fresh whenever you're ready."
@@ -368,6 +379,8 @@ en:
     provider_calls_limited: "You've reached the limit on AI requests for now. Try again later."
     section_not_in_exercise: "That section isn't part of this exercise."
     responses:
+      addition_busy: "An exercise is still being added. Try submitting again when it finishes."
+      manifest_changed: "Your practice session has changed. Review the added exercise before submitting."
       alternates_used:
         one: "You've already asked for an alternate explanation here."
         other: "You've already asked for %{count} alternate explanations here."

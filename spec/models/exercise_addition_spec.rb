@@ -14,6 +14,24 @@ RSpec.describe ExerciseAddition, type: :model do
       date: set.date }.merge(overrides)
   end
 
+  it "offers only absent eligible kinds and preserves the single-fourth limit" do
+    user.update!(excluded_section_kinds: %w[challenge])
+    exercise.update!(section_order: %w[code_review plan_review],
+      problem_set: { "code_review" => {}, "plan_review" => {}, "parsons_problem" => {} })
+
+    kinds = described_class.available_kinds(user, exercise).map(&:key)
+
+    expect(kinds).to include("pattern", "design_comparison")
+    expect(kinds).not_to include("code_review", "plan_review", "ambiguity_hunt", "pseudocode_to_code", "parsons_problem", "challenge")
+  end
+
+  it "offers nothing once the committed manifest reaches capacity" do
+    keys = %w[code_review design_comparison pattern challenge]
+    exercise.update!(section_order: keys, problem_set: keys.index_with { {} })
+
+    expect(described_class.available_kinds(user, exercise)).to be_empty
+  end
+
   it "stores a queued request against its exercise" do
     attributes = attributes_for
     addition = described_class.create!(attributes)

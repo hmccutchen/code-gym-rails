@@ -3,10 +3,11 @@ class PracticeSchedule::SingleSlot
 
   def self.plan(**options) = new(**options).plan
 
-  def initialize(context:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false)
+  def initialize(context:, daily:, preferences:, evidence:, hosts:, rotation_history:, due:, drills:, replacing: false, requested_kind: nil)
     @previous = PracticeSchedule::Note.decode(context || {})
     @daily, @preferences, @evidence, @hosts = daily, preferences, evidence, hosts
     @history, @due, @drills, @replacing = rotation_history, due, drills, replacing
+    @requested_kind = requested_kind
     @sequence = @previous.fetch("sequence", @history.size)
     @continuation = continuation
   end
@@ -14,8 +15,12 @@ class PracticeSchedule::SingleSlot
   def plan
     pool = @preferences.offered(daily: @daily)
     original = @previous.fetch("selected_kinds", []).map { |key| ExerciseSection.for(key) }
-    kind = @replacing && original.one? && pool.include?(original.first) ? original.first : choose(pool)
-    sequence = @replacing ? [ @sequence, 1 ].max : @sequence + 1
+    kind = if @requested_kind
+      pool.find { |candidate| candidate.key == @requested_kind } || raise(ArgumentError, "Requested kind is not eligible")
+    else
+      @replacing && original.one? && pool.include?(original.first) ? original.first : choose(pool)
+    end
+    sequence = @replacing || @requested_kind ? [ @sequence, 1 ].max : @sequence + 1
     (@continuation["kind_service"][@hosts.language] ||= {})[kind.key] = sequence unless @replacing
     note = { "version" => 3, "policy" => 2, "sequence" => sequence,
       "initial_ready" => !!(@previous["initial_ready"] || @evidence.fetch(:initial_reviewed_sets) >= PracticeSchedule::Turns::INITIAL_REVIEWED_SETS),
