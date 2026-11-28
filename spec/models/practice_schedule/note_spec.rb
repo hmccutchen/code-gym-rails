@@ -34,3 +34,40 @@ RSpec.describe PracticeSchedule::Note do
     expect { described_class.decode(note) }.to raise_error(ArgumentError)
   end
 end
+
+RSpec.describe PracticeSchedule::Note, "language-aware continuation" do
+  let(:note) do
+    { "version" => 3, "policy" => 2, "sequence" => 4, "initial_ready" => true,
+      "regular_kinds" => %w[code_review design_comparison], "selected_kinds" => %w[pattern],
+      "assignments" => {}, "continuation" => { "kind_service" => {
+        "ruby_rails" => { "pattern" => 4 }, "javascript" => { "code_review" => 2 }
+      }, "service" => { "ruby_rails" => { "pattern" => {
+        "last_lane" => "practice", "last_maintenance" => nil,
+        "concepts" => [ { "concept" => "memoization", "bucket" => "ruby_rails", "sequence" => 4 } ]
+      } } } } }
+  end
+
+  it "reads independent generated-language service and returns an isolated copy" do
+    decoded = described_class.decode(note)
+    expect(decoded).to eq(note)
+    decoded["continuation"]["kind_service"]["ruby_rails"]["pattern"] = 1
+    expect(note.dig("continuation", "kind_service", "ruby_rails", "pattern")).to eq(4)
+  end
+
+  it "rejects assignment service without a generated-language namespace" do
+    malformed = note.deep_dup
+    malformed["continuation"]["service"] = note.dig("continuation", "service", "ruby_rails")
+    expect { described_class.decode(malformed) }.to raise_error(ArgumentError)
+  end
+
+  it "rejects unknown languages, legacy flat maps and impossible sequences" do
+    [ { "mixed" => {} }, { "other" => {} }, { "pattern" => 4 },
+      { "ruby_rails" => { "unknown" => 1 } }, { "javascript" => { "pattern" => 5 } },
+      { "ruby_rails" => { "pattern" => -1 } }, { "ruby_rails" => { "pattern" => 1.0 } },
+      { "ruby_rails" => [] } ].each do |service|
+      malformed = note.deep_dup
+      malformed["continuation"]["kind_service"] = service
+      expect { described_class.decode(malformed) }.to raise_error(ArgumentError)
+    end
+  end
+end

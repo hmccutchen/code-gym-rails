@@ -5,7 +5,7 @@ class PracticeSchedule::Note
 
   def self.decode(value)
     return {} if value == {}
-    return decode_single(value) if value.is_a?(Hash) && value["version"].eql?(2)
+    return decode_single(value) if value.is_a?(Hash) && [ 2, 3 ].any? { |version| value["version"].eql?(version) }
 
     keys!(value, FIELDS + (value.is_a?(Hash) && value.key?("omitted_kind") ? %w[omitted_kind] : []))
     invalid! unless value["version"].eql?(1) && value["policy"].eql?(2)
@@ -25,14 +25,28 @@ class PracticeSchedule::Note
     contents!(value)
     continuation = value["continuation"]
     keys!(continuation, %w[kind_service service])
-    kinds!(continuation["kind_service"].keys) if continuation["kind_service"].is_a?(Hash)
-    invalid! unless continuation["kind_service"].is_a?(Hash)
-    continuation["kind_service"].each_value do |sequence|
-      integer!(sequence)
-      invalid! if sequence > value["sequence"]
+    if value["version"] == 3
+      by_language!(continuation["kind_service"]) { |service| kind_service!(service, value["sequence"]) }
+      by_language!(continuation["service"]) { |service| service!(service, value["sequence"]) }
+    else
+      kind_service!(continuation["kind_service"], value["sequence"])
+      service!(continuation["service"], value["sequence"])
     end
-    service!(continuation["service"], value["sequence"])
     value.deep_dup
+  end
+
+  def self.by_language!(value)
+    invalid! unless value.is_a?(Hash) && (value.keys - DailyExercise::LANGUAGES).empty?
+    value.each_value { |service| yield service }
+  end
+
+  def self.kind_service!(value, sequence)
+    invalid! unless value.is_a?(Hash)
+    kinds!(value.keys)
+    value.each_value do |last_sequence|
+      integer!(last_sequence)
+      invalid! if last_sequence > sequence
+    end
   end
 
   def self.contents!(value)
@@ -105,5 +119,5 @@ class PracticeSchedule::Note
   def self.phase?(value) = value.is_a?(Integer) && (0...PracticeSchedule::Turns::CYCLE).cover?(value)
 
   def self.invalid! = raise ArgumentError, "Invalid practice schedule format"
-  private_class_method :decode_single, :contents!, :assignments!, :continuation!, :service!, :identity!, :kinds!, :keys!, :integer!, :phase?, :invalid!
+  private_class_method :decode_single, :by_language!, :kind_service!, :contents!, :assignments!, :continuation!, :service!, :identity!, :kinds!, :keys!, :integer!, :phase?, :invalid!
 end
