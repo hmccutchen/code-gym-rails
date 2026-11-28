@@ -234,8 +234,8 @@ language. Other callers retain the unfiltered projection.
 
 The old separate completion reader is retired. `CompetencyGate::Evidence`
 projects basic core completion independently of strict results, without drop
-credit. Planning reads earlier than today; `SizeForecast` passes the
-exercise date's next day so today's eligible evidence can enter.
+credit. Planning reads earlier than today. The submitted dashboard no longer
+forecasts adaptive set sizes; each new practice day starts with one exercise.
 
 ## `#concepts_needing_reinforcement`
 

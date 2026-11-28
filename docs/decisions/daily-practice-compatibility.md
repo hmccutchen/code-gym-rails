@@ -25,18 +25,36 @@ from PR0 (`87f57fb4`) by applying only the patches from `6f763795` and
 verify that the legacy generation and regeneration writers are unchanged
 and still write format 1. Record the resulting release revision and artifact.
 
-Deploy that reader artifact to both web and worker, verify both services
-can decode formats 1, 2 and 3, and retire every older process before
-releasing the PR1 single-exercise writers. Do not deploy `82bdbb63` with
+Deploy that reader artifact to both web and worker and verify both services
+can decode formats 1, 2 and 3. This is decoding compatibility only: the
+reader artifact retains legacy writers that cannot plan generation or
+regeneration from the new continuations. Do not deploy `82bdbb63` with
 its full ancestry for the reader stage: its ancestor `87a17c33` already
 enables format-2 writers, which PR0's format-1 readers cannot decode.
 The two patch SHAs identify reader changes, not the artifact to deploy.
 
-Once format-3 data exists, the functional writer release, or a compatible
-descendant, is the rollback floor. It supports both generation and
-regeneration against the new continuation. Keep manifest readers and
-account deletion coverage wherever those durable records exist.
-Rollout uses release order and adds no flag.
+Before any PR1 writer starts, stop admission of generation and regeneration
+from every source, including manual requests and cron. Stop or drain all
+legacy writers, including the reader-stage web and worker processes,
+replicas, one-off processes and in-flight provider calls. Verify that none
+can resume or commit after the new writers start. There must be no window
+with both legacy and PR1 writers running.
+
+Before admitting work again, verify the compatibility migrations have
+completed, both services see the manifest column and addition table, and
+processes that loaded pre-migration schema metadata have been restarted.
+Verify the functional release's generation and regeneration tests against
+formats 1, 2 and 3; passing reader decoding tests alone does not establish
+writer compatibility. Deploy the functional release to both web and worker
+and verify both run that artifact before resuming admission. This cutover
+temporarily makes generation and regeneration unavailable and adds no
+feature flag.
+
+After the first new-format note is committed, fix forward or roll back only
+to a compatible functional release that supports both generation and
+regeneration. The reader-only artifact is never a rollback target at that
+point. Do not delete or reset notes to permit a rollback. Keep manifest
+readers and account deletion coverage wherever those durable records exist.
 
 The earlier format-2 reader patch (`6f763795`) alone cannot decode format 3
 and is not a safe rollback after a format-3 writer has committed records.

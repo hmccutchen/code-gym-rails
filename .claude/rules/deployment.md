@@ -31,7 +31,7 @@ paths:
 
 ## Migrations
 
-- Daily practice ships its manifest and addition table with compatible readers before any feature writer emits those records. Verify web and worker are compatible and retire older processes before the writer release. See `docs/decisions/daily-practice-compatibility.md` for the format-2 writer rollback floor.
+- Daily practice ships its manifest and addition table with compatible readers before any feature writer emits those records. The reader artifact cannot generate or regenerate from new-format continuations. Before any new writer starts, stop manual and cron admission, stop or drain every legacy writer (including reader-stage web/worker, replicas, one-offs and in-flight provider calls), and verify none can resume. Verify migrations and loaded schema metadata, and deploy the functional artifact to both services before resuming admission. No mixed legacy/new writer window is allowed. After the first new-format note, fix forward or use a compatible functional rollback; never return to reader-only code or reset notes. See `docs/decisions/daily-practice-compatibility.md` for the preparation, test and cutover gates.
 
 - Protected practice has its own P-S/P-C/P-A gates. P-S #741 supplies the
   request column. P-C implements compatible writers with initiation false;

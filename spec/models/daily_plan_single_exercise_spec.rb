@@ -60,11 +60,7 @@ RSpec.describe DailyPlan, "one initial exercise" do
     expect(plan.reinforcement).to include(include(concept: "service_boundaries", bucket: "architecture"))
   end
 
-  it "does not forecast adaptive workload growth from the retired count policy" do
-    exercise = DailyExercise.new(date: Date.current, plan_notes: { "size" => 4, "size_reason" => "gate" },
-      problem_set: { "code_review" => {}, "design_comparison" => {} })
-
-    expect(SizeForecast.for(user, exercise)).to be_nil
+  it "does not apply adaptive workload reductions from the retired count policy" do
     expect(described_class.size_for(user).reduction?).to be(false)
     expect(described_class.size_for(user).brake?).to be(false)
   end

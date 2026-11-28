@@ -49,6 +49,34 @@ RSpec.describe DailyPlan do
   end
 
   describe "retention check selection" do
+    [ false, true ].each do |captured|
+      it "gives the single inactive host to an overdue check with #{captured ? 'an inactive capture' : 'no schedule context'}" do
+        pin_code_review_mode(:application_code)
+        reinforcement = %w[n_plus_one memoization].map do |concept|
+          { concept: concept, bucket: "ruby_rails", tier: "standard" }
+        end
+        allow(user).to receive(:concepts_needing_reinforcement).and_return(reinforcement)
+        check = user.concept_masteries.create!(concept: "transaction_safety", language: "ruby_rails", tier: :standard,
+          mastered_at: 6.months.ago, retention_interval_days: 7, next_retention_check_on: Date.yesterday)
+        context = { active: false, date: Date.current, note: {}, replacing_id: nil } if captured
+
+        ordinary = described_class.for(user, language: "ruby_rails", schedule_context: context)
+        expect(ordinary.kinds).to eq([ ExerciseSection::CodeReview ])
+        expect(ordinary.reinforcement).to eq([ reinforcement.first ])
+        expect(ordinary.due_checks).to be_empty
+
+        overdue_on = 6.months.ago.to_date
+        check.update!(next_retention_check_on: overdue_on)
+        overdue = described_class.for(user, language: "ruby_rails", schedule_context: context)
+
+        expect(overdue.kinds).to eq([ ExerciseSection::CodeReview ])
+        expect(overdue.reinforcement).to be_empty
+        expect(overdue.due_checks).to eq([ check ])
+        expect(overdue.practice_schedule).to be_nil
+        expect(check.reload.next_retention_check_on).to eq(overdue_on)
+      end
+    end
+
     it "releases the fourth slot after a skipped due check and leaves a not-yet-due repeat unchanged" do
       user.update!(daily_section_count: ExerciseSection::MAX_SECTIONS)
       pin_kind("plan_review")

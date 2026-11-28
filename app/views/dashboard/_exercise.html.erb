@@ -24,11 +24,6 @@
       <% if @note_box %>
         <%= render "shared/learner_note", **@note_box %>
       <% end %>
-      <% if @size_change&.direction == :larger %>
-        <p class="hint"><%= t("dashboard.size_change.larger") %></p>
-      <% elsif @size_change&.direction == :smaller %>
-        <p class="hint"><%= t("dashboard.size_change.smaller", count: @size_change.count) %></p>
-      <% end %>
       <% if @level_suggestion %>
         <%= render "dashboard/level_suggestion", proposal: @level_suggestion %>
       <% end %>

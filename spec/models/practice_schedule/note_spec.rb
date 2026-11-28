@@ -7,6 +7,18 @@ RSpec.describe PracticeSchedule::Note do
       "assignments" => {}, "continuation" => { "kind_service" => { "pattern" => 4 }, "service" => {} } }
   end
 
+  it "identifies only integer single-slot format versions" do
+    [ 2, 3 ].each do |version|
+      expect(described_class.single?(note.merge("version" => version))).to be(true)
+    end
+    [ 1, 2.0, 3.0, nil, 4, "2", "3" ].each do |version|
+      expect(described_class.single?(note.merge("version" => version))).to be(false)
+    end
+    [ nil, {}, [], 2 ].each do |value|
+      expect(described_class.single?(value)).to be(false)
+    end
+  end
+
   it "reads the single-slot continuation without legacy turn fields" do
     expect(described_class.decode(note)).to eq(note)
     expect(described_class.decode(note)).not_to equal(note)
@@ -58,6 +70,10 @@ RSpec.describe PracticeSchedule::Note, "language-aware continuation" do
     malformed = note.deep_dup
     malformed["continuation"]["service"] = note.dig("continuation", "service", "ruby_rails")
     expect { described_class.decode(malformed) }.to raise_error(ArgumentError)
+  end
+
+  it "rejects a non-integer version without accepting a single-slot schema" do
+    expect { described_class.decode(note.merge("version" => 3.0)) }.to raise_error(ArgumentError)
   end
 
   it "rejects unknown languages, legacy flat maps and impossible sequences" do

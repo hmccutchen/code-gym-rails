@@ -507,17 +507,17 @@ RSpec.describe User, type: :model do
       expect(CompetencyGate::Evidence.new(user).map { |day| day.completion.answered }).to eq([ 1 ])
     end
 
-    it "keeps plan size and forecast unchanged when a draft is edited" do
+    it "keeps plan size unchanged when a draft is edited" do
       3.times do |i|
         row = exercise_on(Date.current - i - 2, %w[code_review pattern], answers: { "code_review" => "x" })
         row.daily_response.update!(submitted_at: Time.current, ai_review: { "code_review" => { "rating" => "solid" } })
       end
       today = exercise_on(Date.current, %w[code_review pattern], answers: { "code_review" => "x" })
       today.update!(plan_notes: { "size" => 2, "size_reason" => "completion" })
-      before = [ DailyPlan.size_for(user), SizeForecast.for(user, today) ]
+      before = DailyPlan.size_for(user)
       today.daily_response.update!(answers: { "code_review" => "changed", "pattern" => "y" },
                                    section_ratings: { "pattern" => "too_hard" })
-      expect([ DailyPlan.size_for(user), SizeForecast.for(user, today) ]).to eq(before)
+      expect(DailyPlan.size_for(user)).to eq(before)
     end
 
     it "excludes today, which has had no chance to be answered" do

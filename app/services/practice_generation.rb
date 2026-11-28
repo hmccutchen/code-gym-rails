@@ -1,7 +1,7 @@
 # Design notes: docs/code-notes/app/services/practice_generation.md
 class PracticeGeneration
   Outcome = Data.define(:status, :exercise)
-  SETTINGS = %w[daily_section_count daily_section_kinds section_kind_preferences_version skill_level section_kind_levels locked_section_kinds section_kind_weights excluded_section_kinds].freeze
+  SETTINGS = %w[daily_section_kinds section_kind_preferences_version skill_level section_kind_levels locked_section_kinds section_kind_weights excluded_section_kinds].freeze
 
   def self.capture(user, date:, replacing: nil)
     User.transaction do
@@ -96,7 +96,7 @@ class PracticeGeneration
   end
 
   def section_order(note)
-    return ExerciseSection.resolved_keys(@judged.problem_set, daily: DailyKinds.recorded(@judged.plan_notes)) unless note && [ 2, 3 ].include?(note.fetch("version"))
+    return ExerciseSection.resolved_keys(@judged.problem_set, daily: DailyKinds.recorded(@judged.plan_notes)) unless PracticeSchedule::Note.single?(note)
 
     selected = note.fetch("selected_kinds")
     raise ArgumentError, "Generated sections do not match the selected exercise" unless selected.one? && @judged.problem_set.keys.sort == selected.sort
@@ -119,7 +119,7 @@ class PracticeGeneration
     return notes.except("practice_schedule") if original.empty?
 
     changed = notes.fetch("practice_schedule")
-    return notes if [ 2, 3 ].include?(changed.fetch("version"))
+    return notes if PracticeSchedule::Note.single?(changed)
 
     notes["practice_schedule"] = PracticeSchedule::Note.decode(changed.merge(
       original.slice("sequence", "phase", "regular_kinds", "initial_ready", "continuation")))

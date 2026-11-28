@@ -78,7 +78,6 @@ class DashboardController < ApplicationController
     return unless @response&.submitted?
 
     @level_suggestion = LevelSuggestion.for(current_user) if current_user.suggests_level_moves?
-    @size_change = SizeForecast.for(current_user, @exercise)
   end
 
   def load_learner_note_boxes

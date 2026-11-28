@@ -24,7 +24,6 @@ What each listed file does. Specs, migrations and the skills under `.claude/` ar
 - `app/models/competency_gate/kind_window.rb` — one kind's current-rung normal-grade and known-effort windows.
 - `app/models/competency_gate/capacity.rb` — full/skip runs and comfortable recovery at the fold's current count, without a second sizing decision.
 - `app/models/day_size.rb` — Supplies a count of one for new sets and interprets historical fixed and automatic sizes.
-- `app/models/size_forecast.rb` — `SizeForecast`: whether tomorrow's Automatic set will be larger, or smaller because of the brake, than today's planned one, for the submitted dashboard's size lines.
 - `app/models/competency_gate/evidence.rb` — uncapped user-scoped submitted/reviewed replay in cursor batches, projecting strict core results independently of basic core completion and recorded assignment/rung context.
 - `app/controllers/welcome_controller.rb` — the first-run experience question; choices save through `ProfileUpdate`.
 - `app/controllers/level_suggestion_dismissals_controller.rb` — records Not now and removed-kind cutoffs for the current user under the user-row lock, refusing a stale shown step with a 409, with a `dismissed` or `removed` event row for each kind whose cutoff moves forward.

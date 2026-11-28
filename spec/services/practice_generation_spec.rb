@@ -246,7 +246,21 @@ RSpec.describe PracticeGeneration do
     expect(user.daily_exercises.count).to eq(1)
   end
 
-  it "rejects count and baseline changes without overwriting them or buying another call" do
+  it "commits an in-flight draft after only the retired count changes" do
+    context = described_class.capture(user, date: Date.current)
+    draft = single_judged(context)
+    user.update!(daily_section_count: 2)
+
+    result = described_class.commit_new(user, context: context, judged: draft,
+      language: "ruby_rails", drafted_by: service)
+
+    expect(result.status).to eq(:saved)
+    expect(result.exercise.reload.problem_set).to eq(draft.problem_set)
+    expect(result.exercise.section_order).to eq(%w[pattern])
+    expect(user.reload.daily_section_count).to eq(2)
+  end
+
+  it "rejects baseline changes without overwriting them or buying another call" do
     context = described_class.capture(user, date: Date.current)
     user.update!(daily_section_count: 2, skill_level: "senior")
     expect(described_class.commit_new(user, context: context, judged: judged(context), language: "ruby_rails", drafted_by: service).status).to eq(:superseded)

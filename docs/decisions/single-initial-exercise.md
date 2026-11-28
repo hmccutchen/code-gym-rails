@@ -2,9 +2,11 @@
 
 Each new daily set starts with one engineering exercise. `DaySize.initial`
 supplies a count of one without consulting the competency gate. The Daily
-sections control is retired. Stored counts and profile validation remain for
-compatibility, and the historical competency gate, coverage and cadence remain
-available for interpreting older records.
+sections control is retired. Stored counts, profile validation and historical
+record readers remain for compatibility. Historical sets use their stored
+layout and schedule notes use the format-specific decoders described below.
+Cleanup of obsolete planning algorithms is tracked separately in
+[#862](https://github.com/hmccutchen/code-gym-rails/issues/862).
 
 The planner requests one kind from the provider and runs the existing judging
 and retry pipeline for it. A successful save writes one active key to
@@ -84,16 +86,22 @@ the continuation without spending service.
 
 Deploy the PR0 schema and compatible manifest readers first. Prepare the
 reader release from PR0 by applying only the reader patches `6f763795` and
-`82bdbb63`; verify its two-file reader/spec diff, passing reader specs and
-unchanged legacy format-1 writers. Deploy the resulting artifact to web
-and worker and retire every older process before releasing the PR1
-single-exercise writers. `82bdbb63` itself is not a reader-only release:
+`82bdbb63`. Its legacy writers remain unchanged: decoding formats 2 and 3
+does not make generation or regeneration compatible with those formats.
+`82bdbb63` itself is not a reader-only release:
 its ancestry already enables format-2 writers, which PR0 cannot read.
-The exact preparation and verification steps are in
+Before any PR1 writer starts, stop manual and cron admission of generation
+and regeneration, stop or drain every legacy writer including reader-stage
+web and worker processes, replicas, one-offs and in-flight provider calls,
+and verify none can resume. Deploy and verify the functional release on
+both web and worker before resuming admission. No legacy and new writers
+may overlap. This requires temporary generation and regeneration
+unavailability and introduces no feature flag. The schema, loaded metadata,
+format-1/2/3 writer-test and artifact verification gates are in
 [Daily practice compatibility](daily-practice-compatibility.md).
 
-Once format-3 notes exist, the rollback floor must retain
-compatible writers for both initial generation and regeneration. The
-reader-only release by itself is insufficient after that point. The earlier
-format-2 checkpoint cannot decode format 3 and is not a compatible rollback. Rollout
-uses release ordering and introduces no new flags.
+After the first new-format note is committed, fix forward or roll back only
+to a compatible functional release supporting both initial generation and
+regeneration. Never roll back to the reader-only release or delete or reset
+notes to permit a rollback. The earlier format-2 checkpoint cannot decode
+format 3 and is not a compatible rollback.

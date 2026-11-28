@@ -3,9 +3,13 @@ class PracticeSchedule::Note
   REASONS = (ConceptMastery::PracticePolicy::MODES + %w[reinforcement retention drill]).freeze
   ADJUSTMENTS = (%w[normal] + ConceptMastery::PracticePolicy::MODES).freeze
 
+  def self.single?(value)
+    value.is_a?(Hash) && [ 2, 3 ].any? { |version| value["version"].eql?(version) }
+  end
+
   def self.decode(value)
     return {} if value == {}
-    return decode_single(value) if value.is_a?(Hash) && [ 2, 3 ].any? { |version| value["version"].eql?(version) }
+    return decode_single(value) if single?(value)
 
     keys!(value, FIELDS + (value.is_a?(Hash) && value.key?("omitted_kind") ? %w[omitted_kind] : []))
     invalid! unless value["version"].eql?(1) && value["policy"].eql?(2)

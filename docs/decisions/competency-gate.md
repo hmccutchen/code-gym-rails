@@ -146,12 +146,9 @@ change. Historical setting changes during absent kinds cannot be recovered.
 
 ## Presentation, rollout and limitations
 
-`SizeForecast` includes today's evidence using `exercise.date.next_day`.
-Its baseline is the greater of valid base assignment and delivered core
-volume, excluding supplementary work and undelivered coverage. Actual
-completion or overload reductions use: “Your next automatic set will have
-%{count} sections to leave more room for practice.” The larger line is
-unchanged. No hold badge, mastery tier or browser rule is added.
+The former submitted-dashboard forecast and adaptive-size copy are retired.
+Each new practice day starts with one exercise, so historical gate evidence
+does not produce a promise of larger or smaller daily sets.
 
 `[set_size]` reports count, reason, setting and the gate's safety hold,
 per-kind normal dates/successes, effort observations/safeguard, capacity,
